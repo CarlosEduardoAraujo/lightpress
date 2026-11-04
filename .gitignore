@@ -1,0 +1,20 @@
+# Arquivos e pastas ignoradas pelo Git
+storage/staging/*
+!storage/staging/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+storage/migration/*
+!storage/migration/.gitkeep
+
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Configurações com credenciais locais
+config.local.php
+.env
+
+# Logs e arquivos do sistema
+*.log
+.DS_Store
+Thumbs.db
+Desktop.ini
