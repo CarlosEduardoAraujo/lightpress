@@ -85,6 +85,23 @@ use LightPress\Core\Seo;
         .content-body ul, .content-body ol { margin: 1rem 0 1.5rem 1.5rem; }
         .content-body li { margin-bottom: 0.5rem; }
         .content-body a { color: var(--primary-accent); text-decoration: underline; }
+        
+        /* Campo de Busca no Cabeçalho */
+        .nav-search-input {
+            padding: 0.35rem 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            background: var(--bg);
+            color: var(--text);
+            width: 160px;
+            outline: none;
+            transition: width 0.2s ease, border-color 0.2s ease;
+        }
+        .nav-search-input:focus {
+            width: 220px;
+            border-color: var(--primary-accent);
+        }
     </style>
 </head>
 <body>
@@ -93,7 +110,7 @@ use LightPress\Core\Seo;
             <a href="/" class="brand">Speed<span>Press</span></a>
             <nav style="display: flex; align-items: center; gap: 1.5rem;">
                 <form action="/busca" method="GET" style="display: flex; align-items: center;">
-                    <input type="text" name="q" placeholder="Buscar notícias..." value="<?= Security::e($_GET['q'] ?? '') ?>" style="padding: 0.35rem 0.85rem; border: 1px solid var(--border); border-radius: 20px; font-size: 0.85rem; background: var(--bg); color: var(--text); width: 160px; outline: none; transition: width 0.2s;" onfocus="this.style.width='220px'" onblur="if(!this.value) this.style.width='160px'">
+                    <input type="text" name="q" placeholder="Buscar notícias..." value="<?= Security::e($_GET['q'] ?? '') ?>" class="nav-search-input" aria-label="Buscar notícias">
                 </form>
                 <ul class="nav-links">
                     <li><a href="/">Início</a></li>
