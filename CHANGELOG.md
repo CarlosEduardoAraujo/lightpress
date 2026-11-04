@@ -28,7 +28,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
-- **Arquitetura, Governança e CI/CD:**
+- **Editor de Notícias com Suporte a Rich Text e Colar do Google Docs / Word:**
+  - Área visual de edição com suporte a colar direto de editores de texto externos (Google Docs, Microsoft Word, LibreOffice), eliminando estilos proprietários sujos (`MsoNormal`, `style="..."`, `class="..."`, tags Office) e preservando formatação semântica limpa (`h2`, `h3`, `p`, `strong`, `em`, `blockquote`, `ul`, `ol`, `a`).
+  - Barra de ferramentas rica e leve (< 20 KiB em Vanilla JS puro) com botões de formatação, links seguros (`rel="noopener noreferrer"`) e alternador de código HTML.
+  - Sincronização automática entre o HTML sanitizado em `content_html` e a estrutura de blocos em `content_json`.
+- **Modal de Seleção de Mídias Estilo WordPress (`/admin/editor.php`):**
+  - Seletor de imagens em modal overlay para Imagem de Destaque e para inserção direta de fotos no conteúdo da matéria.
+  - Filtro em tempo real por nome, grade responsiva com miniaturas e upload de novas fotos direto do modal sem sair da página de edição.
+  - Prévia visual 16:9 da imagem de destaque com botão de remoção rápida.
+- **Campo Palavra-chave Principal (Primary Focus Keyword):** Adicionado campo dedicado no formulário de edição e integrado ao `PostService` e DDL para estratégia de SEO.
+- **Endpoint de API Interna de Mídias (`public/admin/api/media.php`):** Fornece listagem paginada e busca rápida de fotos cadastradas para consumo do editor e sidecars.
   - Especificação técnica completa no `README.md` com arquitetura limpa, modelo relacional plano e segurança proativa (Security by Design).
   - Pipeline de CI/CD automatizado via GitHub Actions em `.github/workflows/ci.yml` (PHP 8.4, Linting de sintaxe, diagnóstico, testes unitários, migração de banco e seeder).
   - Licença Open Source MIT em `LICENSE` e padronização `.editorconfig`.

@@ -53,8 +53,15 @@ class PostService
         $tags = $data['tags'] ?? null;
         $featuredImage = $data['featured_image'] ?? null;
 
-        $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : $data['content_json'];
-        $contentHtml = BlockCompiler::compile($contentJson);
+        if (!empty($data['content_html'])) {
+            $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
+            $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
+                ? (is_array($data['content_json']) ? json_encode($data['content_json']) : $data['content_json'])
+                : BlockCompiler::htmlToBlocks($contentHtml);
+        } else {
+            $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : ($data['content_json'] ?? '[]');
+            $contentHtml = BlockCompiler::compile($contentJson);
+        }
 
         $seoTitle = $data['seo_title'] ?? null;
         $seoDesc = $data['seo_description'] ?? null;
@@ -149,8 +156,15 @@ class PostService
             $featuredImage = $data['featured_image'] ?? null;
             $isFeatured = !empty($data['is_featured']) ? 1 : 0;
 
-            $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : ($data['content_json'] ?? '');
-            $contentHtml = BlockCompiler::compile($contentJson);
+            if (!empty($data['content_html'])) {
+                $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
+                $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
+                    ? (is_array($data['content_json']) ? json_encode($data['content_json']) : $data['content_json'])
+                    : BlockCompiler::htmlToBlocks($contentHtml);
+            } else {
+                $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : ($data['content_json'] ?? '');
+                $contentHtml = BlockCompiler::compile($contentJson);
+            }
 
             $seoTitle = $data['seo_title'] ?? null;
             $seoDesc = $data['seo_description'] ?? null;

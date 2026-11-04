@@ -15,17 +15,22 @@ use InvalidArgumentException;
 class BlockCompiler
 {
     /**
-     * Compila uma estrutura JSON de blocos para HTML5 seguro.
+     * Compila uma estrutura JSON de blocos ou HTML rico para HTML5 seguro.
      *
-     * @param string|array $input JSON string ou array já decodificado
+     * @param string|array $input JSON string, array já decodificado ou HTML do editor
      * @return string HTML5 sanitizado
      */
     public static function compile(string|array $input): string
     {
         if (is_string($input)) {
+            $trimmed = trim($input);
+            if (!str_starts_with($trimmed, '[') && !str_starts_with($trimmed, '{')) {
+                // Conteúdo enviado diretamente como HTML semântico do editor rico
+                return self::sanitizeHtml($trimmed);
+            }
             $data = json_decode($input, true);
             if (!is_array($data)) {
-                return '';
+                return self::sanitizeHtml($input);
             }
         } else {
             $data = $input;
@@ -63,6 +68,141 @@ class BlockCompiler
         }
 
         return implode("\n", $html);
+    }
+
+    /**
+     * Sanitiza conteúdo HTML permitindo apenas tags semânticas limpas e eliminando classes,
+     * estilos sujos do Word/Google Docs e qualquer vetor de script malicioso (XSS).
+     */
+    public static function sanitizeHtml(string $html): string
+    {
+        if (trim($html) === '') {
+            return '';
+        }
+
+        // 1. Remover tags proibidas e vetores ativos
+        $clean = preg_replace('~<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>~i', '', $html);
+        $clean = preg_replace('~<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>~i', '', $clean);
+        $clean = preg_replace('~<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>~i', '', $clean);
+        $clean = preg_replace('~<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>~i', '', $clean);
+
+        // 2. Filtrar apenas tags semânticas do jornalismo moderno
+        $allowedTags = '<h2><h3><h4><p><br><hr><strong><b><em><i><u><s><blockquote><cite><ul><ol><li><a><figure><picture><source><img><figcaption>';
+        $clean = strip_tags($clean, $allowedTags);
+
+        // 3. Remover atributos de eventos (on*), estilos inline (MsoNormal, font-size, etc.) e IDs
+        $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+        $clean = preg_replace('/\s+style\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+        $clean = preg_replace('/\s+class\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+        $clean = preg_replace('/\s+id\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+
+        // 4. Sanitizar links <a> para evitar javascript: e adicionar rel="noopener noreferrer"
+        $clean = preg_replace_callback('~<a\s+([^>]+)>(.*?)</a>~i', function (array $m): string {
+            $attributes = $m[1];
+            $linkText = $m[2];
+
+            if (preg_match('~href=[\'"]([^\'"]+)[\'"]~i', $attributes, $hrefMatch)) {
+                $safeHref = self::sanitizeUrl($hrefMatch[1]);
+                if (!empty($safeHref)) {
+                    return "<a href=\"{$safeHref}\" rel=\"noopener noreferrer\" target=\"_blank\">{$linkText}</a>";
+                }
+            }
+            return $linkText;
+        }, $clean);
+
+        // 5. Sanitizar tags <img> para garantir URLs válidas e lazy loading
+        $clean = preg_replace_callback('~<img\s+([^>]+)>~i', function (array $m): string {
+            $attributes = $m[1];
+            $src = '';
+            $alt = '';
+
+            if (preg_match('~src=[\'"]([^\'"]+)[\'"]~i', $attributes, $srcMatch)) {
+                $src = self::sanitizeUrl($srcMatch[1]);
+            }
+            if (preg_match('~alt=[\'"]([^\'"]*)[\'"]~i', $attributes, $altMatch)) {
+                $alt = htmlspecialchars($altMatch[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            }
+
+            if (empty($src)) {
+                return '';
+            }
+
+            return "<img src=\"{$src}\" alt=\"{$alt}\" loading=\"lazy\">";
+        }, $clean);
+
+        return trim($clean);
+    }
+
+    /**
+     * Converte HTML rico em blocos estruturados JSON para preservação de integridade em APIs headless.
+     */
+    public static function htmlToBlocks(string $html): string
+    {
+        $sanitized = self::sanitizeHtml($html);
+        if ($sanitized === '') {
+            return '[]';
+        }
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $sanitized, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $blocks = [];
+        if ($dom->childNodes) {
+            foreach ($dom->childNodes as $node) {
+                if ($node->nodeType !== XML_ELEMENT_NODE) {
+                    continue;
+                }
+
+                $tag = strtolower($node->nodeName);
+                if ($tag === 'h2') {
+                    $blocks[] = ['type' => 'heading', 'level' => 2, 'content' => trim($node->textContent)];
+                } elseif ($tag === 'h3') {
+                    $blocks[] = ['type' => 'heading', 'level' => 3, 'content' => trim($node->textContent)];
+                } elseif ($tag === 'p') {
+                    $innerHtml = '';
+                    foreach ($node->childNodes as $child) {
+                        $innerHtml .= $node->ownerDocument->saveHTML($child);
+                    }
+                    $trimmed = trim($innerHtml);
+                    if ($trimmed !== '') {
+                        $blocks[] = ['type' => 'paragraph', 'content' => $trimmed];
+                    }
+                } elseif ($tag === 'blockquote') {
+                    $blocks[] = ['type' => 'quote', 'content' => trim($node->textContent)];
+                } elseif ($tag === 'ul' || $tag === 'ol') {
+                    $items = [];
+                    foreach ($node->childNodes as $li) {
+                        if ($li->nodeName === 'li') {
+                            $items[] = trim($li->textContent);
+                        }
+                    }
+                    if (!empty($items)) {
+                        $blocks[] = ['type' => 'list', 'style' => $tag === 'ol' ? 'ordered' : 'bullet', 'items' => $items];
+                    }
+                } elseif ($tag === 'figure') {
+                    $imgs = $node->getElementsByTagName('img');
+                    if ($imgs->length > 0) {
+                        $img = $imgs->item(0);
+                        $url = $img->getAttribute('src');
+                        $captionNode = $node->getElementsByTagName('figcaption');
+                        $caption = $captionNode->length > 0 ? trim($captionNode->item(0)->textContent) : '';
+                        $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $caption];
+                    }
+                } elseif ($tag === 'img') {
+                    $url = $node->getAttribute('src');
+                    $alt = $node->getAttribute('alt');
+                    $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $alt];
+                }
+            }
+        }
+
+        if (empty($blocks)) {
+            $blocks[] = ['type' => 'paragraph', 'content' => $sanitized];
+        }
+
+        return json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /**
