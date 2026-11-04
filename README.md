@@ -640,15 +640,15 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 
 ## 10. Próximos Passos de Desenvolvimento
 
-1. [ ] **Estrutura e ambiente:** Criar diretórios, `config.php` seguro, diagnóstico de extensões/codecs, origem canônica, UTC e tarefas periódicas.
-2. [ ] **Persistência:** Implementar DDL e transações de usuários, artigos, estatísticas, revisões, tokens e estruturas operacionais da seção 3.6.
-3. [ ] **Autenticação e autorização:** Implementar Argon2id, sessões revogáveis, perfis fixos, autorização por artigo/campo, CSRF administrativo, ativação e redefinição.
-4. [ ] **Rotas e contador:** Implementar URLs canônicas e endpoint público de visualizações sem sessão, com validação de origem, deduplicação atômica e limites de abuso.
-5. [ ] **Mídia:** Implementar WebP obrigatório, AVIF opcional, limites de recursos, staging, manifesto validado e limpeza segura.
-6. [ ] **Blocos e publicação:** Implementar esquema JSON versionado, compilação segura, snapshots, conflitos HTTP 409 e distinção entre salvar e publicar.
-7. [ ] **Cache:** Implementar maps de bypass, chave GET/HEAD unificada, TTLs, purga persistente com URLs antigas/novas, retentativas e verificação de concorrência.
-8. [ ] **Migração:** Implementar dry-run, conversores, backup privado, processamento retomável, ativação de autores, mídia, SEO, redirecionamentos e relatório de homologação.
-9. [ ] **Painel:** Implementar editor dentro do orçamento de JavaScript, revisão/aprovação, histórico, conflitos e indicação de propagação pendente.
+1. [x] **Estrutura e ambiente:** Criar diretórios, `config.php` seguro, diagnóstico de extensões/codecs, origem canônica, UTC e tarefas periódicas.
+2. [x] **Persistência:** Implementar DDL e transações de usuários, artigos, estatísticas, revisões, tokens e estruturas operacionais da seção 3.6.
+3. [x] **Autenticação e autorização:** Implementar Argon2id, sessões revogáveis, perfis fixos, autorização por artigo/campo, CSRF administrativo, ativação e redefinição.
+4. [x] **Rotas e contador:** Implementar URLs canônicas e endpoint público de visualizações sem sessão, com validação de origem, deduplicação atômica e limites de abuso.
+5. [x] **Mídia:** Implementar WebP obrigatório, AVIF opcional, limites de recursos, staging, manifesto validado e limpeza segura.
+6. [x] **Blocos e publicação:** Implementar esquema JSON versionado, compilação segura, snapshots, conflitos HTTP 409 e distinção entre salvar e publicar.
+7. [x] **Cache:** Implementar maps de bypass, chave GET/HEAD unificada, TTLs, purga persistente com URLs antigas/novas, retentativas e verificação de concorrência.
+8. [x] **Migração:** Implementar dry-run, conversores, backup privado, processamento retomável, ativação de autores, mídia, SEO, redirecionamentos e relatório de homologação.
+9. [x] **Painel:** Implementar editor dentro do orçamento de JavaScript, revisão/aprovação, histórico, conflitos e indicação de propagação pendente.
 10. [ ] **Validação:** Executar os critérios das seções 6.3, 7.4 e 11 e registrar resultados reproduzíveis antes de declarar suporte a produção. Esta especificação não significa que o código ou os benchmarks já foram implementados.
 
 ---

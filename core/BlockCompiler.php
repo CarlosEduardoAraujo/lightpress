@@ -131,14 +131,68 @@ class BlockCompiler
     }
 
     /**
-     * Compila imagens com suporte nativo a WebP/AVIF e lazy loading.
+     * Compila imagens com suporte nativo a <picture>, AVIF, WebP e lazy loading.
+     * Conforme seção 4.5 e 6.1 do README: se 'media_id' for fornecido, consulta o manifesto
+     * confiável gravado no servidor para montar as tags <source> com srcset real.
      */
     private static function compileImage(array $block, bool $isFirstImage): string
     {
+        $mediaId = trim($block['media_id'] ?? '');
         $url = trim($block['url'] ?? '');
         $caption = self::sanitizeInline($block['caption'] ?? '');
         $alt = self::sanitizeInline($block['alt'] ?? $caption);
+        $lazyAttr = $isFirstImage ? '' : ' loading="lazy"';
 
+        // 1. Tentar renderizar a partir do catálogo confiável de mídias (media_id)
+        if (!empty($mediaId)) {
+            try {
+                $media = Database::fetchOne(
+                    "SELECT variants_manifest, original_name FROM media WHERE id = ? LIMIT 1",
+                    [$mediaId]
+                );
+
+                if ($media) {
+                    $variants = json_decode($media['variants_manifest'], true) ?? [];
+                    $avifSrcset = [];
+                    $webpSrcset = [];
+                    $defaultSrc = '';
+
+                    // Resoluções disponíveis
+                    foreach (['full', 'intermediate', 'thumb'] as $resKey) {
+                        if (!empty($variants[$resKey]['avif']['url'])) {
+                            $avifSrcset[] = "{$variants[$resKey]['avif']['url']} {$variants[$resKey]['avif']['width']}w";
+                        }
+                        if (!empty($variants[$resKey]['webp']['url'])) {
+                            $webpSrcset[] = "{$variants[$resKey]['webp']['url']} {$variants[$resKey]['webp']['width']}w";
+                            if (empty($defaultSrc) || $resKey === 'intermediate') {
+                                $defaultSrc = $variants[$resKey]['webp']['url'];
+                            }
+                        }
+                    }
+
+                    if (!empty($defaultSrc)) {
+                        $html = "<figure>\n  <picture>\n";
+                        if (!empty($avifSrcset)) {
+                            $html .= '    <source type="image/avif" srcset="' . implode(', ', $avifSrcset) . "\">\n";
+                        }
+                        if (!empty($webpSrcset)) {
+                            $html .= '    <source type="image/webp" srcset="' . implode(', ', $webpSrcset) . "\">\n";
+                        }
+                        $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$alt}\"{$lazyAttr}>\n";
+                        $html .= "  </picture>";
+                        if (!empty($caption)) {
+                            $html .= "\n  <figcaption>{$caption}</figcaption>";
+                        }
+                        $html .= "\n</figure>";
+                        return $html;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Em caso de falha de banco no compilador, prossegue para o fallback por URL
+            }
+        }
+
+        // 2. Fallback por URL direta
         if (empty($url)) {
             return '';
         }
@@ -149,8 +203,6 @@ class BlockCompiler
             return '';
         }
 
-        $lazyAttr = $isFirstImage ? '' : ' loading="lazy"';
-        
         $html = "<figure>";
         $html .= "<img src=\"{$url}\" alt=\"{$alt}\"{$lazyAttr}>";
         if (!empty($caption)) {
