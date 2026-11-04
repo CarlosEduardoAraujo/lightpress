@@ -22,16 +22,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - `bin/setup.php`: instalador CLI automático do banco de dados e gerador de credenciais do primeiro administrador.
   - `bin/seed.php`: gerador de dados de demonstração em lotes transacionais para testes e benchmarks de grande escala.
 
-- **Segurança e RBAC:**
+- **Segurança, RBAC e Auditoria:**
   - `core/Security.php`: escape contextual contra XSS (`e()`), tokens CSRF com comparação em tempo constante, hashing com Argon2id, hardening de sessão (`LIGHTPRESSSESSID`), anonimização de IP por HMAC-SHA-256 e validação de Fetch Metadata / Origin.
   - `core/Authorization.php`: matriz de controle de acesso baseada em papéis (RBAC) com política de negação por padrão para autores, editores e administradores.
+  - `core/Logger.php`: sistema de logs técnicos e auditoria com expurgo recursivo e compulsório de senhas, tokens e segredos em `/storage/logs/`.
   - `public/.htaccess`: fallback defensivo contra execução de scripts em uploads para ambientes Apache/LiteSpeed.
 
-- **Roteamento, Syndication e Frontend Público:**
+- **SEO, Syndication e Frontend Público:**
+  - `core/Seo.php`: gerador de metadados Open Graph (`og:*`), Twitter Cards e Schema.org JSON-LD (`NewsArticle` e `WebSite`) para Google Notícias.
   - `core/Router.php`: roteador regex ultrarrápido com normalização de URLs e redirecionamentos canônicos 301.
   - `public/index.php`: Front Controller com injeção de cabeçalhos HTTP defensivos (CSP, HSTS, X-Frame-Options, X-Content-Type-Options), rotas públicas, `/feed.xml` (RSS 2.0 padrão) e `/sitemap.xml`.
   - `public/api/view.php`: micro-endpoint assíncrono para contagem de visualizações sem sessão e com deduplicação de 30 segundos.
-  - Templates com suporte automático a **Dark Mode** (`prefers-color-scheme: dark`), tipografia responsiva e descoberta de RSS no `templates/header.php`.
+  - Templates com suporte automático a **Dark Mode** (`prefers-color-scheme: dark`), tipografia responsiva e metadados SEO integrados.
 
 - **Pipeline de Mídia e Compilação de Conteúdo:**
   - `core/ImageProcessor.php`: conversão para WebP obrigatório e AVIF opcional, corte 16:9 de thumbnail, 3 resoluções e descarte seguro de originais.
@@ -42,7 +44,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Painel Administrativo Completo (< 50 KiB):**
   - `admin/login.php`: autenticação com Argon2id e proteção contra força bruta.
   - `admin/dashboard.php`: listagem rápida de notícias com navegação integrada, contadores de visualizações e controle de sessões revogáveis.
-  - `admin/editor.php`: editor de blocos leve em Vanilla JS sem React/Redux.
+  - `admin/editor.php`: editor de blocos leve em Vanilla JS sem React/Redux com botão de prévia privada.
+  - `admin/preview.php`: ambiente de prévia privada autenticada para rascunhos com `Cache-Control: private, no-store`.
   - `admin/upload.php`: endpoint autenticado para upload e geração de manifestos de mídia.
   - `admin/categories.php`: módulo administrativo para gestão de categorias.
   - `admin/users.php`: módulo administrativo de controle de equipe e geração de links criptográficos de ativação.
@@ -57,4 +60,4 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - `bin/retry-cache-purge.php`: worker com backoff exponencial para retentativas de purga de cache.
   - `bin/cleanup.php`: rotina de limpeza de tokens, deduplicações expiradas e staging.
   - `bin/migrate-wp.php`: importador auditável do WordPress por lotes com suporte a `--dry-run`.
-  - `bin/test.php`: suíte leve de testes unitários sem dependências cobrindo sanitização, escape XSS, matriz de RBAC, cálculo da árvore de cache Nginx e roteador.
+  - `bin/test.php`: suíte leve de testes unitários sem dependências cobrindo sanitização, escape XSS, matriz de RBAC, cálculo da árvore de cache Nginx, roteador, SEO e Logger.

@@ -172,8 +172,11 @@ $csrfToken = Security::generateCsrfToken();
             <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/dashboard.php" style="color: inherit; text-decoration: none;">Voltar ao Dashboard</a></span>
         </div>
         <div>
+            <?php if ($post): ?>
+                <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">👁️ Prévia Privada</a>
+            <?php endif; ?>
             <?php if ($post && $post['status'] === 'published'): ?>
-                <a href="/noticia/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">Ver Artigo no Ar</a>
+                <a href="/noticia/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">Ver Artigo no Ar &rarr;</a>
             <?php endif; ?>
         </div>
     </header>

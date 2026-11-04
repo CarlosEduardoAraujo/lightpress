@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 use LightPress\Core\Security;
+use LightPress\Core\Seo;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -14,6 +15,13 @@ use LightPress\Core\Security;
         <meta name="description" content="<?= Security::e($post['summary']) ?>">
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($config['app']['name'] ?? 'SpeedPress') ?>" href="/feed.xml">
+
+    <!-- Open Graph & Twitter Cards -->
+    <?= Seo::renderMetaTags($post ?? null, $config) ?>
+
+    <!-- Schema.org JSON-LD para Google Notícias -->
+    <?= Seo::renderJsonLd($post ?? null, $config) ?>
+
     <style>
         :root {
             --primary: #0f172a;

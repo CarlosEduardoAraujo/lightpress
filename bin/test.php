@@ -130,6 +130,48 @@ assertTest("Roteador captura rota com parâmetro nomeado", $matched);
 assertTest("Roteador extrai parâmetro slug corretamente", $paramSlug === 'gp-de-monaco');
 
 // -------------------------------------------------------------
+// 6. Testes do Módulo de SEO e JSON-LD (core/Seo.php)
+// -------------------------------------------------------------
+echo "\n[6] Testando Módulo de SEO e Schema.org (core/Seo.php)\n";
+
+$seoPost = [
+    'title' => 'Vitória Histórica no GP de Silverstone',
+    'slug' => 'vitoria-historica-silverstone',
+    'summary' => 'Resumo da prova épica com ultrapassagens na chuva.',
+    'published_at' => '2026-07-15 14:00:00',
+    'author_name' => 'Redação SpeedPress',
+    'category' => 'formula-1',
+];
+
+$metaTags = \LightPress\Core\Seo::renderMetaTags($seoPost, $config);
+assertTest("Renderização de og:title e og:type", str_contains($metaTags, 'og:title') && str_contains($metaTags, 'content="article"'));
+assertTest("Renderização de Twitter Card summary_large_image", str_contains($metaTags, 'twitter:card'));
+
+$jsonLd = \LightPress\Core\Seo::renderJsonLd($seoPost, $config);
+assertTest("Geração de JSON-LD NewsArticle válido", str_contains($jsonLd, 'NewsArticle') && str_contains($jsonLd, 'schema.org'));
+
+// -------------------------------------------------------------
+// 7. Testes do Logger Sanitizado (core/Logger.php)
+// -------------------------------------------------------------
+echo "\n[7] Testando Logger e Expurgador de Dados Sensíveis (core/Logger.php)\n";
+
+$dirtyContext = [
+    'user' => 'admin',
+    'password' => 'segredo123',
+    'token' => 'abc123xyz',
+    'meta' => [
+        'session_id' => '123',
+        '_csrf_token' => 'token_secreto',
+    ],
+];
+
+$cleanContext = \LightPress\Core\Logger::sanitize($dirtyContext);
+assertTest("Expurgo de campo 'password'", $cleanContext['password'] === '***REDACTED***');
+assertTest("Expurgo de campo 'token'", $cleanContext['token'] === '***REDACTED***');
+assertTest("Expurgo recursivo de '_csrf_token' interno", $cleanContext['meta']['_csrf_token'] === '***REDACTED***');
+assertTest("Preservação de dados não sensíveis", $cleanContext['user'] === 'admin');
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

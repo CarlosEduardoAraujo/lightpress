@@ -39,7 +39,8 @@ require __DIR__ . '/header.php';
     </div>
 </article>
 
-<!-- Disparo Assíncrono e Leve de Visualizações (Views) -->
+<!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->
+<?php if (empty($isPreview)): ?>
 <script>
 (function() {
     var postId = <?= (int)$post['id'] ?>;
@@ -53,5 +54,6 @@ require __DIR__ . '/header.php';
     } catch (e) {}
 })();
 </script>
+<?php endif; ?>
 
 <?php require __DIR__ . '/footer.php'; ?>
