@@ -75,27 +75,43 @@ class CacheManager
         }
 
         $results = [];
+        $parts = parse_url($this->canonicalOrigin);
+        $configuredScheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? 'localhost';
+        if (!empty($parts['port'])) {
+            $host .= ':' . $parts['port'];
+        }
+
+        // Esquemas a expurgar (tanto https quanto http para blindar proxies reversos como Cloudflare)
+        $schemes = array_unique([$configuredScheme, 'https', 'http']);
 
         foreach ($uris as $uri) {
-            $filePath = $this->getCacheFilePath($uri);
+            $cleanUri = '/' . ltrim($uri, '/');
+            $purged = true;
 
-            // Arquivo já ausente é considerado sucesso idempotente
-            if (!file_exists($filePath)) {
-                $results[$uri] = true;
-                continue;
-            }
+            foreach ($schemes as $scheme) {
+                // Chave unificada conforme Nginx: $scheme$lp_cache_method$host$request_uri
+                $cacheKey = "{$scheme}GET{$host}{$cleanUri}";
+                $hash = md5($cacheKey);
 
-            try {
-                if (@unlink($filePath)) {
-                    $results[$uri] = true;
-                } else {
-                    error_log("[CacheManager] Falha de permissão ao remover arquivo de cache: {$filePath}");
-                    $results[$uri] = false;
+                $level1 = substr($hash, -1);
+                $level2 = substr($hash, -3, 2);
+                $filePath = "{$this->cachePath}/{$level1}/{$level2}/{$hash}";
+
+                if (file_exists($filePath)) {
+                    try {
+                        if (!@unlink($filePath)) {
+                            error_log("[CacheManager] Falha de permissão ao remover arquivo de cache: {$filePath}");
+                            $purged = false;
+                        }
+                    } catch (Throwable $e) {
+                        error_log("[CacheManager] Erro ao remover {$filePath}: " . $e->getMessage());
+                        $purged = false;
+                    }
                 }
-            } catch (Throwable $e) {
-                error_log("[CacheManager] Erro ao remover {$filePath}: " . $e->getMessage());
-                $results[$uri] = false;
             }
+
+            $results[$uri] = $purged;
         }
 
         return $results;

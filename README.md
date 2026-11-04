@@ -657,18 +657,36 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 
 ---
 
-## 10. Próximos Passos de Desenvolvimento
+## 10. Próximos Passos de Desenvolvimento e Roadmap
 
+### 10.1. Status Atual do Core e Infraestrutura
 1. [x] **Estrutura e ambiente:** Criar diretórios, `config.php` seguro, diagnóstico de extensões/codecs, origem canônica, UTC e tarefas periódicas.
 2. [x] **Persistência:** Implementar DDL e transações de usuários, artigos, estatísticas, revisões, tokens e estruturas operacionais da seção 3.6.
 3. [x] **Autenticação e autorização:** Implementar Argon2id, sessões revogáveis, perfis fixos, autorização por artigo/campo, CSRF administrativo, ativação e redefinição.
 4. [x] **Rotas e contador:** Implementar URLs canônicas e endpoint público de visualizações sem sessão, com validação de origem, deduplicação atômica e limites de abuso.
-5. [x] **Mídia:** Implementar WebP obrigatório, AVIF opcional, limites de recursos, staging, manifesto validado e limpeza segura.
-6. [x] **Blocos e publicação:** Implementar esquema JSON versionado, compilação segura, snapshots, conflitos HTTP 409 e distinção entre salvar e publicar.
-7. [x] **Cache:** Implementar maps de bypass, chave GET/HEAD unificada, TTLs, purga persistente com URLs antigas/novas, retentativas e verificação de concorrência.
-8. [x] **Migração:** Implementar dry-run, conversores, backup privado, processamento retomável, ativação de autores, mídia, SEO, redirecionamentos e relatório de homologação.
-9. [x] **Painel:** Implementar editor dentro do orçamento de JavaScript, revisão/aprovação, histórico, conflitos e indicação de propagação pendente.
-10. [ ] **Validação:** Executar os critérios das seções 6.3, 7.4 e 11 e registrar resultados reproduzíveis antes de declarar suporte a produção. Esta especificação não significa que o código ou os benchmarks já foram implementados.
+5. [x] **Pipeline de Mídia:** Implementar WebP obrigatório, AVIF calibrado (Q65, speed 8), pass-through de arquivos já otimizados, métricas transparentes e nomes semânticos para SEO.
+6. [x] **Editor Visual de Notícias:** Canvas contínuo com higienizador de cópia do Google Docs/Word, seletor de mídias em modal WordPress-style, slug personalizado e focus keyword.
+7. [x] **Cache Nginx FastCGI:** Implementar maps de bypass, chave unificada (suporte a Cloudflare e HTTPS reverso), invalidação atômica de URLs na publicação e purga em SSD.
+
+### 10.2. Próximas Frentes Priorizadas de Trabalho
+
+* **FASE ATUAL (Em Andamento) — Opção 1: Experiência Visual do Portal (Frontend Público de Notícias):**
+  - [ ] **Design de Portal de Alta Velocidade:** Refinamento dos layouts da Home, Notícia Individual (`/noticia/{slug}/`) e Categorias (`/categoria/{slug}/`) com tipografia de padrão editorial, tempo estimado de leitura (*ex: 3 min de leitura*), bloco de autor com bio/avatar e modo escuro nativo ultra leve.
+  - [ ] **Módulo de Notícias Relacionadas:** Recomendações contextuais de matérias da mesma categoria ao final de cada artigo para retenção de audiência.
+  - [ ] **Sistema de Busca Integrada (`/busca?q=...`):** Pesquisa ágil de notícias publicadas com marcação visual dos termos pesquisados e compatibilidade total com o cache estático.
+  - [ ] **Paginação Rápida:** Navegação paginada limpa em listagens de notícias sem dependência de JavaScript pesado.
+
+* **PRÓXIMA DA LISTA — Opção 2: Recursos Administrativos da Redação (Gestão de Portal):**
+  - [ ] **Gestão de Categorias (`/admin/categories.php`):** Interface administrativa para criar, editar, reordenar e desativar categorias com slugs gerados automaticamente.
+  - [ ] **Gestão de Usuários e Autores (`/admin/users.php`):** Cadastro e gestão de repórteres, colunistas e editores com perfis de acesso, biografia, avatar e redefinição segura de senhas.
+  - [ ] **Filtros e Paginação no Dashboard (`/admin/dashboard.php`):** Filtragem dinâmica por status (Publicado/Rascunho), por categoria e busca por título em acervos com milhares de publicações.
+  - [ ] **Painel de Mais Lidas:** Listagem das publicações com maior volume de visualizações nas últimas 24h e 7 dias.
+
+* **PRÓXIMA DA LISTA — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
+  - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
+  - [ ] **Processamento de Mídia em Lote:** Download/leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.
+  - [ ] **Preservação de SEO e Redirecionamentos 301:** Mapeamento de todos os permalinks antigos para a tabela `redirects` garantindo integridade de ranqueamento no Google.
+  - [ ] **Modo Simulação (`--dry-run`):** Execução com validação prévia e relatório de homologação antes da confirmação da migração.
 
 ---
 

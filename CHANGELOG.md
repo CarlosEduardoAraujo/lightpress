@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Corrigido
+- **Expurgo Abrangente de Cache FastCGI:** 
+  - O `PostService` agora invalida automaticamente a Home (`/`), a notícia atual (`/noticia/slug/`), a notícia anterior (em caso de renomeação de slug), a categoria atual, a categoria anterior e os feeds RSS (`/feed.xml` e `/feed`).
+  - O `CacheManager` agora expurga simultaneamente as chaves em `https` e `http`, garantindo remoção imediata dos arquivos de cache em disco mesmo quando o servidor opera atrás de proxy reverso da Cloudflare com terminação SSL externa.
 - **Ajuste de Content Security Policy (CSP) e Cloudflare Insights:** Adicionado suporte explícito no cabeçalho CSP a scripts embutidos com `'unsafe-inline'`, telemetria da Cloudflare (`static.cloudflareinsights.com` e `cloudflareinsights.com`) e remoção de manipuladores de evento inline no campo de busca (`templates/header.php`) em favor de regras nativas em CSS `:focus`.
 - **BUG no Colar do Editor Visual (`cleanWordOrDocsHtml`):** Corrigido erro `TypeError: Cannot read properties of null (reading 'innerHTML')` ao colar conteúdo do Google Docs ou Word, garantindo que o elemento `<body>` nunca seja desestruturado ou removido pelo parser DOM e adicionando tratamento especial para wrappers com `id="docs-internal-guid"`.
 - **BUG 1 - Seletor de Arquivos AVIF (`public/admin/media.php`):** Adicionado suporte explícito para seleção de imagens `.avif` e `image/avif` no explorador de arquivos do sistema operacional através do atributo `accept`.

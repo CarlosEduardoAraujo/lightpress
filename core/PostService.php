@@ -211,6 +211,8 @@ class PostService
                 "/noticia/{$current['slug']}/",
                 "/categoria/{$category}/",
                 "/categoria/{$current['category']}/",
+                '/feed.xml',
+                '/feed',
             ];
 
             $this->cacheManager->recordPurgeJob($postId, 'publish_update', $affectedUrls);
