@@ -303,6 +303,8 @@ $csrfToken = Security::generateCsrfToken();
                                         <strong><?= round($avifSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;">AVIF</span>
                                         <?php if ($avifReduction > 0): ?>
                                             - <span style="font-weight: 700; color: #059669;"><?= $avifReduction ?>% (redução do tamanho)</span>
+                                        <?php else: ?>
+                                            - <span style="font-weight: 700; color: #059669;">Formato original otimizado</span>
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
@@ -311,6 +313,8 @@ $csrfToken = Security::generateCsrfToken();
                                         <strong><?= round($webpSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;">WebP</span>
                                         <?php if ($webpReduction > 0): ?>
                                             - <span style="font-weight: 700; color: #2563eb;"><?= $webpReduction ?>% (redução do tamanho)</span>
+                                        <?php else: ?>
+                                            - <span style="font-weight: 700; color: #2563eb;">Formato original otimizado</span>
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>

@@ -14,6 +14,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Elevação automática de `memory_limit` (até 512M) e `max_execution_time` (120s) em `core/ImageProcessor.php` para suporte a fotos de alta resolução (Full HD e 4K).
   - Calibração de `avif_speed` para 8 com bloco de fallback não bloqueante (`try/catch`), garantindo que o conjunto WebP sempre seja gerado com sucesso mesmo em servidores com CPUs modestas.
   - Interface da galeria aprimorada com upload assíncrono via `fetch()`, barra de status em tempo real e retorno imediato de erros visíveis ao usuário.
+- **Otimização Inteligente para Uploads WebP e AVIF:** 
+  - Calibração de qualidade AVIF para 65 (padrão recomendado pela indústria para máxima compressão web).
+  - Preservação direta do arquivo original (pass-through) para imagens que já venham em WebP ou AVIF pré-otimizadas quando a recodificação geraria arquivo maior.
+  - Exibição consistente do status de redução ou "Formato original otimizado" na biblioteca de mídias para todas as extensões.
 - **Métricas de Compressão na Galeria de Mídias:** Adicionada exibição detalhada nos cards de mídia com o peso original e extensão (ex: JPG), peso e resolução das variantes AVIF e WebP, e porcentagem exata de economia/redução alcançada por formato.
 - **BUG 3 - Nomes de Imagens Semânticos para SEO:** As variantes em disco e URLs agora preservam com fidelidade o nome original do arquivo sanitizado sem caracteres aleatórios ou hashes (ex: `comparativo-nano-banana-2-1-2-pro-custo-qualidade-ia-1024.avif`), utilizando incremento numérico inteligente (`-1`, `-2`) apenas em caso de colisão de nomes no mesmo mês.
 - **Painel Administrativo em `public/admin/`:** Movido o painel administrativo para a raiz web pública (`public/admin/`), garantindo que tanto o servidor de desenvolvimento do PHP (`php -S -t public`) quanto o Nginx sirvam `/admin/login.php`, `/admin/dashboard.php` e demais endpoints sem erros 404.
