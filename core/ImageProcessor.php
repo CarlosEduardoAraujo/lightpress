@@ -120,16 +120,22 @@ class ImageProcessor
         // Gerar identificador único de catálogo (media_id)
         $mediaId = bin2hex(random_bytes(16));
 
-        // Gerar nome base semântico e amigável para SEO a partir do arquivo original
+        // Gerar nome base semântico preservando o nome original do arquivo
         $pathInfo = pathinfo($originalName);
         $rawBaseName = $pathInfo['filename'] ?? 'imagem';
         $cleanSlug = Security::slugify($rawBaseName);
         if (empty($cleanSlug)) {
             $cleanSlug = 'imagem';
         }
-        $cleanSlug = mb_substr($cleanSlug, 0, 50);
-        $shortHash = substr($mediaId, 0, 8);
-        $fileBase = "{$cleanSlug}-{$shortHash}";
+        $cleanSlug = rtrim(mb_substr($cleanSlug, 0, 100), '-');
+
+        // Se já existir arquivo com o mesmo nome na pasta de destino, incrementa sufixo numérico (-1, -2, etc.)
+        $fileBase = $cleanSlug;
+        $counter = 1;
+        while (file_exists("{$targetDir}/{$fileBase}-1920.webp") || file_exists("{$targetDir}/{$fileBase}-1024.webp")) {
+            $fileBase = "{$cleanSlug}-{$counter}";
+            $counter++;
+        }
 
         $canAvif = function_exists('imageavif');
 
