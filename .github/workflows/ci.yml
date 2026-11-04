@@ -1,0 +1,49 @@
+name: CI - Testes e Validação do LightPress
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: PHP 8.4 Lint e Testes Unitários
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout do Repositório
+      uses: actions/checkout@v4
+
+    - name: Configurar PHP 8.4
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: pdo, pdo_mysql, pdo_sqlite, gd, mbstring, fileinfo
+        ini-values: memory_limit=256M, date.timezone=UTC
+
+    - name: Verificação de Sintaxe (PHP Lint)
+      run: |
+        find . -name "*.php" ! -path "./storage/*" -exec php -l {} +
+
+    - name: Executar Diagnóstico de Ambiente
+      run: php bin/diagnose.php
+
+    - name: Executar Suíte de Testes Automatizados
+      run: php bin/test.php
+
+    - name: Testar Setup de Banco de Dados (SQLite)
+      run: |
+        cat << 'EOF' > config.local.php
+        <?php
+        return [
+          'database' => [
+            'driver' => 'sqlite',
+            'sqlite_path' => __DIR__ . '/storage/test.sqlite',
+          ],
+        ];
+        EOF
+        php bin/setup.php
+
+    - name: Testar Seeder de Demonstração
+      run: php bin/seed.php --count=25
