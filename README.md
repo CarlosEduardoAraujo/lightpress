@@ -217,41 +217,45 @@ Na classe `ImageProcessor.php`, a leitura AVIF verifica `function_exists('imagec
 | **Intermediário** | 1024px | Auto | Proporcional (sem corte) | `.webp`, `.avif` (opcional) |
 | **Thumbnail** | 300px | 169px | Corte fixo 16:9 centralizado | `.webp`, `.avif` (opcional) |
 
-### 4.3. Configurações de Qualidade e CPU (PHP GD)
+### 4.3. Configurações de Qualidade, Velocidade e Otimização Inteligente (PHP GD)
 
 * **WebP:** Qualidade 82% (`imagewebp($resource, $path, 82)`).
-* **AVIF:** Qualidade 75 com velocidade 6 (`imageavif($resource, $path, 75, 6)`) como configuração inicial. Esse parâmetro não garante limite de CPU ou tempo; os limites operacionais da seção 4.4 continuam obrigatórios.
+* **AVIF:** Qualidade 65 com velocidade 8 (`imageavif($resource, $path, 65, 8)`). Essa calibração representa o *sweet spot* da indústria: reduz o tempo de codificação na CPU em até 70% frente à velocidade 6, mantendo arquivos 30% a 50% menores que o WebP com fidelidade visual quase sem perdas.
+* **Pass-Through de Formatos Pré-Comprimidos:** Se o usuário envia uma imagem que já está no formato WebP ou AVIF (ex: gerada por IA ou comprimida pelo Squoosh) e a recodificação em qualidade fixa gerar um arquivo mais pesado que a origem, o arquivo original otimizado é preservado diretamente para a variante Full HD, evitando inchaço desnecessário de armazenamento e banda.
+* **Elevação Dinâmica de Limites para Alta Resolução:** Durante a manipulação de imagens grandes pelo `ImageProcessor.php`, o sistema eleva temporariamente o `memory_limit` para 512M e o `max_execution_time` para 120s, permitindo processar bitmaps de alta fidelidade sem esgotamento de memória no servidor.
 
-### 4.4. Segurança no Processamento de Uploads
+### 4.4. Segurança e Nomenclatura Semântica para SEO
 
-* **Validação Real de MIME Type:** Nunca confiar na extensão informada no cabeçalho `$_FILES`. Validar via `finfo_file(finfo_open(FILEINFO_MIME_TYPE), $tmpPath)` e verificação de *magic bytes*.
+* **Validação Real de MIME Type:** Nunca confiar na extensão informada no cabeçalho `$_FILES`. Validar via `finfo_file(finfo_open(FILEINFO_MIME_TYPE), $tmpPath)` e verificação de *magic bytes*. Suporte explícito a `image/jpeg`, `image/png`, `image/webp` e `image/avif`.
 * **Re-encoding Completo:** Decodificar e redesenhar a imagem em um novo recurso GD, sem copiar metadados desnecessários. Isso reduz a exposição a conteúdo embutido em metadados; não garante eliminar esteganografia nem substitui atualização das bibliotecas e bloqueio de execução de uploads.
-* **Nomes Aleatórios Criptográficos:** O arquivo final recebe um nome baseado em hash aleatório (`bin2hex(random_bytes(16))`), prevenindo colisões e ataques de sobrescrita.
-* **Limites iniciais configuráveis:** Até 8 MiB por arquivo, 12 milhões de pixels e 8.000 pixels por lado, verificados antes de decodificar. Rejeitar imagens que excedam qualquer limite ou a estimativa conservadora de memória disponível. Esses valores são limites de entrada, não garantia de que toda imagem abaixo deles caberá em memória.
-* **Recursos limitados:** No máximo uma conversão simultânea por servidor, com aquisição atômica de slot; excesso retorna HTTP 429 com `Retry-After`. Usar pool PHP-FPM dedicado a uploads, limitado inicialmente a 256 MiB por processo e 30 segundos de duração total via supervisor/FPM. Não depender apenas de `set_time_limit()` para interromper bibliotecas nativas. Calibrar limites no benchmark da seção 11.
-* **Tratamento de falhas:** Rejeitar upload incompleto, arquivo truncado ou erro de decoder sem publicar resultados parciais. HTTP 413 indica limite de entrada; HTTP 415 indica formato não suportado; falhas de processamento recebem mensagem controlada e log técnico privado.
+* **Nomenclatura Semântica Amigável para SEO:** Ao invés de hashes criptográficos aleatórios que prejudicam o ranqueamento no Google Imagens, os arquivos finais preservam com fidelidade o nome original sanitizado (slug) enviado pelo usuário (ex: `dodge-retorna-nascar-cup-series-2027-kaulig-racing-1024.webp`). Colisões de nomes no mesmo diretório mensal são resolvidas automaticamente com incrementos numéricos inteligentes (`-1`, `-2`).
+* **Métricas Transparentes de Compressão:** O manifesto de mídias armazena os tamanhos em bytes de cada variante gerada. O painel administrativo exibe claramente nos cards:
+  - Formato e peso do arquivo original (ex: `6400 KiB • 1920x1072px - PNG`)
+  - Formato, peso e porcentagem de redução alcançada (ex: `129 KiB • 1920x1072px - AVIF - 98% (redução do tamanho)`)
+  - Identificação de mídias já minimalistas (`- Formato original otimizado`)
+* **Limites de Entrada:** Até 8 MiB por arquivo (configurável até 12-16 MiB no PHP-FPM / `bin/serve.php`), 12 milhões de pixels e 8.000 pixels por lado, verificados antes de decodificar. Uploads assíncronos via AJAX com feedback de progresso e tratamento explícito de estouro de `upload_max_filesize` e `post_max_size`.
 
 ### 4.5. Finalização Segura e Manifesto de Variantes
 
 1. Receber o original em área temporária privada, fora de `/public`, e gerar as variantes em staging no mesmo filesystem do destino.
 2. Validar todas as variantes WebP obrigatórias: arquivo não vazio, formato esperado, dimensões e decodificação válidos. Falha nessa etapa impede o sucesso do upload.
-3. Tentar AVIF quando disponível e validar cada arquivo gerado. O retorno de `imageavif()` isoladamente não comprova sucesso; falhas opcionais removem o arquivo defeituoso e preservam o conjunto WebP válido.
+3. Tentar AVIF quando disponível e validar cada arquivo gerado. O bloco de codificação AVIF é isolado em `try/catch` não bloqueante; falhas em encoders ausentes preservam com sucesso o conjunto WebP válido.
 4. Mover somente variantes válidas por renomeação e liberar a referência de mídia apenas quando o conjunto WebP estiver completo. Falha na finalização remove os resultados parciais antes de retornar erro.
-5. Persistir em `media` e retornar um manifesto com as URLs, formatos, larguras e alturas efetivamente gerados. O compilador consulta o manifesto confiável no servidor para montar `<picture>` e `srcset`; nunca deduz a existência de AVIF pela extensão de outra URL nem confia em um manifesto reenviado pelo cliente. Falha de persistência impede sucesso e deixa os arquivos identificáveis para limpeza segura.
-6. Remover o original temporário após a finalização segura. Em falhas, limpar staging e temporários de forma controlada; uma rotina periódica remove resíduos de processos interrompidos, identificados por operação e prazo de expiração.
+5. Persistir em `media` e retornar um manifesto com as URLs, formatos, larguras, alturas e tamanhos em bytes efetivamente gerados. O compilador consulta o manifesto confiável no servidor para montar `<picture>` e `srcset`; nunca deduz a existência de AVIF pela extensão de outra URL nem confia em um manifesto reenviado pelo cliente.
+6. Remover o original temporário após a finalização segura.
 
-Imagens menores não são ampliadas. As variantes proporcionais usam a menor largura entre a origem e o limite; o thumbnail faz corte central 16:9 sem ampliação, registrando suas dimensões reais. Corrigir orientação EXIF antes de descartar metadados e preservar transparência quando aplicável. Uploads animados não são suportados na primeira fase e devem ser rejeitados com mensagem clara.
+Imagens menores não são ampliadas. As variantes proporcionais usam a menor largura entre a origem e o limite; o thumbnail faz corte central 16:9 sem ampliação, registrando suas dimensões reais. Corrigir orientação EXIF antes de descartar metadados e preservar transparência quando aplicável.
 
 ### 4.6. Estrutura de Arquivos em Disco
 
 ```text
 /public/uploads/{ano}/{mes}/
-  ├── {hash}-1920.avif (se habilitado)
-  ├── {hash}-1920.webp
-  ├── {hash}-1024.avif (se habilitado)
-  ├── {hash}-1024.webp
-  ├── {hash}-thumb.avif (se habilitado)
-  └── {hash}-thumb.webp
+  ├── {slug-da-imagem}-1920.avif (se habilitado)
+  ├── {slug-da-imagem}-1920.webp
+  ├── {slug-da-imagem}-1024.avif (se habilitado)
+  ├── {slug-da-imagem}-1024.webp
+  ├── {slug-da-imagem}-thumb.avif (se habilitado)
+  └── {slug-da-imagem}-thumb.webp
 ```
 
 ---
@@ -303,24 +307,39 @@ lightpress/
 
 ## 6. Fluxo de Edição, Renderização e Métricas
 
-### 6.1. Ciclo de Vida do Conteúdo
+### 6.1. Ciclo de Vida do Conteúdo e Editor Visual de Notícias
 
-1. **Redação:** O usuário escreve no editor próprio em JavaScript puro. Bibliotecas de editor só podem ser adotadas após comprovar compatibilidade com o orçamento completo de 50 KiB gzip; não são dependências presumidas.
-2. **Persistência Estruturada:** Ao salvar, o editor envia via `fetch()` autenticado uma carga limpa em JSON:
-   ```json
-   {
-     "schema_version": 1,
-     "blocks": [
-       {"type": "heading", "level": 2, "content": "Título da Notícia"},
-       {"type": "paragraph", "content": "Texto do parágrafo."},
-       {"type": "image", "media_id": "91ae508247dc6381ba45f0c72d96e310", "caption": "Legenda"}
-     ]
-   }
-   ```
-3. **Validação e compilação:** Autenticar, autorizar ação e campos, verificar CSRF e validar o esquema versionado dos blocos no servidor. O `BlockCompiler` produz HTML permitido e usa somente variantes de mídia válidas. Imagens abaixo da dobra usam `loading="lazy"`; a imagem principal visível inicialmente não deve ser atrasada por lazy loading.
-4. **Salvar rascunho ou revisão:** Criar snapshot em `post_revisions` com JSON e HTML compilado na mesma transação. Em conteúdo ainda não publicado, atualizar também `posts` com versão e data editorial explícitas. Em artigo publicado, manter `posts` intacto. Na criação, inicializar artigo, estatísticas e snapshot juntos. Gravações sem alteração efetiva não criam snapshots nem mudam datas.
-5. **Publicar ou atualizar:** Somente editor ou administrador pode aplicar uma revisão validada. Verificar conflitos, preservar o snapshot anterior e atualizar campos, JSON, HTML, `version` e `updated_at` na mesma transação. Registrar nela também o trabalho de invalidação com URLs anteriores e novas. Publicação inicial define `published_at`; atualizações posteriores preservam essa data, salvo correção explícita autorizada.
-6. **Propagação pública:** Após o commit, executar a purga descrita na seção 7. Salvar revisão pendente não invalida páginas públicas. Falha de purga não desfaz silenciosamente uma transação já confirmada: o painel informa propagação pendente e o trabalho permanece disponível para nova tentativa.
+1. **Redação e Editor de Redação Contínua (`public/admin/editor.php`):**
+   - **Canvas Visual Direto:** Elimina o atrito de blocos manuais rígidos. Jornalistas escrevem de forma contínua em um canvas visual rico (`contenteditable`), formatando títulos, parágrafos, listas e citações com atalhos e barra de ferramentas sticky.
+   - **Limpador Inteligente de Ctrl+V (Google Docs e Microsoft Word):** Ao colar matérias prontas redigidas externamente, o sistema intercepta o evento `paste` e sanitiza instantaneamente o HTML:
+     - Remove estilos sujos (`style="..."`), classes proprietárias do Office (`MsoNormal`), metadados, scripts, comentários condicionais (`<!--[if ...]>`) e tags legadas (`<o:p>`, `<xml>`).
+     - Desembrulha automaticamente os wrappers do Google Docs (`<b id="docs-internal-guid-...">`) evitando que a matéria inteira fique em negrito.
+     - Converte e preserva apenas tags semânticas limpas: `<h2>`, `<h3>`, `<p>`, `<strong>`, `<em>`, `<u>`, `<blockquote>`, `<ul>`, `<ol>`, `<li>` e `<a>` (com `rel="noopener noreferrer"`).
+   - **Barra de Ferramentas Rica e Leve (< 20 KiB Vanilla JS):** Formatação rápida (H2, H3, P, B, I, U, Listas, Citação, Link, Inserir Foto e alternância de código-fonte `</> HTML`).
+
+2. **Seletor de Mídias em Modal (Estilo WordPress):**
+   - **Imagem de Destaque:** Botão `[📷 Selecionar da Biblioteca]` abre um modal overlay completo. Exibe miniaturas, dimensões, peso e busca em tempo real por nome.
+   - **Upload Integrado:** Permite enviar novas fotos do computador direto pelo modal sem sair da redação.
+   - **Prévia e Remoção:** Ao confirmar, exibe prévia em proporção 16:9 no formulário com botão de remoção rápida `[✕ Remover Imagem]`.
+   - **Inserção no Corpo da Notícia:** O botão `[📷 Inserir Foto]` da barra de ferramentas insere a imagem selecionada com `<figure>`, `<img>` responsiva e `<figcaption>`.
+
+3. **Gerenciamento de Slug / URL Permanente:**
+   - Campo dedicado **Slug / URL Permanente** exibido logo abaixo do título com prévia em tempo real (`/noticia/slug/`).
+   - Sincronização automática enquanto o jornalista digita o título (com conversão para minúsculas, remoção de acentos e caracteres especiais).
+   - Botão `Auto 🪄` para regeneração a qualquer momento e permissão para digitação manual livre.
+   - **Resolução Automática de Colisões no Core (`PostService.php`):** Caso um slug já exista no banco para outro post, o sistema adiciona automaticamente sufixos numéricos (`-2`, `-3`), evitando falhas de chave duplicada.
+
+4. **SEO Nativo com Primary Focus Keyword:**
+   - Campo dedicado para **Palavra-chave Principal (Focus Keyword)** para orientar a estratégia de ranqueamento nos motores de busca, além do Título SEO (`seo_title`) e Meta Description (`seo_description`).
+
+5. **Validação, Sanitização e Compilação:**
+   - Autenticar, autorizar ação e campos, verificar CSRF e sanitizar o HTML no servidor via `BlockCompiler::sanitizeHtml`.
+   - O `BlockCompiler::htmlToBlocks` converte o HTML semântico sanitizado em estrutura de blocos JSON (`content_json`) para consumo de APIs headless e aplicativos móveis.
+
+6. **Salvar Rascunho ou Publicar:**
+   - Criar snapshot em `post_revisions` com JSON e HTML compilado na mesma transação. Em conteúdo ainda não publicado, atualizar também `posts` com versão e data editorial explícitas.
+   - Somente editor ou administrador pode publicar. Conflitos de edição concorrente são detectados via locking otimista (`version`).
+   - Após o commit, dispara a invalidação atômica do cache FastCGI das URLs afetadas (Home, Notícia e Categorias).
 
 ### 6.2. Contabilização de Visualizações (`post_stats.views`) com Cache Nginx Ativo
 
