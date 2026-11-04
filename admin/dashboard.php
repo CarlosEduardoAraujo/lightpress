@@ -97,7 +97,18 @@ $csrfToken = Security::generateCsrfToken();
 </head>
 <body>
     <header>
-        <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Admin</a>
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Admin</a>
+            <nav style="display: flex; gap: 1rem; font-size: 0.9rem;">
+                <a href="/admin/dashboard.php" style="color: var(--primary); font-weight: 700; text-decoration: none;">Notícias</a>
+                <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none;">Categorias</a>
+                <?php if ($currentUser['role'] === 'admin'): ?>
+                    <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none;">Usuários</a>
+                <?php endif; ?>
+                <a href="/admin/system.php" style="color: var(--text-muted); text-decoration: none;">Diagnóstico</a>
+                <a href="/" target="_blank" style="color: var(--text-muted); text-decoration: none;">Ver Site &rarr;</a>
+            </nav>
+        </div>
         <div class="user-menu">
             <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong> (<?= Security::e($currentUser['role']) ?>)</span>
             <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>">Sair</a>
