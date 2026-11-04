@@ -1,0 +1,32 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Exemplo de Configurações Locais / Produção
+ * 
+ * Copie este arquivo para config.local.php e edite com os dados do seu servidor:
+ * cp config.local.php.example config.local.php
+ */
+
+return [
+    'app' => [
+        'env' => 'production',
+        'debug' => false,
+        'canonical_origin' => 'https://seudominio.com.br',
+    ],
+    'database' => [
+        'driver' => 'mysql', // 'mysql' ou 'sqlite'
+        'host' => '127.0.0.1',
+        'port' => 3306,
+        'dbname' => 'lightpress_speedracing',
+        'username' => 'root',
+        'password' => '',
+    ],
+    'cache' => [
+        'enabled' => true,
+        'cache_path' => '/var/cache/nginx/lightpress',
+    ],
+    'security' => [
+        'hmac_secret' => 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO',
+    ],
+];

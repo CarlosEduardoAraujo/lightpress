@@ -86,13 +86,14 @@ sudo chmod -R 775 /var/cache/nginx/lightpress
 
 ## 6. Configuração de Ambiente (`config.local.php`)
 
-Crie o arquivo de sobreposição local (que não é comitado no Git):
+Copie o modelo de sobreposição local (ignorado pelo Git) e ajuste suas credenciais:
 
 ```bash
-sudo nano /var/www/lightpress/config.local.php
+sudo cp config.local.php.example config.local.php
+sudo nano config.local.php
 ```
 
-Insira as credenciais do seu ambiente:
+Exemplo de conteúdo retornado pelo arquivo:
 
 ```php
 <?php

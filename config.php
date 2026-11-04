@@ -92,10 +92,14 @@ $config = [
 ];
 
 // Carregar sobreposições locais (ambiente de desenvolvimento, credenciais locais) se existirem
-if (file_exists(__DIR__ . '/config.local.php')) {
-    $localConfig = require __DIR__ . '/config.local.php';
-    if (is_array($localConfig)) {
-        $config = array_replace_recursive($config, $localConfig);
+// Proteção contra recursão infinita caso config.local.php tenha sido copiado de config.php
+if (basename(__FILE__) === 'config.php' && file_exists(__DIR__ . '/config.local.php')) {
+    $localConfigFile = realpath(__DIR__ . '/config.local.php');
+    if ($localConfigFile && $localConfigFile !== realpath(__FILE__)) {
+        $localConfig = require $localConfigFile;
+        if (is_array($localConfig)) {
+            $config = array_replace_recursive($config, $localConfig);
+        }
     }
 }
 
