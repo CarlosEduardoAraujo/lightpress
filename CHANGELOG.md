@@ -33,6 +33,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
+- **URLs Canônicas de Notícias na Raiz (`/{slug}/`):** 
+  - Notícias agora possuem links diretos de alto impacto na raiz do domínio (ex: `https://lightpress.suainternet.com/gp-sao-paulo-2026/`).
+  - Redirecionamento permanente HTTP 301 automático de `/noticia/{slug}/` e `/noticia/{slug}` para `/{slug}/`, garantindo integridade de links antigos e retrocompatibilidade total.
+  - Canonicalização automática de barra final (`/`) no roteador para URLs amigáveis.
+- **Priorização Nativa de AVIF no Frontend e WebP para Redes Sociais:**
+  - O frontend passa a requisitar primordialmente variantes `.avif` de máxima compressão web para renderização no navegador.
+  - Metadados de compartilhamento social (`<!-- Open Graph & Twitter Cards -->` em `core/Seo.php`) preservam estritamente o formato `.webp`, garantindo exibição de cards ricos no X/Twitter, WhatsApp, Facebook e LinkedIn (que ainda não suportam AVIF).
+- **Redesign Editorial Moderno do Portal (Opção 1):**
+  - **Navegação Dinâmica e Dark Mode:** Header com categorias ativas do banco, busca animada em CSS puro e alternador de tema Claro/Escuro (Dark Mode) persistido no `localStorage`.
+  - **Home Page de Alto Impacto:** Manchete principal Hero em proporção 16:9, grid de matérias secundárias com cards responsivos e paginação numérica limpa.
+  - **Página de Artigo Completa:** Indicador de tempo estimado de leitura (*ex: ⏱️ 3 min*), bloco de biografia e avatar do autor, e módulo de **Notícias Relacionadas** (3 matérias recomendadas da mesma categoria).
+  - **Listagens Paginadas de Categorias:** Rota `/categoria/{slug}/page/{page}/` com navegação rápida de páginas.
 - **Campo Slug / URL Permanente no Editor:** Adicionado campo de edição de slug com prévia em tempo real da URL permanente (`/noticia/slug/`), botão de geração automática via título (`Auto 🪄`), digitação customizada livre e resolução inteligente de colisões com incremento numérico (`-2`, `-3`) no `PostService`.
 - **Editor de Notícias com Suporte a Rich Text e Colar do Google Docs / Word:**
   - Área visual de edição com suporte a colar direto de editores de texto externos (Google Docs, Microsoft Word, LibreOffice), eliminando estilos proprietários sujos (`MsoNormal`, `style="..."`, `class="..."`, tags Office) e preservando formatação semântica limpa (`h2`, `h3`, `p`, `strong`, `em`, `blockquote`, `ul`, `ol`, `a`).

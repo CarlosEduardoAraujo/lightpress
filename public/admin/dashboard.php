@@ -182,7 +182,7 @@ $csrfToken = Security::generateCsrfToken();
                                 <td style="text-align: right;">
                                     <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Editar</a>
                                     <?php if ($p['status'] === 'published'): ?>
-                                        &bull; <a href="/noticia/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--text-muted); text-decoration: none;">Ver</a>
+                                        &bull; <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--text-muted); text-decoration: none;">Ver</a>
                                     <?php endif; ?>
                                 </td>
                             </tr>

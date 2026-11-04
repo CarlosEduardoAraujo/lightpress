@@ -272,7 +272,7 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                 <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">👁️ Prévia Privada</a>
             <?php endif; ?>
             <?php if ($post && $post['status'] === 'published'): ?>
-                <a href="/noticia/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">Ver Artigo no Ar &rarr;</a>
+                <a href="/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">Ver Artigo no Ar &rarr;</a>
             <?php endif; ?>
         </div>
     </header>
@@ -305,11 +305,11 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem;">
                                 <label for="slug" style="margin-bottom: 0;">Slug / URL Permanente *</label>
                                 <span style="font-size: 0.78rem; color: var(--text-muted);">
-                                    Link: <strong>/noticia/<span id="slugPreviewText"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/</strong>
+                                    Link: <strong>/<span id="slugPreviewText"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/</strong>
                                 </span>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                <span style="font-size: 0.85rem; color: var(--text-muted); font-family: monospace; white-space: nowrap;">/noticia/</span>
+                                <span style="font-size: 0.85rem; color: var(--text-muted); font-family: monospace; white-space: nowrap;">/</span>
                                 <input type="text" id="slug" name="slug" value="<?= Security::e($post['slug'] ?? '') ?>" placeholder="ex: ferrari-confirma-novos-componentes" style="font-family: monospace; font-size: 0.9rem;" required>
                                 <button type="button" class="btn btn-secondary" onclick="generateSlugFromTitle(true)" title="Gerar automaticamente com base no título" style="padding: 0.65rem 0.9rem; font-size: 0.82rem; white-space: nowrap;">
                                     Auto 🪄

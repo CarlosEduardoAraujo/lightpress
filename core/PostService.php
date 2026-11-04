@@ -207,6 +207,8 @@ class PostService
             // Invalidação e registro de purga de cache
             $affectedUrls = [
                 '/',
+                "/{$slug}/",
+                "/{$current['slug']}/",
                 "/noticia/{$slug}/",
                 "/noticia/{$current['slug']}/",
                 "/categoria/{$category}/",

@@ -43,6 +43,40 @@ class ImageProcessor
     }
 
     /**
+     * Converte uma URL de imagem para a variante AVIF de máxima compressão web.
+     */
+    public static function toAvifUrl(string $url): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+        if (str_ends_with($url, '.webp')) {
+            return substr($url, 0, -5) . '.avif';
+        }
+        if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg')) {
+            return preg_replace('~\.(jpe?g|png)$~i', '.avif', $url);
+        }
+        return $url;
+    }
+
+    /**
+     * Converte uma URL de imagem para a variante WebP (compatibilidade garantida com redes sociais/Open Graph).
+     */
+    public static function toWebpUrl(string $url): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+        if (str_ends_with($url, '.avif')) {
+            return substr($url, 0, -5) . '.webp';
+        }
+        if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg')) {
+            return preg_replace('~\.(jpe?g|png)$~i', '.webp', $url);
+        }
+        return $url;
+    }
+
+    /**
      * Processa um arquivo enviado via upload ($_FILES).
      *
      * @param string $tmpFilePath Caminho temporário do arquivo

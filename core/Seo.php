@@ -35,8 +35,10 @@ class Seo
         if ($post !== null) {
             $title = !empty($post['seo_title']) ? $post['seo_title'] : $post['title'];
             $description = !empty($post['seo_description']) ? $post['seo_description'] : ($post['summary'] ?? '');
-            $url = "{$canonicalOrigin}/noticia/" . Security::e($post['slug'] ?? '') . '/';
-            $image = !empty($post['featured_image']) ? (str_starts_with($post['featured_image'], 'http') ? $post['featured_image'] : "{$canonicalOrigin}{$post['featured_image']}") : '';
+            $url = "{$canonicalOrigin}/" . Security::e($post['slug'] ?? '') . '/';
+            $rawImage = !empty($post['featured_image']) ? (str_starts_with($post['featured_image'], 'http') ? $post['featured_image'] : "{$canonicalOrigin}{$post['featured_image']}") : '';
+            // Forçar WebP para Open Graph e Twitter Cards (redes sociais como X/Twitter ainda não aceitam AVIF)
+            $image = !empty($rawImage) ? ImageProcessor::toWebpUrl($rawImage) : '';
             $type = 'article';
         } else {
             $title = $siteName . ' - Portal de Notícias de Alta Performance';
@@ -97,7 +99,7 @@ class Seo
                 '@type' => 'NewsArticle',
                 'mainEntityOfPage' => [
                     '@type' => 'WebPage',
-                    '@id' => "{$canonicalOrigin}/noticia/{$post['slug']}/",
+                    '@id' => "{$canonicalOrigin}/{$post['slug']}/",
                 ],
                 'headline' => $post['title'],
                 'description' => $post['summary'] ?? '',

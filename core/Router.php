@@ -84,6 +84,19 @@ class Router
             exit;
         }
 
+        // Redirecionamento de compatibilidade: /noticia/{slug} -> /{slug}/ (301)
+        if (preg_match('~^/noticia/([^/]+)/?$~', $path, $matches)) {
+            header('Location: /' . $matches[1] . '/', true, 301);
+            exit;
+        }
+
+        // Canonicalização de barra final para rotas públicas amigáveis (sem extensão de arquivo)
+        if ($path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
+            $queryString = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+            header('Location: ' . $path . '/' . $queryString, true, 301);
+            exit;
+        }
+
         // Busca rota correspondente
         foreach ($this->routes as $route) {
             if ($route['method'] !== $method) {

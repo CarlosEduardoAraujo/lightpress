@@ -30,6 +30,7 @@ $router->get('/', function () use ($config): void {
     }
 
     $nowUtc = gmdate('Y-m-d H:i:s');
+    $perPage = 12;
     
     // Buscar artigo em destaque principal
     $featured = Database::fetchOne(
@@ -40,16 +41,25 @@ $router->get('/', function () use ($config): void {
         [$nowUtc]
     );
 
+    // Total de posts para cálculo de paginação
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+        [$nowUtc]
+    );
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = 1;
+
     // Buscar últimas publicações (12 por página)
+    $featuredId = $featured ? (int)$featured['id'] : 0;
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 12",
-        [$nowUtc]
+         WHERE status = 'published' AND published_at <= ? AND id != ?
+         ORDER BY published_at DESC LIMIT ?",
+        [$nowUtc, $featuredId, $perPage]
     );
 
-    $pageTitle = $config['app']['name'] . ' - Início';
+    $pageTitle = $config['app']['name'] . ' - Portal de Notícias';
     require $config['paths']['templates'] . '/home.php';
 });
 
@@ -60,6 +70,13 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+        [$nowUtc]
+    );
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = $page;
+
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
@@ -68,37 +85,53 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
         [$nowUtc, $perPage, $offset]
     );
 
+    $featured = null; // Apenas na primeira página
     $pageTitle = "Página {$page} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/home.php';
 });
 
-// Rota 3: Artigo Individual (/noticia/{slug}/)
-$router->get('/noticia/{slug}/', function (array $params) use ($config): void {
-    $slug = $params['slug'] ?? '';
+// Rota 3: Listagem por Categoria (/categoria/{slug}/)
+$router->get('/categoria/{slug}/', function (array $params) use ($config): void {
+    $categorySlug = $params['slug'] ?? '';
     $nowUtc = gmdate('Y-m-d H:i:s');
+    $perPage = 12;
 
-    $post = Database::fetchOne(
-        "SELECT p.*, u.name as author_name, u.avatar as author_avatar
-         FROM posts p
-         JOIN users u ON u.id = p.user_id
-         WHERE p.slug = ? AND p.status = 'published' AND p.published_at <= ?
-         LIMIT 1",
-        [$slug, $nowUtc]
+    $category = Database::fetchOne(
+        "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
+        [$categorySlug]
     );
 
-    if (!$post) {
+    if (!$category) {
         http_response_code(404);
         require $config['paths']['templates'] . '/404.php';
         return;
     }
 
-    $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
-    require $config['paths']['templates'] . '/post.php';
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+        [$categorySlug, $nowUtc]
+    );
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = 1;
+
+    $posts = Database::fetchAll(
+        "SELECT id, slug, title, summary, category, featured_image, published_at 
+         FROM posts 
+         WHERE category = ? AND status = 'published' AND published_at <= ?
+         ORDER BY published_at DESC LIMIT ?",
+        [$categorySlug, $nowUtc, $perPage]
+    );
+
+    $pageTitle = $category['name'] . ' - ' . $config['app']['name'];
+    require $config['paths']['templates'] . '/category.php';
 });
 
-// Rota 4: Listagem por Categoria (/categoria/{slug}/)
-$router->get('/categoria/{slug}/', function (array $params) use ($config): void {
+// Rota 4: Listagem Paginada de Categoria (/categoria/{slug}/page/{page}/)
+$router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($config): void {
     $categorySlug = $params['slug'] ?? '';
+    $page = max(2, (int)($params['page'] ?? 2));
+    $perPage = 12;
+    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $category = Database::fetchOne(
@@ -112,15 +145,22 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
         return;
     }
 
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+        [$categorySlug, $nowUtc]
+    );
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = $page;
+
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
          WHERE category = ? AND status = 'published' AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 12",
-        [$categorySlug, $nowUtc]
+         ORDER BY published_at DESC LIMIT ? OFFSET ?",
+        [$categorySlug, $nowUtc, $perPage, $offset]
     );
 
-    $pageTitle = $category['name'] . ' - ' . $config['app']['name'];
+    $pageTitle = $category['name'] . " - Página {$page} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/category.php';
 });
 
@@ -143,6 +183,52 @@ $router->get('/busca', function () use ($config): void {
 
     $pageTitle = "Busca: {$query} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/search.php';
+});
+
+// Rota 6: Artigo Individual na Raiz (/{slug}/)
+$router->get('/{slug}/', function (array $params) use ($config): void {
+    $slug = $params['slug'] ?? '';
+    $nowUtc = gmdate('Y-m-d H:i:s');
+
+    // Palavras reservadas que não devem ser tratadas como slug de notícia
+    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria'];
+    if (in_array(strtolower($slug), $reserved, true)) {
+        http_response_code(404);
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $post = Database::fetchOne(
+        "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
+         FROM posts p
+         JOIN users u ON u.id = p.user_id
+         WHERE p.slug = ? AND p.status = 'published' AND p.published_at <= ?
+         LIMIT 1",
+        [$slug, $nowUtc]
+    );
+
+    if (!$post) {
+        http_response_code(404);
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    // Buscar até 3 notícias relacionadas da mesma categoria para retenção de audiência
+    $relatedPosts = Database::fetchAll(
+        "SELECT id, slug, title, summary, category, featured_image, published_at 
+         FROM posts 
+         WHERE category = ? AND status = 'published' AND id != ? AND published_at <= ?
+         ORDER BY published_at DESC LIMIT 3",
+        [$post['category'], (int)$post['id'], $nowUtc]
+    );
+
+    // Calcular tempo estimado de leitura (média de 200 palavras/minuto)
+    $cleanText = strip_tags($post['content_html']);
+    $wordCount = str_word_count($cleanText);
+    $readingTime = max(1, (int)ceil($wordCount / 200));
+
+    $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
+    require $config['paths']['templates'] . '/post.php';
 });
 
 // Rota 6: RSS Feed (/feed.xml)
@@ -171,10 +257,10 @@ $router->get('/feed.xml', function () use ($config): void {
     <?php foreach ($posts as $item): ?>
       <item>
         <title><?= Security::e($item['title']) ?></title>
-        <link><?= Security::e($canonicalOrigin) ?>/noticia/<?= Security::e($item['slug']) ?>/</link>
+        <link><?= Security::e($canonicalOrigin) ?>/<?= Security::e($item['slug']) ?>/</link>
         <description><?= Security::e($item['summary'] ?? '') ?></description>
         <pubDate><?= date(DATE_RSS, strtotime($item['published_at'])) ?></pubDate>
-        <guid isPermaLink="true"><?= Security::e($canonicalOrigin) ?>/noticia/<?= Security::e($item['slug']) ?>/</guid>
+        <guid isPermaLink="true"><?= Security::e($canonicalOrigin) ?>/<?= Security::e($item['slug']) ?>/</guid>
       </item>
     <?php endforeach; ?>
   </channel>
@@ -215,7 +301,7 @@ $router->get('/sitemap.xml', function () use ($config): void {
   <?php endforeach; ?>
   <?php foreach ($posts as $p): ?>
     <url>
-      <loc><?= Security::e($canonicalOrigin) ?>/noticia/<?= Security::e($p['slug']) ?>/</loc>
+      <loc><?= Security::e($canonicalOrigin) ?>/<?= Security::e($p['slug']) ?>/</loc>
       <lastmod><?= date('c', strtotime($p['updated_at'])) ?></lastmod>
       <changefreq>monthly</changefreq>
       <priority>0.6</priority>
