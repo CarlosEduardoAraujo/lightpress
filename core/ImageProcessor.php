@@ -171,12 +171,14 @@ class ImageProcessor
 
                 imagewebp($resized, $webpStaging, $this->webpQuality);
                 if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
+                    $webpSize = filesize($webpStaging);
                     rename($webpStaging, $webpTarget);
                     $manifest['variants'][$key]['webp'] = [
                         'url' => "{$relativeDir}/{$webpFilename}",
                         'width' => $w,
                         'height' => $h,
                         'mime' => 'image/webp',
+                        'size' => $webpSize,
                     ];
                 } else {
                     @unlink($webpStaging);
@@ -192,12 +194,14 @@ class ImageProcessor
                     try {
                         $avifSuccess = @imageavif($resized, $avifStaging, $this->avifQuality, $this->avifSpeed);
                         if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
+                            $avifSize = filesize($avifStaging);
                             rename($avifStaging, $avifTarget);
                             $manifest['variants'][$key]['avif'] = [
                                 'url' => "{$relativeDir}/{$avifFilename}",
                                 'width' => $w,
                                 'height' => $h,
                                 'mime' => 'image/avif',
+                                'size' => $avifSize,
                             ];
                         } else {
                             @unlink($avifStaging);

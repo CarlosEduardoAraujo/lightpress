@@ -256,6 +256,33 @@ $csrfToken = Security::generateCsrfToken();
                         $fullUrl = $variants['intermediate']['webp']['url'] ?? ($variants['full']['webp']['url'] ?? '');
                         $origW = $variants['full']['webp']['width'] ?? 0;
                         $origH = $variants['full']['webp']['height'] ?? 0;
+
+                        $origSize = (int)$item['file_size'];
+                        $origExt = strtoupper(pathinfo($item['original_name'], PATHINFO_EXTENSION) ?: 'IMG');
+
+                        // Medições da variante Full WebP
+                        $webpSize = $variants['full']['webp']['size'] ?? 0;
+                        if (!$webpSize && !empty($variants['full']['webp']['url'])) {
+                            $localWebp = $config['paths']['public'] . $variants['full']['webp']['url'];
+                            if (file_exists($localWebp)) {
+                                $webpSize = filesize($localWebp);
+                            }
+                        }
+                        $webpReduction = ($origSize > 0 && $webpSize > 0 && $webpSize < $origSize)
+                            ? round((1 - ($webpSize / $origSize)) * 100)
+                            : 0;
+
+                        // Medições da variante Full AVIF
+                        $avifSize = $variants['full']['avif']['size'] ?? 0;
+                        if (!$avifSize && !empty($variants['full']['avif']['url'])) {
+                            $localAvif = $config['paths']['public'] . $variants['full']['avif']['url'];
+                            if (file_exists($localAvif)) {
+                                $avifSize = filesize($localAvif);
+                            }
+                        }
+                        $avifReduction = ($origSize > 0 && $avifSize > 0 && $avifSize < $origSize)
+                            ? round((1 - ($avifSize / $origSize)) * 100)
+                            : 0;
                     ?>
                     <div class="media-card" id="media-card-<?= Security::e($item['id']) ?>">
                         <?php if (!empty($thumbUrl)): ?>
@@ -267,10 +294,29 @@ $csrfToken = Security::generateCsrfToken();
                             <div class="media-name" title="<?= Security::e($item['original_name']) ?>">
                                 <?= Security::e($item['original_name']) ?>
                             </div>
-                            <div class="media-meta">
-                                <span><?= round((int)$item['file_size'] / 1024) ?> KiB</span> &bull; 
-                                <span><?= $origW ?>x<?= $origH ?>px</span><br>
-                                <span>Por <?= Security::e($item['uploader_name']) ?></span>
+                            <div class="media-meta" style="line-height: 1.5; font-size: 0.78rem;">
+                                <div style="color: #475569; margin-bottom: 0.2rem;">
+                                    <strong><?= round($origSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;"><?= Security::e($origExt) ?></span>
+                                </div>
+                                <?php if ($avifSize > 0): ?>
+                                    <div style="color: #047857; margin-bottom: 0.2rem;">
+                                        <strong><?= round($avifSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;">AVIF</span>
+                                        <?php if ($avifReduction > 0): ?>
+                                            - <span style="font-weight: 700; color: #059669;"><?= $avifReduction ?>% (redução do tamanho)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($webpSize > 0): ?>
+                                    <div style="color: #1d4ed8; margin-bottom: 0.35rem;">
+                                        <strong><?= round($webpSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;">WebP</span>
+                                        <?php if ($webpReduction > 0): ?>
+                                            - <span style="font-weight: 700; color: #2563eb;"><?= $webpReduction ?>% (redução do tamanho)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <div style="color: var(--text-muted); font-size: 0.72rem;">
+                                    Por <?= Security::e($item['uploader_name']) ?>
+                                </div>
                             </div>
 
                             <?php if (!empty($fullUrl)): ?>
