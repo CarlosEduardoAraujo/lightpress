@@ -40,6 +40,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     }
 }
 
+// Alternar destaque do artigo na Home
+if (isset($_GET['toggle_featured_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
+    if (\LightPress\Core\Authorization::can($currentUser, \LightPress\Core\Authorization::ACTION_SET_FEATURED)) {
+        $toggleId = (int)$_GET['toggle_featured_id'];
+        Database::query("UPDATE posts SET is_featured = IF(is_featured = 1, 0, 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleId]);
+        $cacheMgr = new \LightPress\Core\CacheManager($config);
+        $cacheMgr->purgeUrls(['/']);
+        header('Location: /admin/dashboard.php');
+        exit;
+    }
+}
+
 // Listar artigos recentes com estatísticas
 $posts = Database::fetchAll(
     "SELECT p.id, p.title, p.slug, p.category, p.status, p.is_featured, p.updated_at, p.published_at,
@@ -101,6 +113,7 @@ $csrfToken = Security::generateCsrfToken();
             <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Admin</a>
             <nav style="display: flex; gap: 1rem; font-size: 0.9rem;">
                 <a href="/admin/dashboard.php" style="color: var(--primary); font-weight: 700; text-decoration: none;">Notícias</a>
+                <a href="/admin/media.php" style="color: var(--text-muted); text-decoration: none;">Mídias</a>
                 <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none;">Categorias</a>
                 <?php if ($currentUser['role'] === 'admin'): ?>
                     <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none;">Usuários</a>
@@ -147,7 +160,13 @@ $csrfToken = Security::generateCsrfToken();
                             <tr>
                                 <td>
                                     <strong><?= Security::e($p['title']) ?></strong>
-                                    <?php if (!empty($p['is_featured'])): ?>
+                                    <?php if (\LightPress\Core\Authorization::can($currentUser, \LightPress\Core\Authorization::ACTION_SET_FEATURED)): ?>
+                                        <a href="/admin/dashboard.php?toggle_featured_id=<?= (int)$p['id'] ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
+                                           title="Clique para alternar destaque na Home" 
+                                           style="text-decoration: none; font-size: 0.8rem; margin-left: 0.5rem; color: <?= !empty($p['is_featured']) ? '#d97706' : '#94a3b8' ?>; font-weight: 600;">
+                                            <?= !empty($p['is_featured']) ? '★ Destaque' : '☆ Destacar' ?>
+                                        </a>
+                                    <?php elseif (!empty($p['is_featured'])): ?>
                                         <span style="font-size: 0.75rem; color: #d97706; margin-left: 0.4rem;">★ Destaque</span>
                                     <?php endif; ?>
                                 </td>

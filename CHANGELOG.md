@@ -39,15 +39,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - `public/api/posts.php` e `public/api/categories.php`: micro-APIs de leitura pública em JSON com suporte a paginação e filtros (Headless ready).
   - Templates com suporte automático a **Dark Mode** (`prefers-color-scheme: dark`), barra de busca no cabeçalho e página de resultados em `templates/search.php`.
 
-- **Pipeline de Mídia e Compilação de Conteúdo:**
+- **Pipeline de Mídia e Galeria de Fotos:**
   - `core/ImageProcessor.php`: conversão para WebP obrigatório e AVIF opcional, corte 16:9 de thumbnail, 3 resoluções e descarte seguro de originais.
+  - `admin/media.php`: galeria e biblioteca de mídias com upload direto, prévia WebP, cópia rápida de URLs formatadas e proteção contra remoção de imagens ativas.
   - `core/BlockCompiler.php`: compilador e sanitizador semântico de blocos JSON para HTML5 com proteção estrita contra XSS.
   - `core/PostService.php`: ciclo de vida de publicações, isolamento de visualizações em `post_stats` e versionamento otimista contra conflitos concorrentes (HTTP 409).
   - `core/CacheManager.php`: purga de arquivos em disco para FastCGI Cache do Nginx baseada em hash MD5 e gerenciamento de jobs pendentes.
 
 - **Painel Administrativo Completo (< 50 KiB):**
   - `admin/login.php`: autenticação com Argon2id e proteção contra força bruta.
-  - `admin/dashboard.php`: listagem rápida de notícias com navegação integrada, contadores de visualizações e controle de sessões revogáveis.
+  - `admin/dashboard.php`: listagem rápida de notícias com navegação integrada, alternância de destaque com um clique, contadores de visualizações e controle de sessões revogáveis.
   - `admin/editor.php`: editor de blocos leve em Vanilla JS sem React/Redux com botão de prévia privada e histórico de versões.
   - `admin/preview.php`: ambiente de prévia privada autenticada para rascunhos com `Cache-Control: private, no-store`.
   - `admin/revisions.php`: visualizador de snapshots históricos e botão para restaurar revisões passadas.
