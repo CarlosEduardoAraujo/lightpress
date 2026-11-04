@@ -47,7 +47,8 @@ class PostService
             throw new RuntimeException("O título da publicação é obrigatório.", 400);
         }
 
-        $slug = !empty($data['slug']) ? Security::slugify($data['slug']) : Security::slugify($title);
+        $baseSlug = !empty($data['slug']) ? Security::slugify($data['slug']) : Security::slugify($title);
+        $slug = $this->resolveUniqueSlug($baseSlug);
         $summary = $data['summary'] ?? null;
         $category = !empty($data['category']) ? Security::slugify($data['category']) : 'geral';
         $tags = $data['tags'] ?? null;
@@ -149,7 +150,8 @@ class PostService
             }
 
             $title = trim($data['title'] ?? '');
-            $slug = !empty($data['slug']) ? Security::slugify($data['slug']) : $current['slug'];
+            $baseSlug = !empty($data['slug']) ? Security::slugify($data['slug']) : $current['slug'];
+            $slug = $this->resolveUniqueSlug($baseSlug, $postId);
             $summary = $data['summary'] ?? null;
             $category = !empty($data['category']) ? Security::slugify($data['category']) : $current['category'];
             $tags = $data['tags'] ?? null;
@@ -216,5 +218,34 @@ class PostService
 
             return true;
         });
+    }
+
+    /**
+     * Garante unicidade do slug adicionando sufixo numérico (-2, -3) caso já exista no banco.
+     */
+    private function resolveUniqueSlug(string $baseSlug, ?int $ignorePostId = null): string
+    {
+        $baseSlug = trim($baseSlug, '-');
+        if (empty($baseSlug)) {
+            $baseSlug = 'artigo';
+        }
+
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while (true) {
+            if ($ignorePostId !== null) {
+                $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? AND id != ? LIMIT 1", [$slug, $ignorePostId]);
+            } else {
+                $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? LIMIT 1", [$slug]);
+            }
+
+            if (!$exists) {
+                return $slug;
+            }
+
+            $counter++;
+            $slug = "{$baseSlug}-{$counter}";
+        }
     }
 }

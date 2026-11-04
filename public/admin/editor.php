@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $action = $_POST['form_action'] ?? 'save_draft';
         $title = trim($_POST['title'] ?? '');
+        $slug = trim($_POST['slug'] ?? '');
         $category = trim($_POST['category'] ?? 'geral');
         $summary = trim($_POST['summary'] ?? '');
         $featuredImage = trim($_POST['featured_image'] ?? '');
@@ -71,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $payload = [
             'title' => $title,
+            'slug' => $slug,
             'summary' => $summary,
             'category' => $category,
             'featured_image' => $featuredImage,
@@ -106,15 +108,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? $contentJson
                         : BlockCompiler::htmlToBlocks($cleanHtml);
 
+                    $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($post['slug']) ? $post['slug'] : Security::slugify($title));
+
                     Database::query(
                         "UPDATE posts SET 
-                            title = ?, summary = ?, category = ?, featured_image = ?, 
+                            title = ?, slug = ?, summary = ?, category = ?, featured_image = ?, 
                             content_json = ?, content_html = ?, seo_title = ?, 
                             seo_description = ?, focus_keyword = ?, is_featured = ?, 
                             updated_at = CURRENT_TIMESTAMP 
                          WHERE id = ?",
                         [
-                            $title, $summary, $category, $featuredImage, 
+                            $title, $cleanSlug, $summary, $category, $featuredImage, 
                             $cleanJson, $cleanHtml, $seoTitle, 
                             $seoDesc, $focusKeyword, $isFeatured, $postId
                         ]
@@ -295,6 +299,22 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                         <div class="form-group">
                             <label for="title">Título da Notícia *</label>
                             <input type="text" id="title" name="title" value="<?= Security::e($post['title'] ?? '') ?>" required style="font-size: 1.35rem; font-weight: 800;" placeholder="Ex: Ferrari confirma chegada de novos componentes para o GP de Interlagos">
+                        </div>
+
+                        <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem;">
+                                <label for="slug" style="margin-bottom: 0;">Slug / URL Permanente *</label>
+                                <span style="font-size: 0.78rem; color: var(--text-muted);">
+                                    Link: <strong>/noticia/<span id="slugPreviewText"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/</strong>
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span style="font-size: 0.85rem; color: var(--text-muted); font-family: monospace; white-space: nowrap;">/noticia/</span>
+                                <input type="text" id="slug" name="slug" value="<?= Security::e($post['slug'] ?? '') ?>" placeholder="ex: ferrari-confirma-novos-componentes" style="font-family: monospace; font-size: 0.9rem;" required>
+                                <button type="button" class="btn btn-secondary" onclick="generateSlugFromTitle(true)" title="Gerar automaticamente com base no título" style="padding: 0.65rem 0.9rem; font-size: 0.82rem; white-space: nowrap;">
+                                    Auto 🪄
+                                </button>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -493,13 +513,24 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
         editorCanvas.addEventListener('paste', function(e) {
             e.preventDefault();
             var clipboardData = e.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
             var html = clipboardData.getData('text/html');
             var text = clipboardData.getData('text/plain');
 
-            if (html) {
-                var cleanHtml = cleanWordOrDocsHtml(html);
-                document.execCommand('insertHTML', false, cleanHtml);
-            } else if (text) {
+            if (html && html.trim() !== '') {
+                try {
+                    var cleanHtml = cleanWordOrDocsHtml(html);
+                    if (cleanHtml && cleanHtml.trim() !== '') {
+                        document.execCommand('insertHTML', false, cleanHtml);
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Erro ao processar HTML colado:', err);
+                }
+            }
+            
+            if (text && text.trim() !== '') {
                 var paragraphs = text.split(/\r?\n\r?\n/).map(function(p) {
                     var trimmed = p.trim();
                     return trimmed ? '<p>' + escapeHtml(trimmed) + '</p>' : '';
@@ -509,54 +540,127 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
         });
 
         function cleanWordOrDocsHtml(html) {
+            if (!html || typeof html !== 'string') return '';
+
+            // 1. Pré-limpeza de comentários condicionais e tags proprietárias de XML/Office
+            html = html.replace(/<!--[\s\S]*?-->/g, '');
+            html = html.replace(/<xml[\s\S]*?<\/xml>/gi, '');
+            html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
+            html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+
             var doc = new DOMParser().parseFromString(html, 'text/html');
-            
-            // Remover scripts, styles, meta, comentários e tags de office
-            var badTags = doc.querySelectorAll('script, style, meta, link, o\\:p, xml');
+            if (!doc || !doc.body) return '';
+
+            // 2. Remover tags indesejadas remanescentes
+            var badTags = doc.querySelectorAll('script, style, meta, link, o\\:p, xml, font');
             badTags.forEach(function(el) { el.remove(); });
 
             var allowedTags = ['P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'IMG', 'FIGURE', 'FIGCAPTION', 'BR', 'HR'];
-            
+
             function cleanNode(node) {
+                if (!node) return;
+
+                if (node.nodeType === Node.COMMENT_NODE) {
+                    if (node.parentNode) node.parentNode.removeChild(node);
+                    return;
+                }
+
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     var tag = node.tagName.toUpperCase();
 
+                    // Nunca desestruturar ou remover o BODY ou HTML
+                    if (tag === 'BODY' || tag === 'HTML') {
+                        var bodyChildren = Array.from(node.childNodes);
+                        bodyChildren.forEach(cleanNode);
+                        return;
+                    }
+
+                    // Se for H1, converte para H2 (hierarquia de artigo)
+                    if (tag === 'H1') {
+                        var h2 = doc.createElement('h2');
+                        while (node.firstChild) h2.appendChild(node.firstChild);
+                        if (node.parentNode) node.parentNode.replaceChild(h2, node);
+                        node = h2;
+                        tag = 'H2';
+                    } else if (tag === 'H5' || tag === 'H6') {
+                        var h3 = doc.createElement('h3');
+                        while (node.firstChild) h3.appendChild(node.firstChild);
+                        if (node.parentNode) node.parentNode.replaceChild(h3, node);
+                        node = h3;
+                        tag = 'H3';
+                    }
+
+                    // Se for DIV, SECTION, ARTICLE ou MAIN
+                    if (tag === 'DIV' || tag === 'SECTION' || tag === 'ARTICLE' || tag === 'MAIN') {
+                        var hasBlock = node.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, div');
+                        if (hasBlock) {
+                            var parentDiv = node.parentNode;
+                            if (parentDiv) {
+                                while (node.firstChild) {
+                                    var childDiv = node.firstChild;
+                                    parentDiv.insertBefore(childDiv, node);
+                                    cleanNode(childDiv);
+                                }
+                                parentDiv.removeChild(node);
+                            }
+                            return;
+                        } else {
+                            var p = doc.createElement('p');
+                            while (node.firstChild) p.appendChild(node.firstChild);
+                            if (node.parentNode) node.parentNode.replaceChild(p, node);
+                            node = p;
+                            tag = 'P';
+                        }
+                    }
+
+                    // Wrapper padrão do Google Docs (<b id="docs-internal-guid-...">)
+                    if ((tag === 'B' || tag === 'STRONG') && (node.querySelector('p, h1, h2, h3, h4, ul, ol, div') || (node.id && node.id.indexOf('docs-internal-guid') !== -1))) {
+                        var parentB = node.parentNode;
+                        if (parentB) {
+                            while (node.firstChild) {
+                                var childB = node.firstChild;
+                                parentB.insertBefore(childB, node);
+                                cleanNode(childB);
+                            }
+                            parentB.removeChild(node);
+                        }
+                        return;
+                    }
+
                     // Mapeamento semântico
-                    if (tag === 'DIV' || tag === 'SECTION' || tag === 'ARTICLE') {
-                        var p = doc.createElement('p');
-                        while (node.firstChild) p.appendChild(node.firstChild);
-                        node.parentNode.replaceChild(p, node);
-                        node = p;
-                        tag = 'P';
-                    } else if (tag === 'B') {
+                    if (tag === 'B') {
                         var strong = doc.createElement('strong');
                         while (node.firstChild) strong.appendChild(node.firstChild);
-                        node.parentNode.replaceChild(strong, node);
+                        if (node.parentNode) node.parentNode.replaceChild(strong, node);
                         node = strong;
                         tag = 'STRONG';
                     } else if (tag === 'I') {
                         var em = doc.createElement('em');
                         while (node.firstChild) em.appendChild(node.firstChild);
-                        node.parentNode.replaceChild(em, node);
+                        if (node.parentNode) node.parentNode.replaceChild(em, node);
                         node = em;
                         tag = 'EM';
                     }
 
                     if (!allowedTags.includes(tag)) {
-                        // Desembrulhar elemento não permitido preservando o conteúdo interno
+                        // Desembrulhar elemento não permitido (ex: <span>, <font>) preservando conteúdo
                         var parent = node.parentNode;
-                        while (node.firstChild) {
-                            parent.insertBefore(node.firstChild, node);
+                        if (parent) {
+                            while (node.firstChild) {
+                                var child = node.firstChild;
+                                parent.insertBefore(child, node);
+                                cleanNode(child);
+                            }
+                            parent.removeChild(node);
                         }
-                        parent.removeChild(node);
                         return;
                     }
 
-                    // Remover estilos sujos, classes de Word (MsoNormal) e on*
+                    // Remover estilos sujos, classes de Word (MsoNormal), IDs e eventos on*
                     var attrs = Array.from(node.attributes);
                     attrs.forEach(function(attr) {
                         var name = attr.name.toLowerCase();
-                        if (name.startsWith('on') || name === 'style' || name === 'class' || name === 'id' || name === 'dir') {
+                        if (name.startsWith('on') || name === 'style' || name === 'class' || name === 'id' || name === 'dir' || name === 'lang') {
                             node.removeAttribute(attr.name);
                         }
                     });
@@ -573,11 +677,67 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             }
 
             cleanNode(doc.body);
-            return doc.body.innerHTML;
+            return doc.body ? doc.body.innerHTML : '';
         }
 
         function escapeHtml(text) {
             return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // -------------------------------------------------------------
+        // Gerenciamento e Sincronização do Slug
+        // -------------------------------------------------------------
+        var titleInput = document.getElementById('title');
+        var slugInput = document.getElementById('slug');
+        var slugPreviewText = document.getElementById('slugPreviewText');
+        var userEditedSlug = <?= (!empty($post['slug'])) ? 'true' : 'false' ?>;
+
+        function slugifyJs(text) {
+            return text.toString().toLowerCase().trim()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/[\s_]+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        if (slugInput) {
+            slugInput.addEventListener('input', function() {
+                userEditedSlug = true;
+                if (slugPreviewText) {
+                    slugPreviewText.innerText = slugifyJs(slugInput.value) || 'url-da-noticia';
+                }
+            });
+
+            slugInput.addEventListener('blur', function() {
+                slugInput.value = slugifyJs(slugInput.value);
+                if (slugPreviewText) {
+                    slugPreviewText.innerText = slugInput.value || 'url-da-noticia';
+                }
+            });
+        }
+
+        if (titleInput) {
+            titleInput.addEventListener('input', function() {
+                if (!userEditedSlug || !slugInput.value.trim()) {
+                    var auto = slugifyJs(titleInput.value);
+                    slugInput.value = auto;
+                    if (slugPreviewText) {
+                        slugPreviewText.innerText = auto || 'url-da-noticia';
+                    }
+                }
+            });
+        }
+
+        function generateSlugFromTitle(force) {
+            var auto = slugifyJs(titleInput.value);
+            slugInput.value = auto;
+            if (slugPreviewText) {
+                slugPreviewText.innerText = auto || 'url-da-noticia';
+            }
+            if (force) {
+                userEditedSlug = false;
+            }
         }
 
         function handleFormSubmit() {

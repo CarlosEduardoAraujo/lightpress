@@ -8,6 +8,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Corrigido
+- **BUG no Colar do Editor Visual (`cleanWordOrDocsHtml`):** Corrigido erro `TypeError: Cannot read properties of null (reading 'innerHTML')` ao colar conteúdo do Google Docs ou Word, garantindo que o elemento `<body>` nunca seja desestruturado ou removido pelo parser DOM e adicionando tratamento especial para wrappers com `id="docs-internal-guid"`.
 - **BUG 1 - Seletor de Arquivos AVIF (`public/admin/media.php`):** Adicionado suporte explícito para seleção de imagens `.avif` e `image/avif` no explorador de arquivos do sistema operacional através do atributo `accept`.
 - **BUG 2 - Envio de Imagens Maiores e Diagnóstico de Erros:** 
   - Adicionada detecção robusta para estouro de `upload_max_filesize` e `post_max_size` no PHP com mensagens claras de erro.
@@ -28,6 +29,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
+- **Campo Slug / URL Permanente no Editor:** Adicionado campo de edição de slug com prévia em tempo real da URL permanente (`/noticia/slug/`), botão de geração automática via título (`Auto 🪄`), digitação customizada livre e resolução inteligente de colisões com incremento numérico (`-2`, `-3`) no `PostService`.
 - **Editor de Notícias com Suporte a Rich Text e Colar do Google Docs / Word:**
   - Área visual de edição com suporte a colar direto de editores de texto externos (Google Docs, Microsoft Word, LibreOffice), eliminando estilos proprietários sujos (`MsoNormal`, `style="..."`, `class="..."`, tags Office) e preservando formatação semântica limpa (`h2`, `h3`, `p`, `strong`, `em`, `blockquote`, `ul`, `ol`, `a`).
   - Barra de ferramentas rica e leve (< 20 KiB em Vanilla JS puro) com botões de formatação, links seguros (`rel="noopener noreferrer"`) e alternador de código HTML.
