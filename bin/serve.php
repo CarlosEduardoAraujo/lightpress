@@ -22,9 +22,9 @@ echo "Painel Admin:   http://{$host}:{$port}/admin/login.php\n";
 echo "Web Root:       {$publicDir}\n\n";
 echo "Pressione Ctrl+C para encerrar o servidor.\n\n";
 
-// Executa o servidor embutido do PHP apontando para o diretório /public
+// Executa o servidor embutido do PHP com limites calibrados para uploads de mídia (12M) e processamento GD (512M)
 $command = sprintf(
-    'php -S %s:%d -t "%s"',
+    'php -d upload_max_filesize=12M -d post_max_size=16M -d memory_limit=512M -S %s:%d -t "%s"',
     escapeshellarg($host),
     $port,
     $publicDir
