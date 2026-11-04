@@ -173,6 +173,7 @@ $csrfToken = Security::generateCsrfToken();
         </div>
         <div>
             <?php if ($post): ?>
+                <a href="/admin/revisions.php?post_id=<?= (int)$post['id'] ?>" class="btn btn-secondary" style="margin-right: 0.5rem;">📜 Histórico (#<?= (int)$post['version'] ?>)</a>
                 <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">👁️ Prévia Privada</a>
             <?php endif; ?>
             <?php if ($post && $post['status'] === 'published'): ?>

@@ -91,12 +91,15 @@ use LightPress\Core\Seo;
     <header>
         <div class="container nav-inner">
             <a href="/" class="brand">Speed<span>Press</span></a>
-            <nav>
+            <nav style="display: flex; align-items: center; gap: 1.5rem;">
+                <form action="/busca" method="GET" style="display: flex; align-items: center;">
+                    <input type="text" name="q" placeholder="Buscar notícias..." value="<?= Security::e($_GET['q'] ?? '') ?>" style="padding: 0.35rem 0.85rem; border: 1px solid var(--border); border-radius: 20px; font-size: 0.85rem; background: var(--bg); color: var(--text); width: 160px; outline: none; transition: width 0.2s;" onfocus="this.style.width='220px'" onblur="if(!this.value) this.style.width='160px'">
+                </form>
                 <ul class="nav-links">
                     <li><a href="/">Início</a></li>
                     <li><a href="/categoria/geral/">Geral</a></li>
-                    <li><a href="/feed.xml" target="_blank">Feed RSS</a></li>
-                    <li><a href="/admin/login.php" style="background: var(--primary-accent); color: white; padding: 0.35rem 0.8rem; border-radius: var(--radius);">Painel</a></li>
+                    <li><a href="/feed.xml" target="_blank">RSS</a></li>
+                    <li><a href="/admin/login.php" style="background: var(--primary-accent); color: white; padding: 0.35rem 0.8rem; border-radius: var(--radius); text-decoration: none;">Painel</a></li>
                 </ul>
             </nav>
         </div>

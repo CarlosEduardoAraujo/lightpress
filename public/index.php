@@ -23,6 +23,12 @@ $router = new Router();
 
 // Rota 1: Home Grid (Últimas notícias e destaques)
 $router->get('/', function () use ($config): void {
+    $query = trim($_GET['q'] ?? '');
+    if (!empty($query)) {
+        header('Location: /busca?q=' . urlencode($query));
+        exit;
+    }
+
     $nowUtc = gmdate('Y-m-d H:i:s');
     
     // Buscar artigo em destaque principal
@@ -118,7 +124,28 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     require $config['paths']['templates'] . '/category.php';
 });
 
-// Rota 5: RSS Feed (/feed.xml)
+// Rota 5: Busca Pública de Notícias (/busca)
+$router->get('/busca', function () use ($config): void {
+    $query = trim($_GET['q'] ?? '');
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $searchTerm = "%{$query}%";
+
+    $posts = [];
+    if (strlen($query) >= 2) {
+        $posts = Database::fetchAll(
+            "SELECT id, slug, title, summary, category, featured_image, published_at
+             FROM posts
+             WHERE status = 'published' AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
+             ORDER BY published_at DESC LIMIT 30",
+            [$nowUtc, $searchTerm, $searchTerm]
+        );
+    }
+
+    $pageTitle = "Busca: {$query} - " . $config['app']['name'];
+    require $config['paths']['templates'] . '/search.php';
+});
+
+// Rota 6: RSS Feed (/feed.xml)
 $router->get('/feed.xml', function () use ($config): void {
     header('Content-Type: application/rss+xml; charset=utf-8');
     $nowUtc = gmdate('Y-m-d H:i:s');
