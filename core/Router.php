@@ -101,6 +101,23 @@ class Router
             }
         }
 
+        // Verificar tabela de redirecionamentos (ex: URLs legadas migradas do WordPress)
+        try {
+            $pathHash = hash('sha256', $path);
+            $redirect = Database::fetchOne(
+                "SELECT target_path, status_code FROM redirects WHERE path_hash = ? LIMIT 1",
+                [$pathHash]
+            );
+
+            if ($redirect) {
+                $code = (int)($redirect['status_code'] ?? 301);
+                header('Location: ' . $redirect['target_path'], true, $code);
+                exit;
+            }
+        } catch (\Throwable $e) {
+            // Caso ocorra falha de conexão, prossegue para o manipulador 404
+        }
+
         // Nenhuma rota encontrada -> 404
         if ($this->notFoundHandler !== null) {
             return call_user_func($this->notFoundHandler);

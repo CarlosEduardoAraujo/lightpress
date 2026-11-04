@@ -16,11 +16,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Guia completo de implantação em produção em `docs/DEPLOYMENT.md` (Linux, Nginx, PHP 8.4-FPM, SSL e Cron).
   - Configuração central `config.php` e isolamento de credenciais locais via `config.local.php`.
 
-- **Camada de Dados e Persistência:**
+- **Camada de Dados, Persistência e Backup:**
   - `core/Database.php`: abstração unificada PDO com prepared statements nativos, desativação de emulação, UTF-8 mb4, timezone UTC e transações atômicas seguras.
   - `bin/schema.sql` e `core/Schema.php`: DDL relacional plano para MariaDB/MySQL e SQLite (users, posts, post_stats, post_revisions, user_reset_tokens, categories, media, media_refs, view_dedupe, cache_purge_jobs, migration_map, redirects).
   - `bin/setup.php`: instalador CLI automático do banco de dados e gerador de credenciais do primeiro administrador.
   - `bin/seed.php`: gerador de dados de demonstração em lotes transacionais para testes e benchmarks de grande escala.
+  - `bin/backup.php`: ferramenta de exportação completa do banco de dados compactada em gzip (`.json.gz`).
 
 - **Segurança, RBAC e Auditoria:**
   - `core/Security.php`: escape contextual contra XSS (`e()`), tokens CSRF com comparação em tempo constante, hashing com Argon2id, hardening de sessão (`LIGHTPRESSSESSID`), anonimização de IP por HMAC-SHA-256 e validação de Fetch Metadata / Origin.
@@ -28,11 +29,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - `core/Logger.php`: sistema de logs técnicos e auditoria com expurgo recursivo e compulsório de senhas, tokens e segredos em `/storage/logs/`.
   - `public/.htaccess`: fallback defensivo contra execução de scripts em uploads para ambientes Apache/LiteSpeed.
 
-- **SEO, Syndication e Frontend Público:**
+- **SEO, Roteamento Inteligente e Headless APIs:**
+  - `core/Router.php`: roteador regex ultrarrápido com normalização de URLs, redirecionamentos canônicos 301 e verificação automática da tabela `redirects` (preservando links legados do WordPress).
   - `core/Seo.php`: gerador de metadados Open Graph (`og:*`), Twitter Cards e Schema.org JSON-LD (`NewsArticle` e `WebSite`) para Google Notícias.
-  - `core/Router.php`: roteador regex ultrarrápido com normalização de URLs e redirecionamentos canônicos 301.
   - `public/index.php`: Front Controller com injeção de cabeçalhos HTTP defensivos (CSP, HSTS, X-Frame-Options, X-Content-Type-Options), rotas públicas, `/feed.xml` (RSS 2.0 padrão) e `/sitemap.xml`.
   - `public/api/view.php`: micro-endpoint assíncrono para contagem de visualizações sem sessão e com deduplicação de 30 segundos.
+  - `public/api/posts.php` e `public/api/categories.php`: micro-APIs de leitura pública em JSON com suporte a paginação e filtros (Headless ready).
   - Templates com suporte automático a **Dark Mode** (`prefers-color-scheme: dark`), tipografia responsiva e metadados SEO integrados.
 
 - **Pipeline de Mídia e Compilação de Conteúdo:**
@@ -46,6 +48,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - `admin/dashboard.php`: listagem rápida de notícias com navegação integrada, contadores de visualizações e controle de sessões revogáveis.
   - `admin/editor.php`: editor de blocos leve em Vanilla JS sem React/Redux com botão de prévia privada.
   - `admin/preview.php`: ambiente de prévia privada autenticada para rascunhos com `Cache-Control: private, no-store`.
+  - `admin/profile.php`: gerenciamento de dados de perfil e troca de senha com Argon2id e invalidação de sessões anteriores.
   - `admin/upload.php`: endpoint autenticado para upload e geração de manifestos de mídia.
   - `admin/categories.php`: módulo administrativo para gestão de categorias.
   - `admin/users.php`: módulo administrativo de controle de equipe e geração de links criptográficos de ativação.

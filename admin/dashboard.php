@@ -111,6 +111,7 @@ $csrfToken = Security::generateCsrfToken();
         </div>
         <div class="user-menu">
             <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong> (<?= Security::e($currentUser['role']) ?>)</span>
+            <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Meu Perfil</a>
             <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>">Sair</a>
         </div>
     </header>
