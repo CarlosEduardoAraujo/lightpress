@@ -25,7 +25,42 @@ class Schema
     }
 
     /**
-     * Cria as tabelas para MySQL / MariaDB a partir do script SQL padrão.
+     * Remove todas as tabelas gerenciadas pelo LightPress (para reinstalação limpa).
+     */
+    public static function dropAll(PDO $pdo, string $driver = 'mysql'): void
+    {
+        $tables = [
+            'redirects',
+            'migration_map',
+            'cache_purge_jobs',
+            'view_dedupe',
+            'media_refs',
+            'media',
+            'user_reset_tokens',
+            'post_revisions',
+            'post_stats',
+            'posts',
+            'categories',
+            'users',
+        ];
+
+        if ($driver === 'sqlite') {
+            $pdo->exec('PRAGMA foreign_keys = OFF;');
+            foreach ($tables as $table) {
+                $pdo->exec("DROP TABLE IF EXISTS {$table};");
+            }
+            $pdo->exec('PRAGMA foreign_keys = ON;');
+        } else {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 0;');
+            foreach ($tables as $table) {
+                $pdo->exec("DROP TABLE IF EXISTS `{$table}`;");
+            }
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1;');
+        }
+    }
+
+    /**
+     * Cria as tabelas para MySQL / MariaDB a partir do script SQL padrão executando instrução por instrução.
      */
     private static function installMysql(PDO $pdo): void
     {
@@ -35,7 +70,23 @@ class Schema
         }
 
         $sql = file_get_contents($sqlFile);
-        $pdo->exec($sql);
+        $lines = explode("\n", $sql);
+        $cleanLines = [];
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '--')) {
+                continue;
+            }
+            $cleanLines[] = $line;
+        }
+
+        $statements = explode(';', implode("\n", $cleanLines));
+        foreach ($statements as $stmt) {
+            $trimmed = trim($stmt);
+            if ($trimmed !== '') {
+                $pdo->exec($trimmed);
+            }
+        }
     }
 
     /**

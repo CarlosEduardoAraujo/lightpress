@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Script CLI de Instalação e Migração do Banco de Dados - LightPress
- * Execução: php bin/setup.php
+ * Execução: php bin/setup.php [--fresh]
  */
 
 $config = require __DIR__ . '/../core/bootstrap.php';
@@ -17,6 +17,8 @@ echo "   LightPress / SpeedPress - Instalação de Banco de Dados\n";
 echo "========================================================\n\n";
 
 $driver = $config['database']['driver'] ?? 'mysql';
+$isFresh = in_array('--fresh', $argv, true);
+
 echo "[1/3] Conectando ao banco de dados via driver '{$driver}'...\n";
 
 try {
@@ -25,6 +27,17 @@ try {
 } catch (\Throwable $e) {
     echo "  [ERRO] Falha ao conectar: " . $e->getMessage() . "\n";
     exit(1);
+}
+
+if ($isFresh) {
+    echo "\n[AVISO] Flag --fresh detectada. Removendo tabelas existentes do LightPress...\n";
+    try {
+        Schema::dropAll($pdo, $driver);
+        echo "  [OK] Tabelas anteriores removidas com sucesso.\n";
+    } catch (\Throwable $e) {
+        echo "  [ERRO] Falha ao remover tabelas: " . $e->getMessage() . "\n";
+        exit(1);
+    }
 }
 
 echo "\n[2/3] Instalando tabelas e índices do esquema...\n";
@@ -39,8 +52,26 @@ try {
     exit(1);
 }
 
-echo "\n[3/3] Verificando existência de usuário Administrador...\n";
+echo "\n[3/3] Verificando integridade da tabela de usuários e administrador...\n";
 try {
+    // Validar se a tabela users possui a estrutura correta (caso o banco já contivesse tabela de outro app)
+    if ($driver === 'mysql') {
+        $columns = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+    } else {
+        $tableInfo = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
+        $columns = array_column($tableInfo, 'name');
+    }
+
+    if (!in_array('role', $columns, true)) {
+        echo "  [ERRO CRÍTICO DE COMPATIBILIDADE]\n";
+        echo "  A tabela 'users' já existia no banco com estrutura incompatível (coluna 'role' não encontrada).\n";
+        echo "  Isso acontece quando o banco configurado já possui tabelas de outro sistema anterior.\n\n";
+        echo "  Para recriar as tabelas do LightPress do zero, execute:\n";
+        echo "    php bin/setup.php --fresh\n\n";
+        echo "  Ou aponte para um banco de dados exclusivo no 'config.local.php'.\n";
+        exit(1);
+    }
+
     $admin = Database::fetchOne("SELECT id, username, email FROM users WHERE role = 'admin' LIMIT 1");
     if ($admin) {
         echo "  [INFO] Administrador já existente: {$admin['username']} ({$admin['email']}).\n";

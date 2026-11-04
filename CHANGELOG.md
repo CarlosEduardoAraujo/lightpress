@@ -9,6 +9,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Corrigido
 - **Loop Infinito no `config.php`:** Adicionada proteção estrita contra recursão infinita no carregamento de `config.local.php` caso o arquivo tenha sido copiado integralmente de `config.php`, evitando esgotamento de memória e SIGKILL (`Morto`) no Linux.
+- **Instalador com Flag `--fresh` e Validação de Esquema:** Adicionada validação de integridade para detectar conflitos com tabelas legadas preexistentes (ex: tabela `users` externa sem a coluna `role`) e flag `php bin/setup.php --fresh` com `Schema::dropAll()` para recriação limpa.
+- **Execução Atômica de DDL MySQL:** Em `Schema::installMysql`, as instruções de criação de tabelas e índices do `schema.sql` agora são executadas instrução por instrução de forma isolada, evitando falhas silenciosas de comandos múltiplos no driver PDO MySQL.
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
