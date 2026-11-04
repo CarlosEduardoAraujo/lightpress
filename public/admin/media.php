@@ -35,35 +35,81 @@ $message = '';
 $error = '';
 
 // 1. Processar Upload Direto na Galeria
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
+$isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+    || (str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json'));
+
+// Detectar se o arquivo excedeu o post_max_size do PHP (quando $_POST e $_FILES chegam vazios mas houve payload)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    $error = "O arquivo enviado excede o limite máximo permitido pelo servidor (post_max_size no php.ini). Limite recomendado: 8 MiB.";
+    if ($isAjax) {
+        http_response_code(413);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => $error]);
+        exit;
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
     if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? '')) {
-        $error = "Token CSRF inválido ou expirado.";
-    } elseif (!is_uploaded_file($_FILES['media_file']['tmp_name'])) {
-        $error = "Nenhum arquivo enviado.";
+        $error = "Token CSRF inválido ou expirado. Recarregue a página e tente novamente.";
     } else {
-        $processor = new ImageProcessor($config);
-        try {
-            $manifest = $processor->processUpload(
-                $_FILES['media_file']['tmp_name'],
-                $_FILES['media_file']['name']
-            );
+        $uploadErr = $_FILES['media_file']['error'] ?? UPLOAD_ERR_OK;
+        if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
+            $error = "O arquivo excede o limite de tamanho permitido pelo servidor. Limite: 8 MiB.";
+        } elseif ($uploadErr === UPLOAD_ERR_PARTIAL) {
+            $error = "O envio da imagem foi interrompido antes de ser concluído. Tente novamente.";
+        } elseif ($uploadErr === UPLOAD_ERR_NO_FILE) {
+            $error = "Nenhum arquivo de imagem foi selecionado.";
+        } elseif ($uploadErr !== UPLOAD_ERR_OK) {
+            $error = "Falha no envio do arquivo (código de erro PHP: {$uploadErr}).";
+        } elseif (!is_uploaded_file($_FILES['media_file']['tmp_name'])) {
+            $error = "Arquivo temporário não reconhecido ou inválido.";
+        } else {
+            $processor = new ImageProcessor($config);
+            try {
+                $manifest = $processor->processUpload(
+                    $_FILES['media_file']['tmp_name'],
+                    $_FILES['media_file']['name']
+                );
 
-            $mediaId = $manifest['media_id'];
-            $userId = (int)$currentUser['id'];
-            $origName = $manifest['original_name'];
-            $fileSize = (int)$_FILES['media_file']['size'];
-            $variantsJson = json_encode($manifest['variants'], JSON_THROW_ON_ERROR);
+                $mediaId = $manifest['media_id'];
+                $userId = (int)$currentUser['id'];
+                $origName = $manifest['original_name'];
+                $fileSize = (int)$_FILES['media_file']['size'];
+                $variantsJson = json_encode($manifest['variants'], JSON_THROW_ON_ERROR);
 
-            Database::query(
-                "INSERT INTO media (id, user_id, original_name, mime_type, file_size, variants_manifest, is_finalized)
-                 VALUES (?, ?, ?, 'image/webp', ?, ?, 1)",
-                [$mediaId, $userId, $origName, $fileSize, $variantsJson]
-            );
+                Database::query(
+                    "INSERT INTO media (id, user_id, original_name, mime_type, file_size, variants_manifest, is_finalized)
+                     VALUES (?, ?, ?, 'image/webp', ?, ?, 1)",
+                    [$mediaId, $userId, $origName, $fileSize, $variantsJson]
+                );
 
-            $message = "Imagem processada e adicionada à biblioteca com sucesso!";
-        } catch (\Throwable $e) {
-            $error = "Erro no upload: " . $e->getMessage();
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'ok' => true,
+                        'message' => 'Imagem processada com sucesso!',
+                        'media' => [
+                            'id' => $mediaId,
+                            'original_name' => $origName,
+                            'file_size' => $fileSize,
+                            'uploader_name' => $currentUser['name'],
+                            'variants' => $manifest['variants'],
+                        ],
+                    ]);
+                    exit;
+                }
+
+                $message = "Imagem processada e adicionada à biblioteca com sucesso!";
+            } catch (\Throwable $e) {
+                $error = "Erro no upload: " . $e->getMessage();
+            }
         }
+    }
+
+    if ($isAjax && !empty($error)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => $error]);
+        exit;
     }
 }
 
@@ -171,31 +217,38 @@ $csrfToken = Security::generateCsrfToken();
             <h1 style="font-size: 1.6rem; font-weight: 800;">Biblioteca de Mídias e Imagens</h1>
         </div>
 
+        <div id="dynamicAlert"></div>
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>
 
         <!-- Formulário de Upload Rápido -->
         <div class="card-upload">
             <form method="POST" enctype="multipart/form-data" id="uploadForm">
-                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                <input type="hidden" name="_csrf_token" id="csrfToken" value="<?= Security::e($csrfToken) ?>">
                 <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: #334155;">
                     Envie fotos para conversão automática em WebP / AVIF
                 </p>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-                    Formatos aceitos: JPG, PNG, WebP (até 8 MiB). Imagens originais são descartadas e 3 resoluções são geradas.
+                    Formatos aceitos: JPG, PNG, WebP e AVIF (até 8 MiB). Três resoluções são geradas e nomes amigáveis para SEO são aplicados.
                 </p>
-                <input type="file" name="media_file" id="fileInput" accept="image/jpeg,image/png,image/webp" required style="display: none;" onchange="document.getElementById('uploadForm').submit()">
-                <button type="button" onclick="document.getElementById('fileInput').click()" style="padding: 0.65rem 1.5rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer;">
+                <input type="file" name="media_file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" required style="display: none;">
+                <button type="button" id="btnSelect" onclick="document.getElementById('fileInput').click()" style="padding: 0.65rem 1.5rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer;">
                     Selecionar Imagem do Computador
                 </button>
+                <div id="uploadStatus" style="display: none; margin-top: 1rem; padding: 0.75rem 1rem; background: #e0f2fe; color: #0369a1; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600;">
+                    <span style="display: inline-block; animation: spin 1s linear infinite; margin-right: 0.5rem;">⏳</span>
+                    <span id="uploadStatusText">Enviando e processando imagem em 3 resoluções...</span>
+                </div>
             </form>
         </div>
 
         <!-- Grade de Fotos -->
-        <?php if (empty($mediaList)): ?>
-            <p style="text-align: center; color: var(--text-muted); padding: 3rem;">Nenhuma mídia cadastrada ainda. Utilize o botão acima para enviar fotos.</p>
-        <?php else: ?>
-            <div class="grid-media">
+        <div class="grid-media" id="mediaGrid">
+            <?php if (empty($mediaList)): ?>
+                <p id="emptyMsg" style="text-align: center; color: var(--text-muted); padding: 3rem; grid-column: 1 / -1;">
+                    Nenhuma mídia cadastrada ainda. Utilize o botão acima para enviar fotos.
+                </p>
+            <?php else: ?>
                 <?php foreach ($mediaList as $item): ?>
                     <?php
                         $variants = json_decode($item['variants_manifest'], true) ?? [];
@@ -204,7 +257,7 @@ $csrfToken = Security::generateCsrfToken();
                         $origW = $variants['full']['webp']['width'] ?? 0;
                         $origH = $variants['full']['webp']['height'] ?? 0;
                     ?>
-                    <div class="media-card">
+                    <div class="media-card" id="media-card-<?= Security::e($item['id']) ?>">
                         <?php if (!empty($thumbUrl)): ?>
                             <img src="<?= Security::e($thumbUrl) ?>" alt="<?= Security::e($item['original_name']) ?>" class="media-thumb" loading="lazy">
                         <?php else: ?>
@@ -240,8 +293,8 @@ $csrfToken = Security::generateCsrfToken();
                         </div>
                     </div>
                 <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </div>
 
     <script>
@@ -258,6 +311,78 @@ $csrfToken = Security::generateCsrfToken();
                 }, 1500);
             });
         }
+
+        const fileInput = document.getElementById('fileInput');
+        const btnSelect = document.getElementById('btnSelect');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const uploadStatusText = document.getElementById('uploadStatusText');
+        const dynamicAlert = document.getElementById('dynamicAlert');
+        const csrfToken = document.getElementById('csrfToken').value;
+
+        function showAlert(msg, isError) {
+            dynamicAlert.innerHTML = '<div class="' + (isError ? 'alert-error' : 'alert-success') + '">' + msg + '</div>';
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (!this.files || !this.files[0]) return;
+            const file = this.files[0];
+
+            // Validação de tamanho no cliente (8 MiB)
+            if (file.size > 8 * 1024 * 1024) {
+                showAlert('O arquivo selecionado (' + (file.size / (1024 * 1024)).toFixed(1) + ' MiB) excede o limite máximo permitido de 8 MiB.', true);
+                this.value = '';
+                return;
+            }
+
+            uploadStatus.style.display = 'block';
+            btnSelect.disabled = true;
+            btnSelect.style.opacity = '0.6';
+            uploadStatusText.innerText = 'Enviando ' + file.name + ' (' + Math.round(file.size / 1024) + ' KiB) e gerando variantes WebP / AVIF...';
+            dynamicAlert.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('media_file', file);
+            formData.append('_csrf_token', csrfToken);
+
+            fetch('/admin/media.php', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, status: res.status, data: data };
+                }).catch(function() {
+                    return { ok: res.ok, status: res.status, data: null };
+                });
+            })
+            .then(function(result) {
+                uploadStatus.style.display = 'none';
+                btnSelect.disabled = false;
+                btnSelect.style.opacity = '1';
+                fileInput.value = '';
+
+                if (result.ok && result.data && result.data.ok) {
+                    showAlert('Imagem enviada e convertida com sucesso!', false);
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 800);
+                } else {
+                    const errorMsg = (result.data && result.data.error) ? result.data.error : ('Erro durante o envio da imagem (HTTP ' + result.status + '). Verifique os limites do PHP.');
+                    showAlert(errorMsg, true);
+                }
+            })
+            .catch(function(err) {
+                uploadStatus.style.display = 'none';
+                btnSelect.disabled = false;
+                btnSelect.style.opacity = '1';
+                fileInput.value = '';
+                showAlert('Erro de conexão ou timeout ao enviar arquivo: ' + err.message, true);
+            });
+        });
     </script>
 </body>
 </html>

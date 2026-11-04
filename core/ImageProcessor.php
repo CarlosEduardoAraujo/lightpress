@@ -51,6 +51,16 @@ class ImageProcessor
      */
     public function processUpload(string $tmpFilePath, string $originalName): array
     {
+        // 0. Elevar temporariamente os limites de execução e memória para manipulação de bitmaps pesados
+        $currentLimit = ini_get('memory_limit');
+        if ($currentLimit !== false && $currentLimit !== '-1') {
+            $bytes = self::parseMemoryBytes((string)$currentLimit);
+            if ($bytes < 512 * 1024 * 1024) {
+                @ini_set('memory_limit', '512M');
+            }
+        }
+        @set_time_limit(120);
+
         // 1. Verificação de existência e tamanho
         if (!file_exists($tmpFilePath) || filesize($tmpFilePath) <= 0) {
             throw new RuntimeException("Arquivo de upload vazio ou inválido.", 400);
@@ -107,8 +117,20 @@ class ImageProcessor
             @mkdir($this->stagingDir, 0755, true);
         }
 
-        // Gerar hash aleatório criptográfico para os nomes de arquivo
+        // Gerar identificador único de catálogo (media_id)
         $mediaId = bin2hex(random_bytes(16));
+
+        // Gerar nome base semântico e amigável para SEO a partir do arquivo original
+        $pathInfo = pathinfo($originalName);
+        $rawBaseName = $pathInfo['filename'] ?? 'imagem';
+        $cleanSlug = Security::slugify($rawBaseName);
+        if (empty($cleanSlug)) {
+            $cleanSlug = 'imagem';
+        }
+        $cleanSlug = mb_substr($cleanSlug, 0, 50);
+        $shortHash = substr($mediaId, 0, 8);
+        $fileBase = "{$cleanSlug}-{$shortHash}";
+
         $canAvif = function_exists('imageavif');
 
         $manifest = [
@@ -137,36 +159,46 @@ class ImageProcessor
                 $h = imagesy($resized);
 
                 // Geração do WebP Obrigatório
-                $webpFilename = "{$mediaId}-{$spec['suffix']}.webp";
+                $webpFilename = "{$fileBase}-{$spec['suffix']}.webp";
                 $webpStaging = "{$this->stagingDir}/{$webpFilename}";
                 $webpTarget = "{$targetDir}/{$webpFilename}";
 
                 imagewebp($resized, $webpStaging, $this->webpQuality);
-                rename($webpStaging, $webpTarget);
+                if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
+                    rename($webpStaging, $webpTarget);
+                    $manifest['variants'][$key]['webp'] = [
+                        'url' => "{$relativeDir}/{$webpFilename}",
+                        'width' => $w,
+                        'height' => $h,
+                        'mime' => 'image/webp',
+                    ];
+                } else {
+                    @unlink($webpStaging);
+                    throw new RuntimeException("Falha ao gerar variante WebP ({$key}).", 500);
+                }
 
-                $manifest['variants'][$key]['webp'] = [
-                    'url' => "{$relativeDir}/{$webpFilename}",
-                    'width' => $w,
-                    'height' => $h,
-                    'mime' => 'image/webp',
-                ];
-
-                // Geração do AVIF Opcional (se biblioteca suportada)
+                // Geração do AVIF Opcional (se biblioteca suportada e sem falhas)
                 if ($canAvif) {
-                    $avifFilename = "{$mediaId}-{$spec['suffix']}.avif";
+                    $avifFilename = "{$fileBase}-{$spec['suffix']}.avif";
                     $avifStaging = "{$this->stagingDir}/{$avifFilename}";
                     $avifTarget = "{$targetDir}/{$avifFilename}";
 
-                    if (@imageavif($resized, $avifStaging, $this->avifQuality, $this->avifSpeed) && file_exists($avifStaging) && filesize($avifStaging) > 0) {
-                        rename($avifStaging, $avifTarget);
-                        $manifest['variants'][$key]['avif'] = [
-                            'url' => "{$relativeDir}/{$avifFilename}",
-                            'width' => $w,
-                            'height' => $h,
-                            'mime' => 'image/avif',
-                        ];
-                    } else {
+                    try {
+                        $avifSuccess = @imageavif($resized, $avifStaging, $this->avifQuality, $this->avifSpeed);
+                        if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
+                            rename($avifStaging, $avifTarget);
+                            $manifest['variants'][$key]['avif'] = [
+                                'url' => "{$relativeDir}/{$avifFilename}",
+                                'width' => $w,
+                                'height' => $h,
+                                'mime' => 'image/avif',
+                            ];
+                        } else {
+                            @unlink($avifStaging);
+                        }
+                    } catch (Throwable $avifErr) {
                         @unlink($avifStaging);
+                        error_log("[LightPress AVIF Fallback] " . $avifErr->getMessage());
                     }
                 }
 
@@ -181,11 +213,30 @@ class ImageProcessor
             return $manifest;
 
         } catch (Throwable $e) {
-            if (isset($source) && is_resource($source)) {
+            if (isset($source) && ($source instanceof \GdImage || is_resource($source))) {
                 imagedestroy($source);
             }
             throw new RuntimeException("Erro durante a conversão das imagens: " . $e->getMessage(), 500, $e);
         }
+    }
+
+    /**
+     * Converte string de memória no formato do php.ini (ex: '128M', '1G') em bytes inteiros.
+     */
+    private static function parseMemoryBytes(string $val): int
+    {
+        $val = trim($val);
+        if ($val === '' || $val === '-1') {
+            return PHP_INT_MAX;
+        }
+        $last = strtolower($val[strlen($val) - 1]);
+        $num = (int)substr($val, 0, -1);
+        return match ($last) {
+            'g' => $num * 1024 * 1024 * 1024,
+            'm' => $num * 1024 * 1024,
+            'k' => $num * 1024,
+            default => (int)$val,
+        };
     }
 
     /**

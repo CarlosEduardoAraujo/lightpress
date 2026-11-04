@@ -31,10 +31,27 @@ if (!Security::verifyCsrfToken($csrfToken)) {
     exit;
 }
 
-// 3. Validação do arquivo enviado
-if (empty($_FILES['image']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
+// 3. Validação de payload e limites do servidor
+if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    http_response_code(413);
+    echo json_encode(['ok' => false, 'error' => 'O arquivo enviado excede o limite máximo permitido pelo servidor (post_max_size no php.ini).']);
+    exit;
+}
+
+if (!isset($_FILES['image'])) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Nenhum arquivo enviado']);
+    exit;
+}
+
+$uploadErr = $_FILES['image']['error'] ?? UPLOAD_ERR_OK;
+if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
+    http_response_code(413);
+    echo json_encode(['ok' => false, 'error' => 'O arquivo excede o limite máximo permitido pelo servidor de 8 MiB.']);
+    exit;
+} elseif ($uploadErr !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['image']['tmp_name'])) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Falha no recebimento do arquivo de imagem (código: ' . $uploadErr . ').']);
     exit;
 }
 

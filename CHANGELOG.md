@@ -8,6 +8,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Corrigido
+- **BUG 1 - Seletor de Arquivos AVIF (`public/admin/media.php`):** Adicionado suporte explícito para seleção de imagens `.avif` e `image/avif` no explorador de arquivos do sistema operacional através do atributo `accept`.
+- **BUG 2 - Envio de Imagens Maiores e Diagnóstico de Erros:** 
+  - Adicionada detecção robusta para estouro de `upload_max_filesize` e `post_max_size` no PHP com mensagens claras de erro.
+  - Elevação automática de `memory_limit` (até 512M) e `max_execution_time` (120s) em `core/ImageProcessor.php` para suporte a fotos de alta resolução (Full HD e 4K).
+  - Calibração de `avif_speed` para 8 com bloco de fallback não bloqueante (`try/catch`), garantindo que o conjunto WebP sempre seja gerado com sucesso mesmo em servidores com CPUs modestas.
+  - Interface da galeria aprimorada com upload assíncrono via `fetch()`, barra de status em tempo real e retorno imediato de erros visíveis ao usuário.
+- **BUG 3 - Nomes de Imagens Semânticos para SEO:** As variantes em disco e URLs agora recebem o nome original limpo e slugificado com hash curto único (ex: `piloto-ferrari-2026-a1b2c3d4-1024.webp`), substituindo os nomes genéricos de 32 caracteres hexadecimais.
 - **Painel Administrativo em `public/admin/`:** Movido o painel administrativo para a raiz web pública (`public/admin/`), garantindo que tanto o servidor de desenvolvimento do PHP (`php -S -t public`) quanto o Nginx sirvam `/admin/login.php`, `/admin/dashboard.php` e demais endpoints sem erros 404.
 - **Rotas de Atalho para o Admin:** Adicionadas rotas de conveniência `/admin` e `/admin/` redirecionando automaticamente para `/admin/login.php`.
 - **Loop Infinito no `config.php`:** Adicionada proteção estrita contra recursão infinita no carregamento de `config.local.php` caso o arquivo tenha sido copiado integralmente de `config.php`, evitando esgotamento de memória e SIGKILL (`Morto`) no Linux.

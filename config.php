@@ -59,7 +59,7 @@ $config = [
         'max_dimension' => 8_000,            // 8.000 px por lado
         'webp_quality' => 82,
         'avif_quality' => 75,
-        'avif_speed' => 6,
+        'avif_speed' => 8,
         'allowed_mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
         'resolutions' => [
             'full' => ['width' => 1920, 'height' => null, 'crop' => false],
