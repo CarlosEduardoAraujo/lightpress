@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Painel Administrativo - Diagnóstico do Sistema e Saúde da Infraestrutura
  */
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;

@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Painel Administrativo - Meu Perfil e Alteração de Senha Segura
  */
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
 use LightPress\Core\Security;

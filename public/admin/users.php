@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Painel Administrativo - Gerenciador de Usuários e Perfis (Apenas Administrador)
  */
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;

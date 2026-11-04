@@ -8,7 +8,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;

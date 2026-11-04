@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Painel Administrativo - Tela de Ativação de Conta e Definição de Senha
  */
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
 use LightPress\Core\Security;

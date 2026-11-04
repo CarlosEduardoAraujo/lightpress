@@ -86,7 +86,7 @@ $config = [
         'core' => __DIR__ . '/core',
         'storage' => __DIR__ . '/storage',
         'templates' => __DIR__ . '/templates',
-        'admin' => __DIR__ . '/admin',
+        'admin' => __DIR__ . '/public/admin',
         'public' => __DIR__ . '/public',
     ],
 ];

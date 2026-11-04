@@ -282,17 +282,17 @@ lightpress/
 │   ├── home.php               # Grid inicial (destaques + últimas notícias)
 │   ├── post.php               # Notícia individual com schema SEO
 │   └── category.php           # Listagens de categoria
-├── admin/                     # Painel administrativo enxuto protegido
-│   ├── login.php              # Autenticação com proteção contra força bruta
-│   ├── dashboard.php
-│   ├── editor.php             # Tela de edição
-│   └── upload.php             # Endpoint assíncrono para fotos
 ├── bin/                       # Ferramentas CLI
 │   ├── migrate-wp.php         # Importador em lotes, retomável e auditável
 │   ├── retry-cache-purge.php  # Retentativa de purgas persistidas
 │   └── cleanup.php            # Expiração de tokens, deduplicação e staging
-└── public/                    # Web Root (Nginx)
+└── public/                    # Web Root (Nginx / Servidor Web)
     ├── index.php              # Ponto único de entrada (Front Controller)
+    ├── admin/                 # Painel administrativo enxuto protegido
+    │   ├── login.php          # Autenticação com proteção contra força bruta
+    │   ├── dashboard.php      # Gestão de publicações e métricas
+    │   ├── editor.php         # Editor visual de blocos sem dependências
+    │   └── media.php          # Catálogo e upload de imagens
     ├── api/                   # Micro-endpoints públicos de baixa latência
     │   └── view.php           # Incremento assíncrono de visualizações
     ├── assets/                # JS puro do editor e folhas de estilo CSS

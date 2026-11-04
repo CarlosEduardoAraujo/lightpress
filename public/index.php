@@ -231,6 +231,16 @@ $router->post('/api/view/{id}', function (array $params): void {
     require __DIR__ . '/api/view.php';
 });
 
+// Rota 8: Redirecionamento conveniente para o painel administrativo
+$router->get('/admin', function (): void {
+    header('Location: /admin/login.php');
+    exit;
+});
+$router->get('/admin/', function (): void {
+    header('Location: /admin/login.php');
+    exit;
+});
+
 // Configurar manipulador 404
 $router->setNotFound(function () use ($config): void {
     http_response_code(404);

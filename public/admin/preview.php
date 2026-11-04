@@ -12,7 +12,7 @@ declare(strict_types=1);
 header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
 header('X-Robots-Tag: noindex, nofollow, noarchive');
 
-$config = require dirname(__DIR__) . '/core/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;
