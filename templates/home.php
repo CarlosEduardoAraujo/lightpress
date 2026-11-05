@@ -4,89 +4,353 @@ use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
 require __DIR__ . '/header.php';
+
+// Formatador de data em português
+$ptMonths = [
+    1 => 'janeiro', 2 => 'fevereiro', 3 => 'março', 4 => 'abril',
+    5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
+    9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
+];
+$formatPtDate = function(?string $dateStr) use ($ptMonths): string {
+    if (empty($dateStr)) return date('d/m/Y');
+    $t = strtotime($dateStr);
+    $d = date('j', $t);
+    $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
+    $y = date('Y', $t);
+    $h = date('H:i', $t);
+    return "{$d} de {$m} de {$y}, {$h}";
+};
+
+$calcReadingTime = function(?string $html): string {
+    $chars = mb_strlen(strip_tags($html ?? ''));
+    $min = max(2, (int)ceil($chars / 1100));
+    return "{$min} min de leitura";
+};
+
+$getSubtopic = function(?string $tagsStr, string $fallback = 'Velocidade Máxima'): string {
+    if (empty($tagsStr)) return $fallback;
+    $parts = array_map('trim', explode(',', $tagsStr));
+    return !empty($parts[0]) ? $parts[0] : $fallback;
+};
+
+// Separar o grande destaque principal dos 3 secundários
+$mainLead = $featuredPosts[0] ?? null;
+$secondaryLeads = array_slice($featuredPosts, 1, 3);
 ?>
 
-<?php if (!empty($featuredPosts)): ?>
-    <section>
-        <div class="hero-quad-grid">
-            <?php foreach ($featuredPosts as $feat): ?>
-                <a href="/<?= Security::e($feat['slug']) ?>/" class="hero-quad-card" title="<?= Security::e($feat['title']) ?>">
-                    <?php if (!empty($feat['featured_image'])): ?>
-                        <img src="<?= Security::e(ImageProcessor::toAvifUrl($feat['featured_image'])) ?>" alt="<?= Security::e($feat['title']) ?>" class="hero-quad-img">
-                    <?php else: ?>
-                        <div class="hero-quad-img" style="display: flex; align-items: center; justify-content: center; background: #1e293b; color: #94a3b8; font-size: 0.85rem;">Sem imagem</div>
-                    <?php endif; ?>
-                    <div class="hero-quad-overlay">
-                        <span class="hero-quad-badge"><?= Security::e($feat['category']) ?></span>
-                        <h2 class="hero-quad-title"><?= Security::e($feat['title']) ?></h2>
-                    </div>
+<?php if (!empty($mainLead) && ($currentPage ?? 1) === 1): ?>
+<!-- 1. HERO EDITORIAL & ASYMMETRIC NEWS MOSAIC -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-stretch">
+    <!-- Master Lead Story (8 Cols) -->
+    <article class="lg:col-span-8 group relative flex flex-col justify-end min-h-[460px] lg:min-h-[540px] rounded-xl overflow-hidden bg-carbon-black shadow-md cursor-pointer border border-subtle-border">
+        <a href="/<?= Security::e($mainLead['slug']) ?>/" class="absolute inset-0 z-0 overflow-hidden block">
+            <?php if (!empty($mainLead['featured_image'])): ?>
+                <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
+                     src="<?= Security::e(ImageProcessor::toAvifUrl($mainLead['featured_image'])) ?>" 
+                     alt="<?= Security::e($mainLead['title']) ?>">
+            <?php else: ?>
+                <div class="w-full h-full bg-carbon-surface flex items-center justify-center text-secondary">Sem imagem</div>
+            <?php endif; ?>
+            <div class="absolute inset-0 bg-gradient-to-t from-carbon-black via-carbon-black/60 to-transparent"></div>
+        </a>
+
+        <div class="relative z-10 p-space-md md:p-space-xl flex flex-col gap-space-sm text-pure-white pointer-events-none">
+            <div class="flex flex-wrap items-center gap-space-xs">
+                <span class="px-space-sm py-1 bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider rounded">
+                    <?= Security::e($mainLead['category']) ?>
+                </span>
+                <span class="px-space-sm py-1 bg-carbon-surface/80 backdrop-blur-md text-surface-container font-data-telemetry text-data-telemetry rounded flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-flag-green"></span>
+                    <?= Security::e($getSubtopic($mainLead['tags'] ?? null, 'GP de Velocidade')) ?>
+                </span>
+                <span class="text-secondary-fixed font-label-meta text-label-meta ml-auto hidden sm:inline">
+                    <?= $calcReadingTime($mainLead['content_html'] ?? null) ?>
+                </span>
+            </div>
+
+            <h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-pure-white group-hover:text-primary-fixed-dim transition-colors leading-tight drop-shadow-sm max-w-3xl">
+                <a href="/<?= Security::e($mainLead['slug']) ?>/" class="pointer-events-auto text-pure-white hover:text-primary-fixed-dim">
+                    <?= Security::e($mainLead['title']) ?>
                 </a>
-            <?php endforeach; ?>
+            </h1>
+
+            <div class="flex items-center gap-space-md pt-space-xs text-secondary-fixed font-label-meta text-label-meta">
+                <span class="flex items-center gap-1.5 text-pure-white font-semibold">
+                    <span class="material-symbols-outlined text-[16px] text-racing-red">edit_note</span>
+                    Por <?= Security::e($mainLead['author_name'] ?? 'Redação SpeedRacing') ?>
+                </span>
+                <span>•</span>
+                <time datetime="<?= $mainLead['published_at'] ?>"><?= $formatPtDate($mainLead['published_at']) ?></time>
+                <span class="hidden sm:inline">•</span>
+                <span class="hidden sm:inline text-flag-yellow font-medium">Interlagos Circuit, SP</span>
+            </div>
         </div>
-    </section>
+    </article>
+
+    <!-- Secondary Trio Column (4 Cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-space-md justify-between">
+        <?php foreach ($secondaryLeads as $sec): ?>
+            <article class="group flex-1 flex flex-col justify-between p-space-md rounded-xl bg-pure-white shadow-xs border border-subtle-border hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between gap-2 mb-space-xs">
+                    <span class="px-2 py-0.5 bg-surface-container font-label-category text-label-category text-carbon-black uppercase rounded">
+                        <?= Security::e($sec['category']) ?>
+                    </span>
+                    <span class="font-label-meta text-label-meta text-secondary">
+                        <?= date('H:i', strtotime($sec['published_at'])) ?>
+                    </span>
+                </div>
+                <h2 class="font-headline-sm text-headline-sm text-carbon-black group-hover:text-racing-red transition-colors line-clamp-3 font-bold">
+                    <a href="/<?= Security::e($sec['slug']) ?>/">
+                        <?= Security::e($sec['title']) ?>
+                    </a>
+                </h2>
+                <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta mt-space-sm pt-space-xs">
+                    <span class="text-tertiary font-medium">Oficial Paddock</span>
+                    <a href="/<?= Security::e($sec['slug']) ?>/" class="material-symbols-outlined text-[18px] text-secondary group-hover:text-racing-red transition-transform group-hover:translate-x-1" title="Ler matéria">arrow_forward</a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </div>
+</section>
+
+<!-- 2. LIVE FAST-NEWS TELEMETRY STRIP -->
+<section class="w-full bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-col md:flex-row items-stretch md:items-center gap-space-md">
+    <div class="flex items-center gap-2 shrink-0 bg-carbon-black text-pure-white px-space-md py-1.5 rounded-lg">
+        <span class="w-2.5 h-2.5 rounded-full bg-racing-red animate-pulse"></span>
+        <span class="font-data-telemetry text-data-telemetry tracking-wider uppercase font-bold text-flag-yellow">PIT WALL FEED</span>
+    </div>
+    <div class="flex-1 flex flex-wrap md:flex-nowrap items-center gap-space-lg overflow-x-auto text-body-sm font-body-sm text-on-surface">
+        <?php foreach (array_slice($posts, 0, 3) as $pit): ?>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="font-data-telemetry text-data-telemetry text-secondary"><?= date('H:i', strtotime($pit['published_at'])) ?></span>
+                <a href="/<?= Security::e($pit['slug']) ?>/" class="font-medium text-carbon-black hover:text-racing-red transition-colors line-clamp-1">
+                    <?= Security::e($pit['title']) ?>
+                </a>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <div class="shrink-0 flex items-center justify-end">
+        <a href="#feed" class="text-label-meta font-label-meta text-racing-red hover:text-tertiary flex items-center gap-1 font-semibold uppercase">
+            Feed Completo <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+        </a>
+    </div>
+</section>
 <?php endif; ?>
 
-<section>
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; border-left: 4px solid var(--primary-accent); padding-left: 0.85rem; color: var(--primary);">
-            <?= (!empty($featuredPosts)) ? 'Mais Notícias' : 'Últimas Publicações' ?>
-        </h2>
-    </div>
+<!-- 3. MAIN TWO-COLUMN BODY LAYOUT -->
+<div id="feed" class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+    <!-- LEFT: MAIN NEWS FEED (8 COLS) -->
+    <section class="lg:col-span-8 flex flex-col gap-space-lg">
+        <div class="flex items-center justify-between pb-space-xs">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-6 bg-racing-red rounded-sm"></span>
+                <h2 class="font-headline-lg text-headline-md md:text-headline-lg text-carbon-black font-bold">
+                    <?= ($currentPage ?? 1) > 1 ? "Página {$currentPage} - Notícias" : "Últimas Notícias" ?>
+                </h2>
+            </div>
+            <span class="font-label-meta text-label-meta text-secondary">Atualizado em tempo real</span>
+        </div>
 
-    <?php if (empty($posts)): ?>
-        <p style="padding: 3rem; text-align: center; color: var(--text-muted);">Nenhuma publicação encontrada no momento.</p>
-    <?php else: ?>
-        <div class="grid-posts">
+        <!-- Editorial Articles List -->
+        <div class="flex flex-col gap-space-md">
             <?php foreach ($posts as $item): ?>
-                <article class="card">
-                    <?php if (!empty($item['featured_image'])): ?>
-                        <a href="/<?= Security::e($item['slug']) ?>/">
-                            <img src="<?= Security::e(ImageProcessor::toAvifUrl($item['featured_image'])) ?>" alt="<?= Security::e($item['title']) ?>" class="card-img" loading="lazy">
-                        </a>
-                    <?php else: ?>
-                        <div class="card-img" style="display: flex; align-items: center; justify-content: center; color: var(--text-muted);">Sem imagem</div>
-                    <?php endif; ?>
-                    <div class="card-body">
-                        <div>
-                            <a href="/categoria/<?= Security::e($item['category']) ?>/" class="badge" style="text-decoration: none;">
-                                <?= Security::e($item['category']) ?>
-                            </a>
+                <article class="group bg-pure-white p-space-md rounded-xl shadow-xs border border-subtle-border hover:shadow-md transition-all flex flex-col sm:flex-row gap-space-md items-start">
+                    <a href="/<?= Security::e($item['slug']) ?>/" class="w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0 relative bg-surface-container block">
+                        <?php if (!empty($item['featured_image'])): ?>
+                            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                 src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
+                                 alt="<?= Security::e($item['title']) ?>" loading="lazy">
+                        <?php else: ?>
+                            <div class="w-full h-full flex items-center justify-center text-secondary text-xs">Sem foto</div>
+                        <?php endif; ?>
+                        <span class="absolute top-2 left-2 bg-carbon-black/85 backdrop-blur-sm text-pure-white font-label-category text-label-category px-1.5 py-0.5 rounded uppercase">
+                            <?= Security::e($item['category']) ?>
+                        </span>
+                    </a>
+                    <div class="flex-1 flex flex-col justify-between h-full w-full">
+                        <div class="space-y-space-xs">
+                            <div class="flex items-center gap-space-xs text-secondary font-label-meta text-label-meta">
+                                <span class="material-symbols-outlined text-[14px]">calendar_today</span>
+                                <time datetime="<?= $item['published_at'] ?>"><?= $formatPtDate($item['published_at']) ?></time>
+                                <span>•</span>
+                                <span class="capitalize"><?= Security::e($getSubtopic($item['tags'] ?? null, $item['category'])) ?></span>
+                            </div>
+                            <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black group-hover:text-racing-red transition-colors font-bold leading-snug">
+                                <a href="/<?= Security::e($item['slug']) ?>/">
+                                    <?= Security::e($item['title']) ?>
+                                </a>
+                            </h3>
+                            <?php if (!empty($item['summary'])): ?>
+                                <p class="font-body-md text-body-sm md:text-body-md text-secondary line-clamp-2">
+                                    <?= Security::e($item['summary']) ?>
+                                </p>
+                            <?php endif; ?>
                         </div>
-                        <h3 class="card-title">
-                            <a href="/<?= Security::e($item['slug']) ?>/">
-                                <?= Security::e($item['title']) ?>
+                        <div class="pt-space-sm flex items-center text-racing-red font-label-category text-label-category uppercase tracking-wider gap-1">
+                            <a href="/<?= Security::e($item['slug']) ?>/" class="flex items-center gap-1 hover:underline">
+                                Ler matéria completa <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
                             </a>
-                        </h3>
-                        <p class="card-summary"><?= Security::e($item['summary'] ?? '') ?></p>
-                        <div class="card-meta">
-                            <span><?= date('d/m/Y', strtotime($item['published_at'])) ?></span>
-                            <a href="/<?= Security::e($item['slug']) ?>/" style="color: var(--primary-accent); text-decoration: none; font-weight: 700;">Ler matéria &rarr;</a>
                         </div>
                     </div>
                 </article>
             <?php endforeach; ?>
         </div>
 
+        <!-- REFINED MINIMAL PAGINATION (Reflete a Imagem 3 do Usuário) -->
         <?php if (!empty($totalPages) && $totalPages > 1): ?>
-            <nav class="pagination" aria-label="Navegação de páginas">
-                <?php if ($currentPage > 1): ?>
-                    <a href="<?= ($currentPage === 2) ? '/' : '/page/' . ($currentPage - 1) . '/' ?>" class="page-btn">&larr; Anterior</a>
-                <?php endif; ?>
-
-                <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                    <?php if ($p === 1): ?>
-                        <a href="/" class="page-btn <?= ($currentPage === 1) ? 'active' : '' ?>">1</a>
+            <nav aria-label="Navegação de páginas" class="w-full bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-wrap items-center justify-between gap-space-sm mt-space-sm">
+                <div class="flex items-center gap-1.5 font-headline-sm text-data-telemetry">
+                    <?php if ($currentPage === 1): ?>
+                        <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold">1</span>
                     <?php else: ?>
-                        <a href="/page/<?= $p ?>/" class="page-btn <?= ($currentPage === $p) ? 'active' : '' ?>"><?= $p ?></a>
+                        <a href="/" class="w-9 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors">1</a>
                     <?php endif; ?>
-                <?php endfor; ?>
+
+                    <?php if ($currentPage > 3): ?>
+                        <span class="w-8 h-9 flex items-center justify-center text-secondary">…</span>
+                    <?php endif; ?>
+
+                    <?php for ($p = max(2, $currentPage - 1); $p <= min($totalPages - 1, $currentPage + 1); $p++): ?>
+                        <?php if ($p === $currentPage): ?>
+                            <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= $p ?></span>
+                        <?php else: ?>
+                            <a href="/page/<?= $p ?>/" class="w-9 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors"><?= $p ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+
+                    <?php if ($currentPage < $totalPages - 2): ?>
+                        <span class="w-8 h-9 flex items-center justify-center text-secondary">…</span>
+                    <?php endif; ?>
+
+                    <?php if ($totalPages > 1): ?>
+                        <?php if ($currentPage === $totalPages): ?>
+                            <span class="px-2.5 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= number_format($totalPages, 0, ',', '.') ?></span>
+                        <?php else: ?>
+                            <a href="/page/<?= $totalPages ?>/" class="px-2.5 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors"><?= number_format($totalPages, 0, ',', '.') ?></a>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
 
                 <?php if ($currentPage < $totalPages): ?>
-                    <a href="/page/<?= $currentPage + 1 ?>/" class="page-btn">Próxima &rarr;</a>
+                    <a class="px-space-md py-2 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs" href="/page/<?= $currentPage + 1 ?>/">
+                        Próxima Página <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
                 <?php endif; ?>
             </nav>
         <?php endif; ?>
-    <?php endif; ?>
-</section>
+    </section>
+
+    <!-- RIGHT: RACE WEEKEND & OPINION SIDEBAR (4 COLS) -->
+    <aside class="lg:col-span-4 flex flex-col gap-space-lg">
+        <!-- WIDGET 1: RACE RADAR / UPCOMING EVENTS -->
+        <div class="bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md space-y-space-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-racing-red text-[20px]">sports_score</span>
+                    <h3 class="font-headline-sm text-headline-sm text-carbon-black uppercase tracking-tight font-bold">Próximas Etapas</h3>
+                </div>
+                <span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-category text-[10px]">CALENDÁRIO</span>
+            </div>
+            <div class="space-y-space-sm">
+                <!-- Event 1: F1 Interlagos -->
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                    <div class="flex items-center justify-between text-label-category font-label-category">
+                        <span class="text-racing-red font-bold">FÓRMULA 1</span>
+                        <span class="text-secondary font-data-telemetry">06 - 08 NOV</span>
+                    </div>
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Grande Prêmio de São Paulo</div>
+                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                        <span>Autódromo de Interlagos</span>
+                        <span class="px-1.5 py-0.5 rounded bg-flag-green/10 text-flag-green font-semibold">T-02 Dias</span>
+                    </div>
+                </div>
+
+                <!-- Event 2: NASCAR Homestead -->
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                    <div class="flex items-center justify-between text-label-category font-label-category">
+                        <span class="text-carbon-black font-bold">NASCAR CUP</span>
+                        <span class="text-secondary font-data-telemetry">08 NOV</span>
+                    </div>
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Homestead-Miami Championship 4</div>
+                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                        <span>Homestead Speedway</span>
+                        <span class="text-secondary">Decisão de Título</span>
+                    </div>
+                </div>
+
+                <!-- Event 3: Stock Car Goiânia -->
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                    <div class="flex items-center justify-between text-label-category font-label-category">
+                        <span class="text-flag-yellow font-bold text-carbon-black">STOCK CAR PRO</span>
+                        <span class="text-secondary font-data-telemetry">15 NOV</span>
+                    </div>
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Etapa de Goiânia • Anel Externo</div>
+                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                        <span>Ayrton Senna, GO</span>
+                        <span class="text-secondary">Corrida Principal</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 2: SPECIAL COLUMN - OPINIÃO / REDAÇÃO -->
+        <div class="bg-carbon-black text-pure-white rounded-xl shadow-md p-space-md relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 opacity-10">
+                <span class="material-symbols-outlined text-[160px] text-pure-white">speed</span>
+            </div>
+            <div class="relative z-10 space-y-space-sm">
+                <div class="flex items-center gap-space-sm">
+                    <div class="w-12 h-12 rounded-full overflow-hidden bg-carbon-surface shrink-0 shadow flex items-center justify-center font-bold text-racing-red text-lg">
+                        SR
+                    </div>
+                    <div>
+                        <span class="font-label-category text-[10px] text-racing-red uppercase tracking-widest block font-bold">Coluna de Opinião</span>
+                        <h4 class="font-headline-sm text-headline-sm text-pure-white font-bold leading-none">Carlos Araújo</h4>
+                        <span class="font-label-meta text-label-meta text-secondary-fixed">Diretor Geral SpeedRacing</span>
+                    </div>
+                </div>
+                <p class="font-body-md text-body-sm text-surface-container italic pt-space-xs leading-relaxed">
+                    "A velocidade pura não perdoa erros. Do asfalto quente de Interlagos aos circuitos da NASCAR, a precisão e a coragem definem os campeões da era moderna."
+                </p>
+                <a class="inline-flex items-center gap-1.5 text-flag-yellow hover:text-pure-white font-label-category text-label-category uppercase tracking-wider transition-colors pt-space-xs" href="/categoria/opiniao/">
+                    Ler todas as análises <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- WIDGET 3: INSTAGRAM COMMUNITY CARD -->
+        <div class="bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-col gap-space-sm items-center text-center">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-flag-yellow via-racing-red to-primary flex items-center justify-center text-pure-white shadow-md">
+                <span class="material-symbols-outlined text-[32px]">photo_camera</span>
+            </div>
+            <div>
+                <h4 class="font-headline-sm text-headline-sm text-carbon-black font-bold">@speedracing.com.br</h4>
+                <p class="font-body-sm text-body-sm text-secondary">Bastidores, telemetria em tempo real e fotografias exclusivas direto do paddock.</p>
+            </div>
+            <a class="w-full py-2.5 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-xs" href="https://www.instagram.com/speedracing.com.br/" rel="noopener noreferrer" target="_blank">
+                <span>Seguir no Instagram</span>
+                <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+            </a>
+        </div>
+
+        <!-- WIDGET 4: FAST NEWSLETTER -->
+        <div id="newsletter" class="bg-surface-container-low rounded-xl p-space-md space-y-space-sm border border-subtle-border">
+            <div class="flex items-center gap-2 text-carbon-black font-headline-sm text-headline-sm font-bold">
+                <span class="material-symbols-outlined text-racing-red text-[20px]">mark_email_read</span>
+                <span>Grid SpeedRacing</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-secondary">
+                O resumo técnico e os bastidores das principais categorias do automobilismo todo dia às 7h no seu e-mail.
+            </p>
+            <form class="flex flex-col gap-2" onsubmit="event.preventDefault(); alert('Obrigado por se inscrever no Grid SpeedRacing!');">
+                <input class="w-full px-space-sm py-2 rounded-lg bg-pure-white text-carbon-black placeholder:text-secondary font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-racing-red border border-subtle-border" placeholder="Seu melhor e-mail" type="email" required/>
+                <button class="w-full py-2 rounded-lg bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold transition-colors" type="submit">
+                    Inscrever-se Grátis
+                </button>
+            </form>
+            <span class="block text-[11px] text-secondary font-label-meta text-center">Sem spam. Desinscreva-se a qualquer momento.</span>
+        </div>
+    </aside>
+</div>
 
 <?php require __DIR__ . '/footer.php'; ?>

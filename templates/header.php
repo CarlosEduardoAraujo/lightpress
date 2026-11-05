@@ -5,339 +5,218 @@ use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\Seo;
 
-$navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_active = 1 ORDER BY id ASC LIMIT 5");
+// Categorias principais de automobilismo para o menu
+$menuCategories = [
+    ['slug' => 'formula-1', 'name' => 'Fórmula 1'],
+    ['slug' => 'formula-2', 'name' => 'Fórmula 2'],
+    ['slug' => 'formula-e', 'name' => 'Fórmula E'],
+    ['slug' => 'indycar', 'name' => 'IndyCar'],
+    ['slug' => 'stockcar', 'name' => 'Stock Car'],
+    ['slug' => 'nascar', 'name' => 'NASCAR'],
+    ['slug' => 'wec', 'name' => 'Le Mans / WEC'],
+    ['slug' => 'motovelocidade', 'name' => 'Motovelocidade'],
+];
+
+// Tags em alta
+$trendingTags = ['GPSãoPaulo2026', 'RafaelCamara', 'NASCARHomestead', 'LeMansUltimate', 'TelemetriaF1'];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= Security::e($pageTitle ?? 'SpeedPress') ?></title>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title><?= Security::e($pageTitle ?? 'SpeedRacing - Automobilismo e Velocidade') ?></title>
     <?php if (!empty($post['seo_description'])): ?>
         <meta name="description" content="<?= Security::e($post['seo_description']) ?>">
     <?php elseif (!empty($post['summary'])): ?>
         <meta name="description" content="<?= Security::e($post['summary']) ?>">
     <?php endif; ?>
-    <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($config['app']['name'] ?? 'SpeedPress') ?>" href="/feed.xml">
+    <link rel="alternate" type="application/rss+xml" title="Feed RSS - SpeedRacing" href="/feed.xml">
 
-    <!-- Open Graph & Twitter Cards (Sempre WebP para máxima compatibilidade com redes sociais) -->
+    <!-- Open Graph & Twitter Cards -->
     <?= Seo::renderMetaTags($post ?? null, $config) ?>
 
     <!-- Schema.org JSON-LD para Google Notícias -->
     <?= Seo::renderJsonLd($post ?? null, $config) ?>
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
+    <!-- Tipografia e Ícones do Design System SpeedRacing (Kinetic Apex Editorial) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS com a Paleta Exata do DESIGN.md -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-bright": "#f6faff",
+                        "surface-container": "#e6eff8",
+                        "surface-container-high": "#e0e9f2",
+                        "surface-container-highest": "#dbe4ed",
+                        "surface-container-low": "#ecf5fe",
+                        "surface-container-lowest": "#ffffff",
+                        "carbon-black": "#111418",
+                        "carbon-surface": "#1A1E24",
+                        "racing-red": "#E10600",
+                        "primary": "#b30400",
+                        "primary-container": "#e10600",
+                        "tertiary": "#af101a",
+                        "tertiary-container": "#d32f2f",
+                        "secondary": "#5c5e63",
+                        "secondary-container": "#dedfe5",
+                        "secondary-fixed": "#e1e2e8",
+                        "secondary-fixed-dim": "#c5c6cc",
+                        "track-asphalt": "#272727",
+                        "pure-white": "#FFFFFF",
+                        "canvas-cream": "#F9FAFB",
+                        "subtle-border": "#E5E7EB",
+                        "flag-green": "#00A859",
+                        "flag-yellow": "#FFB800",
+                        "surface": "#f6faff",
+                        "on-surface": "#141d23",
+                        "on-surface-variant": "#5e3f3a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.125rem",
+                        lg: "0.25rem",
+                        xl: "0.5rem",
+                        full: "0.75rem",
+                    },
+                    spacing: {
+                        "gutter-mobile": "0.75rem",
+                        "space-xs": "0.25rem",
+                        "space-sm": "0.5rem",
+                        "space-md": "1rem",
+                        "space-lg": "1.5rem",
+                        "space-xl": "2.5rem",
+                        "margin-mobile": "1rem",
+                        "margin": "2rem",
+                        "gutter": "1.5rem",
+                    },
+                    fontFamily: {
+                        "display-hero": ["Space Grotesk", "sans-serif"],
+                        "headline-lg": ["Space Grotesk", "sans-serif"],
+                        "headline-md": ["Space Grotesk", "sans-serif"],
+                        "headline-sm": ["Space Grotesk", "sans-serif"],
+                        "label-category": ["Space Grotesk", "sans-serif"],
+                        "data-telemetry": ["Space Grotesk", "sans-serif"],
+                        "body-lg": ["Work Sans", "sans-serif"],
+                        "body-md": ["Work Sans", "sans-serif"],
+                        "body-sm": ["Work Sans", "sans-serif"],
+                        "label-meta": ["Work Sans", "sans-serif"],
+                    },
+                    fontSize: {
+                        "display-hero": ["48px", { lineHeight: "54px", letterSpacing: "-0.03em", fontWeight: "700" }],
+                        "display-hero-mobile": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg-mobile": ["24px", { lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700" }],
+                        "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "headline-sm": ["18px", { lineHeight: "24px", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "body-md": ["15px", { lineHeight: "22px", fontWeight: "400" }],
+                        "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+                        "label-category": ["11px", { lineHeight: "14px", letterSpacing: "0.08em", fontWeight: "700" }],
+                        "label-meta": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+                        "data-telemetry": ["13px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+                    }
+                }
             }
-        })();
+        };
     </script>
 
     <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --text: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --radius: 10px;
-            --badge-bg: #eff6ff;
-            --badge-color: #2563eb;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            --card-hover-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.08);
-            --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        @layer base {
+            html, body { margin: 0; padding: 0; }
+            body { overscroll-behavior: none; }
         }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #1e293b;
-            --badge-bg: #1e293b;
-            --badge-color: #60a5fa;
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-            --card-hover-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.4);
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.2s, color 0.2s; }
-        
-        .site-header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; transition: background 0.2s, border-color 0.2s; }
-        .container { max-width: 1900px; margin: 0 auto; padding: 0 1.5rem; }
-        .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 1rem; }
-        
-        .brand { font-size: 1.45rem; font-weight: 900; letter-spacing: -0.03em; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.35rem; }
-        .brand span { color: var(--primary-accent); }
-
-        .nav-links { display: flex; gap: 1.25rem; list-style: none; align-items: center; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.92rem; font-weight: 600; transition: color 0.15s; }
-        .nav-links a:hover { color: var(--primary-accent); }
-
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-
-        main { padding: 2.5rem 0; }
-        .badge { display: inline-block; padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; background: var(--badge-bg); color: var(--badge-color); border-radius: 6px; }
-        
-        /* Grid de Cards */
-        .grid-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.75rem; margin-top: 1.5rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--card-shadow); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-        .card:hover { transform: translateY(-4px); box-shadow: var(--card-hover-shadow); }
-        .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--border); display: block; }
-        .card-body { padding: 1.5rem; display: flex; flex-direction: column; flex-grow: 1; }
-        .card-title { font-size: 1.22rem; font-weight: 800; margin: 0.65rem 0; line-height: 1.35; letter-spacing: -0.015em; }
-        .card-title a { color: var(--primary); text-decoration: none; transition: color 0.15s; }
-        .card-title a:hover { color: var(--primary-accent); }
-        .card-summary { font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1.25rem; flex-grow: 1; line-height: 1.6; }
-        .card-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 0.85rem; }
-
-        /* Hero Quad Grid (4 Notícias Destacadas no Topo da Home) */
-        .hero-quad-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-            margin-bottom: 3rem;
-        }
-        @media (max-width: 1280px) {
-            .hero-quad-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 640px) {
-            .hero-quad-grid { grid-template-columns: 1fr; }
-        }
-        .hero-quad-card {
-            position: relative;
-            border-radius: var(--radius);
-            overflow: hidden;
-            aspect-ratio: 16 / 10;
-            min-height: 220px;
-            background: #090d16;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s;
-            display: block;
-            text-decoration: none;
-            border: 1px solid var(--border);
-        }
-        .hero-quad-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--card-hover-shadow);
-        }
-        .hero-quad-card:hover .hero-quad-img {
-            transform: scale(1.05);
-        }
-        .hero-quad-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .hero-quad-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.6) 45%, rgba(0, 0, 0, 0.05) 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 1.25rem 1rem 1rem;
-            color: #ffffff;
-            pointer-events: none;
-        }
-        .hero-quad-badge {
-            align-self: flex-start;
-            background: rgba(37, 99, 235, 0.9);
-            backdrop-filter: blur(4px);
-            color: #ffffff;
-            font-size: 0.68rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0.2rem 0.55rem;
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-        }
-        .hero-quad-title {
-            color: #ffffff;
-            font-size: 1.05rem;
-            font-weight: 700;
-            line-height: 1.35;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-            margin: 0;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* Botões de Compartilhamento Social (Sem rastreadores externos) */
-        .share-bar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.6rem;
-            margin: 1.5rem 0 2rem;
-            padding: 0.9rem 1.25rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-        }
-        .share-label {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--text-muted);
-            margin-right: 0.4rem;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .share-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.45rem 0.85rem;
-            border-radius: 6px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: #ffffff;
-            transition: opacity 0.2s, transform 0.15s;
-            cursor: pointer;
-            border: none;
-        }
-        .share-btn:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-        .share-btn svg {
-            width: 15px;
-            height: 15px;
-            fill: currentColor;
-        }
-        .share-wa { background: #25D366; }
-        .share-x { background: #000000; }
-        [data-theme="dark"] .share-x { background: #24292e; border: 1px solid #444; }
-        .share-fb { background: #1877F2; }
-        .share-tg { background: #229ED9; }
-        .share-copy {
-            background: var(--badge-bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
-        .share-copy:hover {
-            background: var(--border);
-        }
-
-        /* Super Destaque Hero */
-        .hero-card { display: grid; grid-template-columns: 1.2fr 1fr; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--card-shadow); margin-bottom: 3rem; }
-        @media (max-width: 768px) {
-            .hero-card { grid-template-columns: 1fr; }
-            .nav-links { display: none; }
-            article { padding: 1.5rem !important; }
-        }
-        .hero-img { width: 100%; height: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
-        .hero-body { padding: 2.5rem; display: flex; flex-direction: column; justify-content: center; }
-        .hero-title { font-size: 1.95rem; font-weight: 900; line-height: 1.25; letter-spacing: -0.025em; margin: 0.85rem 0; }
-        .hero-title a { color: var(--primary); text-decoration: none; }
-        .hero-title a:hover { color: var(--primary-accent); }
-
-        /* Tipografia de Artigos (BlockCompiler) */
-        .content-body { font-size: 1.22rem; line-height: 1.85; color: var(--text); }
-        .content-body h2 { font-size: 1.85rem; font-weight: 800; margin: 2.5rem 0 1rem; color: var(--primary); letter-spacing: -0.02em; }
-        .content-body h3 { font-size: 1.45rem; font-weight: 700; margin: 2rem 0 0.85rem; color: var(--primary); letter-spacing: -0.015em; }
-        .content-body p { margin-bottom: 1.5rem; }
-        .content-body blockquote { border-left: 4px solid var(--primary-accent); padding: 1rem 1.6rem; background: var(--badge-bg); border-radius: 0 var(--radius) var(--radius) 0; margin: 2rem 0; font-style: italic; color: var(--text); font-size: 1.25rem; }
-        .content-body blockquote cite { display: block; font-size: 0.9rem; color: var(--text-muted); font-style: normal; margin-top: 0.6rem; font-weight: 600; }
-        .content-body figure { margin: 2.5rem 0; }
-        .content-body figure img { width: 100%; border-radius: var(--radius); height: auto; display: block; }
-        .content-body figcaption { text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-top: 0.6rem; font-style: italic; }
-        .content-body ul, .content-body ol { margin: 1.25rem 0 1.75rem 2rem; }
-        .content-body li { margin-bottom: 0.6rem; }
-        .content-body a { color: var(--primary-accent); text-decoration: underline; text-underline-offset: 3px; }
-
-        /* Grid de Notícias Relacionadas (4 colunas na tela cheia) */
-        .grid-related {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-top: 1rem;
-        }
-        @media (max-width: 1280px) {
-            .grid-related { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 640px) {
-            .grid-related { grid-template-columns: 1fr; }
-        }
-        
-        /* Campo de Busca no Cabeçalho */
-        .nav-search-input {
-            padding: 0.4rem 0.9rem;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            font-size: 0.85rem;
-            background: var(--bg);
-            color: var(--text);
-            width: 160px;
-            outline: none;
-            transition: width 0.2s ease, border-color 0.2s ease;
-        }
-        .nav-search-input:focus {
-            width: 220px;
-            border-color: var(--primary-accent);
-        }
-
-        /* Paginação */
-        .pagination { display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 3.5rem; }
-        .page-btn { padding: 0.6rem 1rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius); text-decoration: none; font-weight: 600; font-size: 0.9rem; transition: all 0.15s; }
-        .page-btn:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
-        .page-btn.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
-
-        /* Caixa de Autor */
-        .author-box { display: flex; align-items: center; gap: 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-top: 3rem; }
-        .author-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--border); }
-        .author-info h4 { font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-bottom: 0.25rem; }
-        .author-info p { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin: 0; }
-
-        footer { background: var(--surface); border-top: 1px solid var(--border); padding: 3rem 0; color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 5rem; }
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body>
-    <header class="site-header">
-        <div class="container nav-inner">
-            <a href="/" class="brand">Speed<span>Press</span></a>
-            <nav style="display: flex; align-items: center; gap: 1.25rem;">
-                <form action="/busca" method="GET" style="display: flex; align-items: center;">
-                    <input type="text" name="q" placeholder="Buscar notícias..." value="<?= Security::e($_GET['q'] ?? '') ?>" class="nav-search-input" aria-label="Buscar notícias">
-                </form>
-                <ul class="nav-links">
-                    <li><a href="/">Início</a></li>
-                    <?php foreach ($navCategories as $navCat): ?>
-                        <li><a href="/categoria/<?= Security::e($navCat['slug']) ?>/"><?= Security::e($navCat['name']) ?></a></li>
+<body class="bg-surface font-body-md text-on-surface antialiased">
+    <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
+        <!-- 1. Top Strip (Ao Vivo / Próxima Etapa) -->
+        <div class="w-full bg-carbon-black text-on-tertiary">
+            <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between h-9 text-label-meta font-label-meta">
+                <div class="flex items-center gap-space-md">
+                    <span class="flex items-center gap-space-xs text-flag-yellow font-semibold">
+                        <span class="w-2 h-2 rounded-full bg-racing-red animate-ping"></span>AO VIVO
+                    </span>
+                    <span class="text-secondary-fixed-dim hidden sm:inline">|</span>
+                    <span class="text-surface-container-lowest tracking-tight">Próxima Etapa: GP de São Paulo 2026 • Interlagos (F1)</span>
+                </div>
+                <div class="flex items-center gap-space-md">
+                    <span class="hidden md:inline text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
+                    <div class="flex items-center gap-space-sm">
+                        <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#newsletter">
+                            <span class="material-symbols-outlined text-[15px]">mail</span><span class="hidden lg:inline">Newsletter</span>
+                        </a>
+                        <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
+                            <span class="material-symbols-outlined text-[15px]">share</span><span class="hidden lg:inline">Social</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Main Navigation Bar -->
+        <div class="h-20 max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between gap-space-md">
+            <div class="flex items-center gap-space-lg">
+                <a class="flex items-center gap-space-sm shrink-0" href="/">
+                    <img alt="SpeedRacing Logo" class="h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY" onerror="this.style.display='none'"/>
+                    <div class="flex flex-col">
+                        <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-carbon-black leading-none">SPEED<span class="text-racing-red">RACING</span></span>
+                        <span class="font-label-category text-[9px] tracking-widest text-secondary uppercase">Desde 2002</span>
+                    </div>
+                </a>
+
+                <nav class="hidden xl:flex items-center gap-space-md font-body-sm text-body-sm">
+                    <a aria-current="page" class="transition-colors whitespace-nowrap text-racing-red font-semibold" href="/">Home</a>
+                    <?php foreach ($menuCategories as $cat): ?>
+                        <a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" href="/categoria/<?= Security::e($cat['slug']) ?>/"><?= Security::e($cat['name']) ?></a>
                     <?php endforeach; ?>
-                    <li><a href="/feed.xml" target="_blank">RSS</a></li>
-                    <li><a href="/admin/login.php" style="background: var(--primary-accent); color: white; padding: 0.35rem 0.8rem; border-radius: var(--radius); text-decoration: none;">Painel</a></li>
-                </ul>
-                <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            </nav>
+                    <a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" href="/quem-somos/">Nossa Equipe</a>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-space-sm">
+                <form action="/busca" method="GET" class="relative flex items-center">
+                    <input type="text" name="q" placeholder="Buscar no portal..." value="<?= Security::e($_GET['q'] ?? '') ?>" class="hidden md:block w-36 focus:w-52 transition-all duration-200 text-body-sm py-1.5 px-3 rounded-lg bg-surface-container text-carbon-black placeholder:text-secondary focus:outline-none focus:ring-1 focus:ring-racing-red">
+                    <button type="submit" aria-label="Buscar no portal" class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors md:absolute md:right-0">
+                        <span class="material-symbols-outlined text-[20px]">search</span>
+                    </button>
+                </form>
+                
+                <div class="hidden sm:flex items-center px-space-sm py-1 bg-surface-container rounded-lg text-label-category font-label-category text-carbon-black uppercase tracking-wider gap-1">
+                    <span class="material-symbols-outlined text-[14px] text-racing-red">language</span>
+                    <span>BR</span>
+                </div>
+
+                <a href="/admin/login.php" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-pure-white hover:opacity-90 transition-opacity" title="Acessar Painel">
+                    <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 3. Em Alta Ticker Strip -->
+        <div class="bg-surface-container-low border-t border-subtle-border/60">
+            <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin h-11 flex items-center gap-space-sm overflow-x-auto">
+                <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red shrink-0 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">trending_up</span>Em Alta:
+                </span>
+                <div class="flex items-center gap-space-xs font-label-meta text-label-meta">
+                    <?php foreach ($trendingTags as $tTag): ?>
+                        <a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors shadow-xs" href="/tag/<?= urlencode(Security::slugify($tTag)) ?>/">#<?= Security::e($tTag) ?></a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         </div>
     </header>
-    <main class="container">
+
+    <main class="w-full pt-40 bg-surface min-h-[calc(100vh-280px)]">
+        <div class="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin space-y-space-xl pb-space-xl">

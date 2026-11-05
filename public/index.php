@@ -34,10 +34,11 @@ $router->get('/', function () use ($config): void {
     
     // Buscar até 4 artigos em destaque principal
     $featuredPosts = Database::fetchAll(
-        "SELECT id, slug, title, summary, category, featured_image, published_at 
-         FROM posts 
-         WHERE status IN ('published', 'scheduled') AND is_featured = 1 AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 4",
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
+         ORDER BY p.published_at DESC LIMIT 4",
         [$nowUtc]
     );
 
@@ -45,12 +46,13 @@ $router->get('/', function () use ($config): void {
     $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
     if (count($featuredPosts) < 4) {
         $needed = 4 - count($featuredPosts);
-        $excludeSql = !empty($featuredIds) ? "AND id NOT IN (" . implode(',', $featuredIds) . ")" : "";
+        $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
         $extraPosts = Database::fetchAll(
-            "SELECT id, slug, title, summary, category, featured_image, published_at 
-             FROM posts 
-             WHERE status IN ('published', 'scheduled') AND published_at <= ? {$excludeSql}
-             ORDER BY published_at DESC LIMIT {$needed}",
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
+             ORDER BY p.published_at DESC LIMIT {$needed}",
             [$nowUtc]
         );
         $featuredPosts = array_merge($featuredPosts, $extraPosts);
@@ -65,13 +67,14 @@ $router->get('/', function () use ($config): void {
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Buscar publicações para o grid principal excluindo os 4 destaques do topo
-    $excludeSql = !empty($featuredIds) ? "AND id NOT IN (" . implode(',', $featuredIds) . ")" : "";
+    // Buscar publicações para o feed principal excluindo os 4 destaques do topo
+    $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
     $posts = Database::fetchAll(
-        "SELECT id, slug, title, summary, category, featured_image, published_at 
-         FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ? {$excludeSql}
-         ORDER BY published_at DESC LIMIT ?",
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
+         ORDER BY p.published_at DESC LIMIT ?",
         [$nowUtc, $perPage]
     );
 
@@ -94,10 +97,11 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $currentPage = $page;
 
     $posts = Database::fetchAll(
-        "SELECT id, slug, title, summary, category, featured_image, published_at 
-         FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ?
-         ORDER BY published_at DESC LIMIT ? OFFSET ?",
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$nowUtc, $perPage, $offset]
     );
 
