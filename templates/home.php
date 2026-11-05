@@ -81,8 +81,6 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                 </span>
                 <span>•</span>
                 <time datetime="<?= $mainLead['published_at'] ?>"><?= $formatPtDate($mainLead['published_at']) ?></time>
-                <span class="hidden sm:inline">•</span>
-                <span class="hidden sm:inline text-flag-yellow font-medium">Interlagos Circuit, SP</span>
             </div>
         </div>
     </article>
@@ -105,7 +103,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                     </a>
                 </h2>
                 <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-sm pt-space-xs">
-                    <span class="text-tertiary dark:text-racing-red font-medium">Oficial Paddock</span>
+                    <span class="text-tertiary dark:text-racing-red font-medium"></span>
                     <a href="/<?= Security::e($sec['slug']) ?>/" class="material-symbols-outlined text-[18px] text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1" title="Ler matéria">arrow_forward</a>
                 </div>
             </article>
