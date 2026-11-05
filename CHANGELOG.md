@@ -8,6 +8,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Consumo Padronizado de Miniaturas AVIF (`-thumb.avif`):**
+  - Ajustado o método `ImageProcessor::toThumbUrl($url, 'avif')` para priorizar estritamente a variante `-thumb.avif` no HTML de renderização, mantendo a regra de ouro do LightPress (HTML sempre requisita AVIF, deixando WebP reservado exclusivamente para metadados sociais e fallback automático transparente no Nginx).
 - **Consumo Otimizado da Variante Thumbnail (`-thumb.webp`):**
   - Implementado o método estático `ImageProcessor::toThumbUrl($url, 'webp')` para converter automaticamente URLs de qualquer resolução para a variante de corte 16:9 (`-thumb.webp`, 300x169px).
   - O painel administrativo (`/admin/dashboard.php` e `/admin/stats.php`) agora requisita estritamente o arquivo minúsculo `-thumb.webp` (~3 a 6 KiB) em vez do arquivo intermediário de 1024px, economizando banda e acelerando o carregamento da lista de publicações.

@@ -77,23 +77,24 @@ class ImageProcessor
     }
 
     /**
-     * Obtém a URL da variante Thumbnail (-thumb.webp ou -thumb.avif, 300x169px) para listagens e painéis leves.
+     * Obtém a URL da variante Thumbnail (-thumb.avif ou -thumb.webp, 300x169px) para listagens e painéis leves.
+     * Padrão do sistema: SEMPRE AVIF no HTML (Nginx realiza fallback automático para WebP quando necessário).
      *
      * @param string $url URL de qualquer variante da imagem
-     * @param string $format 'webp' (padrão) ou 'avif'
+     * @param string $format 'avif' (padrão) ou 'webp'
      * @return string URL apontando diretamente para a versão -thumb
      */
-    public static function toThumbUrl(string $url, string $format = 'webp'): string
+    public static function toThumbUrl(string $url, string $format = 'avif'): string
     {
         if (empty($url)) {
             return '';
         }
 
-        $targetExt = ($format === 'avif') ? 'avif' : 'webp';
+        $targetExt = ($format === 'webp') ? 'webp' : 'avif';
 
         // Se já tiver -thumb no nome, apenas ajusta a extensão
         if (str_contains($url, '-thumb.')) {
-            return ($targetExt === 'avif') ? self::toAvifUrl($url) : self::toWebpUrl($url);
+            return ($targetExt === 'webp') ? self::toWebpUrl($url) : self::toAvifUrl($url);
         }
 
         // Substitui sufixos de resolução conhecidos (-1024, -1920) por -thumb

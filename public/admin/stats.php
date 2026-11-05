@@ -219,7 +219,7 @@ $csrfToken = Security::generateCsrfToken();
                                     <div style="display: flex; align-items: center; gap: 0.85rem;">
                                         <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
                                             <?php if (!empty($p['featured_image'])): ?>
-                                                <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'webp')) ?>" 
+                                                <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'avif')) ?>" 
                                                      alt="" 
                                                      loading="lazy" 
                                                      style="width: 64px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">
