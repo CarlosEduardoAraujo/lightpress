@@ -337,8 +337,26 @@ $router->setNotFound(function () use ($config): void {
     }
 });
 
-// Despachar requisição
+// Despachar requisição com captura e log defensivo de exceções
 $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 
-$router->dispatch($requestMethod, $requestUri);
+try {
+    $router->dispatch($requestMethod, $requestUri);
+} catch (\Throwable $e) {
+    error_log("[LightPress HTTP 500] " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    http_response_code(500);
+    if (!empty($config['app']['debug'])) {
+        echo "<!DOCTYPE html><html lang='pt-BR'><head><title>Erro 500 - Debug</title><meta charset='utf-8'></head><body style='font-family: monospace; padding: 2rem; background: #fff1f2; color: #9f1239;'>";
+        echo "<h1>Erro 500: " . htmlspecialchars($e->getMessage()) . "</h1>";
+        echo "<p><strong>Arquivo:</strong> " . htmlspecialchars($e->getFile()) . " (Linha " . $e->getLine() . ")</p>";
+        echo "<h3>Stack Trace:</h3><pre style='background: white; padding: 1.5rem; border: 1px solid #fecdd3; border-radius: 8px; overflow-x: auto;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+        echo "</body></html>";
+    } else {
+        if (file_exists($config['paths']['templates'] . '/500.php')) {
+            require $config['paths']['templates'] . '/500.php';
+        } else {
+            echo "500 - Erro interno do servidor. Os detalhes foram registrados nos logs.";
+        }
+    }
+}

@@ -143,6 +143,16 @@ class Database
     }
 
     /**
+     * Retorna o valor escalar de uma única coluna da primeira linha (ex: COUNT(*), SUM(views)).
+     */
+    public static function fetchValue(string $sql, array $params = []): mixed
+    {
+        $stmt = self::query($sql, $params);
+        $val = $stmt->fetchColumn();
+        return $val !== false ? $val : null;
+    }
+
+    /**
      * Retorna todas as linhas do resultado.
      */
     public static function fetchAll(string $sql, array $params = []): array

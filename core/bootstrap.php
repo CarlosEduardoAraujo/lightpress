@@ -48,6 +48,10 @@ if (!empty($config['app']['debug'])) {
 }
 
 ini_set('log_errors', '1');
-ini_set('error_log', $config['paths']['storage'] . '/logs/error.log');
+$logDir = $config['paths']['storage'] . '/logs';
+if (!is_dir($logDir)) {
+    @mkdir($logDir, 0775, true);
+}
+ini_set('error_log', $logDir . '/error.log');
 
 return $config;

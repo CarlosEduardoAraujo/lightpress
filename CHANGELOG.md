@@ -8,6 +8,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Corrigido
+- **BUG Erro 500 na Página Inicial (`Database::fetchValue`):** Implementado o método ausente `Database::fetchValue()` utilizado para contagem de registros na paginação da Home e Categorias.
+- **Tratamento Global de Exceções e Logs em Produção:** Adicionado bloco `try/catch` de segurança no ponto de entrada (`public/index.php`), gravação automática de falhas no log `/storage/logs/error.log` e template visual limpo `templates/500.php` sem exposição de credenciais ou stack traces sensíveis.
 - **Expurgo Abrangente de Cache FastCGI:** 
   - O `PostService` agora invalida automaticamente a Home (`/`), a notícia atual (`/noticia/slug/`), a notícia anterior (em caso de renomeação de slug), a categoria atual, a categoria anterior e os feeds RSS (`/feed.xml` e `/feed`).
   - O `CacheManager` agora expurga simultaneamente as chaves em `https` e `http`, garantindo remoção imediata dos arquivos de cache em disco mesmo quando o servidor opera atrás de proxy reverso da Cloudflare com terminação SSL externa.
