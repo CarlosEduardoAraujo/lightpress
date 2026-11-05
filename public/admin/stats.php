@@ -9,6 +9,7 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
 Security::startSecureSession($config);
@@ -34,7 +35,7 @@ if (!$currentUser || empty($currentUser['is_active']) || (int)$currentUser['sess
 
 // Top 20 Notícias Mais Lidas
 $topPosts = Database::fetchAll(
-    "SELECT p.id, p.title, p.slug, p.category, p.published_at, u.name as author_name, s.views
+    "SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.published_at, u.name as author_name, s.views
      FROM posts p
      JOIN post_stats s ON s.post_id = p.id
      JOIN users u ON u.id = p.user_id
@@ -215,12 +216,29 @@ $csrfToken = Security::generateCsrfToken();
                                     <span class="rank-badge <?= $rankClass ?>"><?= $rank ?></span>
                                 </td>
                                 <td>
-                                    <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem;">
-                                        <?= Security::e($p['title']) ?>
-                                    </a>
-                                    <span style="margin-left: 0.5rem; font-size: 0.8rem;">
-                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary-accent); text-decoration: none;">[Editar]</a>
-                                    </span>
+                                    <div style="display: flex; align-items: center; gap: 0.85rem;">
+                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
+                                            <?php if (!empty($p['featured_image'])): ?>
+                                                <img src="<?= Security::e(ImageProcessor::toAvifUrl($p['featured_image'])) ?>" 
+                                                     alt="" 
+                                                     loading="lazy" 
+                                                     style="width: 64px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">
+                                            <?php else: ?>
+                                                <div style="width: 64px; height: 40px; border-radius: 6px; border: 1px dashed var(--border); background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;">
+                                                    Sem foto
+                                                </div>
+                                            <?php endif; ?>
+                                        </a>
+
+                                        <div>
+                                            <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem;">
+                                                <?= Security::e($p['title']) ?>
+                                            </a>
+                                            <span style="margin-left: 0.4rem; font-size: 0.8rem;">
+                                                <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary-accent); text-decoration: none;">[Editar]</a>
+                                            </span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <span style="background: #eff6ff; color: #2563eb; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">

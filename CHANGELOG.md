@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Thumbnails Visuais de Notícias no Painel Administrativo:**
+  - Adicionadas miniaturas das imagens em destaque (`featured_image`) na listagem de publicações do **Gerenciador de Notícias (`/admin/dashboard.php`)** e no ranking do **Painel de Mais Lidas (`/admin/stats.php`)**.
+  - As miniaturas contam com proporção 16:9, carregamento preguiçoso (`loading="lazy"`), link direto de clique para o editor e placeholder elegante (*"Sem foto"*) para matérias sem imagem atribuída.
 - **Recursos Administrativos da Redação (Opção 2 - Gestão de Portal):**
   - **Dashboard Editorial Turbinado (`/admin/dashboard.php`):**
     - Cards de métricas operacionais em tempo real: Total de Matérias, Matérias Publicadas, Rascunhos/Revisões Pendentes e Total Acumulado de Visualizações.

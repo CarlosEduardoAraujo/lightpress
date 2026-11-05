@@ -10,6 +10,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;
+use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\CacheManager;
 
@@ -151,7 +152,7 @@ $filteredCount = (int)Database::fetchValue(
 );
 $totalPages = max(1, (int)ceil($filteredCount / $perPage));
 
-$querySql = "SELECT p.id, p.title, p.slug, p.category, p.status, p.is_featured, p.updated_at, p.published_at,
+$querySql = "SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
                     u.name as author_name, COALESCE(s.views, 0) as views
              FROM posts p
              JOIN users u ON u.id = p.user_id
@@ -483,23 +484,40 @@ function buildFilterUrl(array $overrides = []): string {
                         <?php foreach ($posts as $p): ?>
                             <tr>
                                 <td>
-                                    <div style="display: flex; align-items: center;">
-                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem;">
-                                            <?= Security::e($p['title']) ?>
+                                    <div style="display: flex; align-items: center; gap: 1rem;">
+                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
+                                            <?php if (!empty($p['featured_image'])): ?>
+                                                <img src="<?= Security::e(ImageProcessor::toAvifUrl($p['featured_image'])) ?>" 
+                                                     alt="" 
+                                                     loading="lazy" 
+                                                     style="width: 76px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">
+                                            <?php else: ?>
+                                                <div style="width: 76px; height: 48px; border-radius: 6px; border: 1px dashed var(--border); background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;">
+                                                    Sem foto
+                                                </div>
+                                            <?php endif; ?>
                                         </a>
 
-                                        <?php if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)): ?>
-                                            <a href="<?= buildFilterUrl(['toggle_featured_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 
-                                               class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>"
-                                               title="Clique para alternar presença no Hero Quad Grid da Home">
-                                                <?= !empty($p['is_featured']) ? '★ Destaque Home' : '☆ Destacar' ?>
-                                            </a>
-                                        <?php elseif (!empty($p['is_featured'])): ?>
-                                            <span class="star-featured star-active">★ Destaque</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-                                        Slug: <code>/<?= Security::e($p['slug']) ?>/</code>
+                                        <div style="flex-grow: 1; min-width: 0;">
+                                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+                                                <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem; line-height: 1.35;">
+                                                    <?= Security::e($p['title']) ?>
+                                                </a>
+
+                                                <?php if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)): ?>
+                                                    <a href="<?= buildFilterUrl(['toggle_featured_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 
+                                                       class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>"
+                                                       title="Clique para alternar presença no Hero Quad Grid da Home">
+                                                        <?= !empty($p['is_featured']) ? '★ Destaque Home' : '☆ Destacar' ?>
+                                                    </a>
+                                                <?php elseif (!empty($p['is_featured'])): ?>
+                                                    <span class="star-featured star-active">★ Destaque</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
+                                                Slug: <code>/<?= Security::e($p['slug']) ?>/</code>
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
                                 <td>
