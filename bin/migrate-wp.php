@@ -150,9 +150,41 @@ if ($iaResourcesTable) {
     try {
         $resCols = $wpPdo->query("SHOW COLUMNS FROM {$iaResourcesTable}")->fetchAll(PDO::FETCH_COLUMN);
         echo "[Info Analytics] Tabela de recursos: {$iaResourcesTable} (" . implode(', ', $resCols) . ")\n";
-        foreach (['post_id', 'resource_id', 'object_id', 'wp_id'] as $cand) {
+        foreach (['singular_id', 'post_id', 'resource_id', 'object_id', 'wp_id'] as $cand) {
             if (in_array($cand, $resCols, true)) {
                 $iaResourcePostIdCol = $cand;
+                break;
+            }
+        }
+        if ($iaResourcePostIdCol) {
+            echo "[Info Analytics] Coluna identificadora do artigo em '{$iaResourcesTable}': '{$iaResourcePostIdCol}'\n";
+        }
+    } catch (\Throwable $e) {}
+}
+
+// Detecção de plugin secundário (Post Views Counter / SPVC)
+$pvcTable = null;
+$pvcPostIdCol = null;
+$pvcCountCol = null;
+foreach ($allTables as $tblName) {
+    if (str_contains(strtolower($tblName), 'post_views_count')) {
+        $pvcTable = $tblName;
+        break;
+    }
+}
+if ($pvcTable) {
+    try {
+        $pvcCols = $wpPdo->query("SHOW COLUMNS FROM {$pvcTable}")->fetchAll(PDO::FETCH_COLUMN);
+        echo "[Info Analytics] Tabela Post Views Counter: {$pvcTable} (" . implode(', ', $pvcCols) . ")\n";
+        foreach (['post_id', 'id', 'post_ID', 'object_id'] as $cand) {
+            if (in_array($cand, $pvcCols, true)) {
+                $pvcPostIdCol = $cand;
+                break;
+            }
+        }
+        foreach (['count', 'views', 'post_views', 'views_count'] as $cand) {
+            if (in_array($cand, $pvcCols, true)) {
+                $pvcCountCol = $cand;
                 break;
             }
         }
@@ -475,7 +507,21 @@ foreach ($articles as $p) {
     }
 
     if ($views === 0) {
-        // Fallback: postmeta tradicional (views, post_views_count, ia_views)
+        // Fallback A: Post Views Counter (tabela dedicada spvc)
+        if ($pvcTable && $pvcPostIdCol && $pvcCountCol) {
+            try {
+                $pvcStmt = $wpPdo->prepare("SELECT SUM({$pvcCountCol}) FROM {$pvcTable} WHERE {$pvcPostIdCol} = ?");
+                $pvcStmt->execute([$wpPostId]);
+                $pvcCount = (int)$pvcStmt->fetchColumn();
+                if ($pvcCount > 0) {
+                    $views = $pvcCount;
+                }
+            } catch (\Throwable $e) {}
+        }
+    }
+
+    if ($views === 0) {
+        // Fallback B: postmeta tradicional (views, post_views_count, ia_views)
         $viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count', 'ia_views') LIMIT 1");
         $viewsStmt->execute([$wpPostId]);
         $metaViews = $viewsStmt->fetchColumn();
