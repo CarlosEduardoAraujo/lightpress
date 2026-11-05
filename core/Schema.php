@@ -13,6 +13,103 @@ use RuntimeException;
 class Schema
 {
     /**
+     * Garante a existência da tabela de Páginas Institucionais e faz seed das páginas iniciais.
+     */
+    public static function ensurePagesTable(): void
+    {
+        $driver = Database::getDriver();
+        if ($driver === 'sqlite') {
+            Database::query("CREATE TABLE IF NOT EXISTS pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NULL,
+                slug TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                content_html TEXT NOT NULL,
+                featured_image TEXT NULL,
+                seo_title TEXT NULL,
+                seo_description TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'published',
+                views INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+            );");
+            Database::query("CREATE INDEX IF NOT EXISTS idx_page_status_slug ON pages (status, slug);");
+        } else {
+            Database::query("CREATE TABLE IF NOT EXISTS `pages` (
+                `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `user_id` SMALLINT UNSIGNED NULL,
+                `slug` VARCHAR(191) NOT NULL UNIQUE,
+                `title` VARCHAR(255) NOT NULL,
+                `content_html` MEDIUMTEXT NOT NULL,
+                `featured_image` VARCHAR(500) NULL,
+                `seo_title` VARCHAR(255) NULL,
+                `seo_description` VARCHAR(500) NULL,
+                `status` ENUM('published', 'draft', 'archived') NOT NULL DEFAULT 'published',
+                `views` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+                `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX `idx_page_status_slug` (`status`, `slug`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        }
+
+        // Se a tabela estiver vazia, cria as páginas institucionais padrão
+        $count = (int)Database::fetchValue("SELECT COUNT(*) FROM pages");
+        if ($count === 0) {
+            $initialPages = [
+                [
+                    'slug' => 'quem-somos',
+                    'title' => 'Nossa Equipe Editorial',
+                    'seo_title' => 'Nossa Equipe - SpeedRacing',
+                    'seo_description' => 'Conheça a equipe editorial, jornalistas e colunistas especializados do portal SpeedRacing.',
+                    'content_html' => "<p>Fundado em 2002, o <strong>SpeedRacing</strong> é uma das publicações pioneiras na cobertura de automobilismo no Brasil, unindo o universo das pistas reais ao dinamismo do SimRacing e das novas tecnologias do esporte a motor.</p>\n<h2>Redação & Direção Geral</h2>\n<p>Nossa equipe reúne profissionais apaixonados pela velocidade, com décadas de experiência prática nos autódromos, telemetria avançada e rigor informativo.</p>\n<ul>\n<li><strong>Carlos Araújo</strong> — Diretor Geral & Fundador</li>\n<li><strong>Redação SpeedRacing Press</strong> — Notícias, bastidores e paddock oficial</li>\n<li><strong>Equipe Técnica SpeedRacing</strong> — Telemetria e dados de pista FIA, CBA e IMSA</li>\n</ul>",
+                ],
+                [
+                    'slug' => 'equipe',
+                    'title' => 'Equipe SpeedRacing',
+                    'seo_title' => 'Equipe Técnica e Editorial - SpeedRacing',
+                    'seo_description' => 'Equipe técnica, jornalistas e analistas do portal SpeedRacing.',
+                    'content_html' => "<p>Conheça os profissionais que trazem as melhores análises, telemetrias e notícias do automobilismo mundial para o portal SpeedRacing desde 2002.</p>\n<h2>Corpo Editorial</h2>\n<ul>\n<li><strong>Carlos Araújo</strong> — Fundador e Especialista Técnico</li>\n<li><strong>Redação SpeedRacing</strong> — Plantão 24/7 em finais de semana de corrida</li>\n</ul>",
+                ],
+                [
+                    'slug' => 'contato',
+                    'title' => 'Fale Conosco / Anuncie',
+                    'seo_title' => 'Contato & Redação - SpeedRacing',
+                    'seo_description' => 'Entre em contato com a equipe do SpeedRacing para pautas, parcerias comerciais e sugestões.',
+                    'content_html' => "<p>Estamos à disposição para atender leitores, assessorias de imprensa, equipes e parceiros comerciais.</p>\n<h2>Canais Diretos de Comunicação</h2>\n<p>Escolha o canal mais adequado para a sua solicitação:</p>\n<ul>\n<li><strong>Redação & Envio de Press Releases:</strong> redacao@speedracing.com.br</li>\n<li><strong>Publicidade & Parcerias Comerciais:</strong> comercial@speedracing.com.br</li>\n<li><strong>Contato Geral & Paddock:</strong> contato@speedracing.com.br</li>\n</ul>\n<p>Respondemos a todos os comunicados com agilidade durante os finais de semana de corrida e dias úteis.</p>",
+                ],
+                [
+                    'slug' => 'termos-de-uso',
+                    'title' => 'Termos de Uso',
+                    'seo_title' => 'Termos de Uso - SpeedRacing',
+                    'seo_description' => 'Termos e condições gerais de uso do portal de notícias SpeedRacing.',
+                    'content_html' => "<p>Bem-vindo ao <strong>SpeedRacing</strong>. Ao acessar este portal, você concorda em cumprir e sujeitar-se aos seguintes Termos e Condições de Uso.</p>\n<h2>1. Propriedade Intelectual & Direitos Autorais</h2>\n<p>Todo o conteúdo publicado no portal — incluindo textos, matérias investigativas, telemetrias, dados de timing e composições fotográficas — é protegido pela legislação brasileira de direitos autorais. Qualquer reprodução exige citação expressa da fonte com link direto.</p>\n<h2>2. Conduta do Usuário</h2>\n<p>É vedada qualquer tentativa de ataque cibernético, raspagem não autorizada ou uso abusivo que comprometa a integridade dos servidores e o acesso dos demais leitores.</p>",
+                ],
+                [
+                    'slug' => 'politica-de-privacidade',
+                    'title' => 'Política de Privacidade',
+                    'seo_title' => 'Política de Privacidade & LGPD - SpeedRacing',
+                    'seo_description' => 'Diretrizes de proteção e privacidade de dados dos usuários do SpeedRacing.',
+                    'content_html' => "<p>O <strong>SpeedRacing</strong> preza pela total transparência e segurança no tratamento dos dados pessoais de seus visitantes, em integral conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD — Lei nº 13.709/2018).</p>\n<h2>1. Coleta e Uso de Dados</h2>\n<p>Nosso portal é projetado com arquitetura de privacidade por padrão (Privacy by Design). Coletamos apenas informações fornecidas voluntariamente, como endereço de e-mail para a assinatura da nossa newsletter diária.</p>\n<h2>2. Cookies & Preferências Locais</h2>\n<p>Utilizamos apenas cookies essenciais para manter preferências do leitor, como a alternância entre o Modo Escuro e o Modo Claro. Não realizamos rastreamento invasivo nem comercializamos dados de usuários com terceiros.</p>",
+                ],
+                [
+                    'slug' => 'codigo-de-etica',
+                    'title' => 'Código de Ética Editorial',
+                    'seo_title' => 'Código de Ética Editorial - SpeedRacing',
+                    'seo_description' => 'Diretrizes editoriais de imparcialidade, checagem e rigor jornalístico do SpeedRacing.',
+                    'content_html' => "<p>Desde sua fundação em 2002, o <strong>SpeedRacing</strong> rege sua produção jornalística sob os princípios fundamentais da verdade factual, rigor técnico e transparência com seus leitores.</p>\n<h2>1. Rigor na Apuração e Checagem</h2>\n<p>Não publicamos boatos sem a devida contextualização e consulta prévia às partes envolvidas (equipes, montadoras, pilotos e federações).</p>\n<h2>2. Separação entre Publicidade e Opinião</h2>\n<p>Conteúdos patrocinados ou comerciais são explicitamente identificados, preservando a independência do juízo crítico de nossos colunistas e analistas.</p>",
+                ],
+            ];
+
+            foreach ($initialPages as $pg) {
+                Database::query(
+                    "INSERT INTO pages (slug, title, content_html, seo_title, seo_description, status) VALUES (?, ?, ?, ?, ?, 'published')",
+                    [$pg['slug'], $pg['title'], $pg['content_html'], $pg['seo_title'], $pg['seo_description']]
+                );
+            }
+        }
+    }
+
+    /**
      * Executa a instalação completa do esquema com base no driver configurado.
      */
     public static function install(PDO $pdo, string $driver = 'mysql'): void

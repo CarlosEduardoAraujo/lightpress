@@ -182,4 +182,21 @@ CREATE TABLE IF NOT EXISTS redirects (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 13. Tabela de Páginas Institucionais (Equipe, Contato, Termos, Privacidade, etc.)
+CREATE TABLE IF NOT EXISTS pages (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id SMALLINT UNSIGNED NULL,
+    slug VARCHAR(191) NOT NULL UNIQUE,
+    title VARCHAR(255) NOT NULL,
+    content_html MEDIUMTEXT NOT NULL,
+    featured_image VARCHAR(500) NULL,
+    seo_title VARCHAR(255) NULL,
+    seo_description VARCHAR(500) NULL,
+    status ENUM('published', 'draft', 'archived') NOT NULL DEFAULT 'published',
+    views BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_page_status_slug (status, slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

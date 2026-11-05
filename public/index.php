@@ -297,6 +297,20 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     );
 
     if (!$post) {
+        // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
+        \LightPress\Core\Schema::ensurePagesTable();
+        $page = Database::fetchOne(
+            "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
+            [$slug]
+        );
+        if ($page) {
+            // Contabilizar visualização da página
+            Database::query("UPDATE pages SET views = views + 1 WHERE id = ?", [(int)$page['id']]);
+            $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
+            require $config['paths']['templates'] . '/page.php';
+            return;
+        }
+
         http_response_code(404);
         require $config['paths']['templates'] . '/404.php';
         return;

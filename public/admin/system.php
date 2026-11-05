@@ -151,6 +151,7 @@ $csrfToken = Security::generateCsrfToken();
             <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
             <nav style="display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center;">
                 <a href="/admin/dashboard.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Notícias</a>
+                <a href="/admin/pages.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Páginas</a>
                 <a href="/admin/media.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mídias</a>
                 <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Categorias</a>
                 <a href="/admin/stats.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mais Lidas 📈</a>

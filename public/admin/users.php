@@ -328,6 +328,7 @@ $csrfToken = Security::generateCsrfToken();
             <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
             <nav class="nav-links">
                 <a href="/admin/dashboard.php">Notícias</a>
+                <a href="/admin/pages.php">Páginas</a>
                 <a href="/admin/media.php">Mídias</a>
                 <a href="/admin/categories.php">Categorias</a>
                 <a href="/admin/stats.php">Mais Lidas 📈</a>
