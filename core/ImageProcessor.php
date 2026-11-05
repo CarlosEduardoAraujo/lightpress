@@ -208,10 +208,12 @@ class ImageProcessor
         $targetDir = "{$this->uploadDir}/{$year}/{$month}";
 
         if (!is_dir($targetDir)) {
-            @mkdir($targetDir, 0755, true);
+            @mkdir($targetDir, 0775, true);
+            @chmod($targetDir, 0775);
         }
         if (!is_dir($this->stagingDir)) {
-            @mkdir($this->stagingDir, 0755, true);
+            @mkdir($this->stagingDir, 0775, true);
+            @chmod($this->stagingDir, 0775);
         }
 
         // Gerar identificador único de catálogo (media_id)
@@ -284,6 +286,7 @@ class ImageProcessor
                 if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
                     $webpSize = filesize($webpStaging);
                     rename($webpStaging, $webpTarget);
+                    @chmod($webpTarget, 0664);
                     $manifest['variants'][$key]['webp'] = [
                         'url' => "{$relativeDir}/{$webpFilename}",
                         'width' => $w,
@@ -313,6 +316,7 @@ class ImageProcessor
                         if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
                             $avifSize = filesize($avifStaging);
                             rename($avifStaging, $avifTarget);
+                            @chmod($avifTarget, 0664);
                             $manifest['variants'][$key]['avif'] = [
                                 'url' => "{$relativeDir}/{$avifFilename}",
                                 'width' => $w,
