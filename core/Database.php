@@ -123,6 +123,18 @@ class Database
     }
 
     /**
+     * Retorna o driver configurado (mysql ou sqlite).
+     */
+    public static function getDriver(): string
+    {
+        if (empty(self::$config)) {
+            $globalConfig = require dirname(__DIR__) . '/config.php';
+            self::$config = $globalConfig['database'] ?? [];
+        }
+        return self::$config['driver'] ?? 'mysql';
+    }
+
+    /**
      * Executa uma consulta preparada com parâmetros vinculados.
      */
     public static function query(string $sql, array $params = []): \PDOStatement

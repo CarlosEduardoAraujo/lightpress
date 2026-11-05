@@ -55,18 +55,23 @@ echo "  Origem WordPress: {$wpUser}@{$wpHost}:{$wpPort}/{$wpDb}\n";
 echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)" : "Mais antigas primeiro (ID ASC)") . "\n";
 echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n\n";
 
-// 1. Conexão com a base de dados do WordPress
+// 1. Conexão com a base de dados do WordPress e Atualização de Schema
 if (!$isDryRun) {
     try {
-        if (Database::getDriver() === 'mysql') {
-            Database::query("ALTER TABLE posts MODIFY COLUMN tags TEXT NULL");
-            Database::query("ALTER TABLE posts MODIFY COLUMN summary TEXT NULL");
-            Database::query("ALTER TABLE posts MODIFY COLUMN featured_image VARCHAR(500) NULL");
-            Database::query("ALTER TABLE posts MODIFY COLUMN seo_title VARCHAR(255) NULL");
-            Database::query("ALTER TABLE posts MODIFY COLUMN seo_description VARCHAR(500) NULL");
-            Database::query("ALTER TABLE posts MODIFY COLUMN focus_keyword VARCHAR(150) NULL");
+        $lpPdo = Database::getConnection();
+        $driver = Database::getDriver();
+        if ($driver === 'mysql') {
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN tags TEXT NULL");
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN summary TEXT NULL");
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN featured_image VARCHAR(500) NULL");
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN seo_title VARCHAR(255) NULL");
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN seo_description VARCHAR(500) NULL");
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN focus_keyword VARCHAR(150) NULL");
+            echo "[SpeedPress DB] Estrutura da tabela 'posts' verificada e atualizada com sucesso (tags TEXT, summary TEXT).\n";
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        echo "[Aviso SpeedPress DB] Falha ao ajustar colunas: " . $e->getMessage() . "\n";
+    }
 }
 
 try {
