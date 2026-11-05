@@ -11,7 +11,7 @@ $postUrlEncoded = rawurlencode($postUrl);
 ?>
 
 <article style="max-width: 1750px; margin: 0 auto; background: var(--surface); padding: 3rem 3.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--card-shadow);">
-    <header style="margin-bottom: 2.5rem;">
+    <header class="post-header" style="margin-bottom: 2.5rem; position: static;">
         <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem;">
             <a href="/categoria/<?= Security::e($post['category']) ?>/" class="badge" style="text-decoration: none;">
                 <?= Security::e($post['category']) ?>
