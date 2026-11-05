@@ -10,25 +10,25 @@ $postTitleEncoded = rawurlencode($post['title']);
 $postUrlEncoded = rawurlencode($postUrl);
 ?>
 
-<article style="max-width: 960px; margin: 0 auto; background: var(--surface); padding: 2.75rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--card-shadow);">
-    <header style="margin-bottom: 2rem;">
-        <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem;">
+<article style="max-width: 1750px; margin: 0 auto; background: var(--surface); padding: 3rem 3.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--card-shadow);">
+    <header style="margin-bottom: 2.5rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem;">
             <a href="/categoria/<?= Security::e($post['category']) ?>/" class="badge" style="text-decoration: none;">
                 <?= Security::e($post['category']) ?>
             </a>
             <?php if (!empty($readingTime)): ?>
-                <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">
+                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
                     ⏱️ <?= (int)$readingTime ?> min de leitura
                 </span>
             <?php endif; ?>
         </div>
 
-        <h1 style="font-size: 2.35rem; font-weight: 900; line-height: 1.25; letter-spacing: -0.025em; margin: 0.75rem 0 1rem; color: var(--primary);">
+        <h1 style="font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 900; line-height: 1.2; letter-spacing: -0.03em; margin: 0.75rem 0 1.25rem; color: var(--primary);">
             <?= Security::e($post['title']) ?>
         </h1>
 
         <?php if (!empty($post['summary'])): ?>
-            <p style="font-size: 1.18rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1.75rem;">
+            <p style="font-size: clamp(1.12rem, 1.6vw, 1.3rem); color: var(--text-muted); line-height: 1.6; margin-bottom: 2rem;">
                 <?= Security::e($post['summary']) ?>
             </p>
         <?php endif; ?>
@@ -74,8 +74,8 @@ $postUrlEncoded = rawurlencode($postUrl);
     </header>
 
     <?php if (!empty($post['featured_image'])): ?>
-        <figure style="margin-bottom: 2.5rem; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);">
-            <img src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" alt="<?= Security::e($post['title']) ?>" style="width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;">
+        <figure style="margin-bottom: 3rem; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);">
+            <img src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" alt="<?= Security::e($post['title']) ?>" style="width: 100%; aspect-ratio: 16/9; max-height: 760px; object-fit: cover; display: block;">
         </figure>
     <?php endif; ?>
 
@@ -130,11 +130,11 @@ $postUrlEncoded = rawurlencode($postUrl);
 
 <!-- Bloco de Notícias Relacionadas (Mesma Categoria) -->
 <?php if (!empty($relatedPosts)): ?>
-    <section style="max-width: 1400px; margin: 3.5rem auto 0;">
-        <h3 style="font-size: 1.4rem; font-weight: 900; letter-spacing: -0.02em; border-left: 4px solid var(--primary-accent); padding-left: 0.75rem; color: var(--primary); margin-bottom: 1.5rem;">
+    <section style="max-width: 1750px; margin: 4rem auto 0;">
+        <h3 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; border-left: 4px solid var(--primary-accent); padding-left: 0.85rem; color: var(--primary); margin-bottom: 1.75rem;">
             Notícias Relacionadas
         </h3>
-        <div class="grid-posts" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; margin-top: 0;">
+        <div class="grid-related">
             <?php foreach ($relatedPosts as $rel): ?>
                 <article class="card">
                     <?php if (!empty($rel['featured_image'])): ?>

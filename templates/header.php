@@ -252,6 +252,7 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         @media (max-width: 768px) {
             .hero-card { grid-template-columns: 1fr; }
             .nav-links { display: none; }
+            article { padding: 1.5rem !important; }
         }
         .hero-img { width: 100%; height: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
         .hero-body { padding: 2.5rem; display: flex; flex-direction: column; justify-content: center; }
@@ -260,18 +261,32 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         .hero-title a:hover { color: var(--primary-accent); }
 
         /* Tipografia de Artigos (BlockCompiler) */
-        .content-body { font-size: 1.15rem; line-height: 1.85; color: var(--text); }
-        .content-body h2 { font-size: 1.65rem; font-weight: 800; margin: 2.25rem 0 0.85rem; color: var(--primary); letter-spacing: -0.02em; }
-        .content-body h3 { font-size: 1.35rem; font-weight: 700; margin: 1.75rem 0 0.65rem; color: var(--primary); letter-spacing: -0.015em; }
-        .content-body p { margin-bottom: 1.4rem; }
-        .content-body blockquote { border-left: 4px solid var(--primary-accent); padding: 0.85rem 1.4rem; background: var(--badge-bg); border-radius: 0 var(--radius) var(--radius) 0; margin: 1.75rem 0; font-style: italic; color: var(--text); }
-        .content-body blockquote cite { display: block; font-size: 0.85rem; color: var(--text-muted); font-style: normal; margin-top: 0.5rem; font-weight: 600; }
-        .content-body figure { margin: 2rem 0; }
+        .content-body { font-size: 1.22rem; line-height: 1.85; color: var(--text); }
+        .content-body h2 { font-size: 1.85rem; font-weight: 800; margin: 2.5rem 0 1rem; color: var(--primary); letter-spacing: -0.02em; }
+        .content-body h3 { font-size: 1.45rem; font-weight: 700; margin: 2rem 0 0.85rem; color: var(--primary); letter-spacing: -0.015em; }
+        .content-body p { margin-bottom: 1.5rem; }
+        .content-body blockquote { border-left: 4px solid var(--primary-accent); padding: 1rem 1.6rem; background: var(--badge-bg); border-radius: 0 var(--radius) var(--radius) 0; margin: 2rem 0; font-style: italic; color: var(--text); font-size: 1.25rem; }
+        .content-body blockquote cite { display: block; font-size: 0.9rem; color: var(--text-muted); font-style: normal; margin-top: 0.6rem; font-weight: 600; }
+        .content-body figure { margin: 2.5rem 0; }
         .content-body figure img { width: 100%; border-radius: var(--radius); height: auto; display: block; }
-        .content-body figcaption { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; font-style: italic; }
-        .content-body ul, .content-body ol { margin: 1rem 0 1.5rem 1.75rem; }
-        .content-body li { margin-bottom: 0.5rem; }
+        .content-body figcaption { text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-top: 0.6rem; font-style: italic; }
+        .content-body ul, .content-body ol { margin: 1.25rem 0 1.75rem 2rem; }
+        .content-body li { margin-bottom: 0.6rem; }
         .content-body a { color: var(--primary-accent); text-decoration: underline; text-underline-offset: 3px; }
+
+        /* Grid de Notícias Relacionadas (4 colunas na tela cheia) */
+        .grid-related {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        @media (max-width: 1280px) {
+            .grid-related { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .grid-related { grid-template-columns: 1fr; }
+        }
         
         /* Campo de Busca no Cabeçalho */
         .nav-search-input {

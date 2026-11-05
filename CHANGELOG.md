@@ -35,6 +35,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
+- **Layout Panorâmico Expandido para Leitura de Artigos (1750px):**
+  - A página de leitura (`templates/post.php`) agora se expande até `1750px`, aproveitando a totalidade de monitores Full HD (1920x1080) e ultrawide com presença imersiva.
+  - Capa da notícia (*featured image*) com visual widescreen cinematográfico (até 760px de altura).
+  - Tipografia de leitura ajustada (`font-size: 1.22rem; line-height: 1.85;`) com títulos responsivos fluidos (`clamp`).
+  - Bloco de Notícias Relacionadas em 4 colunas distribuídas por toda a largura panorâmica com a nova classe `.grid-related`.
 - **Layout Panorâmico Full HD (1900px) e Grid Quádruplo de Destaques:**
   - Expansão do container global para `max-width: 1900px;` preenchendo monitores Full HD (1920x1080) e ultrawide com proporções fluidas e fim do excesso de margens laterais.
   - **Hero Quad Grid no Topo da Home:** Substituição do hero card único por uma faixa superior de **4 notícias destacadas** lado a lado em cards 16:10 com overlay degradê escuro, tipografia branca sobreposta, selos de categoria e preenchimento automático (*backfill*) com as últimas matérias publicadas caso existam menos de 4 marcadas como destaque.
