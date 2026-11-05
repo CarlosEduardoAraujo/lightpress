@@ -37,11 +37,11 @@ $options = getopt('', [
 ]);
 
 $isDryRun = isset($options['dry-run']);
-$wpHost = $options['wp-host'] ?? '127.0.0.1';
-$wpPort = (int)($options['wp-port'] ?? 3306);
+$wpHost = $options['wp-host'] ?? ($config['database']['host'] ?? '127.0.0.1');
+$wpPort = (int)($options['wp-port'] ?? ($config['database']['port'] ?? 3306));
 $wpDb = $options['wp-db'] ?? 'suaint41_speed';
-$wpUser = $options['wp-user'] ?? ($config['database']['user'] ?? 'root');
-$wpPass = $options['wp-pass'] ?? ($config['database']['password'] ?? '');
+$wpUser = $options['wp-user'] ?? ($config['database']['username'] ?? ($config['database']['user'] ?? 'root'));
+$wpPass = $options['wp-pass'] ?? ($config['database']['password'] ?? ($config['database']['pass'] ?? ''));
 $isAll = isset($options['all']);
 $limit = $isAll ? 100000 : (int)($options['limit'] ?? 10);
 $offset = (int)($options['offset'] ?? 0);
