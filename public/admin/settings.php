@@ -39,50 +39,55 @@ $successMessage = '';
 $errorMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!Security::validateCsrfToken($_POST['_csrf_token'] ?? null)) {
-        $errorMessage = 'Token de segurança CSRF inválido ou expirado. Recarregue a página e tente novamente.';
-    } else {
-        $siteTitle = trim($_POST['site_title'] ?? 'SpeedRacing');
-        if ($siteTitle === '') {
-            $siteTitle = 'SpeedRacing';
-        }
+    try {
+        if (!Security::validateCsrfToken($_POST['_csrf_token'] ?? null)) {
+            $errorMessage = 'Token de segurança CSRF inválido ou expirado. Recarregue a página e tente novamente.';
+        } else {
+            $siteTitle = trim($_POST['site_title'] ?? 'SpeedRacing');
+            if ($siteTitle === '') {
+                $siteTitle = 'SpeedRacing';
+            }
 
-        $siteDescription = trim($_POST['site_description'] ?? '');
-        $siteFavicon = trim($_POST['site_favicon'] ?? '');
-        $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
+            $siteDescription = trim($_POST['site_description'] ?? '');
+            $siteFavicon = trim($_POST['site_favicon'] ?? '');
+            $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
 
-        // Validação estrita do Fuso Horário informado
-        $validTz = false;
-        try {
-            new \DateTimeZone($siteTimezone);
-            $validTz = true;
-        } catch (\Throwable) {
+            // Validação estrita do Fuso Horário informado
             $validTz = false;
+            try {
+                new \DateTimeZone($siteTimezone);
+                $validTz = true;
+            } catch (\Throwable) {
+                $validTz = false;
+            }
+
+            if (!$validTz) {
+                $siteTimezone = 'America/Sao_Paulo';
+            }
+
+            Settings::setMany([
+                'site_title' => $siteTitle,
+                'site_description' => $siteDescription,
+                'site_favicon' => $siteFavicon,
+                'site_timezone' => $siteTimezone,
+            ]);
+
+            // Aplicar imediatamente à configuração global em tempo de execução
+            Settings::applyToConfig($config);
+
+            // Expurgar cache do Nginx para propagar mudanças instantaneamente
+            try {
+                $cacheManager = new CacheManager($config);
+                $cacheManager->purge(['/', '/feed.xml', '/sitemap.xml']);
+            } catch (\Throwable) {
+                // Silencioso em ambiente de desenvolvimento
+            }
+
+            $successMessage = 'Configurações do site salvas com sucesso!';
         }
-
-        if (!$validTz) {
-            $siteTimezone = 'America/Sao_Paulo';
-        }
-
-        Settings::setMany([
-            'site_title' => $siteTitle,
-            'site_description' => $siteDescription,
-            'site_favicon' => $siteFavicon,
-            'site_timezone' => $siteTimezone,
-        ]);
-
-        // Aplicar imediatamente à configuração global em tempo de execução
-        Settings::applyToConfig($config);
-
-        // Expurgar cache do Nginx para propagar mudanças instantaneamente
-        try {
-            $cacheManager = new CacheManager($config);
-            $cacheManager->purge(['/', '/feed.xml', '/sitemap.xml']);
-        } catch (\Throwable) {
-            // Silencioso em ambiente de desenvolvimento
-        }
-
-        $successMessage = 'Configurações do site salvas com sucesso!';
+    } catch (\Throwable $e) {
+        error_log("[Settings Save Error] " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+        $errorMessage = 'Erro ao processar as configurações: ' . $e->getMessage();
     }
 }
 

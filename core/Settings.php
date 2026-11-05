@@ -47,7 +47,7 @@ class Settings
                     'site_timezone' => 'America/Sao_Paulo',
                 ];
                 foreach ($defaults as $k => $v) {
-                    Database::query("INSERT INTO settings (`key`, `value`) VALUES (?, ?)", [$k, $v]);
+                    Database::query("REPLACE INTO `settings` (`key`, `value`) VALUES (?, ?)", [$k, $v]);
                 }
             }
         } catch (Throwable) {
@@ -109,8 +109,7 @@ class Settings
             );
         } else {
             Database::query(
-                "INSERT INTO `settings` (`key`, `value`) VALUES (?, ?) 
-                 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `updated_at` = NOW()",
+                "REPLACE INTO `settings` (`key`, `value`, `updated_at`) VALUES (?, ?, NOW())",
                 [$key, $val]
             );
         }

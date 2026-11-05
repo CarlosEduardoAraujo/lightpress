@@ -158,13 +158,13 @@ $filteredCount = (int)Database::fetchValue(
 );
 $totalPages = max(1, (int)ceil($filteredCount / $perPage));
 
-$querySql = "SELECT p.id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.created_at, p.updated_at, p.published_at,
+$querySql = "SELECT p.id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
                     u.name as author_name, COALESCE(s.views, 0) as views
              FROM posts p
              JOIN users u ON u.id = p.user_id
              LEFT JOIN post_stats s ON s.post_id = p.id
              WHERE {$whereSql}
-             ORDER BY p.created_at DESC
+             ORDER BY p.id DESC
              LIMIT ? OFFSET ?";
 
 $queryParams = array_merge($params, [$perPage, $offset]);
@@ -630,7 +630,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <?= number_format((int)$p['views'], 0, ',', '.') ?>
                                 </td>
                                 <td style="font-size: 0.82rem; color: var(--text-muted);">
-                                    <?= date('d/m/Y \à\s H:i', strtotime($p['created_at'])) ?>
+                                    <?= date('d/m/Y \à\s H:i', strtotime($p['published_at'] ?? $p['updated_at'])) ?>
                                 </td>
                                 <td style="text-align: right; white-space: nowrap;">
                                     <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: #eff6ff; color: #2563eb;">
