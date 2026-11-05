@@ -70,8 +70,8 @@ class ImageProcessor
         if (str_ends_with($url, '.avif')) {
             return substr($url, 0, -5) . '.webp';
         }
-        if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg')) {
-            return preg_replace('~\.(jpe?g|png)$~i', '.webp', $url);
+        if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg') || str_ends_with($url, '.ico')) {
+            return preg_replace('~\.(jpe?g|png|ico)$~i', '.webp', $url);
         }
         return $url;
     }

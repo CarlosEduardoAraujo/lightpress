@@ -43,8 +43,21 @@ class Seo
         } else {
             $title = $siteName . ' - ' . (!empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Portal de Notícias');
             $description = !empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Notícias, coberturas em tempo real e análises aprofundadas com máxima velocidade.';
-            $url = "{$canonicalOrigin}/";
-            $image = "{$canonicalOrigin}/assets/og-default.jpg";
+            $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+            $url = "{$canonicalOrigin}" . (str_starts_with($requestUri, '/') ? $requestUri : "/{$requestUri}");
+
+            // Para Home, Categorias, Tags e demais páginas não-artigo:
+            // og:image e twitter:image devem ser o mesmo do favicon e SEMPRE .webp
+            $faviconRaw = $appConfig['app']['favicon'] ?? '';
+            if (!empty($faviconRaw)) {
+                $webpFavicon = ImageProcessor::toWebpUrl($faviconRaw);
+            } else {
+                $webpFavicon = '/favicon.webp';
+            }
+            if (!str_ends_with(strtolower($webpFavicon), '.webp')) {
+                $webpFavicon = preg_replace('~\.[a-z0-9]+$~i', '.webp', $webpFavicon);
+            }
+            $image = str_starts_with($webpFavicon, 'http') ? $webpFavicon : "{$canonicalOrigin}{$webpFavicon}";
             $type = 'website';
         }
 
