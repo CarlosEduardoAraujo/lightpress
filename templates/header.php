@@ -262,7 +262,7 @@ if (empty($trendingTags)) {
                     <?php foreach ($menuCategories as $cat): ?>
                         <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red dark:hover:text-racing-red transition-colors whitespace-nowrap" href="/categoria/<?= Security::e($cat['slug']) ?>/"><?= Security::e($cat['name']) ?></a>
                     <?php endforeach; ?>
-                    <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red dark:hover:text-racing-red transition-colors whitespace-nowrap" href="/quem-somos/">Nossa Equipe</a>
+                    <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red dark:hover:text-racing-red transition-colors whitespace-nowrap" href="/nossa-equipe/">Nossa Equipe</a>
                 </nav>
             </div>
 

@@ -57,7 +57,7 @@ class Schema
         if ($count === 0) {
             $initialPages = [
                 [
-                    'slug' => 'quem-somos',
+                    'slug' => 'nossa-equipe',
                     'title' => 'Nossa Equipe Editorial',
                     'seo_title' => 'Nossa Equipe - SpeedRacing',
                     'seo_description' => 'Conheça a equipe editorial, jornalistas e colunistas especializados do portal SpeedRacing.',
@@ -105,6 +105,16 @@ class Schema
                     "INSERT INTO pages (slug, title, content_html, seo_title, seo_description, status) VALUES (?, ?, ?, ?, ?, 'published')",
                     [$pg['slug'], $pg['title'], $pg['content_html'], $pg['seo_title'], $pg['seo_description']]
                 );
+            }
+        } else {
+            // Se já existia 'quem-somos' e ainda não existe 'nossa-equipe', migra o slug automaticamente
+            try {
+                $hasNossaEquipe = Database::fetchOne("SELECT id FROM pages WHERE slug = 'nossa-equipe' LIMIT 1");
+                if (!$hasNossaEquipe) {
+                    Database::query("UPDATE pages SET slug = 'nossa-equipe' WHERE slug = 'quem-somos'");
+                }
+            } catch (\Throwable) {
+                // Silencioso se o banco estiver em processo de criação
             }
         }
     }
