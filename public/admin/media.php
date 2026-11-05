@@ -310,8 +310,16 @@ $csrfToken = Security::generateCsrfToken();
                 <?php foreach ($mediaList as $item): ?>
                     <?php
                         $variants = json_decode($item['variants_manifest'], true) ?? [];
-                        $thumbUrl = $variants['thumb']['avif']['url'] ?? ($variants['thumb']['webp']['url'] ?? ($variants['intermediate']['avif']['url'] ?? ($variants['intermediate']['webp']['url'] ?? '')));
-                        $fullUrl = $variants['full']['avif']['url'] ?? ($variants['full']['webp']['url'] ?? '');
+                        
+                        $rawFull = $variants['full']['avif']['url'] ?? ($variants['full']['webp']['url'] ?? '');
+                        $rawIntermediate = $variants['intermediate']['avif']['url'] ?? ($variants['intermediate']['webp']['url'] ?? '');
+                        $rawThumb = $variants['thumb']['avif']['url'] ?? ($variants['thumb']['webp']['url'] ?? '');
+
+                        $fullAvifUrl = !empty($rawFull) ? ImageProcessor::toAvifUrl($rawFull) : '';
+                        $mediumAvifUrl = !empty($rawIntermediate) ? ImageProcessor::toAvifUrl($rawIntermediate) : '';
+                        $thumbAvifUrl = !empty($rawThumb) ? ImageProcessor::toAvifUrl($rawThumb) : '';
+
+                        $thumbDisplayUrl = $thumbAvifUrl ?: ($mediumAvifUrl ?: $fullAvifUrl);
                         $origW = $variants['full']['avif']['width'] ?? ($variants['full']['webp']['width'] ?? 0);
                         $origH = $variants['full']['avif']['height'] ?? ($variants['full']['webp']['height'] ?? 0);
 
@@ -343,8 +351,8 @@ $csrfToken = Security::generateCsrfToken();
                             : 0;
                     ?>
                     <div class="media-card" id="media-card-<?= Security::e($item['id']) ?>">
-                        <?php if (!empty($thumbUrl)): ?>
-                            <img src="<?= Security::e($thumbUrl) ?>" alt="<?= Security::e($item['original_name']) ?>" class="media-thumb" loading="lazy">
+                        <?php if (!empty($thumbDisplayUrl)): ?>
+                            <img src="<?= Security::e($thumbDisplayUrl) ?>" alt="<?= Security::e($item['original_name']) ?>" class="media-thumb" loading="lazy">
                         <?php else: ?>
                             <div class="media-thumb" style="display:flex;align-items:center;justify-content:center;color:#94a3b8;">Sem miniatura</div>
                         <?php endif; ?>
@@ -381,15 +389,21 @@ $csrfToken = Security::generateCsrfToken();
                                 </div>
                             </div>
 
-                            <?php if (!empty($fullUrl)): ?>
-                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($fullUrl) ?>', this)">
-                                    Copiar URL (1024px)
+                            <?php if (!empty($fullAvifUrl)): ?>
+                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($fullAvifUrl) ?>', this)">
+                                    Copiar URL (Original / Full .avif)
                                 </button>
                             <?php endif; ?>
 
-                            <?php if (!empty($variants['full']['webp']['url'])): ?>
-                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($variants['full']['webp']['url']) ?>', this)">
-                                    Copiar URL (Full 1920px)
+                            <?php if (!empty($mediumAvifUrl)): ?>
+                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($mediumAvifUrl) ?>', this)">
+                                    Copiar URL (1024px .avif)
+                                </button>
+                            <?php endif; ?>
+
+                            <?php if (!empty($thumbAvifUrl)): ?>
+                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($thumbAvifUrl) ?>', this)">
+                                    Copiar URL (Thumb .avif)
                                 </button>
                             <?php endif; ?>
 

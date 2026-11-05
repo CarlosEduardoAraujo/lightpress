@@ -87,6 +87,13 @@ class Schema
                 $pdo->exec($trimmed);
             }
         }
+
+        // Migrações incrementais seguras e idempotentes
+        try {
+            $pdo->exec("ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'");
+        } catch (\Throwable $e) {
+            // Ignora se já estiver atualizado
+        }
     }
 
     /**
@@ -135,7 +142,7 @@ class Schema
                 featured_image TEXT NULL,
                 content_json TEXT NOT NULL,
                 content_html TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'published', 'archived')),
+                status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'scheduled', 'published', 'archived')),
                 is_featured INTEGER NOT NULL DEFAULT 0,
                 version INTEGER NOT NULL DEFAULT 1,
                 seo_title TEXT NULL,

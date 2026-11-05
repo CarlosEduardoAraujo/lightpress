@@ -172,10 +172,19 @@ class PostService
             $seoDesc = $data['seo_description'] ?? null;
             $focusKw = $data['focus_keyword'] ?? null;
 
-            // Se for primeira publicação, define published_at
-            $publishedAt = $current['published_at'];
-            if (empty($publishedAt)) {
-                $publishedAt = gmdate('Y-m-d H:i:s');
+            // Tratamento de Data de Publicação e Agendamento
+            $nowUtc = gmdate('Y-m-d H:i:s');
+            if (!empty($data['published_at'])) {
+                $publishedAt = date('Y-m-d H:i:s', strtotime($data['published_at']));
+            } else {
+                $publishedAt = $current['published_at'] ?: $nowUtc;
+            }
+
+            // Se a data de publicação for no futuro, o status é 'scheduled'. Se for agora/passado, 'published'.
+            $targetStatus = ($publishedAt > $nowUtc) ? 'scheduled' : 'published';
+
+            if (!empty($data['status']) && in_array($data['status'], ['draft', 'pending_review', 'archived'], true)) {
+                $targetStatus = $data['status'];
             }
 
             $newVersion = (int)$current['version'] + 1;
@@ -184,12 +193,12 @@ class PostService
             Database::query(
                 "UPDATE posts SET
                     slug = ?, title = ?, summary = ?, category = ?, tags = ?, featured_image = ?,
-                    content_json = ?, content_html = ?, status = 'published', is_featured = ?, version = ?,
+                    content_json = ?, content_html = ?, status = ?, is_featured = ?, version = ?,
                     seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?",
                 [
                     $slug, $title, $summary, $category, $tags, $featuredImage,
-                    $contentJson, $contentHtml, $isFeatured, $newVersion,
+                    $contentJson, $contentHtml, $targetStatus, $isFeatured, $newVersion,
                     $seoTitle, $seoDesc, $focusKw, $publishedAt,
                     $postId
                 ]

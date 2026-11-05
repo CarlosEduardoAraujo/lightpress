@@ -8,6 +8,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Nomenclatura Limpa de Imagens (Sem Sufixo -1920) e Copiar URL estritamente .AVIF:**
+  - A variante original/full de máxima resolução é gravada sem nenhum sufixo numérico (ex: `foto.avif` e `foto.webp`), preservando o nome original do upload. As variantes complementares mantêm `-1024` e `-thumb`.
+  - Os botões de copiar URL na Biblioteca de Mídias (`/admin/media.php`) agora copiam estritamente a variante `.avif` (Original/Full, 1024px e Thumb).
+- **Agendamento de Postagens para Data Futura (`status = 'scheduled'`):**
+  - Adicionado suporte a agendamento automático com seletor `<input type="datetime-local">` no editor (`/admin/editor.php`).
+  - Matérias com data de publicação futura recebem o status `scheduled` e botão dinâmico de agendamento.
+  - No frontend (`public/index.php`), as consultas utilizam `WHERE status IN ('published', 'scheduled') AND published_at <= ?`, garantindo que o artigo entra no ar de forma instantânea e automática assim que o horário é atingido, sem atrasos.
+  - No Dashboard (`/admin/dashboard.php`), incluído card de métricas com total de agendadas, filtro por status `Agendados` e badge visual indicando a data e hora do agendamento.
+  - Criado script de migração `bin/migrate-scheduled.php` para atualizar o ENUM de status no MySQL.
+- **Sistema de Tags Adicionais (Tópicos Semânticos):**
+  - Implementado campo de tags separadas por vírgula no editor de notícias.
+  - Na página do artigo (`templates/post.php`), as tags são exibidas como badges clicáveis `#tag` antes da caixa do autor.
+  - Criada a rota de arquivo por tag (`/tag/{slug}/` e `/tag/{slug}/page/{page}/`) com template dedicado (`templates/tag.php`), paginação e contagem de matérias.
+  - O mecanismo de busca pública (`/busca?q=...`) e a busca do painel agora também localizam matérias por suas tags.
 - **Dark Mode Completo e Universal no Painel Administrativo:**
   - Implementado suporte a Modo Escuro instantâneo e sem flash em 100% das telas da redação: Gerenciador (`/admin/dashboard.php`), Biblioteca de Mídias (`/admin/media.php`), Diagnóstico de Infraestrutura (`/admin/system.php`), Configurações de Perfil (`/admin/profile.php`), Editor de Notícias (`/admin/editor.php`), Histórico de Revisões (`/admin/revisions.php`), Mais Lidas (`/admin/stats.php`), Categorias (`/admin/categories.php`) e Usuários (`/admin/users.php`).
   - Botão de alternância `#btnThemeToggle` integrado com persistência automática no `localStorage` (`lp_theme`), sincronizado de ponta a ponta com o tema do site público.
@@ -73,6 +87,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
+- **Nomenclatura Limpa de Imagens (Sem Sufixo -1920) e Copiar URL estritamente .AVIF:**
+  - A variante original/full de máxima resolução é gravada sem nenhum sufixo numérico (ex: `foto.avif` e `foto.webp`), preservando o nome original do upload. As variantes complementares mantêm `-1024` e `-thumb`.
+  - Os botões de copiar URL na Biblioteca de Mídias (`/admin/media.php`) agora copiam estritamente a variante `.avif` (Original/Full, 1024px e Thumb).
+- **Agendamento de Postagens para Data Futura (`status = 'scheduled'`):**
+  - Adicionado suporte a agendamento automático com seletor `<input type="datetime-local">` no editor (`/admin/editor.php`).
+  - Matérias com data de publicação futura recebem o status `scheduled` e botão dinâmico de agendamento.
+  - No frontend (`public/index.php`), as consultas utilizam `WHERE status IN ('published', 'scheduled') AND published_at <= ?`, garantindo que o artigo entra no ar de forma instantânea e automática assim que o horário é atingido, sem atrasos.
+  - No Dashboard (`/admin/dashboard.php`), incluído card de métricas com total de agendadas, filtro por status `Agendados` e badge visual indicando a data e hora do agendamento.
+  - Criado script de migração `bin/migrate-scheduled.php` para atualizar o ENUM de status no MySQL.
+- **Sistema de Tags Adicionais (Tópicos Semânticos):**
+  - Implementado campo de tags separadas por vírgula no editor de notícias.
+  - Na página do artigo (`templates/post.php`), as tags são exibidas como badges clicáveis `#tag` antes da caixa do autor.
+  - Criada a rota de arquivo por tag (`/tag/{slug}/` e `/tag/{slug}/page/{page}/`) com template dedicado (`templates/tag.php`), paginação e contagem de matérias.
+  - O mecanismo de busca pública (`/busca?q=...`) e a busca do painel agora também localizam matérias por suas tags.
 - **Layout Panorâmico Expandido para Leitura de Artigos (1750px):**
   - A página de leitura (`templates/post.php`) agora se expande até `1750px`, aproveitando a totalidade de monitores Full HD (1920x1080) e ultrawide com presença imersiva.
   - Capa da notícia (*featured image*) com visual widescreen cinematográfico (até 760px de altura).

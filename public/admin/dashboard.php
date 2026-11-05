@@ -96,7 +96,8 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
 
 // Métricas do Topo
 $totalPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts");
-$publishedPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published'");
+$scheduledPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'scheduled' OR (status = 'published' AND published_at > CURRENT_TIMESTAMP)");
+$publishedPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND (published_at IS NULL OR published_at <= CURRENT_TIMESTAMP)");
 $draftPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status IN ('draft', 'pending_review')");
 $totalViews = (int)Database::fetchValue("SELECT COALESCE(SUM(views), 0) FROM post_stats");
 
@@ -114,7 +115,11 @@ $filterFeatured = !empty($_GET['featured']) ? 1 : 0;
 $whereClauses = ["1=1"];
 $params = [];
 
-if (!empty($filterStatus)) {
+if ($filterStatus === 'scheduled') {
+    $whereClauses[] = "(p.status = 'scheduled' OR (p.status = 'published' AND p.published_at > CURRENT_TIMESTAMP))";
+} elseif ($filterStatus === 'published') {
+    $whereClauses[] = "(p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= CURRENT_TIMESTAMP))";
+} elseif (!empty($filterStatus)) {
     $whereClauses[] = "p.status = ?";
     $params[] = $filterStatus;
 }
@@ -130,7 +135,8 @@ if ($filterAuthor > 0) {
 }
 
 if (!empty($filterSearch)) {
-    $whereClauses[] = "(p.title LIKE ? OR p.summary LIKE ?)";
+    $whereClauses[] = "(p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)";
+    $params[] = '%' . $filterSearch . '%';
     $params[] = '%' . $filterSearch . '%';
     $params[] = '%' . $filterSearch . '%';
 }
@@ -152,7 +158,7 @@ $filteredCount = (int)Database::fetchValue(
 );
 $totalPages = max(1, (int)ceil($filteredCount / $perPage));
 
-$querySql = "SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
+$querySql = "SELECT p.id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
                     u.name as author_name, COALESCE(s.views, 0) as views
              FROM posts p
              JOIN users u ON u.id = p.user_id
@@ -437,6 +443,11 @@ function buildFilterUrl(array $overrides = []): string {
                 <span class="metric-sub">Disponíveis ao público</span>
             </div>
             <div class="metric-card">
+                <span class="metric-label">Agendadas</span>
+                <span class="metric-value" style="color: #b45309;"><?= number_format($scheduledPosts, 0, ',', '.') ?></span>
+                <span class="metric-sub">Publicação futura automática</span>
+            </div>
+            <div class="metric-card">
                 <span class="metric-label">Rascunhos / Revisões</span>
                 <span class="metric-value" style="color: #d97706;"><?= number_format($draftPosts, 0, ',', '.') ?></span>
                 <span class="metric-sub">Em preparação editorial</span>
@@ -464,11 +475,12 @@ function buildFilterUrl(array $overrides = []): string {
         <!-- Barra de Filtros e Busca -->
         <form method="GET" action="/admin/dashboard.php" class="filter-bar">
             <div class="filter-group">
-                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="Buscar por título ou resumo..." class="form-input">
+                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="Buscar por título, resumo ou tag..." class="form-input">
 
                 <select name="status" class="form-select">
                     <option value="">Todos os Status</option>
                     <option value="published" <?= $filterStatus === 'published' ? 'selected' : '' ?>>Publicados</option>
+                    <option value="scheduled" <?= $filterStatus === 'scheduled' ? 'selected' : '' ?>>Agendados</option>
                     <option value="draft" <?= $filterStatus === 'draft' ? 'selected' : '' ?>>Rascunhos</option>
                     <option value="pending_review" <?= $filterStatus === 'pending_review' ? 'selected' : '' ?>>Em Revisão</option>
                     <option value="archived" <?= $filterStatus === 'archived' ? 'selected' : '' ?>>Arquivados</option>
@@ -566,6 +578,18 @@ function buildFilterUrl(array $overrides = []): string {
                                             <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
                                                 Slug: <code>/<?= Security::e($p['slug']) ?>/</code>
                                             </div>
+
+                                            <?php if (!empty($p['tags'])): ?>
+                                                <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem;">
+                                                    <?php foreach (array_slice(array_map('trim', explode(',', $p['tags'])), 0, 4) as $tg): ?>
+                                                        <?php if (!empty($tg)): ?>
+                                                            <span style="font-size: 0.7rem; font-weight: 600; background: rgba(37,99,235,0.08); color: var(--primary-accent); padding: 0.1rem 0.45rem; border-radius: 4px;">
+                                                                #<?= Security::e($tg) ?>
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </td>
@@ -578,15 +602,24 @@ function buildFilterUrl(array $overrides = []): string {
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="status-badge status-<?= Security::e($p['status']) ?>">
-                                        <?= match($p['status']) {
-                                            'published' => 'Publicado',
-                                            'draft' => 'Rascunho',
-                                            'pending_review' => 'Em Revisão',
-                                            'archived' => 'Arquivado',
-                                            default => $p['status']
-                                        } ?>
-                                    </span>
+                                    <?php 
+                                        $isSched = ($p['status'] === 'scheduled') || ($p['status'] === 'published' && !empty($p['published_at']) && strtotime($p['published_at']) > time());
+                                    ?>
+                                    <?php if ($isSched): ?>
+                                        <span class="status-badge" style="background: #fef3c7; color: #b45309;" title="Agendado para <?= date('d/m/Y \à\s H:i', strtotime($p['published_at'])) ?>">
+                                            📅 Agendado (<?= date('d/m H:i', strtotime($p['published_at'])) ?>)
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="status-badge status-<?= Security::e($p['status']) ?>">
+                                            <?= match($p['status']) {
+                                                'published' => 'Publicado',
+                                                'draft' => 'Rascunho',
+                                                'pending_review' => 'Em Revisão',
+                                                'archived' => 'Arquivado',
+                                                default => $p['status']
+                                            } ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
                                 <td style="text-align: right; font-weight: 800; color: var(--primary);">
                                     <?= number_format((int)$p['views'], 0, ',', '.') ?>

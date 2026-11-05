@@ -84,6 +84,21 @@ $postUrlEncoded = rawurlencode($postUrl);
         <?= $post['content_html'] ?>
     </div>
 
+    <!-- Tags e Tópicos Relacionados -->
+    <?php if (!empty($post['tags'])): ?>
+        <div class="post-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 2.5rem 0 1.5rem; align-items: center;">
+            <span style="font-weight: 800; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Tópicos:</span>
+            <?php foreach (array_map('trim', explode(',', $post['tags'])) as $tagItem): ?>
+                <?php if (!empty($tagItem)): ?>
+                    <a href="/tag/<?= urlencode(Security::slugify($tagItem)) ?>/" 
+                       style="display: inline-flex; align-items: center; padding: 0.35rem 0.8rem; background: var(--badge-bg); color: var(--primary-accent); border: 1px solid var(--border); border-radius: 999px; font-size: 0.82rem; font-weight: 700; text-decoration: none; transition: transform 0.15s, border-color 0.15s;">
+                        #<?= Security::e($tagItem) ?>
+                    </a>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
     <!-- Caixa de Autor -->
     <div class="author-box">
         <?php if (!empty($post['author_avatar'])): ?>

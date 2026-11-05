@@ -198,7 +198,12 @@ class ImageProcessor
         // Se já existir arquivo com o mesmo nome na pasta de destino, incrementa sufixo numérico (-1, -2, etc.)
         $fileBase = $cleanSlug;
         $counter = 1;
-        while (file_exists("{$targetDir}/{$fileBase}-1920.webp") || file_exists("{$targetDir}/{$fileBase}-1024.webp")) {
+        while (
+            file_exists("{$targetDir}/{$fileBase}.webp") || 
+            file_exists("{$targetDir}/{$fileBase}.avif") || 
+            file_exists("{$targetDir}/{$fileBase}-1920.webp") || 
+            file_exists("{$targetDir}/{$fileBase}-1024.webp")
+        ) {
             $fileBase = "{$cleanSlug}-{$counter}";
             $counter++;
         }
@@ -215,8 +220,10 @@ class ImageProcessor
 
         try {
             // Definição das 3 resoluções padronizadas
+            // A imagem original/full não recebe sufixo de resolução (fica apenas o nome original)
+            // As variantes intermediária e miniatura recebem -1024 e -thumb
             $specs = [
-                'full' => ['max_w' => 1920, 'suffix' => '1920', 'crop' => false],
+                'full' => ['max_w' => 1920, 'suffix' => '', 'crop' => false],
                 'intermediate' => ['max_w' => 1024, 'suffix' => '1024', 'crop' => false],
                 'thumb' => ['max_w' => 300, 'max_h' => 169, 'suffix' => 'thumb', 'crop' => true],
             ];
@@ -230,8 +237,10 @@ class ImageProcessor
                 $w = imagesx($resized);
                 $h = imagesy($resized);
 
+                $suffixPart = empty($spec['suffix']) ? '' : "-{$spec['suffix']}";
+
                 // Geração do WebP Obrigatório
-                $webpFilename = "{$fileBase}-{$spec['suffix']}.webp";
+                $webpFilename = "{$fileBase}{$suffixPart}.webp";
                 $webpStaging = "{$this->stagingDir}/{$webpFilename}";
                 $webpTarget = "{$targetDir}/{$webpFilename}";
 
@@ -258,7 +267,7 @@ class ImageProcessor
 
                 // Geração do AVIF Opcional (se biblioteca suportada e sem falhas)
                 if ($canAvif) {
-                    $avifFilename = "{$fileBase}-{$spec['suffix']}.avif";
+                    $avifFilename = "{$fileBase}{$suffixPart}.avif";
                     $avifStaging = "{$this->stagingDir}/{$avifFilename}";
                     $avifTarget = "{$targetDir}/{$avifFilename}";
 

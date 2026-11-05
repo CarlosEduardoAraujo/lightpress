@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = trim($_POST['title'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $category = trim($_POST['category'] ?? 'geral');
+        $tags = trim($_POST['tags'] ?? '');
         $summary = trim($_POST['summary'] ?? '');
         $featuredImage = trim($_POST['featured_image'] ?? '');
         $contentHtml = trim($_POST['content_html'] ?? '');
@@ -68,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $seoDesc = trim($_POST['seo_description'] ?? '');
         $focusKeyword = trim($_POST['focus_keyword'] ?? '');
         $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
+        $publishedAtRaw = trim($_POST['published_at'] ?? '');
+        $publishedAt = !empty($publishedAtRaw) ? date('Y-m-d H:i:s', strtotime($publishedAtRaw)) : null;
         $knownVersion = (int)($_POST['version'] ?? 1);
 
         $payload = [
@@ -75,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'slug' => $slug,
             'summary' => $summary,
             'category' => $category,
+            'tags' => $tags,
             'featured_image' => $featuredImage,
             'content_html' => $contentHtml,
             'content_json' => $contentJson,
@@ -82,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'seo_description' => $seoDesc,
             'focus_keyword' => $focusKeyword,
             'is_featured' => $isFeatured,
+            'published_at' => $publishedAt,
         ];
 
         try {
@@ -100,7 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new RuntimeException("Apenas Editores e Administradores podem publicar.");
                     }
                     $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion);
-                    $message = "Publicação atualizada e cache invalidado com sucesso!";
+                    
+                    $isFuture = (!empty($publishedAt) && strtotime($publishedAt) > time());
+                    $message = $isFuture 
+                        ? "Matéria agendada com sucesso para " . date('d/m/Y \à\s H:i', strtotime($publishedAt)) . "!"
+                        : "Publicação atualizada e cache invalidado com sucesso!";
                 } else {
                     // Salvar rascunho
                     $cleanHtml = BlockCompiler::sanitizeHtml($contentHtml);
@@ -109,18 +118,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         : BlockCompiler::htmlToBlocks($cleanHtml);
 
                     $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($post['slug']) ? $post['slug'] : Security::slugify($title));
+                    $publishedAtVal = !empty($publishedAt) ? $publishedAt : ($post['published_at'] ?? null);
 
                     Database::query(
                         "UPDATE posts SET 
-                            title = ?, slug = ?, summary = ?, category = ?, featured_image = ?, 
+                            title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
                             content_json = ?, content_html = ?, seo_title = ?, 
-                            seo_description = ?, focus_keyword = ?, is_featured = ?, 
+                            seo_description = ?, focus_keyword = ?, is_featured = ?, published_at = ?,
                             updated_at = CURRENT_TIMESTAMP 
                          WHERE id = ?",
                         [
-                            $title, $cleanSlug, $summary, $category, $featuredImage, 
+                            $title, $cleanSlug, $summary, $category, $tags, $featuredImage, 
                             $cleanJson, $cleanHtml, $seoTitle, 
-                            $seoDesc, $focusKeyword, $isFeatured, $postId
+                            $seoDesc, $focusKeyword, $isFeatured, $publishedAtVal, $postId
                         ]
                     );
                     $message = "Rascunho salvo com sucesso!";
@@ -411,9 +421,48 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                 <!-- Coluna Lateral (Metadados, Destaques, Categoria e SEO) -->
                 <div>
                     <div class="card">
+                        <?php if ($post): ?>
+                            <?php 
+                                $isSched = ($post['status'] === 'scheduled') || ($post['status'] === 'published' && !empty($post['published_at']) && strtotime($post['published_at']) > time());
+                            ?>
+                            <?php if ($isSched): ?>
+                                <div style="background: #fef3c7; color: #b45309; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #fde68a;">
+                                    📅 Matéria Agendada para <?= date('d/m/Y \à\s H:i', strtotime($post['published_at'])) ?>
+                                </div>
+                            <?php elseif ($post['status'] === 'published'): ?>
+                                <div style="background: #dcfce7; color: #15803d; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #bbf7d0;">
+                                    ✓ Publicada no Ar (<?= date('d/m/Y \à\s H:i', strtotime($post['published_at'])) ?>)
+                                </div>
+                            <?php else: ?>
+                                <div style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid var(--border);">
+                                    📝 Modo Rascunho
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <!-- Data e Hora de Publicação / Agendamento -->
+                        <div class="form-group">
+                            <label for="published_at">Data de Publicação / Agendamento</label>
+                            <input type="datetime-local" id="published_at" name="published_at" 
+                                   value="<?= !empty($post['published_at']) ? date('Y-m-d\TH:i', strtotime($post['published_at'])) : '' ?>"
+                                   onchange="updatePublishButtonLabel()" oninput="updatePublishButtonLabel()">
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                                Deixe vazio para publicar agora ou escolha data futura para <strong>agendamento automático</strong>.
+                            </span>
+                        </div>
+
                         <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                            <button type="submit" name="form_action" value="publish" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
-                                <?= ($post && $post['status'] === 'published') ? 'Atualizar Publicação' : '🚀 Publicar Agora' ?>
+                            <button type="submit" name="form_action" value="publish" id="btnPublishAction" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
+                                <?php
+                                    $isFutureDate = ($post && !empty($post['published_at']) && strtotime($post['published_at']) > time());
+                                    if ($isFutureDate || ($post && $post['status'] === 'scheduled')) {
+                                        echo '📅 Salvar Agendamento';
+                                    } elseif ($post && $post['status'] === 'published') {
+                                        echo 'Atualizar Publicação';
+                                    } else {
+                                        echo '🚀 Publicar Agora';
+                                    }
+                                ?>
                             </button>
                             <button type="submit" name="form_action" value="save_draft" class="btn btn-secondary" style="width: 100%;">
                                 💾 Salvar como Rascunho
@@ -429,6 +478,15 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                        </div>
+
+                        <!-- Tags Adicionais / Tópicos Relacionados -->
+                        <div class="form-group">
+                            <label for="tags">Tags Adicionais (Tópicos)</label>
+                            <input type="text" id="tags" name="tags" value="<?= Security::e($post['tags'] ?? '') ?>" placeholder="ex: f1, hamilton, ferrari, gp brasil">
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                                Separe por vírgulas. Cria links clicáveis (#tag) no rodapé da notícia e gera páginas automáticas de arquivo (ex: <code>/tag/f1/</code>).
+                            </span>
                         </div>
 
                         <!-- Imagem de Destaque com Modal Seletor Estilo WordPress -->
@@ -960,6 +1018,24 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             document.getElementById('featured_image').value = '';
             document.getElementById('featuredPreviewImg').src = '';
             document.getElementById('featuredPreviewBox').style.display = 'none';
+        }
+
+        // Atualização Dinâmica do Botão com base na Data de Publicação/Agendamento
+        function updatePublishButtonLabel() {
+            var input = document.getElementById('published_at');
+            var btn = document.getElementById('btnPublishAction');
+            if (!btn) return;
+            if (input && input.value) {
+                var selected = new Date(input.value);
+                var now = new Date();
+                if (selected > now) {
+                    btn.innerHTML = '📅 Salvar Agendamento';
+                    btn.style.background = '#d97706';
+                    return;
+                }
+            }
+            btn.style.background = 'var(--primary-accent)';
+            btn.innerHTML = '<?= ($post && $post['status'] === 'published') ? 'Atualizar Publicação' : '🚀 Publicar Agora' ?>';
         }
 
         // Alternância de Tema Claro / Escuro

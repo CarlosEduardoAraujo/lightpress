@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS posts (
     content_html MEDIUMTEXT NOT NULL,
     
     -- Controle de Publicação e Edição Concorrente
-    status ENUM('draft', 'pending_review', 'published', 'archived') NOT NULL DEFAULT 'draft',
+    status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft',
     is_featured TINYINT(1) NOT NULL DEFAULT 0,
     version INT UNSIGNED NOT NULL DEFAULT 1,
     

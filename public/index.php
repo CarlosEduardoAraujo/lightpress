@@ -36,7 +36,7 @@ $router->get('/', function () use ($config): void {
     $featuredPosts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE status = 'published' AND is_featured = 1 AND published_at <= ?
+         WHERE status IN ('published', 'scheduled') AND is_featured = 1 AND published_at <= ?
          ORDER BY published_at DESC LIMIT 4",
         [$nowUtc]
     );
@@ -49,7 +49,7 @@ $router->get('/', function () use ($config): void {
         $extraPosts = Database::fetchAll(
             "SELECT id, slug, title, summary, category, featured_image, published_at 
              FROM posts 
-             WHERE status = 'published' AND published_at <= ? {$excludeSql}
+             WHERE status IN ('published', 'scheduled') AND published_at <= ? {$excludeSql}
              ORDER BY published_at DESC LIMIT {$needed}",
             [$nowUtc]
         );
@@ -59,7 +59,7 @@ $router->get('/', function () use ($config): void {
 
     // Total de posts para cálculo de paginação
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
         [$nowUtc]
     );
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -70,7 +70,7 @@ $router->get('/', function () use ($config): void {
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ? {$excludeSql}
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? {$excludeSql}
          ORDER BY published_at DESC LIMIT ?",
         [$nowUtc, $perPage]
     );
@@ -87,7 +87,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
         [$nowUtc]
     );
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -96,7 +96,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ?
+         WHERE status IN ('published', 'scheduled') AND published_at <= ?
          ORDER BY published_at DESC LIMIT ? OFFSET ?",
         [$nowUtc, $perPage, $offset]
     );
@@ -124,7 +124,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
         [$categorySlug, $nowUtc]
     );
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -133,7 +133,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE category = ? AND status = 'published' AND published_at <= ?
+         WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?
          ORDER BY published_at DESC LIMIT ?",
         [$categorySlug, $nowUtc, $perPage]
     );
@@ -162,7 +162,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
         [$categorySlug, $nowUtc]
     );
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -171,7 +171,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE category = ? AND status = 'published' AND published_at <= ?
+         WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?
          ORDER BY published_at DESC LIMIT ? OFFSET ?",
         [$categorySlug, $nowUtc, $perPage, $offset]
     );
@@ -191,14 +191,76 @@ $router->get('/busca', function () use ($config): void {
         $posts = Database::fetchAll(
             "SELECT id, slug, title, summary, category, featured_image, published_at
              FROM posts
-             WHERE status = 'published' AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
+             WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (title LIKE ? OR summary LIKE ? OR tags LIKE ?)
              ORDER BY published_at DESC LIMIT 30",
-            [$nowUtc, $searchTerm, $searchTerm]
+            [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
         );
     }
 
     $pageTitle = "Busca: {$query} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/search.php';
+});
+
+// Rota 5b: Listagem por Tag (/tag/{tag}/)
+$router->get('/tag/{tag}/', function (array $params) use ($config): void {
+    $tagRaw = $params['tag'] ?? '';
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $perPage = 12;
+
+    $tagClean = trim(str_replace('-', ' ', $tagRaw));
+    $tagSearch = "%{$tagClean}%";
+
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)",
+        [$nowUtc, $tagSearch, "%{$tagRaw}%"]
+    );
+
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = 1;
+
+    $posts = Database::fetchAll(
+        "SELECT id, slug, title, summary, category, featured_image, published_at 
+         FROM posts 
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)
+         ORDER BY published_at DESC LIMIT ?",
+        [$nowUtc, $tagSearch, "%{$tagRaw}%", $perPage]
+    );
+
+    $tagName = ucwords($tagClean);
+    $pageTitle = "Tópico: #{$tagName} - " . $config['app']['name'];
+    require $config['paths']['templates'] . '/tag.php';
+});
+
+// Rota 5c: Listagem Paginada de Tag (/tag/{tag}/page/{page}/)
+$router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): void {
+    $tagRaw = $params['tag'] ?? '';
+    $page = max(2, (int)($params['page'] ?? 2));
+    $perPage = 12;
+    $offset = ($page - 1) * $perPage;
+    $nowUtc = gmdate('Y-m-d H:i:s');
+
+    $tagClean = trim(str_replace('-', ' ', $tagRaw));
+    $tagSearch = "%{$tagClean}%";
+
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)",
+        [$nowUtc, $tagSearch, "%{$tagRaw}%"]
+    );
+
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = $page;
+
+    $posts = Database::fetchAll(
+        "SELECT id, slug, title, summary, category, featured_image, published_at 
+         FROM posts 
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)
+         ORDER BY published_at DESC LIMIT ? OFFSET ?",
+        [$nowUtc, $tagSearch, "%{$tagRaw}%", $perPage, $offset]
+    );
+
+    $tagName = ucwords($tagClean);
+    $pageTitle = "Tópico: #{$tagName} - Página {$page} - " . $config['app']['name'];
+    require $config['paths']['templates'] . '/tag.php';
 });
 
 // Rota 6: Artigo Individual na Raiz (/{slug}/)
@@ -207,7 +269,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     // Palavras reservadas que não devem ser tratadas como slug de notícia
-    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria'];
+    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag'];
     if (in_array(strtolower($slug), $reserved, true)) {
         http_response_code(404);
         require $config['paths']['templates'] . '/404.php';
@@ -218,7 +280,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
          FROM posts p
          JOIN users u ON u.id = p.user_id
-         WHERE p.slug = ? AND p.status = 'published' AND p.published_at <= ?
+         WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
          LIMIT 1",
         [$slug, $nowUtc]
     );
@@ -233,7 +295,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $relatedPosts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE category = ? AND status = 'published' AND id != ? AND published_at <= ?
+         WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
          ORDER BY published_at DESC LIMIT 4",
         [$post['category'], (int)$post['id'], $nowUtc]
     );
@@ -256,7 +318,7 @@ $router->get('/feed.xml', function () use ($config): void {
     $posts = Database::fetchAll(
         "SELECT slug, title, summary, published_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ? 
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
          ORDER BY published_at DESC LIMIT 50",
         [$nowUtc]
     );
@@ -293,7 +355,7 @@ $router->get('/sitemap.xml', function () use ($config): void {
     $posts = Database::fetchAll(
         "SELECT slug, updated_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ? 
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
          ORDER BY updated_at DESC LIMIT 1000",
         [$nowUtc]
     );
