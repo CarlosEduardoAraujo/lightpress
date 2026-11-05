@@ -34,10 +34,6 @@ $getSubtopic = function(?string $tagsStr, string $fallback = 'Velocidade Máxima
     return !empty($parts[0]) ? $parts[0] : $fallback;
 };
 
-// Separar o grande destaque principal dos 3 secundários (apenas na página 1)
-$featuredPosts = is_array($featuredPosts ?? null) ? $featuredPosts : [];
-$mainLead = $featuredPosts[0] ?? null;
-$secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [];
 $tagCleanName = Security::e($tagName ?? 'Tópico');
 $tagSlug = Security::e($tagRaw ?? 'topico');
 ?>
@@ -82,83 +78,7 @@ $tagSlug = Security::e($tagRaw ?? 'topico');
         </div>
     </header>
 
-    <!-- 2. MOSAICO EDITORIAL ASSIMÉTRICO (Apenas na Página 1 com 4 Destaques) -->
-    <?php if (!empty($mainLead) && ($currentPage ?? 1) === 1): ?>
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-stretch">
-        <!-- Master Lead Story (8 Cols) -->
-        <article class="lg:col-span-8 group relative flex flex-col justify-end min-h-[460px] lg:min-h-[540px] rounded-xl overflow-hidden bg-carbon-black shadow-md cursor-pointer border border-subtle-border dark:border-[#2a303c]">
-            <a href="/<?= Security::e($mainLead['slug']) ?>/" class="absolute inset-0 z-0 overflow-hidden block">
-                <?php if (!empty($mainLead['featured_image'])): ?>
-                    <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
-                         src="<?= Security::e(ImageProcessor::toAvifUrl($mainLead['featured_image'])) ?>" 
-                         alt="<?= Security::e($mainLead['title']) ?>">
-                <?php else: ?>
-                    <div class="w-full h-full bg-carbon-surface flex items-center justify-center text-secondary">Sem imagem</div>
-                <?php endif; ?>
-                <div class="absolute inset-0 bg-gradient-to-t from-carbon-black via-carbon-black/60 to-transparent"></div>
-            </a>
-
-            <div class="relative z-10 p-space-md md:p-space-xl flex flex-col gap-space-sm text-pure-white pointer-events-none">
-                <div class="flex flex-wrap items-center gap-space-xs">
-                    <span class="px-space-sm py-1 bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider rounded">
-                        <?= Security::e($mainLead['category']) ?>
-                    </span>
-                    <span class="px-space-sm py-1 bg-carbon-surface/80 backdrop-blur-md text-surface-container font-data-telemetry text-data-telemetry rounded flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-flag-green"></span>
-                        #<?= $tagCleanName ?>
-                    </span>
-                    <span class="text-secondary-fixed font-label-meta text-label-meta ml-auto hidden sm:inline">
-                        <?= $calcReadingTime($mainLead['content_html'] ?? null) ?>
-                    </span>
-                </div>
-
-                <h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-pure-white group-hover:text-primary-fixed-dim transition-colors leading-tight drop-shadow-sm max-w-3xl">
-                    <a href="/<?= Security::e($mainLead['slug']) ?>/" class="pointer-events-auto text-pure-white hover:text-primary-fixed-dim">
-                        <?= Security::e($mainLead['title']) ?>
-                    </a>
-                </h2>
-
-                <div class="flex items-center gap-space-md pt-space-xs text-secondary-fixed font-label-meta text-label-meta">
-                    <span class="flex items-center gap-1.5 text-pure-white font-semibold">
-                        <?= Icon::svg('edit_note', 'text-racing-red', 16) ?>
-                        Por <?= Security::e($mainLead['author_name'] ?? 'Redação SpeedRacing') ?>
-                    </span>
-                    <span>•</span>
-                    <time datetime="<?= $mainLead['published_at'] ?>"><?= $formatPtDate($mainLead['published_at']) ?></time>
-                </div>
-            </div>
-        </article>
-
-        <!-- Secondary Trio Column (4 Cols) -->
-        <div class="lg:col-span-4 flex flex-col gap-space-md justify-between">
-            <?php foreach ($secondaryLeads as $sec): ?>
-                <article class="group flex-1 flex flex-col justify-between p-space-md rounded-xl bg-pure-white dark:bg-carbon-surface shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all">
-                    <div class="flex items-center justify-between gap-2 mb-space-xs">
-                        <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] font-label-category text-label-category text-carbon-black dark:text-pure-white uppercase rounded">
-                            <?= Security::e($sec['category']) ?>
-                        </span>
-                        <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-                            <?= date('H:i', strtotime($sec['published_at'])) ?>
-                        </span>
-                    </div>
-                    <h3 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors line-clamp-3 font-bold">
-                        <a href="/<?= Security::e($sec['slug']) ?>/">
-                            <?= Security::e($sec['title']) ?>
-                        </a>
-                    </h3>
-                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-sm pt-space-xs">
-                        <span class="text-tertiary dark:text-racing-red font-medium"></span>
-                        <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
-                            <?= Icon::svg('arrow_forward', '', 18) ?>
-                        </a>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-        </div>
-    </section>
-    <?php endif; ?>
-
-    <!-- 3. MAIN TWO-COLUMN BODY LAYOUT (8 COLS FEED / 4 COLS SIDEBAR) -->
+    <!-- 2. MAIN TWO-COLUMN BODY LAYOUT (8 COLS FEED / 4 COLS SIDEBAR) -->
     <div id="feed" class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
         
         <!-- LEFT: MAIN NEWS FEED (8 COLS) -->

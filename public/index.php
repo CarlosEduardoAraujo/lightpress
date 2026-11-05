@@ -134,37 +134,14 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Se houver 4 ou mais matérias na categoria, compõe o mosaico de 4 destaques no topo
-    $featuredPosts = [];
-    if ($totalPosts >= 4) {
-        $featuredPosts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
-             ORDER BY p.is_featured DESC, p.published_at DESC LIMIT 4",
-            [$categorySlug, $nowUtc]
-        );
-        $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
-        $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
-             ORDER BY p.published_at DESC LIMIT ?",
-            [$categorySlug, $nowUtc, (int)$perPage]
-        );
-    } else {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
-             ORDER BY p.published_at DESC LIMIT ?",
-            [$categorySlug, $nowUtc, (int)$perPage]
-        );
-    }
+    $posts = Database::fetchAll(
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         ORDER BY p.published_at DESC LIMIT ?",
+        [$categorySlug, $nowUtc, (int)$perPage]
+    );
 
     $pageTitle = $category['name'] . ' - ' . $config['app']['name'];
     require $config['paths']['templates'] . '/category.php';
@@ -249,37 +226,14 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Se houver 4 ou mais matérias com a tag, compõe o mosaico de destaques no topo
-    $featuredPosts = [];
-    if ($totalPosts >= 4) {
-        $featuredPosts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
-             ORDER BY p.is_featured DESC, p.published_at DESC LIMIT 4",
-            [$nowUtc, $tagSearch, "%{$tagRaw}%"]
-        );
-        $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
-        $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?) {$excludeSql}
-             ORDER BY p.published_at DESC LIMIT ?",
-            [$nowUtc, $tagSearch, "%{$tagRaw}%", (int)$perPage]
-        );
-    } else {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
-             ORDER BY p.published_at DESC LIMIT ?",
-            [$nowUtc, $tagSearch, "%{$tagRaw}%", (int)$perPage]
-        );
-    }
+    $posts = Database::fetchAll(
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
+         ORDER BY p.published_at DESC LIMIT ?",
+        [$nowUtc, $tagSearch, "%{$tagRaw}%", (int)$perPage]
+    );
 
     $tagName = ucwords($tagClean);
     $pageTitle = "Tópico: #{$tagName} - " . $config['app']['name'];
