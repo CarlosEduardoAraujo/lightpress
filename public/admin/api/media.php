@@ -47,11 +47,11 @@ if (!empty($search)) {
 $media = [];
 foreach ($items as $row) {
     $variants = json_decode($row['variants_manifest'], true) ?? [];
-    $thumbUrl = $variants['thumb']['webp']['url'] ?? ($variants['intermediate']['webp']['url'] ?? '');
-    $fullUrl = $variants['intermediate']['webp']['url'] ?? ($variants['full']['webp']['url'] ?? '');
-    $fullHdUrl = $variants['full']['webp']['url'] ?? $fullUrl;
-    $w = $variants['full']['webp']['width'] ?? 0;
-    $h = $variants['full']['webp']['height'] ?? 0;
+    $thumbUrl = $variants['thumb']['avif']['url'] ?? ($variants['thumb']['webp']['url'] ?? ($variants['intermediate']['avif']['url'] ?? ($variants['intermediate']['webp']['url'] ?? '')));
+    $fullUrl = $variants['intermediate']['avif']['url'] ?? ($variants['intermediate']['webp']['url'] ?? ($variants['full']['avif']['url'] ?? ($variants['full']['webp']['url'] ?? '')));
+    $fullHdUrl = $variants['full']['avif']['url'] ?? ($variants['full']['webp']['url'] ?? $fullUrl);
+    $w = $variants['full']['avif']['width'] ?? ($variants['full']['webp']['width'] ?? 0);
+    $h = $variants['full']['avif']['height'] ?? ($variants['full']['webp']['height'] ?? 0);
 
     $media[] = [
         'id' => $row['id'],

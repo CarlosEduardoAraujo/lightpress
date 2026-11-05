@@ -94,6 +94,19 @@ $csrfToken = Security::generateCsrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Histórico de Revisões - <?= Security::e($post['title']) ?></title>
+
+    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --primary: #0f172a;
@@ -106,13 +119,35 @@ $csrfToken = Security::generateCsrfToken();
             --radius: 8px;
             --font: system-ui, -apple-system, sans-serif;
         }
+        [data-theme="dark"] {
+            --primary: #f8fafc;
+            --primary-accent: #3b82f6;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+        [data-theme="dark"] th { background: #090d16; color: #94a3b8; }
+        [data-theme="dark"] .badge-draft { background: #1e293b; color: #cbd5e1; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); }
-        header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); transition: background 0.2s, color 0.2s; }
+        .site-header { 
+            background: var(--surface); 
+            border-bottom: 1px solid var(--border); 
+            padding: 0.85rem 1.75rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: background 0.2s, border-color 0.2s;
+        }
         .brand { font-size: 1.25rem; font-weight: 800; color: var(--primary); text-decoration: none; }
         .brand span { color: var(--primary-accent); }
         .container { max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; transition: background 0.2s, border-color 0.2s; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
         th { background: #f8fafc; padding: 0.75rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
         td { padding: 0.85rem; border-bottom: 1px solid var(--border); }
@@ -125,13 +160,32 @@ $csrfToken = Security::generateCsrfToken();
         .badge-pending_review { background: #fef3c7; color: #b45309; }
         .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
         .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--border); }
     </style>
 </head>
 <body>
-    <header>
+    <header class="site-header">
         <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span></a>
+            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
             <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" style="color: inherit; text-decoration: none;">Voltar ao Editor</a></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
         </div>
     </header>
 
@@ -189,5 +243,21 @@ $csrfToken = Security::generateCsrfToken();
             </table>
         </div>
     </div>
+
+    <script>
+        function updateThemeIcon() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var btn = document.getElementById('btnThemeToggle');
+            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            updateThemeIcon();
+        }
+        updateThemeIcon();
+    </script>
 </body>
 </html>

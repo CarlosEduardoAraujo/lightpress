@@ -153,6 +153,19 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $post ? 'Editar: ' . Security::e($post['title']) : 'Nova Publicação' ?> - SpeedPress Admin</title>
+
+    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --primary: #0f172a;
@@ -165,14 +178,39 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             --radius: 8px;
             --font: system-ui, -apple-system, sans-serif;
         }
+        [data-theme="dark"] {
+            --primary: #f8fafc;
+            --primary-accent: #3b82f6;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+        [data-theme="dark"] .editor-toolbar { background: #1a233a; border-color: #1e293b; }
+        [data-theme="dark"] .tool-btn { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .tool-btn:hover { background: #1e293b; }
+        [data-theme="dark"] .editor-canvas { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .editor-canvas h2, [data-theme="dark"] .editor-canvas h3 { color: #f1f5f9; }
+        [data-theme="dark"] .editor-canvas blockquote { background: #1a233a; color: #cbd5e1; }
+        [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] label { color: #f1f5f9; }
+        [data-theme="dark"] .btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; }
+        [data-theme="dark"] .btn-secondary:hover { background: #334155; }
+        [data-theme="dark"] .media-modal-dialog { background: #131b2e; color: #f1f5f9; }
+        [data-theme="dark"] .media-modal-header, [data-theme="dark"] .media-modal-footer { background: #090d16; border-color: #1e293b; }
+        [data-theme="dark"] .media-modal-header h2 { color: #f1f5f9; }
+        [data-theme="dark"] .modal-media-item { background: #131b2e; border-color: #1e293b; }
+        [data-theme="dark"] .modal-media-title { color: #f1f5f9; }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); padding-bottom: 5rem; }
-        header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); padding-bottom: 5rem; transition: background 0.2s, color 0.2s; }
+        header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; transition: background 0.2s, border-color 0.2s; }
         .brand { font-size: 1.25rem; font-weight: 800; color: var(--primary); text-decoration: none; }
         .brand span { color: var(--primary-accent); }
         .container { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
         .editor-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 2rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; transition: background 0.2s, border-color 0.2s; }
         .form-group { margin-bottom: 1.25rem; }
         label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #334155; }
         input[type="text"], textarea, select { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; font-family: inherit; }
@@ -184,6 +222,22 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
         .btn-secondary:hover { background: #cbd5e1; }
         .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
         .alert-error { background: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--border); }
 
         /* Barra de Ferramentas Rica */
         .editor-toolbar {
@@ -261,19 +315,20 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
     </style>
 </head>
 <body>
-    <header>
+    <header class="site-header">
         <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span></a>
-            <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/dashboard.php" style="color: inherit; text-decoration: none;">Voltar ao Dashboard</a></span>
+            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
+            <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/dashboard.php" style="color: inherit; text-decoration: none;">Voltar ao Gerenciador</a></span>
         </div>
-        <div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
             <?php if ($post): ?>
-                <a href="/admin/revisions.php?post_id=<?= (int)$post['id'] ?>" class="btn btn-secondary" style="margin-right: 0.5rem;">📜 Histórico (#<?= (int)$post['version'] ?>)</a>
-                <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">👁️ Prévia Privada</a>
+                <a href="/admin/revisions.php?post_id=<?= (int)$post['id'] ?>" class="btn btn-secondary">📜 Histórico (#<?= (int)$post['version'] ?>)</a>
+                <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary">👁️ Prévia Privada</a>
             <?php endif; ?>
             <?php if ($post && $post['status'] === 'published'): ?>
-                <a href="/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary" style="margin-right: 0.5rem;">Ver Artigo no Ar &rarr;</a>
+                <a href="/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary">Ver Artigo no Ar &rarr;</a>
             <?php endif; ?>
+            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
         </div>
     </header>
 
@@ -906,6 +961,21 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             document.getElementById('featuredPreviewImg').src = '';
             document.getElementById('featuredPreviewBox').style.display = 'none';
         }
+
+        // Alternância de Tema Claro / Escuro
+        function updateThemeIcon() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var btn = document.getElementById('btnThemeToggle');
+            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            updateThemeIcon();
+        }
+        updateThemeIcon();
     </script>
 </body>
 </html>

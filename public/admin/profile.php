@@ -92,6 +92,19 @@ $csrfToken = Security::generateCsrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Perfil - SpeedPress Admin</title>
+
+    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --primary: #0f172a;
@@ -104,29 +117,94 @@ $csrfToken = Security::generateCsrfToken();
             --radius: 8px;
             --font: system-ui, -apple-system, sans-serif;
         }
+        [data-theme="dark"] {
+            --primary: #f8fafc;
+            --primary-accent: #3b82f6;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); }
-        header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-        .brand { font-size: 1.25rem; font-weight: 800; color: var(--primary); text-decoration: none; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
+        
+        .site-header { 
+            background: var(--surface); 
+            border-bottom: 1px solid var(--border); 
+            padding: 0.85rem 1.75rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
         .brand span { color: var(--primary-accent); }
-        .container { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+        .container { max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; transition: background 0.2s, border-color 0.2s; }
         .card-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
         .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #334155; }
-        input[type="text"], input[type="email"], input[type="password"], textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; font-family: inherit; }
-        .btn { padding: 0.7rem 1.25rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text); }
+        input[type="text"], input[type="email"], input[type="password"], textarea { 
+            width: 100%; 
+            padding: 0.75rem; 
+            background: var(--surface); 
+            color: var(--text); 
+            border: 1px solid var(--border); 
+            border-radius: var(--radius); 
+            font-size: 0.95rem; 
+            font-family: inherit; 
+        }
+        input:disabled { opacity: 0.65; cursor: not-allowed; background: rgba(148, 163, 184, 0.15) !important; }
+        .btn { padding: 0.7rem 1.25rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn:hover { background: #1d4ed8; }
         .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
         .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--border); }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-    <header>
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span></a>
-            <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/dashboard.php" style="color: inherit; text-decoration: none;">Voltar ao Dashboard</a></span>
+    <header class="site-header">
+        <div style="display: flex; align-items: center; gap: 2.5rem;">
+            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
+            <nav style="display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center;">
+                <a href="/admin/dashboard.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Notícias</a>
+                <a href="/admin/media.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mídias</a>
+                <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Categorias</a>
+                <a href="/admin/stats.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mais Lidas 📈</a>
+                <?php if ($currentUser['role'] === 'admin'): ?>
+                    <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Usuários & Autores</a>
+                <?php endif; ?>
+                <a href="/admin/system.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Diagnóstico</a>
+                <a href="/" target="_blank" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Ver Site &rarr;</a>
+            </nav>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong></span>
+            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
+            <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: #dc2626; text-decoration: none; font-size: 0.9rem; font-weight: 600;">Sair</a>
         </div>
     </header>
 
@@ -195,5 +273,21 @@ $csrfToken = Security::generateCsrfToken();
             </div>
         </div>
     </div>
+
+    <script>
+        function updateThemeIcon() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var btn = document.getElementById('btnThemeToggle');
+            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            updateThemeIcon();
+        }
+        updateThemeIcon();
+    </script>
 </body>
 </html>
