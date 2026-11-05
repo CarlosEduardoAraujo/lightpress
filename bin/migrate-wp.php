@@ -56,6 +56,19 @@ echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)"
 echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n\n";
 
 // 1. Conexão com a base de dados do WordPress
+if (!$isDryRun) {
+    try {
+        if (Database::getDriver() === 'mysql') {
+            Database::query("ALTER TABLE posts MODIFY COLUMN tags TEXT NULL");
+            Database::query("ALTER TABLE posts MODIFY COLUMN summary TEXT NULL");
+            Database::query("ALTER TABLE posts MODIFY COLUMN featured_image VARCHAR(500) NULL");
+            Database::query("ALTER TABLE posts MODIFY COLUMN seo_title VARCHAR(255) NULL");
+            Database::query("ALTER TABLE posts MODIFY COLUMN seo_description VARCHAR(500) NULL");
+            Database::query("ALTER TABLE posts MODIFY COLUMN focus_keyword VARCHAR(150) NULL");
+        }
+    } catch (\Throwable $e) {}
+}
+
 try {
     $dsn = "mysql:host={$wpHost};port={$wpPort};dbname={$wpDb};charset=utf8mb4";
     $wpPdo = new PDO($dsn, $wpUser, $wpPass, [

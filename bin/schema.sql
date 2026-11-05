@@ -41,10 +41,10 @@ CREATE TABLE IF NOT EXISTS posts (
     user_id SMALLINT UNSIGNED NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     title VARCHAR(255) NOT NULL,
-    summary VARCHAR(500) NULL,
+    summary TEXT NULL,
     category VARCHAR(100) NOT NULL DEFAULT 'geral',
-    tags VARCHAR(255) NULL,
-    featured_image VARCHAR(255) NULL,
+    tags TEXT NULL,
+    featured_image VARCHAR(500) NULL,
     
     -- Conteúdo Desacoplado
     content_json MEDIUMTEXT NOT NULL,
@@ -56,9 +56,9 @@ CREATE TABLE IF NOT EXISTS posts (
     version INT UNSIGNED NOT NULL DEFAULT 1,
     
     -- SEO Integrado Nativo
-    seo_title VARCHAR(150) NULL,
-    seo_description VARCHAR(255) NULL,
-    focus_keyword VARCHAR(100) NULL,
+    seo_title VARCHAR(255) NULL,
+    seo_description VARCHAR(500) NULL,
+    focus_keyword VARCHAR(150) NULL,
     
     published_at DATETIME NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
