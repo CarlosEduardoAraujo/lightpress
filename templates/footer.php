@@ -38,7 +38,7 @@ use LightPress\Core\Icon;
 
                 <div class="flex flex-col gap-space-xs">
                     <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Institucional</span>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/quem-somos/">Nossa Equipe Editorial</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/nossa-equipe/">Nossa Equipe Editorial</a>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/codigo-de-etica/">Código de Ética</a>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/politica-de-privacidade/">Política de Privacidade</a>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/contato/">Fale Conosco / Anuncie</a>

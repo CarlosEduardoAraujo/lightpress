@@ -206,14 +206,13 @@ $tagSlug = Security::e($tagRaw ?? 'topico');
                     <span>Publicidade</span>
                     <span class="text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
-                <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
-                    <?= Icon::svg('campaign', 'text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
-                    <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
-                    <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
-                    <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
-                        Anuncie Aqui
-                    </a>
-                </div>
+                <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
+                    <picture>
+                        <source srcset="/uploads/2026/10/banner-vertical-qr-site.avif" type="image/avif">
+                        <source srcset="/uploads/2026/10/banner-vertical-qr-site.webp" type="image/webp">
+                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
+                    </picture>
+                </a>
             </div>
 
             <!-- INSTAGRAM COMMUNITY CARD -->
