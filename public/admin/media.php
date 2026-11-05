@@ -200,11 +200,12 @@ $csrfToken = Security::generateCsrfToken();
                 <a href="/admin/dashboard.php" style="color: var(--text-muted); text-decoration: none;">Notícias</a>
                 <a href="/admin/media.php" style="color: var(--primary); font-weight: 700; text-decoration: none;">Mídias</a>
                 <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none;">Categorias</a>
+                <a href="/admin/stats.php" style="color: var(--text-muted); text-decoration: none;">Mais Lidas 📈</a>
                 <?php if ($currentUser['role'] === 'admin'): ?>
-                    <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none;">Usuários</a>
+                    <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none;">Usuários & Autores</a>
                 <?php endif; ?>
                 <a href="/admin/system.php" style="color: var(--text-muted); text-decoration: none;">Diagnóstico</a>
-                <a href="/" target="_blank" style="color: var(--text-muted); text-decoration: none;">Ver Site &rarr;</a>
+                <a href="/" target="_blank" style="color: var(--primary-accent); text-decoration: none;">Ver Site &rarr;</a>
             </nav>
         </div>
         <div>

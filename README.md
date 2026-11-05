@@ -670,19 +670,21 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 
 ### 10.2. Próximas Frentes Priorizadas de Trabalho
 
-* **FASE ATUAL (Em Andamento) — Opção 1: Experiência Visual do Portal (Frontend Público de Notícias):**
-  - [ ] **Design de Portal de Alta Velocidade:** Refinamento dos layouts da Home, Notícia Individual (`/noticia/{slug}/`) e Categorias (`/categoria/{slug}/`) com tipografia de padrão editorial, tempo estimado de leitura (*ex: 3 min de leitura*), bloco de autor com bio/avatar e modo escuro nativo ultra leve.
-  - [ ] **Módulo de Notícias Relacionadas:** Recomendações contextuais de matérias da mesma categoria ao final de cada artigo para retenção de audiência.
-  - [ ] **Sistema de Busca Integrada (`/busca?q=...`):** Pesquisa ágil de notícias publicadas com marcação visual dos termos pesquisados e compatibilidade total com o cache estático.
-  - [ ] **Paginação Rápida:** Navegação paginada limpa em listagens de notícias sem dependência de JavaScript pesado.
+* **FASE CONCLUÍDA — Opção 1: Experiência Visual do Portal (Frontend Público de Notícias):**
+  - [x] **Design de Portal de Alta Velocidade:** Layout panorâmico Full HD (`1900px`), Home com Hero Quad Grid de 4 destaques com backfill automático, página de leitura de artigos widescreen (`1750px`), capa com visual cinematográfico, tempo estimado de leitura (*ex: 3 min de leitura*), bloco de autor com bio/avatar e modo escuro nativo sem flash.
+  - [x] **Módulo de Notícias Relacionadas:** Recomendações contextuais de 4 matérias da mesma categoria em grid responsivo de tela ampla para retenção de audiência.
+  - [x] **Botões Rápidos de Compartilhamento Social:** Barra leve de compartilhamento (WhatsApp, X, Facebook, Telegram e botão de 1 clique Copiar Link com feedback instantâneo) sem rastreadores ou bibliotecas pesadas.
+  - [x] **Menu Superior Sticky Fixo:** Cabeçalho global fixado no topo para navegação fluida em todo o site.
+  - [x] **Sistema de Busca Integrada (`/busca?q=...`):** Pesquisa ágil de notícias publicadas com marcação visual dos termos pesquisados e compatibilidade total com o cache estático.
+  - [x] **URLs Canônicas na Raiz (`/{slug}/`):** URLs permanentes de alto impacto com redirecionamento 301 automático das rotas antigas.
 
-* **PRÓXIMA DA LISTA — Opção 2: Recursos Administrativos da Redação (Gestão de Portal):**
-  - [ ] **Gestão de Categorias (`/admin/categories.php`):** Interface administrativa para criar, editar, reordenar e desativar categorias com slugs gerados automaticamente.
-  - [ ] **Gestão de Usuários e Autores (`/admin/users.php`):** Cadastro e gestão de repórteres, colunistas e editores com perfis de acesso, biografia, avatar e redefinição segura de senhas.
-  - [ ] **Filtros e Paginação no Dashboard (`/admin/dashboard.php`):** Filtragem dinâmica por status (Publicado/Rascunho), por categoria e busca por título em acervos com milhares de publicações.
-  - [ ] **Painel de Mais Lidas:** Listagem das publicações com maior volume de visualizações nas últimas 24h e 7 dias.
+* **FASE CONCLUÍDA — Opção 2: Recursos Administrativos da Redação (Gestão de Portal):**
+  - [x] **Dashboard Editorial Turbinado (`/admin/dashboard.php`):** Barra de filtros dinâmicos por Status (Publicados, Rascunhos, Em Revisão, Arquivados), por Categoria, por Autor, busca textual por título/resumo, filtro de Destaques Home (★), métricas em tempo real no topo e paginação rápida (25 por página).
+  - [x] **Painel de Mais Lidas e Audiência (`/admin/stats.php`):** Ranking Top 20 matérias mais lidas, desempenho por categoria e produção por autor baseados em dados atômicos sem duplicidade por IP.
+  - [x] **Gestão Completa de Categorias (`/admin/categories.php`):** Interface administrativa para criar, editar nome/slug com atualização em cascata de matérias vinculadas, pausar/ativar e exclusão segura com reatribuição automática para a categoria padrão `geral`, com expurgo de cache no Nginx.
+  - [x] **Gestão de Usuários e Autores (`/admin/users.php`):** Cadastro e edição completa de membros da redação (repórteres, editores e administradores), biografia do autor, avatar, link seguro de ativação criptográfico de uso único ou definição direta de senha com Argon2id e revogação instantânea de sessões ativas (`session_version`).
 
-* **PRÓXIMA DA LISTA — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
+* **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
   - [ ] **Processamento de Mídia em Lote:** Download/leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.
   - [ ] **Preservação de SEO e Redirecionamentos 301:** Mapeamento de todos os permalinks antigos para a tabela `redirects` garantindo integridade de ranqueamento no Google.

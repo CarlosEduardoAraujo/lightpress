@@ -8,6 +8,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Recursos Administrativos da Redação (Opção 2 - Gestão de Portal):**
+  - **Dashboard Editorial Turbinado (`/admin/dashboard.php`):**
+    - Cards de métricas operacionais em tempo real: Total de Matérias, Matérias Publicadas, Rascunhos/Revisões Pendentes e Total Acumulado de Visualizações.
+    - Filtros dinâmicos múltiplos: Status (*Publicado, Rascunho, Em Revisão, Arquivado*), Categoria, Autor, e checkbox para Destaques Home (★).
+    - Campo de busca textual rápida por título ou resumo.
+    - Paginação rápida (25 itens por página) com preservação de parâmetros de busca e contagem eficiente.
+    - Ações rápidas por artigo: Alternar destaque na Home (★) com invalidação imediata de cache, Edição, Link direto de visualização pública e Exclusão segura com expurgo de cache.
+  - **Painel de Mais Lidas e Audiência Editorial (`/admin/stats.php`):**
+    - Ranking Top 20 matérias mais lidas com base em visualizações atômicas deduplicadas.
+    - Painel de desempenho e audiência agregada por Categoria (total de posts, total de views e média por post).
+    - Desempenho e produtividade da equipe de redação por Autor.
+  - **Gestão Completa de Categorias (`/admin/categories.php`):**
+    - Criação e Edição de categorias com validação de unicidade de slugs.
+    - Atualização transacional em cascata de matérias vinculadas caso o slug da categoria seja alterado.
+    - Exclusão segura com migração automática de posts para a categoria padrão `geral` (sem deixar matérias órfãs).
+    - Expurgo atômico de cache no Nginx da Home e das categorias alteradas.
+  - **Gestão de Usuários e Autores (`/admin/users.php`):**
+    - Cadastro e edição completa de membros da redação (repórteres, editores, colunistas e administradores).
+    - Edição da Biografia do Autor e Avatar/Foto (exibidos na caixa de autor de cada matéria).
+    - Emissão de link seguro de ativação criptográfico de uso único (32 bytes / 24h) ou definição direta de senha com Argon2id.
+    - Incremento atômico de `session_version` em qualquer modificação ou bloqueio, revogando sessões ativas imediatamente.
 - **Menu Superior Fixo (Sticky Header):** O cabeçalho global `.site-header` foi configurado com `position: sticky; top: 0; z-index: 100;`, mantendo a logo, campo de busca, links de categorias e alternador de tema sempre visíveis e acessíveis durante a navegação, enquanto as notícias e artigos passam normalmente por baixo sem qualquer conflito.
 
 ### Corrigido
