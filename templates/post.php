@@ -5,193 +5,605 @@ use LightPress\Core\Security;
 
 require __DIR__ . '/header.php';
 
-$postUrl = rtrim($config['app']['url'] ?? 'https://lightpress.suainternet.com', '/') . '/' . rawurlencode($post['slug']) . '/';
+// Formatador de data por extenso em português
+$ptMonths = [
+    1 => 'janeiro', 2 => 'fevereiro', 3 => 'março', 4 => 'abril',
+    5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
+    9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
+];
+$formatPtFullDate = function(?string $dateStr) use ($ptMonths): string {
+    if (empty($dateStr)) return date('d/m/Y');
+    $t = strtotime($dateStr);
+    $d = date('j', $t);
+    $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
+    $y = date('Y', $t);
+    $h = date('H:i', $t);
+    return sprintf('%02d de %s de %d às %s', $d, $m, $y, $h);
+};
+
+$canonicalBase = rtrim($config['app']['url'] ?? 'https://lightpress.suainternet.com', '/');
+$postUrl = $canonicalBase . '/' . rawurlencode($post['slug']) . '/';
 $postTitleEncoded = rawurlencode($post['title']);
 $postUrlEncoded = rawurlencode($postUrl);
+
+// Tags
+$tagsList = !empty($post['tags']) ? array_filter(array_map('trim', explode(',', $post['tags']))) : [];
+$primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
 ?>
 
-<article style="max-width: 1750px; margin: 0 auto; background: var(--surface); padding: 3rem 3.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--card-shadow);">
-    <header class="post-header" style="margin-bottom: 2.5rem; position: static;">
-        <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem;">
-            <a href="/categoria/<?= Security::e($post['category']) ?>/" class="badge" style="text-decoration: none;">
+<style>
+    /* Estilos semânticos para o corpo da matéria (.article-body) */
+    .article-body {
+        font-family: 'Work Sans', sans-serif;
+        font-size: 1.125rem;
+        line-height: 1.85;
+        color: #141d23;
+    }
+    html.dark .article-body {
+        color: #d1d5db;
+    }
+    .article-body > p:first-of-type::first-letter {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 3.5rem;
+        float: left;
+        margin-right: 0.75rem;
+        line-height: 0.85;
+        color: #E10600;
+        font-weight: 700;
+    }
+    .article-body p {
+        margin-bottom: 1.5rem;
+    }
+    .article-body h2 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.875rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.25;
+        margin-top: 2.5rem;
+        margin-bottom: 1rem;
+        color: #111418;
+    }
+    html.dark .article-body h2 {
+        color: #FFFFFF;
+    }
+    .article-body h3 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+        color: #111418;
+    }
+    html.dark .article-body h3 {
+        color: #FFFFFF;
+    }
+    .article-body h4 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-top: 1.75rem;
+        margin-bottom: 0.5rem;
+        color: #111418;
+    }
+    html.dark .article-body h4 {
+        color: #FFFFFF;
+    }
+    .article-body a {
+        color: #E10600;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        font-weight: 600;
+        transition: color 0.15s ease;
+    }
+    .article-body a:hover {
+        color: #af101a;
+    }
+    html.dark .article-body a:hover {
+        color: #ffb4a8;
+    }
+    .article-body strong, .article-body b {
+        font-weight: 700;
+        color: #111418;
+    }
+    html.dark .article-body strong, html.dark .article-body b {
+        color: #FFFFFF;
+    }
+    .article-body blockquote {
+        margin: 2rem 0;
+        padding: 1.25rem 1.75rem;
+        border-left: 4px solid #E10600;
+        background: #F9FAFB;
+        border-radius: 0 0.75rem 0.75rem 0;
+        font-style: italic;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.25rem;
+        line-height: 1.5;
+        color: #111418;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    html.dark .article-body blockquote {
+        background: #1A1E24;
+        color: #FFFFFF;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    }
+    .article-body figure {
+        margin: 2.25rem 0;
+    }
+    .article-body img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 0.75rem;
+        display: block;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid #E5E7EB;
+    }
+    html.dark .article-body img {
+        border-color: #2a303c;
+    }
+    .article-body figcaption {
+        font-size: 0.875rem;
+        color: #5c5e63;
+        text-align: center;
+        margin-top: 0.5rem;
+        font-family: 'Work Sans', sans-serif;
+    }
+    html.dark .article-body figcaption {
+        color: #c5c6cc;
+    }
+    .article-body ul {
+        list-style-type: disc;
+        margin: 1.5rem 0;
+        padding-left: 1.75rem;
+    }
+    .article-body ol {
+        list-style-type: decimal;
+        margin: 1.5rem 0;
+        padding-left: 1.75rem;
+    }
+    .article-body li {
+        margin-bottom: 0.5rem;
+        line-height: 1.75;
+    }
+    .article-body hr {
+        margin: 2.5rem 0;
+        border: none;
+        border-top: 1px solid #E5E7EB;
+    }
+    html.dark .article-body hr {
+        border-top: 1px solid #2a303c;
+    }
+</style>
+
+<div class="flex flex-col w-full">
+    <!-- Breadcrumbs & Live Pill Strip -->
+    <nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pb-space-md">
+        <div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
+            <a class="hover:text-racing-red transition-colors flex items-center gap-1" href="/">
+                <span class="material-symbols-outlined text-[16px]">home</span>
+                Home
+            </a>
+            <span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+            <a class="hover:text-racing-red transition-colors capitalize" href="/categoria/<?= Security::e($post['category']) ?>/">
                 <?= Security::e($post['category']) ?>
             </a>
-            <?php if (!empty($readingTime)): ?>
-                <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
-                    ⏱️ <?= (int)$readingTime ?> min de leitura
-                </span>
-            <?php endif; ?>
-        </div>
-
-        <h1 style="font-size: clamp(2rem, 3.8vw, 3rem); font-weight: 900; line-height: 1.2; letter-spacing: -0.03em; margin: 0.75rem 0 1.25rem; color: var(--primary);">
-            <?= Security::e($post['title']) ?>
-        </h1>
-
-        <?php if (!empty($post['summary'])): ?>
-            <p style="font-size: clamp(1.12rem, 1.6vw, 1.3rem); color: var(--text-muted); line-height: 1.6; margin-bottom: 2rem;">
-                <?= Security::e($post['summary']) ?>
-            </p>
-        <?php endif; ?>
-
-        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; color: var(--text-muted); font-size: 0.88rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.85rem 0;">
-            <div>
-                Por <strong><?= Security::e($post['author_name'] ?? 'Redação') ?></strong>
-                <span style="margin: 0 0.4rem;">&bull;</span>
-                <span>Publicado em <?= date('d/m/Y \à\s H:i', strtotime($post['published_at'])) ?></span>
-            </div>
-            <?php if (!empty($post['updated_at']) && $post['updated_at'] !== $post['published_at']): ?>
-                <span style="font-size: 0.8rem;">Atualizado em <?= date('d/m/Y H:i', strtotime($post['updated_at'])) ?></span>
-            <?php endif; ?>
-        </div>
-
-        <!-- Botões Rápidos de Compartilhamento Social (100% Leves e Sem Rastreadores) -->
-        <div class="share-bar">
-            <span class="share-label">
-                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-                Compartilhar:
+            <span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+            <span class="text-carbon-black dark:text-pure-white font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md">
+                <?= Security::e($primarySubtopic) ?>
             </span>
-            <a href="https://api.whatsapp.com/send?text=<?= $postTitleEncoded ?>%20-%20<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-wa" title="Compartilhar no WhatsApp">
-                <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-                WhatsApp
-            </a>
-            <a href="https://twitter.com/intent/tweet?text=<?= $postTitleEncoded ?>&url=<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-x" title="Compartilhar no X (Twitter)">
-                <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 24.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                X / Twitter
-            </a>
-            <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-fb" title="Compartilhar no Facebook">
-                <svg viewBox="0 0 24 24"><path d="M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.374 14.356 5 15.567 5H18V0h-3.808C10.597 0 9 1.583 9 4.615V8z"/></svg>
-                Facebook
-            </a>
-            <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-tg" title="Compartilhar no Telegram">
-                <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.3-.616.3l.204-3.13 5.69-5.144c.248-.22-.054-.343-.385-.121l-7.032 4.428-3.036-.95c-.66-.206-.673-.66.138-.977l11.87-4.575c.55-.2 1.03.132.867.871z"/></svg>
-                Telegram
-            </a>
-            <button type="button" class="share-btn share-copy" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da publicação">
-                <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-                <span>Copiar Link</span>
-            </button>
         </div>
-    </header>
+        <div class="inline-flex items-center gap-2 px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded-full text-label-category font-label-category text-carbon-black dark:text-pure-white uppercase border border-subtle-border dark:border-[#2a303c]">
+            <span class="w-2 h-2 rounded-full bg-racing-red animate-pulse"></span>
+            <span>SpeedRacing Paddock • F1 &amp; Velocidade</span>
+        </div>
+    </nav>
 
-    <?php if (!empty($post['featured_image'])): ?>
-        <figure style="margin-bottom: 3rem; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border);">
-            <img src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" alt="<?= Security::e($post['title']) ?>" style="width: 100%; aspect-ratio: 16/9; max-height: 760px; object-fit: cover; display: block;">
-        </figure>
-    <?php endif; ?>
-
-    <!-- Conteúdo HTML Compilado e Sanitizado pelo BlockCompiler -->
-    <div class="content-body">
-        <?= $post['content_html'] ?>
-    </div>
-
-    <!-- Tags e Tópicos Relacionados -->
-    <?php if (!empty($post['tags'])): ?>
-        <div class="post-tags" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 2.5rem 0 1.5rem; align-items: center;">
-            <span style="font-weight: 800; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;">Tópicos:</span>
-            <?php foreach (array_map('trim', explode(',', $post['tags'])) as $tagItem): ?>
-                <?php if (!empty($tagItem)): ?>
-                    <a href="/tag/<?= urlencode(Security::slugify($tagItem)) ?>/" 
-                       style="display: inline-flex; align-items: center; padding: 0.35rem 0.8rem; background: var(--badge-bg); color: var(--primary-accent); border: 1px solid var(--border); border-radius: 999px; font-size: 0.82rem; font-weight: 700; text-decoration: none; transition: transform 0.15s, border-color 0.15s;">
-                        #<?= Security::e($tagItem) ?>
+    <!-- Main Editorial Grid: 8 Cols Article / 4 Cols Trackside Sidebar -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
+        
+        <!-- Left Column (Article Core - 8 Cols) -->
+        <article class="lg:col-span-8 flex flex-col gap-space-lg">
+            
+            <!-- 1. Header Section -->
+            <header class="flex flex-col gap-space-sm">
+                <div class="flex items-center gap-space-xs flex-wrap">
+                    <a href="/categoria/<?= Security::e($post['category']) ?>/" class="bg-carbon-black text-pure-white text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm hover:bg-racing-red transition-colors">
+                        <?= Security::e($post['category']) ?>
                     </a>
+                    <span class="bg-surface-container dark:bg-carbon-surface text-racing-red text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm font-bold border border-subtle-border dark:border-[#2a303c]">
+                        <?= Security::e($primarySubtopic) ?>
+                    </span>
+                    <span class="bg-surface-container-high dark:bg-[#252b36] text-on-surface-variant dark:text-secondary-fixed text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px]">military_tech</span>
+                        Temporada <?= date('Y') ?>
+                    </span>
+                </div>
+
+                <!-- Título H1 -->
+                <h1 class="font-display-hero text-headline-lg md:text-display-hero text-carbon-black dark:text-pure-white leading-[1.12] tracking-tight font-bold">
+                    <?= Security::e($post['title']) ?>
+                </h1>
+
+                <!-- Resumo / Subtítulo / Lead -->
+                <?php if (!empty($post['summary'])): ?>
+                    <p class="font-body-lg text-body-lg text-secondary dark:text-secondary-fixed-dim leading-relaxed">
+                        <?= Security::e($post['summary']) ?>
+                    </p>
                 <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 
-    <!-- Caixa de Autor -->
-    <div class="author-box">
-        <?php if (!empty($post['author_avatar'])): ?>
-            <img src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>" alt="<?= Security::e($post['author_name']) ?>" class="author-avatar">
-        <?php else: ?>
-            <div class="author-avatar" style="display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.4rem; color: var(--primary-accent); background: var(--badge-bg);">
-                <?= mb_strtoupper(mb_substr($post['author_name'] ?? 'R', 0, 1)) ?>
-            </div>
-        <?php endif; ?>
-        <div class="author-info">
-            <h4><?= Security::e($post['author_name'] ?? 'Redação SpeedPress') ?></h4>
-            <p><?= Security::e($post['author_bio'] ?? 'Jornalista e redator focado em coberturas aprofundadas e notícias de alta velocidade.') ?></p>
-        </div>
-    </div>
-
-    <!-- Compartilhamento ao final do artigo -->
-    <div class="share-bar" style="margin-top: 2rem; margin-bottom: 0;">
-        <span class="share-label">
-            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
-            Gostou? Compartilhe:
-        </span>
-        <a href="https://api.whatsapp.com/send?text=<?= $postTitleEncoded ?>%20-%20<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-wa" title="Compartilhar no WhatsApp">
-            <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
-            WhatsApp
-        </a>
-        <a href="https://twitter.com/intent/tweet?text=<?= $postTitleEncoded ?>&url=<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-x" title="Compartilhar no X (Twitter)">
-            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 24.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            X / Twitter
-        </a>
-        <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-fb" title="Compartilhar no Facebook">
-            <svg viewBox="0 0 24 24"><path d="M9 8H6v4h3v12h5V12h3.642L18 8h-4V6.333C14 5.374 14.356 5 15.567 5H18V0h-3.808C10.597 0 9 1.583 9 4.615V8z"/></svg>
-            Facebook
-        </a>
-        <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="share-btn share-tg" title="Compartilhar no Telegram">
-            <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.3-.616.3l.204-3.13 5.69-5.144c.248-.22-.054-.343-.385-.121l-7.032 4.428-3.036-.95c-.66-.206-.673-.66.138-.977l11.87-4.575c.55-.2 1.03.132.867.871z"/></svg>
-            Telegram
-        </a>
-        <button type="button" class="share-btn share-copy" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da publicação">
-            <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-            <span>Copiar Link</span>
-        </button>
-    </div>
-</article>
-
-<!-- Bloco de Notícias Relacionadas (Mesma Categoria) -->
-<?php if (!empty($relatedPosts)): ?>
-    <section style="max-width: 1750px; margin: 4rem auto 0;">
-        <h3 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; border-left: 4px solid var(--primary-accent); padding-left: 0.85rem; color: var(--primary); margin-bottom: 1.75rem;">
-            Notícias Relacionadas
-        </h3>
-        <div class="grid-related">
-            <?php foreach ($relatedPosts as $rel): ?>
-                <article class="card">
-                    <?php if (!empty($rel['featured_image'])): ?>
-                        <a href="/<?= Security::e($rel['slug']) ?>/">
-                            <img src="<?= Security::e(ImageProcessor::toAvifUrl($rel['featured_image'])) ?>" alt="<?= Security::e($rel['title']) ?>" class="card-img" loading="lazy">
-                        </a>
-                    <?php else: ?>
-                        <div class="card-img" style="display: flex; align-items: center; justify-content: center; color: var(--text-muted);">Sem imagem</div>
-                    <?php endif; ?>
-                    <div class="card-body" style="padding: 1.25rem;">
-                        <div>
-                            <span class="badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;"><?= Security::e($rel['category']) ?></span>
+                <!-- Byline, Publication Time & Social Sharing Deck -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md py-space-sm mt-space-xs bg-canvas-cream dark:bg-carbon-surface p-space-sm rounded-lg border border-subtle-border dark:border-[#2a303c]">
+                    <div class="flex items-center gap-space-sm">
+                        <div class="relative w-11 h-11 rounded-full overflow-hidden shrink-0 shadow-sm bg-surface-container dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white">
+                            <?php if (!empty($post['author_avatar'])): ?>
+                                <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
+                            <?php else: ?>
+                                <span class="text-racing-red font-headline-sm"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
+                            <?php endif; ?>
                         </div>
-                        <h4 class="card-title" style="font-size: 1.05rem; margin: 0.5rem 0;">
-                            <a href="/<?= Security::e($rel['slug']) ?>/">
-                                <?= Security::e($rel['title']) ?>
-                            </a>
-                        </h4>
-                        <div class="card-meta" style="padding-top: 0.65rem;">
-                            <span><?= date('d/m/Y', strtotime($rel['published_at'])) ?></span>
-                            <a href="/<?= Security::e($rel['slug']) ?>/" style="color: var(--primary-accent); text-decoration: none; font-weight: 700; font-size: 0.8rem;">Ler &rarr;</a>
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-1">
+                                <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">
+                                    <?= Security::e($post['author_name'] ?? 'Redação SpeedRacing') ?>
+                                </span>
+                                <span class="material-symbols-outlined text-flag-green text-[15px]" title="Jornalista Verificado SpeedRacing">verified</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">
+                                <time datetime="<?= $post['published_at'] ?>"><?= $formatPtFullDate($post['published_at']) ?></time>
+                                <span>•</span>
+                                <span class="flex items-center gap-1 text-carbon-black dark:text-pure-white">
+                                    <span class="material-symbols-outlined text-[14px]">schedule</span> <?= (int)($readingTime ?? 3) ?> min de leitura
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </article>
-            <?php endforeach; ?>
-        </div>
-    </section>
-<?php endif; ?>
 
+                    <!-- Social Action Ribbon (Botões de Compartilhamento Leves) -->
+                    <div class="flex items-center gap-1 shrink-0">
+                        <a href="https://twitter.com/intent/tweet?text=<?= $postTitleEncoded ?>&url=<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no X">
+                            <span class="font-headline-sm text-[12px] font-bold">𝕏</span>
+                        </a>
+                        <a href="https://api.whatsapp.com/send?text=<?= $postTitleEncoded ?>%20-%20<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-flag-green flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no WhatsApp">
+                            <span class="material-symbols-outlined text-[18px]">chat</span>
+                        </a>
+                        <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-racing-red flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no Telegram">
+                            <span class="material-symbols-outlined text-[18px]">send</span>
+                        </a>
+                        <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da matéria">
+                            <span class="material-symbols-outlined text-[18px]">link</span>
+                        </button>
+                        <div class="h-4 w-px bg-surface-variant dark:bg-[#2a303c] mx-1"></div>
+                        <a class="flex items-center gap-1 px-space-xs py-1 rounded-lg text-label-meta font-label-meta text-secondary dark:text-secondary-fixed hover:text-carbon-black dark:hover:text-pure-white" href="#comments-anchor">
+                            <span class="material-symbols-outlined text-[16px]">mode_comment</span>
+                            <span class="font-semibold text-carbon-black dark:text-pure-white">Debater</span>
+                        </a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 2. Feature Hero Image Block -->
+            <?php if (!empty($post['featured_image'])): ?>
+                <figure class="flex flex-col gap-space-xs -mx-margin-mobile sm:mx-0">
+                    <div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group bg-carbon-black border border-subtle-border dark:border-[#2a303c]">
+                        <img alt="<?= Security::e($post['title']) ?>" 
+                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" 
+                             src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>">
+                        <div class="absolute top-space-sm left-space-sm bg-carbon-black/85 backdrop-blur-md px-2.5 py-1 rounded text-label-category font-data-telemetry text-pure-white flex items-center gap-1.5 shadow-sm">
+                            <span class="w-2 h-2 rounded-full bg-flag-green"></span>
+                            <span>SPEEDRACING • <?= Security::e(strtoupper($post['category'])) ?></span>
+                        </div>
+                        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-carbon-black/90 via-carbon-black/40 to-transparent p-space-md text-pure-white flex items-end justify-between">
+                            <div class="text-label-meta font-label-meta text-surface-container-lowest/90 truncate max-w-sm sm:max-w-md">
+                                <span><?= Security::e($post['title']) ?></span>
+                            </div>
+                            <span class="font-label-category text-[10px] text-surface-variant uppercase tracking-widest bg-carbon-surface/70 px-2 py-0.5 rounded shrink-0">
+                                Foto: Acervo SpeedRacing
+                            </span>
+                        </div>
+                    </div>
+                    <figcaption class="px-space-xs text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim flex items-center justify-between">
+                        <span class="truncate"><?= Security::e($post['title']) ?></span>
+                        <span class="shrink-0 text-carbon-black dark:text-pure-white font-semibold">SpeedRacing Press</span>
+                    </figcaption>
+                </figure>
+            <?php endif; ?>
+
+            <!-- 3. Main Narrative Body (HTML Compilado & Sanitizado) -->
+            <section class="article-body flex flex-col gap-space-md">
+                <?= $post['content_html'] ?>
+            </section>
+
+            <!-- 4. Tags & Social Engagement Strip -->
+            <?php if (!empty($tagsList)): ?>
+                <div class="flex flex-wrap items-center justify-between gap-space-sm py-space-md border-t border-b border-subtle-border dark:border-[#2a303c]">
+                    <div class="flex items-center gap-space-xs flex-wrap">
+                        <span class="font-label-category text-label-category text-secondary dark:text-secondary-fixed uppercase">Tags:</span>
+                        <?php foreach ($tagsList as $tItem): ?>
+                            <a class="px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded text-label-meta font-label-meta text-carbon-black dark:text-pure-white hover:bg-racing-red hover:text-pure-white dark:hover:bg-racing-red transition-colors border border-subtle-border dark:border-[#2a303c]" href="/tag/<?= urlencode(Security::slugify($tItem)) ?>/">
+                                #<?= Security::e($tItem) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                    <button class="flex items-center gap-2 px-space-md py-2 bg-canvas-cream dark:bg-carbon-surface hover:bg-surface-container dark:hover:bg-[#252b36] rounded-lg text-carbon-black dark:text-pure-white font-label-category text-label-category transition-colors border border-subtle-border dark:border-[#2a303c]" id="like-btn" onclick="toggleLike(<?= (int)$post['id'] ?>)">
+                        <span class="material-symbols-outlined text-racing-red text-[18px]" id="like-icon">favorite</span>
+                        <span>CURTIR ANÁLISE (<span id="like-count">184</span>)</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <!-- 5. Author Profile Dossier Box -->
+            <aside class="p-space-lg bg-canvas-cream dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+                <div class="flex items-center gap-space-md">
+                    <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-md bg-surface-container dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white text-xl">
+                        <?php if (!empty($post['author_avatar'])): ?>
+                            <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
+                        <?php else: ?>
+                            <span class="text-racing-red"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">
+                                <?= Security::e($post['author_name'] ?? 'Redação SpeedRacing') ?>
+                            </h4>
+                            <span class="px-1.5 py-0.5 bg-carbon-black dark:bg-[#252b36] text-pure-white text-[10px] font-label-category rounded uppercase">
+                                Redação Oficial
+                            </span>
+                        </div>
+                        <p class="font-body-sm text-body-sm text-secondary dark:text-secondary-fixed-dim mt-1 max-w-lg">
+                            <?= Security::e($post['author_bio'] ?? 'Cobertura técnica in loco, telemetria de precisão e bastidores do automobilismo mundial pelo SpeedRacing desde 2002.') ?>
+                        </p>
+                    </div>
+                </div>
+                <a href="#newsletter" class="shrink-0 px-space-md py-2 bg-carbon-black hover:bg-racing-red dark:bg-[#252b36] dark:hover:bg-racing-red text-pure-white rounded font-label-category text-label-category uppercase tracking-wider transition-colors shadow-xs">
+                    + Seguir Colunista
+                </a>
+            </aside>
+
+            <!-- 6. Debate no Pit Lane (Comments & Discussion Anchor) -->
+            <section class="flex flex-col gap-space-md mt-space-sm" id="comments-anchor">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold flex items-center gap-2">
+                        <span class="material-symbols-outlined text-racing-red">forum</span>
+                        Debate no Pit Lane
+                    </h3>
+                    <span class="text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">Moderação ativa SpeedRacing</span>
+                </div>
+
+                <!-- Formulário de Comentário -->
+                <div class="flex flex-col gap-space-xs p-space-md bg-canvas-cream dark:bg-carbon-surface rounded-xl border border-subtle-border dark:border-[#2a303c]">
+                    <textarea id="comment-input" class="w-full p-space-sm rounded-lg bg-pure-white dark:bg-[#151920] text-carbon-black dark:text-pure-white font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c] resize-none shadow-xs placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim" placeholder="O que você achou desta análise técnica? Participe da discussão no paddock..." rows="3"></textarea>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+                        <span class="text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">Respeite as diretrizes da comunidade motorsport.</span>
+                        <button type="button" onclick="submitComment()" class="px-space-md py-2 bg-racing-red hover:bg-tertiary-container text-pure-white font-label-category text-label-category uppercase rounded font-bold transition-colors shadow-xs">
+                            Publicar Comentário
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Comentário em Destaque -->
+                <div class="p-space-md bg-canvas-cream dark:bg-carbon-surface rounded-xl flex flex-col gap-space-xs shadow-xs border border-subtle-border dark:border-[#2a303c]" id="comments-list">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-surface-container-high dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white text-body-sm">
+                                MT
+                            </div>
+                            <div>
+                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Marcelo Toledo</span>
+                                <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim ml-2">Há 45 minutos</span>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] rounded text-label-category text-[10px] text-secondary dark:text-secondary-fixed uppercase font-semibold">Engenheiro Mecânico</span>
+                    </div>
+                    <p class="font-body-md text-body-md text-carbon-black dark:text-pure-white mt-1">
+                        A análise técnica está impecável. As configurações de asa e carga aerodinâmica são determinantes para o ritmo de corrida nos trechos de alta velocidade. Parabéns à redação SpeedRacing pela cobertura com rigor técnico!
+                    </p>
+                    <div class="flex items-center gap-space-md mt-1 text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">
+                        <button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">thumb_up</span> 18</button>
+                        <button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">reply</span> Responder</button>
+                    </div>
+                </div>
+            </section>
+        </article>
+
+        <!-- Right Column (Trackside Technical Sidebar - 4 Cols) -->
+        <aside class="lg:col-span-4 flex flex-col gap-space-lg">
+            
+            <!-- Widget 1: Track Weather Radar & Paddock Telemetry -->
+            <div class="bg-carbon-black text-pure-white rounded-xl p-space-md shadow-md flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
+                <div class="flex items-center justify-between pb-2 border-b border-track-asphalt">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-flag-green animate-pulse"></span>
+                        <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Paddock Radar • Ao Vivo</span>
+                    </div>
+                    <span class="font-data-telemetry text-data-telemetry text-flag-yellow">INTERLAGOS <?= date('H:i') ?></span>
+                </div>
+                <div class="grid grid-cols-2 gap-space-xs pt-1">
+                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
+                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura da Pista</span>
+                        <span class="font-data-telemetry text-[22px] font-bold text-racing-red mt-1">42.8° C</span>
+                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Asfalto aquecido</span>
+                    </div>
+                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
+                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura do Ar</span>
+                        <span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">26.2° C</span>
+                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Umidade: 58%</span>
+                    </div>
+                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
+                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Vento no Circuito</span>
+                        <span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">14.1 <span class="text-xs">km/h</span></span>
+                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Direção: Noroeste</span>
+                    </div>
+                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
+                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Risco de Chuva</span>
+                        <span class="font-data-telemetry text-[22px] font-bold text-flag-yellow mt-1">20%</span>
+                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Nuvens sobre o vale</span>
+                    </div>
+                </div>
+                <div class="mt-1 p-2 bg-carbon-surface/60 rounded flex items-center gap-2 text-label-meta text-[11px] text-surface-container-high">
+                    <span class="material-symbols-outlined text-[16px] text-flag-green">sensors</span>
+                    <span>Sensores oficiais FIA / CBA sincronizados em tempo real.</span>
+                </div>
+            </div>
+
+            <!-- Widget 2: World Championship Standings 2026 -->
+            <div class="bg-pure-white dark:bg-carbon-surface rounded-xl p-space-md shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col gap-space-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-racing-red text-[20px]">emoji_events</span>
+                        <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">Mundial de Construtores</h4>
+                    </div>
+                    <span class="text-label-category text-[10px] bg-surface-container dark:bg-[#252b36] px-2 py-0.5 rounded font-bold text-secondary dark:text-secondary-fixed uppercase">Temporada <?= date('Y') ?></span>
+                </div>
+                <p class="font-body-sm text-body-sm text-secondary dark:text-secondary-fixed-dim">
+                    Disputa acirrada pelo topo da tabela nas principais categorias do automobilismo mundial.
+                </p>
+                <!-- Tabela de Classificação -->
+                <div class="flex flex-col gap-1.5 mt-1">
+                    <!-- Row 1 (Mercedes) -->
+                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border-l-4 border-racing-red border border-subtle-border/60 dark:border-[#2a303c]">
+                        <div class="flex items-center gap-2">
+                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white w-4">1</span>
+                            <div class="flex flex-col">
+                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Mercedes-AMG</span>
+                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Russell / Antonelli</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">512 pts</span>
+                            <span class="text-[10px] text-flag-green font-semibold">Líder</span>
+                        </div>
+                    </div>
+                    <!-- Row 2 (Ferrari) -->
+                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
+                        <div class="flex items-center gap-2">
+                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">2</span>
+                            <div class="flex flex-col">
+                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Scuderia Ferrari</span>
+                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Leclerc / Hamilton</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">489 pts</span>
+                            <span class="text-[10px] text-racing-red font-semibold">-23 pts</span>
+                        </div>
+                    </div>
+                    <!-- Row 3 (McLaren) -->
+                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
+                        <div class="flex items-center gap-2">
+                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">3</span>
+                            <div class="flex flex-col">
+                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">McLaren F1 Team</span>
+                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Norris / Piastri</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">462 pts</span>
+                            <span class="text-[10px] text-secondary dark:text-secondary-fixed-dim font-semibold">-50 pts</span>
+                        </div>
+                    </div>
+                    <!-- Row 4 (Red Bull) -->
+                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
+                        <div class="flex items-center gap-2">
+                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">4</span>
+                            <div class="flex flex-col">
+                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Red Bull Racing</span>
+                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Verstappen / Lawson</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">398 pts</span>
+                            <span class="text-[10px] text-secondary dark:text-secondary-fixed-dim font-semibold">-114 pts</span>
+                        </div>
+                    </div>
+                </div>
+                <a class="text-center pt-2 text-label-category font-label-category text-racing-red hover:underline uppercase tracking-wider text-[11px] font-bold" href="/categoria/formula-1/">
+                    Ver Calendário e Notícias de F1 →
+                </a>
+            </div>
+
+            <!-- Widget 3: Matérias Relacionadas do Banco de Dados -->
+            <?php if (!empty($relatedPosts)): ?>
+                <div class="bg-pure-white dark:bg-carbon-surface rounded-xl p-space-md shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col gap-space-sm">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-racing-red text-[20px]">recommend</span>
+                            <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">Notícias Relacionadas</h4>
+                        </div>
+                        <span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
+                    </div>
+                    <div class="flex flex-col gap-space-sm mt-1">
+                        <?php foreach ($relatedPosts as $rel): ?>
+                            <a class="group flex gap-space-sm items-start p-space-xs rounded-lg hover:bg-canvas-cream dark:hover:bg-[#252b36] transition-colors border border-transparent hover:border-subtle-border dark:hover:border-[#2a303c]" href="/<?= Security::e($rel['slug']) ?>/">
+                                <div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-xs relative bg-surface-container dark:bg-[#151920]">
+                                    <?php if (!empty($rel['featured_image'])): ?>
+                                        <img alt="<?= Security::e($rel['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="<?= Security::e(ImageProcessor::toThumbUrl($rel['featured_image'], 'avif')) ?>" loading="lazy">
+                                    <?php else: ?>
+                                        <div class="w-full h-full flex items-center justify-center text-[10px] text-secondary">Sem foto</div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="flex flex-col gap-1 min-w-0 flex-1">
+                                    <span class="text-[10px] font-label-category uppercase text-racing-red font-bold">
+                                        <?= Security::e($rel['category']) ?>
+                                    </span>
+                                    <h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red line-clamp-2 transition-colors leading-snug">
+                                        <?= Security::e($rel['title']) ?>
+                                    </h5>
+                                    <span class="text-[11px] font-label-meta text-secondary dark:text-secondary-fixed-dim">
+                                        <?= date('d/m/Y', strtotime($rel['published_at'])) ?>
+                                    </span>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <!-- Widget 4: High Performance Newsletter Box -->
+            <div id="newsletter" class="bg-carbon-black text-pure-white rounded-xl p-space-lg shadow-md relative overflow-hidden flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
+                <div class="w-24 h-24 rounded-full bg-racing-red/20 blur-2xl absolute -top-8 -right-8 pointer-events-none"></div>
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-racing-red text-[24px]">mark_email_unread</span>
+                    <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Grid SpeedRacing</span>
+                </div>
+                <h4 class="font-headline-sm text-headline-sm text-pure-white leading-tight font-bold">
+                    Receba as análises técnicas e telemetria antes de todo mundo
+                </h4>
+                <p class="font-body-sm text-body-sm text-surface-container">
+                    Toda manhã direto na sua caixa de entrada, com rigor editorial e sem enrolação.
+                </p>
+                <form class="flex flex-col gap-space-xs mt-1" onsubmit="event.preventDefault(); alert('Inscrição confirmada no Grid SpeedRacing!');">
+                    <input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red border border-[#2a303c]" placeholder="Seu melhor e-mail" required="" type="email"/>
+                    <button class="w-full py-2.5 bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm" type="submit">
+                        <span>Garantir Vaga no Grid</span>
+                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </button>
+                </form>
+                <span class="text-[10px] font-label-meta text-surface-container-high/60 text-center">
+                    Zero spam. Desinscreva-se a qualquer momento com 1 clique.
+                </span>
+            </div>
+
+        </aside>
+    </div>
+</div>
+
+<!-- Scripts de Interação da Matéria -->
 <script>
 function copyPostLink(btn, url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(function() {
-            var orig = btn.innerHTML;
-            btn.innerHTML = '<span>✓ Link Copiado!</span>';
-            btn.style.borderColor = '#16a34a';
-            btn.style.color = '#16a34a';
-            setTimeout(function() {
-                btn.innerHTML = orig;
-                btn.style.borderColor = '';
-                btn.style.color = '';
-            }, 2500);
+            var icon = btn.querySelector('.material-symbols-outlined');
+            if (icon) {
+                icon.textContent = 'check';
+                btn.classList.add('text-flag-green');
+                setTimeout(function() {
+                    icon.textContent = 'link';
+                    btn.classList.remove('text-flag-green');
+                }, 2000);
+            }
         }).catch(function() {
             prompt('Copie o link:', url);
         });
@@ -199,6 +611,52 @@ function copyPostLink(btn, url) {
         prompt('Copie o link:', url);
     }
 }
+
+function toggleLike(postId) {
+    var key = 'sr_liked_' + postId;
+    var countEl = document.getElementById('like-count');
+    var iconEl = document.getElementById('like-icon');
+    var btn = document.getElementById('like-btn');
+    if (!countEl) return;
+
+    var cur = parseInt(countEl.textContent, 10) || 184;
+    var isLiked = localStorage.getItem(key) === '1';
+
+    if (isLiked) {
+        localStorage.removeItem(key);
+        countEl.textContent = cur - 1;
+        if (iconEl) iconEl.textContent = 'favorite_border';
+        if (btn) btn.classList.remove('border-racing-red');
+    } else {
+        localStorage.setItem(key, '1');
+        countEl.textContent = cur + 1;
+        if (iconEl) iconEl.textContent = 'favorite';
+        if (btn) btn.classList.add('border-racing-red');
+    }
+}
+
+function submitComment() {
+    var input = document.getElementById('comment-input');
+    var text = input ? input.value.trim() : '';
+    if (!text) {
+        alert('Por favor, escreva um comentário antes de publicar.');
+        return;
+    }
+    alert('Comentário enviado com sucesso para a moderação da redação SpeedRacing!');
+    if (input) input.value = '';
+}
+
+// Inicializar estado de curtida
+(function() {
+    var postId = <?= (int)$post['id'] ?>;
+    var isLiked = localStorage.getItem('sr_liked_' + postId) === '1';
+    var iconEl = document.getElementById('like-icon');
+    var btn = document.getElementById('like-btn');
+    if (isLiked) {
+        if (iconEl) iconEl.textContent = 'favorite';
+        if (btn) btn.classList.add('border-racing-red');
+    }
+})();
 </script>
 
 <!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;family=Work+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"surface-bright":"#f6faff","on-primary-fixed-variant":"#930300","flag-green":"#00A859","surface-container":"#e6eff8","surface-container-high":"#e0e9f2","carbon-black":"#111418","surface-variant":"#dbe4ed","tertiary":"#af101a","tertiary-container":"#d32f2f","outline-variant":"#e9bcb5","secondary-container":"#dedfe5","track-asphalt":"#272727","primary-fixed-dim":"#ffb4a8","secondary-fixed":"#e1e2e8","canvas-cream":"#F9FAFB","on-secondary-fixed":"#191c20","on-tertiary":"#ffffff","primary":"#b30400","surface-container-lowest":"#ffffff","subtle-border":"#E5E7EB","surface-container-low":"#ecf5fe","primary-fixed":"#ffdad4","on-primary":"#ffffff","surface-container-highest":"#dbe4ed","secondary":"#5c5e63","on-primary-fixed":"#410100","pure-white":"#FFFFFF","on-tertiary-fixed":"#410003","inverse-surface":"#293138","background":"#f6faff","surface-tint":"#c00500","tertiary-fixed-dim":"#ffb3ac","error":"#ba1a1a","error-container":"#ffdad6","on-error":"#ffffff","on-surface-variant":"#5e3f3a","flag-yellow":"#FFB800","on-background":"#141d23","on-secondary-container":"#606368","surface-dim":"#d2dbe4","surface":"#f6faff","on-secondary-fixed-variant":"#44474c","racing-red":"#E10600","on-surface":"#141d23","on-error-container":"#93000a","primary-container":"#e10600","tertiary-fixed":"#ffdad6","inverse-primary":"#ffb4a8","on-tertiary-fixed-variant":"#930010","inverse-on-surface":"#e9f2fb","carbon-surface":"#1A1E24","on-tertiary-container":"#fff2f0","secondary-fixed-dim":"#c5c6cc","on-secondary":"#ffffff","on-primary-container":"#fff2f0","outline":"#936e68"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"gutter-mobile":"0.75rem","space-sm":"0.5rem","margin-mobile":"1rem","space-lg":"1.5rem","margin":"2rem","gutter":"1.5rem","space-xl":"2.5rem","space-xs":"0.25rem","space-md":"1rem"},"fontFamily":{"headline-lg-mobile":["Space Grotesk"],"body-lg":["Work Sans"],"headline-sm":["Space Grotesk"],"label-category":["Space Grotesk"],"data-telemetry":["Space Grotesk"],"display-hero-mobile":["Space Grotesk"],"headline-lg":["Space Grotesk"],"body-md":["Work Sans"],"body-sm":["Work Sans"],"display-hero":["Space Grotesk"],"label-meta":["Work Sans"],"headline-md":["Space Grotesk"]},"fontSize":{"headline-lg-mobile":["24px",{"lineHeight":"30px","letterSpacing":"-0.01em","fontWeight":"700"}],"body-lg":["18px",{"lineHeight":"28px","fontWeight":"400"}],"headline-sm":["18px",{"lineHeight":"24px","fontWeight":"600"}],"label-category":["11px",{"lineHeight":"14px","letterSpacing":"0.08em","fontWeight":"700"}],"data-telemetry":["13px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"600"}],"display-hero-mobile":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-lg":["32px",{"lineHeight":"38px","letterSpacing":"-0.02em","fontWeight":"700"}],"body-md":["15px",{"lineHeight":"22px","fontWeight":"400"}],"body-sm":["13px",{"lineHeight":"18px","fontWeight":"400"}],"display-hero":["48px",{"lineHeight":"54px","letterSpacing":"-0.03em","fontWeight":"700"}],"label-meta":["12px",{"lineHeight":"16px","fontWeight":"500"}],"headline-md":["22px",{"lineHeight":"28px","letterSpacing":"-0.01em","fontWeight":"600"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)]"><div class="w-full bg-carbon-black text-on-tertiary"><div class="max-w-[1280px] mx-auto px-margin flex items-center justify-between h-9 text-label-meta font-label-meta"><div class="flex items-center gap-space-md"><span class="flex items-center gap-space-xs text-flag-yellow font-semibold"><span class="w-2 h-2 rounded-full bg-racing-red animate-ping"></span>AO VIVO</span><span class="text-secondary-fixed-dim hidden sm:inline">|</span><span class="text-surface-container-lowest tracking-tight">Próxima Etapa: GP de São Paulo 2026 • Interlagos (F1)</span></div><div class="flex items-center gap-space-md"><span class="hidden md:inline text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span><div class="flex items-center gap-space-sm"><a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#"><span class="material-symbols-outlined text-[15px]">mail</span><span class="hidden lg:inline">Newsletter</span></a><a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#"><span class="material-symbols-outlined text-[15px]">share</span><span class="hidden lg:inline">Social</span></a></div></div></div></div><div class="h-20 max-w-[1280px] mx-auto px-margin flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-lg"><a class="flex items-center gap-space-sm shrink-0" data-path="home" href="#"><img alt="SpeedRacing Logo" class="h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-carbon-black leading-none">SPEED<span class="text-racing-red">RACING</span></span><span class="font-label-category text-[9px] tracking-widest text-secondary uppercase">Desde 2002</span></div></a><nav class="hidden xl:flex items-center gap-space-md font-body-sm text-body-sm" data-active-classes="text-racing-red font-semibold"><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="home" href="#">Home</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="formula-1" href="#">Fórmula 1</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="formula-2" href="#">Fórmula 2</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="formula-e" href="#">Fórmula E</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="indycar" href="#">IndyCar</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="stock-car" href="#">Stock Car</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="nascar" href="#">NASCAR</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="le-mans-wec" href="#">Le Mans / WEC</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="motovelocidade" href="#">Motovelocidade</a><a class="text-on-surface-variant hover:text-racing-red transition-colors whitespace-nowrap" data-path="nossa-equipe" href="#">Nossa Equipe</a></nav></div><div class="flex items-center gap-space-sm"><button aria-label="Buscar no portal" class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-[20px]">search</span></button><div class="hidden sm:flex items-center px-space-sm py-1 bg-surface-container rounded-lg text-label-category font-label-category text-carbon-black uppercase tracking-wider gap-1"><span class="material-symbols-outlined text-[14px] text-racing-red">language</span><span>BR</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div><div class="bg-surface-container-low"><div class="max-w-[1280px] mx-auto px-margin h-11 flex items-center gap-space-sm overflow-x-auto"><span class="font-label-category text-label-category uppercase tracking-wider text-racing-red shrink-0 flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span>Em Alta:</span><div class="flex items-center gap-space-xs font-label-meta text-label-meta"><a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors" href="#">#GPSãoPaulo2026</a><a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors" href="#">#RafaelCamara</a><a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors" href="#">#NASCARHomestead</a><a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors" href="#">#LeMansUltimate</a><a class="px-space-sm py-1 rounded-full bg-pure-white hover:bg-surface-container-high text-carbon-black whitespace-nowrap transition-colors" href="#">#TelemetriaF1</a></div></div></div></header><main class="w-full pt-40 bg-surface min-h-[calc(100vh-280px)]"><div class="flex flex-col w-full">
+<!-- Article Viewport Container -->
+<div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin w-full pb-space-xl">
+<!-- Breadcrumbs & Live Pill -->
+<nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pt-space-md pb-space-lg">
+<div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary">
+<a class="hover:text-racing-red transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]">home</span>
+          Home
+        </a>
+<span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+<a class="hover:text-racing-red transition-colors" href="#">Fórmula 1</a>
+<span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+<span class="text-carbon-black font-semibold">GP de São Paulo 2026</span>
+</div>
+<div class="inline-flex items-center gap-2 px-space-sm py-1 bg-surface-container rounded-full text-label-category font-label-category text-carbon-black uppercase">
+<span class="w-2 h-2 rounded-full bg-racing-red animate-pulse"></span>
+<span>Especial Interlagos • F1 2026</span>
+</div>
+</nav>
+<!-- Main Editorial Grid: 8 Cols Article / 4 Cols Trackside Sidebar -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column (Article Core) -->
+<article class="lg:col-span-8 flex flex-col gap-space-lg">
+<!-- Header Section -->
+<header class="flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="bg-carbon-black text-pure-white text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm">
+              Fórmula 1
+            </span>
+<span class="bg-surface-container text-racing-red text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm font-bold">
+              Grande Prêmio de São Paulo
+            </span>
+<span class="bg-surface-container-high text-on-surface-variant text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">military_tech</span>
+              Temporada 2026
+            </span>
+</div>
+<h1 class="font-display-hero text-headline-lg md:text-display-hero text-carbon-black leading-[1.08] tracking-tight">
+            Rafael Camara estreia na F1 em Interlagos e Mercedes busca título de Construtores no GP de São Paulo 2026
+          </h1>
+<p class="font-body-lg text-body-lg text-secondary leading-relaxed">
+            O jovem pernambucano assume o cockpit no Autódromo José Carlos Pace diante de mais de 280 mil espectadores no fim de semana em que as Flechas de Prata podem liquidar o campeonato mundial contra Ferrari e McLaren.
+          </p>
+<!-- Byline, Publication Time & Social Sharing Deck -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md py-space-sm mt-space-xs bg-canvas-cream p-space-sm rounded-lg">
+<div class="flex items-center gap-space-sm">
+<div class="relative w-11 h-11 rounded-full overflow-hidden shrink-0 shadow-sm">
+<img alt="Pedro Araújo" class="w-full h-full object-cover" data-alt="Close-up professional portrait of Brazilian motorsport journalist Pedro Araújo wearing a black technical paddock vest with credential badge, neutral high-end studio lighting with warm rim lights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdvh3rDYFGGDwk725GbcUag3wyDvMiiRkjzWkMp8KQSOYGWdf2vN-FOQqAsdkcsWtlkh2s2TdSdvsbUqQHJaQFhhV_owHKPZXiK1sBwdQn3UHL0YVVw2EMxT8U4WpghmxU6aQg04nuG-U8g3fZShSJMJnmihJJgR_DQAu08fmzYx08WeMseZk7jeAFaYtJtDPfLgnUhi1DbcU7jiIEEs8WmvXzC4E53LpA9OdnTgQ"/>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-headline-sm text-body-md font-bold text-carbon-black">Pedro Araújo</span>
+<span class="material-symbols-outlined text-flag-green text-[15px]" title="Jornalista Verificado FIA">verified</span>
+</div>
+<div class="flex items-center gap-2 text-label-meta font-label-meta text-secondary">
+<span>04 de nov de 2026 às 16:15</span>
+<span>•</span>
+<span class="flex items-center gap-1 text-carbon-black">
+<span class="material-symbols-outlined text-[14px]">schedule</span> 5 min de leitura
+                  </span>
+</div>
+</div>
+</div>
+<!-- Social Action Ribbon -->
+<div class="flex items-center gap-1 shrink-0">
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors" title="Compartilhar no X">
+<span class="font-headline-sm text-[12px] font-bold">𝕏</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-flag-green flex items-center justify-center transition-colors" title="Compartilhar no WhatsApp">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary flex items-center justify-center transition-colors" title="Compartilhar no Telegram">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors" id="copy-btn" title="Copiar link da matéria">
+<span class="material-symbols-outlined text-[18px]">link</span>
+</button>
+<div class="h-4 w-px bg-surface-variant mx-1"></div>
+<a class="flex items-center gap-1 px-space-xs py-1 rounded-lg text-label-meta font-label-meta text-secondary hover:text-carbon-black" href="#comments-anchor">
+<span class="material-symbols-outlined text-[16px]">mode_comment</span>
+<span class="font-semibold text-carbon-black">42</span>
+</a>
+</div>
+</div>
+</header>
+<!-- Feature Hero Image Block -->
+<figure class="flex flex-col gap-space-xs -mx-margin-mobile sm:mx-0">
+<div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group">
+<img alt="Rafael Camara em Interlagos" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" data-alt="Brazilian Formula 1 driver Rafael Camara inside the high-tech cockpit of his 2026 race car speeding through the Curva do Sol in Interlagos circuit São Paulo under golden hour Brazilian sun with asphalt heat haze, motion blur in wheels, intense focused visor gaze reflecting grandstands." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAraf1xo19B9Au_smeQDI3u8UFtMsoX6Cs1TztGII1bRLv8QaYUgI2DsAhhj5ip9kMOlNIed0rh7u7hthHEUGp-lUHNMTF_-yweoEIA7ztgBqxUoJZz7B_xzWjEpocrxxGwz6aeCHeIxJ7Hip6gCwGFoPrFJ_OOgQGXv9S5481SUK4pXAi3dBu-4Cbd8ZMqTxFZyh_3ZY9SNABIZerepM_sqsCan9dfHqSUbjFrOsQ"/>
+<div class="absolute top-space-sm left-space-sm bg-carbon-black/85 backdrop-blur-md px- space-sm px-2.5 py-1 rounded text-label-category font-data-telemetry text-pure-white flex items-center gap-1.5 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-flag-green"></span>
+<span>TL1 • INTERLAGOS SPEED TRAP 338.4 KM/H</span>
+</div>
+<div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-carbon-black/90 via-carbon-black/40 to-transparent p-space-md text-pure-white flex items-end justify-between">
+<div class="text-label-meta font-label-meta text-surface-container-lowest/90">
+<span>Curva do Sol, São Paulo • Sexta-Feira de Treinos Livres</span>
+</div>
+<span class="font-label-category text-[10px] text-surface-variant uppercase tracking-widest bg-carbon-surface/70 px-2 py-0.5 rounded">
+                Foto: Beto Issa / SpeedRacing Agency
+              </span>
+</div>
+</div>
+<figcaption class="px-space-xs text-label-meta font-label-meta text-secondary flex items-center justify-between">
+<span>Rafael Camara acelera no circuito paulistano ajustando os fluxos aerodinâmicos do assoalho com especificações 2026.</span>
+<span class="shrink-0 text-carbon-black font-semibold">FIA Photo Credential #SP26</span>
+</figcaption>
+</figure>
+<!-- Main Narrative Body -->
+<section class="flex flex-col gap-space-md font-body-lg text-body-lg text-on-surface leading-[1.8]">
+<p class="first-letter:font-headline-lg first-letter:text-[54px] first-letter:float-left first-letter:mr-3 first-letter:leading-none first-letter:text-racing-red first-letter:font-bold">
+            O som cortante dos novos motores turbocomprimidos com 50% de eletrificação ecoou pelo vale de Interlagos com uma pulsação diferente nesta tarde. Não se tratava apenas do retorno da maior categoria do automobilismo mundial à capital paulista: para os torcedores que lotam as arquibancadas do Setor G e da Reta Oposta, a presença do pernambucano Rafael Camara marca o reinício de uma linhagem histórica que o automobilismo brasileiro ansiava ver reconstruída.
+          </p>
+<p>
+            Aos 21 anos, recém-promovido após conquistar títulos contundentes nos degraus de acesso e cumprir um extenso programa de desenvolvimento em simulador em Maranello e Banbury, Camara não apenas bateu o ponto na sessão oficial: cravou tempos competitivos imediatos no primeiro terço de pneus médios e executou com frieza os planos de telemetria traçados pelos engenheiros de pista.
+          </p>
+<!-- Pull Quote (Aggressive, track-inspired) -->
+<div class="my-space-md bg-canvas-cream p-space-lg rounded-xl relative overflow-hidden shadow-sm">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-racing-red"></div>
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-racing-red text-[40px] shrink-0 leading-none">format_quote</span>
+<div class="flex flex-col gap-space-xs">
+<blockquote class="font-headline-md text-headline-md text-carbon-black italic leading-snug">
+                  “Sentir a vibração da torcida no S do Senna guiando um carro de Fórmula 1 é a realização de um sonho que começou no kartódromo de Paulista. Mas meu compromisso aqui é puramente com o cronômetro e a correlação de dados.”
+                </blockquote>
+<span class="font-label-category text-label-category uppercase tracking-wider text-secondary">
+                  — Rafael Camara, em coletiva no paddock de Interlagos
+                </span>
+</div>
+</div>
+</div>
+<h2 class="font-headline-lg text-headline-md md:text-headline-lg text-carbon-black mt-space-sm tracking-tight">
+            A Dinâmica do Monoposto 2026: Efeito Solo e o Pacote Aerodinâmico
+          </h2>
+<p>
+            O VF-26, impulsionado pela unidade de potência cliente italiana, exibiu uma evolução notável nas curvas de raio médio do miolo de Interlagos. Durante a simulação de corrida nos stints de 18 voltas, os engenheiros monitoraram de perto a degradação da borracha traseira na saída da Junção e no mergulho do Bico de Pato — tradicional ponto crítico do asfalto paulistano que costuma punir o balanço de massa.
+          </p>
+<p>
+            Enquanto isso, na garagem vizinha, a Mercedes-AMG Petronas trabalha focada no tabuleiro maior. George Russell e Kimi Antonelli mantiveram ritmo cirúrgico. Se a equipe somar 28 pontos neste fim de semana entre a Corrida Sprint de sábado e o Grande Prêmio de domingo, fecha matematicamente a taça do Mundial de Construtores com duas etapas de antecedência sobre Ferrari e McLaren.
+          </p>
+</section>
+<!-- SPECIAL MODULE: Speed Telemetry Lab -->
+<section class="my-space-md bg-carbon-black text-pure-white rounded-xl p-space-md md:p-space-lg shadow-xl relative overflow-hidden">
+<!-- Subtle telemetry grid background effect -->
+<div class="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+<div class="relative z-10 flex flex-col gap-space-md">
+<!-- Telemetry Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="p-2 bg-racing-red rounded text-pure-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+</span>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-label-category text-[10px] tracking-widest text-racing-red uppercase">SPEED RACING LAB</span>
+<span class="text-data-telemetry font-data-telemetry text-[11px] text-surface-container-high/60">AUTÓDROMO JOSÉ CARLOS PACE</span>
+</div>
+<h3 class="font-headline-md text-headline-sm md:text-headline-md text-pure-white">
+                    Telemetria Comparativa: Curva a Curva
+                  </h3>
+</div>
+</div>
+<!-- Interactive Sector Filters -->
+<div class="inline-flex p-1 bg-carbon-surface rounded-lg self-start sm:self-auto text-label-category font-label-category">
+<button class="px-space-sm py-1 rounded bg-racing-red text-pure-white sector-tab" data-sector="all">GERAL</button>
+<button class="px-space-sm py-1 rounded text-secondary-fixed hover:text-pure-white sector-tab" data-sector="s1">SETOR 1</button>
+<button class="px-space-sm py-1 rounded text-secondary-fixed hover:text-pure-white sector-tab" data-sector="s2">SETOR 2</button>
+<button class="px-space-sm py-1 rounded text-secondary-fixed hover:text-pure-white sector-tab" data-sector="s3">SETOR 3</button>
+</div>
+</div>
+<!-- KPIs Matrix -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
+<div class="p-space-sm rounded-lg bg-carbon-surface/90 flex flex-col">
+<span class="font-label-category text-label-category text-secondary-fixed uppercase">Speed Trap (Reta)</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-data-telemetry text-[26px] font-bold text-pure-white">338.4</span>
+<span class="font-label-meta text-[11px] text-flag-green font-semibold">km/h</span>
+</div>
+<span class="text-[11px] font-label-meta text-surface-container-high/60 mt-0.5">+2.1 km/h vs Russell</span>
+</div>
+<div class="p-space-sm rounded-lg bg-carbon-surface/90 flex flex-col">
+<span class="font-label-category text-label-category text-secondary-fixed uppercase">Força G Lateral (S Senna)</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-data-telemetry text-[26px] font-bold text-flag-yellow">5.2</span>
+<span class="font-label-meta text-[11px] text-surface-container-high/60 font-semibold">G</span>
+</div>
+<span class="text-[11px] font-label-meta text-surface-container-high/60 mt-0.5">Ápice na Curva 2</span>
+</div>
+<div class="p-space-sm rounded-lg bg-carbon-surface/90 flex flex-col">
+<span class="font-label-category text-label-category text-secondary-fixed uppercase">Ponto de Frenagem</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-data-telemetry text-[26px] font-bold text-pure-white">-118</span>
+<span class="font-label-meta text-[11px] text-surface-container-high/60 font-semibold">metros</span>
+</div>
+<span class="text-[11px] font-label-meta text-surface-container-high/60 mt-0.5">Pressão máx: 132 bar</span>
+</div>
+<div class="p-space-sm rounded-lg bg-carbon-surface/90 flex flex-col">
+<span class="font-label-category text-label-category text-secondary-fixed uppercase">Delta Simulado</span>
+<div class="flex items-baseline gap-1 mt-1">
+<span class="font-data-telemetry text-[26px] font-bold text-racing-red">+0.284</span>
+<span class="font-label-meta text-[11px] text-pure-white font-semibold">seg</span>
+</div>
+<span class="text-[11px] font-label-meta text-surface-container-high/60 mt-0.5">1:10.842 vs 1:10.558</span>
+</div>
+</div>
+<!-- Telemetry Graph Vector Simulation -->
+<div class="p-space-md rounded-lg bg-carbon-surface flex flex-col gap-space-sm">
+<div class="flex items-center justify-between text-label-category font-label-category text-surface-container">
+<div class="flex items-center gap-space-md">
+<span class="flex items-center gap-1.5">
+<span class="w-3 h-1 bg-flag-green rounded-full"></span>
+<strong class="text-pure-white">#43 Rafael Camara</strong> (VF-26)
+                  </span>
+<span class="flex items-center gap-1.5">
+<span class="w-3 h-1 bg-surface-container-high rounded-full"></span>
+<strong class="text-surface-variant">#63 George Russell</strong> (W17)
+                  </span>
+</div>
+<span class="text-[11px] text-flag-yellow font-data-telemetry">AMOSTRAGEM CANBUS 200Hz</span>
+</div>
+<!-- Inline SVG Speed Trace Visualizer -->
+<div class="w-full h-44 relative mt-2">
+<svg class="w-full h-full preserve-3d" fill="none" viewbox="0 0 800 180" xmlns="http://www.w3.org/2000/svg">
+<!-- Grid Horizon Markers -->
+<line stroke="#333842" stroke-dasharray="4 4" stroke-width="0.8" x1="0" x2="800" y1="30" y2="30"></line>
+<line stroke="#333842" stroke-dasharray="4 4" stroke-width="0.8" x1="0" x2="800" y1="75" y2="75"></line>
+<line stroke="#333842" stroke-dasharray="4 4" stroke-width="0.8" x1="0" x2="800" y1="120" y2="120"></line>
+<line stroke="#444955" stroke-width="1" x1="0" x2="800" y1="165" y2="165"></line>
+<!-- Section Labels -->
+<text fill="#7E8594" font-family="Space Grotesk" font-size="10" x="70" y="20">S DO SENNA</text>
+<text fill="#7E8594" font-family="Space Grotesk" font-size="10" x="240" y="20">CURVA DO SOL</text>
+<text fill="#7E8594" font-family="Space Grotesk" font-size="10" x="430" y="20">DESCIDA DO LAGO</text>
+<text fill="#7E8594" font-family="Space Grotesk" font-size="10" x="610" y="20">BICO DE PATO / JUNÇÃO</text>
+<text fill="#7E8594" font-family="Space Grotesk" font-size="10" x="730" y="20">SUBIDA BOXES</text>
+<!-- Russell Baseline Speed Profile (Silver/White) -->
+<path d="M 0,35 Q 40,32 70,145 T 140,80 T 240,40 T 320,55 T 430,135 T 530,90 T 630,150 T 710,70 T 800,38" stroke="#DDE3EA" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<!-- Camara Comparative Speed Profile (Vibrant Green) -->
+<path d="M 0,33 Q 42,30 72,150 T 142,85 T 242,38 T 320,52 T 428,140 T 528,88 T 628,148 T 708,68 T 800,34" stroke="#00A859" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+<!-- Apex Indicator Dots -->
+<circle cx="72" cy="150" fill="#E10600" r="4"></circle>
+<circle cx="242" cy="38" fill="#00A859" r="4"></circle>
+<circle cx="628" cy="148" fill="#FFB800" r="4"></circle>
+</svg>
+</div>
+<div class="flex items-center justify-between text-label-meta text-body-sm text-surface-container-high/80 pt-1">
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-racing-red"></span>
+                  Ponto de maior perda: Vmin no ápice da Curva 1 (-4.2 km/h)
+                </span>
+<span class="flex items-center gap-1 text-flag-green">
+<span class="w-2 h-2 rounded-full bg-flag-green"></span>
+                  Ponto de ganho: Tração na Curva do Sol (+3.8 km/h)
+                </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Technical Paddock Insights -->
+<section class="flex flex-col gap-space-md font-body-lg text-body-lg text-on-surface leading-[1.8]">
+<h2 class="font-headline-lg text-headline-md md:text-headline-lg text-carbon-black tracking-tight">
+            A Batalha Política e Mecânica no Paddock Paulistano
+          </h2>
+<p>
+            O chefe da equipe Haas destacou aos repórteres que o objetivo de colocar Camara na sessão foi deliberado: submeter o piloto à altíssima pressão aerodinâmica e à carga cervical de um circuito anti-horário exigente, testando novas barras estabilizadoras projetadas para conter as oscilações em alta velocidade na Curva do Café.
+          </p>
+<p>
+            Nos boxes da Ferrari e da Mercedes, a atmosfera é de concentração milimétrica. A equipe alemã precisa apenas administrar as posições no pódio para reatar os laços com o troféu mundial que não conquistava desde o ciclo de 2021.
+          </p>
+</section>
+<!-- Interactive Exclusive Photo Gallery -->
+<section class="flex flex-col gap-space-sm my-space-md">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-category text-label-category text-racing-red uppercase tracking-wider">Galeria de Pista &amp; Paddock</span>
+<h3 class="font-headline-sm text-headline-sm text-carbon-black">Bastidores Exclusivos de Interlagos</h3>
+</div>
+<div class="flex items-center gap-space-xs font-label-category text-label-category text-secondary">
+<span id="gallery-counter">1 de 4 fotos</span>
+<button class="p-1.5 rounded bg-surface-container hover:bg-surface-container-high text-carbon-black transition-colors" id="gallery-fullscreen-btn" title="Tela Cheia">
+<span class="material-symbols-outlined text-[18px]">fullscreen</span>
+</button>
+</div>
+</div>
+<!-- Photo Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-xs">
+<div class="relative aspect-square rounded-lg overflow-hidden group cursor-pointer shadow-sm gallery-item" data-caption="Rafael Camara ajusta as luvas momentos antes de subir no cockpit na garagem de Interlagos." data-index="1">
+<img alt="Rafael Camara se preparando no box" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Rafael Camara preparing his Nomex gloves and balaclava inside the fluorescent-lit pit garage at Interlagos, intense dramatic lighting, mechanics with wrenches in background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdQfNbI1mAZltDng9H5-1SAloeFpxvrXvbR-wRuDGA0NS_JpWQjYe_40FSgzxIpw6RQvpmqevUi3E0dJbECtHycpkUTIiyQU-5js7wj8dEKF_EMAFndZa-CqYiKqrR1G5_l_Ic8V53yShJ2_5rQYu4oDtnR341loHasWsgZ7w5YC8kk23DPpd7hSFXCXEwjCHSSc-buUOejG-zcOPTYgPcrDXQF-1qt53KrojB9zE"/>
+<div class="absolute inset-0 bg-carbon-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-pure-white text-[24px]">zoom_in</span>
+</div>
+</div>
+<div class="relative aspect-square rounded-lg overflow-hidden group cursor-pointer shadow-sm gallery-item" data-caption="O capacete comemorativo de Camara pintado com as cores verde, amarelo e a bandeira de Pernambuco." data-index="2">
+<img alt="Capacete de Rafael Camara" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Detailed macro shot of modern carbon-fiber Formula 1 racing helmet painted with dynamic Brazilian flag green-yellow patterns and state of Pernambuco details resting on the carbon pit perch." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCb2C2IOrul4HCGf-uGW-aeTaBYkdqvl30ImsnEma_M6cFMKaEluSoMmu2PM3qJ_xYrI8-wQmKRCBp8Q8miY1yviJxO8-kSaIrcdYCYy5aOANr-EWR7sxW8dbvdSrbGzikkDmonMpTD9uXHfppYZfHhy7UaHTgHZ3M-DMboLwGwQTa60zxTHmCe9Q8l_XqYdKdj8zZnRkcSE8oSvU2XTYpcmh5hf7rxvgtBQN7-39U"/>
+<div class="absolute inset-0 bg-carbon-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-pure-white text-[24px]">zoom_in</span>
+</div>
+</div>
+<div class="relative aspect-square rounded-lg overflow-hidden group cursor-pointer shadow-sm gallery-item" data-caption="Mecânicos da equipe trabalham na suspensão dianteira durante a troca de acerto entre stints." data-index="3">
+<img alt="Mecânicos no trabalho de suspensão" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Formula 1 pit crew team in dark technical uniforms adjusting front pushrod suspension geometry with torque instruments under garage spotlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAi-_MicJsbQ6WTZDb-AWp871Sn7N_3cHTTFT-bFBMmbcxFnRvVWxtB0CxKsWY0phZccE1Nedg4WkA8bWJ-d6Od6qPmUDIKmH9fyKy9SbUbbAPHiRCj7AAFFK5pffsQzCP8gAibeGwU1L-fmb86T2WbIi7HF8ym5ePmIvzCSUOlj4qIeNlnLnXqQ4hdbD_-QiQyAtKdGOXioyOnlAN7pcPqGoAxPJ349kZJiYpkc8s"/>
+<div class="absolute inset-0 bg-carbon-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-pure-white text-[24px]">zoom_in</span>
+</div>
+</div>
+<div class="relative aspect-square rounded-lg overflow-hidden group cursor-pointer shadow-sm gallery-item" data-caption="Visão panorâmica da 'Ferradura' e do miolo de Interlagos repleto de bandeiras e torcedores." data-index="4">
+<img alt="Arquibancadas cheias em Interlagos" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Atmospheric wide angle landscape view of Interlagos racetrack in Sao Paulo with packed grandstands full of vibrant green yellow and red flags under dramatic overcast Brazilian skies." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1jAs5JZL-fgIonpF00xeePt25NYXJ9DwiYZE1c2vvQB8z4PtIgXwdYgYhRO7tOdbGzaU4abOp0qHyu9UpTE4k_QQRon_LU1pO8rTQhOP-f8m1CbGNpczPbHpxWZPalSyU-mTbBwdYh9zviroImAGECWou8mvfpf0c2iTUyIeqyoeqNrVJzmQhTdQ3bS96BvGxJVYy-zWDjylQ1wmXpOzZMnMmxabvdcRF3_hYw1Y"/>
+<div class="absolute inset-0 bg-carbon-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<span class="material-symbols-outlined text-pure-white text-[24px]">zoom_in</span>
+</div>
+</div>
+</div>
+<div class="p-space-sm bg-surface-container rounded-lg text-body-sm font-body-sm text-carbon-black flex items-center gap-2" id="gallery-caption-box">
+<span class="material-symbols-outlined text-racing-red text-[18px]">photo_camera</span>
+<span id="gallery-caption-text">Clique em qualquer foto para navegar pelos detalhes em alta definição.</span>
+</div>
+</section>
+<!-- Social Engagement / Tags Strip -->
+<div class="flex flex-wrap items-center justify-between gap-space-sm py-space-md border-t border-b border-surface-container">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-label-category text-label-category text-secondary uppercase">Tags:</span>
+<a class="px-space-sm py-1 bg-surface-container rounded text-label-meta font-label-meta text-carbon-black hover:bg-racing-red hover:text-pure-white transition-colors" href="#">#RafaelCamara</a>
+<a class="px-space-sm py-1 bg-surface-container rounded text-label-meta font-label-meta text-carbon-black hover:bg-racing-red hover:text-pure-white transition-colors" href="#">#F12026</a>
+<a class="px-space-sm py-1 bg-surface-container rounded text-label-meta font-label-meta text-carbon-black hover:bg-racing-red hover:text-pure-white transition-colors" href="#">#Interlagos</a>
+<a class="px-space-sm py-1 bg-surface-container rounded text-label-meta font-label-meta text-carbon-black hover:bg-racing-red hover:text-pure-white transition-colors" href="#">#MercedesF1</a>
+<a class="px-space-sm py-1 bg-surface-container rounded text-label-meta font-label-meta text-carbon-black hover:bg-racing-red hover:text-pure-white transition-colors" href="#">#Telemetria</a>
+</div>
+<button class="flex items-center gap-2 px-space-md py-2 bg-canvas-cream hover:bg-surface-container rounded-lg text-carbon-black font-label-category text-label-category transition-colors" id="like-btn">
+<span class="material-symbols-outlined text-racing-red text-[18px]">favorite</span>
+<span>CURTIR ANÁLISE (<span id="like-count">184</span>)</span>
+</button>
+</div>
+<!-- Author Profile Dossier Box -->
+<aside class="p-space-lg bg-canvas-cream rounded-xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-md">
+<img alt="Pedro Araújo" class="w-full h-full object-cover" data-alt="Editorial portrait of Pedro Araújo, veteran Formula 1 columnist with headphones and credentials in FIA press center, focused expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLOjV_1S8CenBaas19O2XpGxkz6Fav0ir2hMvLE-bMTSmiopLAnB7gsQ1GM3E7ykPK2-HlWNwZy9eqDmDZP3A1eTnZAist0uSDAXvLsjO2a_xkd-EIQO8wSmfYqm4tmyA1_N4Ynq5-OGo8NE6W6W7xhhyKInAB4BOPUPfSnWm8AL-6s1ad-SfhbB11Df__v8FW3KeN8xljyc7ckKM_8bgCRDp1OZHqXU9Dzobl0LQ"/>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<h4 class="font-headline-sm text-headline-sm text-carbon-black">Pedro Araújo</h4>
+<span class="px-1.5 py-0.5 bg-carbon-black text-pure-white text-[10px] font-label-category rounded uppercase">Diretor de Redação</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary mt-1 max-w-lg">
+                Cobriu mais de 220 Grandes Prêmios in loco pelo SpeedRacing desde 2008. Especialista em regulamento técnico da FIA, dinâmica veicular e bastidores do paddock europeu.
+              </p>
+</div>
+</div>
+<button class="shrink-0 px-space-md py-2 bg-carbon-black hover:bg-racing-red text-pure-white rounded font-label-category text-label-category uppercase tracking-wider transition-colors">
+            + Seguir Colunista
+          </button>
+</aside>
+<!-- Reader Comments Teaser / Anchor Section -->
+<section class="flex flex-col gap-space-md mt-space-sm" id="comments-anchor">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-carbon-black flex items-center gap-2">
+<span class="material-symbols-outlined text-racing-red">forum</span>
+              Debate no Pit Lane (42 comentários)
+            </h3>
+<span class="text-label-meta font-label-meta text-secondary">Moderação ativa FIA/SpeedRacing</span>
+</div>
+<!-- Add Comment Input Box -->
+<div class="flex flex-col gap-space-xs p-space-md bg-canvas-cream rounded-xl">
+<textarea class="w-full p-space-sm rounded-lg bg-pure-white text-carbon-black font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-racing-red resize-none shadow-sm" placeholder="O que achou do ritmo de Camara nos treinos? Participe da discussão técnica..." rows="3"></textarea>
+<div class="flex items-center justify-between pt-1">
+<span class="text-label-meta font-label-meta text-secondary">Respeite as diretrizes da comunidade</span>
+<button class="px-space-md py-2 bg-racing-red hover:bg-tertiary-container text-pure-white font-label-category text-label-category uppercase rounded font-bold transition-colors">
+                Publicar Comentário
+              </button>
+</div>
+</div>
+<!-- Top Comment -->
+<div class="p-space-md bg-canvas-cream rounded-xl flex flex-col gap-space-xs shadow-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-carbon-black text-body-sm">
+                  MT
+                </div>
+<div>
+<span class="font-headline-sm text-body-md text-carbon-black">Marcelo Toledo</span>
+<span class="text-label-meta text-[11px] text-secondary ml-2">Há 45 minutos</span>
+</div>
+</div>
+<span class="px-2 py-0.5 bg-surface-container rounded text-label-category text-[10px] text-secondary uppercase font-semibold">Engenheiro Mecânico</span>
+</div>
+<p class="font-body-md text-body-md text-carbon-black mt-1">
+              A telemetria de velocidade na Curva do Sol é impressionante. Ele conseguiu carregar muito mais aceleração lateral sem perder a frente na saída para a Reta Oposta. Se mantiver a consistência nas frenagens em apoio, o carro pontua no domingo!
+            </p>
+<div class="flex items-center gap-space-md mt-1 text-label-meta font-label-meta text-secondary">
+<button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">thumb_up</span> 18</button>
+<button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">reply</span> Responder</button>
+</div>
+</div>
+</section>
+</article>
+<!-- Right Column (Technical Sidebar & Standings) -->
+<aside class="lg:col-span-4 flex flex-col gap-space-lg">
+<!-- Widget 1: Track Weather Radar & Paddock Telemetry -->
+<div class="bg-carbon-black text-pure-white rounded-xl p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-2 border-b border-track-asphalt">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-flag-green animate-pulse"></span>
+<span class="font-label-category text-label-category uppercase tracking-wider text-pure-white">Paddock Radar • Ao Vivo</span>
+</div>
+<span class="font-data-telemetry text-data-telemetry text-flag-yellow">SÃO PAULO 16:35</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs pt-1">
+<div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col">
+<span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura da Pista</span>
+<span class="font-data-telemetry text-[22px] font-bold text-racing-red mt-1">42.8° C</span>
+<span class="text-[10px] font-label-meta text-surface-container-high/60">Asfalto aquecido</span>
+</div>
+<div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col">
+<span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura do Ar</span>
+<span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">26.2° C</span>
+<span class="text-[10px] font-label-meta text-surface-container-high/60">Umidade: 58%</span>
+</div>
+<div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col">
+<span class="text-[11px] font-label-category uppercase text-secondary-fixed">Vento em Interlagos</span>
+<span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">14.1 <span class="text-xs">km/h</span></span>
+<span class="text-[10px] font-label-meta text-surface-container-high/60">Direção: Noroeste</span>
+</div>
+<div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col">
+<span class="text-[11px] font-label-category uppercase text-secondary-fixed">Risco de Chuva</span>
+<span class="font-data-telemetry text-[22px] font-bold text-flag-yellow mt-1">20%</span>
+<span class="text-[10px] font-label-meta text-surface-container-high/60">Nuvens sobre a Represa</span>
+</div>
+</div>
+<div class="mt-1 p-2 bg-carbon-surface/60 rounded flex items-center gap-2 text-label-meta text-[11px] text-surface-container-high">
+<span class="material-symbols-outlined text-[16px] text-flag-green">sensors</span>
+<span>Sensores meteorológicos oficiais CBA/FIA atualizados a cada 30s.</span>
+</div>
+</div>
+<!-- Widget 2: World Championship Standings 2026 -->
+<div class="bg-canvas-cream rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-racing-red text-[20px]">emoji_events</span>
+<h4 class="font-headline-sm text-headline-sm text-carbon-black">Mundial de Construtores 2026</h4>
+</div>
+<span class="text-label-category text-[10px] bg-pure-white px-2 py-0.5 rounded font-bold text-secondary uppercase">Etapa 21/24</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+            Mercedes pode garantir o título neste fim de semana em caso de dobradinha no GP de São Paulo.
+          </p>
+<!-- Standings Table -->
+<div class="flex flex-col gap-1 mt-1">
+<!-- Row 1 (Mercedes) -->
+<div class="flex items-center justify-between p-2.5 bg-pure-white rounded-lg shadow-sm border-l-4 border-racing-red">
+<div class="flex items-center gap-2">
+<span class="font-data-telemetry text-body-md font-bold text-carbon-black w-4">1</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-body-md text-carbon-black">Mercedes-AMG</span>
+<span class="text-[11px] text-secondary font-label-meta">Russell / Antonelli</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-data-telemetry text-body-md font-bold text-carbon-black">512 pts</span>
+<span class="text-[10px] text-flag-green font-semibold">Líder</span>
+</div>
+</div>
+<!-- Row 2 (Ferrari) -->
+<div class="flex items-center justify-between p-2.5 bg-pure-white rounded-lg shadow-sm">
+<div class="flex items-center gap-2">
+<span class="font-data-telemetry text-body-md font-bold text-secondary w-4">2</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-body-md text-carbon-black">Scuderia Ferrari</span>
+<span class="text-[11px] text-secondary font-label-meta">Leclerc / Hamilton</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-data-telemetry text-body-md font-bold text-carbon-black">489 pts</span>
+<span class="text-[10px] text-racing-red font-semibold">-23 pts</span>
+</div>
+</div>
+<!-- Row 3 (McLaren) -->
+<div class="flex items-center justify-between p-2.5 bg-pure-white rounded-lg shadow-sm">
+<div class="flex items-center gap-2">
+<span class="font-data-telemetry text-body-md font-bold text-secondary w-4">3</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-body-md text-carbon-black">McLaren F1 Team</span>
+<span class="text-[11px] text-secondary font-label-meta">Norris / Piastri</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-data-telemetry text-body-md font-bold text-carbon-black">462 pts</span>
+<span class="text-[10px] text-secondary font-semibold">-50 pts</span>
+</div>
+</div>
+<!-- Row 4 (Red Bull) -->
+<div class="flex items-center justify-between p-2.5 bg-pure-white rounded-lg shadow-sm">
+<div class="flex items-center gap-2">
+<span class="font-data-telemetry text-body-md font-bold text-secondary w-4">4</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-body-md text-carbon-black">Red Bull Racing</span>
+<span class="text-[11px] text-secondary font-label-meta">Verstappen / Lawson</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-data-telemetry text-body-md font-bold text-carbon-black">398 pts</span>
+<span class="text-[10px] text-secondary font-semibold">-114 pts</span>
+</div>
+</div>
+</div>
+<a class="text-center py-2 text-label-category font-label-category text-racing-red hover:underline uppercase tracking-wider text-[11px]" href="#">
+            Ver Classificação Completa de Pilotos →
+          </a>
+</div>
+<!-- Widget 3: Related High-Octane Articles -->
+<div class="bg-canvas-cream rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<h4 class="font-headline-sm text-headline-sm text-carbon-black">Matérias Relacionadas</h4>
+<span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Article 1 -->
+<a class="group flex gap-space-sm items-start p-space-xs rounded-lg hover:bg-pure-white transition-colors" href="#">
+<div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-sm">
+<img alt="Análise de chuva" class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Formula 1 car cornering at high speed in rainy conditions with immense spray behind it on a modern circuit." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSIC1ImokizhyKhuezXb95DZiBQGDE_7VYkMcfCVPBioSmG5qFEXuoRFZXqYg2DoAoO97uBmlUem7p6igLphQjjfd09X9i-5-RAnsnG2AcY19iBhc7mu7NZxuBjsO36eOdk8179Hg_GwjQe-S9nAgwPMqRufvawFFx6I61v5sFkepU7esq-kE1L07b1O43pzZuOXgDKC4Wz3tmhaB1bKajX3BZAsyks4AOQHEf1NI"/>
+</div>
+<div class="flex flex-col gap-1 min-w-0">
+<span class="text-[10px] font-label-category uppercase text-racing-red">Análise Técnica</span>
+<h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black group-hover:text-racing-red line-clamp-2 transition-colors">
+                  Como a chuva de primavera em Interlagos pode mudar a estratégia das equipes na Sprint
+                </h5>
+<span class="text-[11px] font-label-meta text-secondary">3 min • Há 2 horas</span>
+</div>
+</a>
+<!-- Article 2 -->
+<a class="group flex gap-space-sm items-start p-space-xs rounded-lg hover:bg-pure-white transition-colors" href="#">
+<div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-sm">
+<img alt="Volante F1" class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Close up of modern Formula 1 carbon steering wheel display showing LED rev counters and race telemetry data switches." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAf0bxIM5NFK9UvMAAd2AP9uIC4bFcb4TAviMvrUUvJv2Hc3q0xiSEOy306BWFK8NdqnYupYCz1cdsxCm5HvpBNaCZ921u8PbiBgMYdTmR2Uptyy8nltc5fc4Dd9D63lTAAuF4nmXqt0IobhU4L7EHmu7FZHiHKdpYVb0MZIABj7tY9paOLhW6G3SZ7Ox9Ti6XUVIG13Xfrbv53xuwZetyJbA2CiBiVpOAVNEPdCWU"/>
+</div>
+<div class="flex flex-col gap-1 min-w-0">
+<span class="text-[10px] font-label-category uppercase text-carbon-black">Bastidores</span>
+<h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black group-hover:text-racing-red line-clamp-2 transition-colors">
+                  Exclusivo: Os comandos e mapeamentos de motor usados por Rafael Camara no volante
+                </h5>
+<span class="text-[11px] font-label-meta text-secondary">6 min • Há 4 horas</span>
+</div>
+</a>
+<!-- Article 3 -->
+<a class="group flex gap-space-sm items-start p-space-xs rounded-lg hover:bg-pure-white transition-colors" href="#">
+<div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-sm">
+<img alt="Entrevista chefe de equipe" class="w-full h-full object-cover group-hover:scale-105 transition-transform" data-alt="Formula 1 team principal in pit lane talking intensely to race engineers during practice session with monitors in background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf4UmsvZEcW__rzXrG5myGd8Myt9THKlbEntOurGcO8FVl4sl3EJbDrJqOpMseowRiuBIR12kWlTp8WpKl2zdLoKg5D5uq77p50Gc2KxutXPcB6RYSDUWspxMxerNT05TUhiKVMk8A8QoLVYkoW2KyFXvUcskob3a6v7qpoe3vkGsiLVgjaq34mpo-yJqtgKZsbhcgSYanl-cxKB6oQOhBRimfLWIulVO92JfN6iM"/>
+</div>
+<div class="flex flex-col gap-1 min-w-0">
+<span class="text-[10px] font-label-category uppercase text-racing-red">Entrevista</span>
+<h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black group-hover:text-racing-red line-clamp-2 transition-colors">
+                  "O Brasil tem um talento de calibre mundial novamente", afirma chefe da Haas
+                </h5>
+<span class="text-[11px] font-label-meta text-secondary">4 min • Há 6 horas</span>
+</div>
+</a>
+</div>
+</div>
+<!-- Widget 4: High Performance Newsletter Box -->
+<div class="bg-carbon-black text-pure-white rounded-xl p-space-lg shadow-md relative overflow-hidden flex flex-col gap-space-sm">
+<div class="w-24 h-24 rounded-full bg-racing-red/20 blur-2xl absolute -top-8 -right-8 pointer-events-none"></div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-racing-red text-[24px]">mark_email_unread</span>
+<span class="font-label-category text-label-category uppercase tracking-wider text-pure-white">Grid SpeedRacing</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-pure-white leading-tight">
+            Receba as telemetrias e bastidores antes de todo mundo
+          </h4>
+<p class="font-body-sm text-body-sm text-surface-container">
+            Toda manhã de sexta, sábado e domingo de Grande Prêmio direto na sua caixa de entrada, sem rodeios.
+          </p>
+<form class="flex flex-col gap-space-xs mt-1" onsubmit="event.preventDefault(); alert('Inscrição confirmada no Grid SpeedRacing!');">
+<input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red" placeholder="Seu melhor e-mail profissional" required="" type="email"/>
+<button class="w-full py-2.5 bg-racing-red hover:bg-tertiary-container text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1" type="submit">
+<span>Garantir Vaga no Grid</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</form>
+<span class="text-[10px] font-label-meta text-surface-container-high/60 text-center">
+            Zero spam. Desinscreva-se a qualquer momento com 1 clique.
+          </span>
+</div>
+</aside>
+</div>
+</div>
+</div>
+<!-- Micro-Interactions Client Script -->
+<script>
+  // Copy Link Micro-Interaction
+  const copyBtn = document.getElementById('copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href);
+      const icon = copyBtn.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.textContent = 'check';
+        setTimeout(() => {
+          icon.textContent = 'link';
+        }, 2000);
+      }
+    });
+  }
+
+  // Like Article Button
+  const likeBtn = document.getElementById('like-btn');
+  const likeCount = document.getElementById('like-count');
+  let liked = false;
+  if (likeBtn && likeCount) {
+    likeBtn.addEventListener('click', () => {
+      let count = parseInt(likeCount.textContent, 10);
+      if (!liked) {
+        likeCount.textContent = count + 1;
+        likeBtn.classList.add('bg-surface-container-high');
+        liked = true;
+      } else {
+        likeCount.textContent = count - 1;
+        likeBtn.classList.remove('bg-surface-container-high');
+        liked = false;
+      }
+    });
+  }
+
+  // Interactive Sector Filter for Telemetry
+  const sectorTabs = document.querySelectorAll('.sector-tab');
+  sectorTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      sectorTabs.forEach(t => {
+        t.classList.remove('bg-racing-red', 'text-pure-white');
+        t.classList.add('text-secondary-fixed');
+      });
+      tab.classList.add('bg-racing-red', 'text-pure-white');
+      tab.classList.remove('text-secondary-fixed');
+    });
+  });
+
+  // Photo Gallery Lightbox / Caption Switcher
+  const galleryItems = document.querySelectorAll('.gallery-item');
+  const captionText = document.getElementById('gallery-caption-text');
+  const galleryCounter = document.getElementById('gallery-counter');
+
+  galleryItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = item.getAttribute('data-index');
+      const caption = item.getAttribute('data-caption');
+      if (captionText) captionText.textContent = caption;
+      if (galleryCounter) galleryCounter.textContent = `${idx} de 4 fotos`;
+      
+      galleryItems.forEach(i => i.classList.remove('ring-2', 'ring-racing-red'));
+      item.classList.add('ring-2', 'ring-racing-red');
+    });
+  });
+
+  const fsBtn = document.getElementById('gallery-fullscreen-btn');
+  if (fsBtn) {
+    fsBtn.addEventListener('click', () => {
+      alert('Modo de exibição imersiva em alta resolução aberto para o paddock.');
+    });
+  }
+</script></main><footer class="w-full bg-carbon-black text-pure-white mt-space-xl pt-space-xl pb-space-lg"><div class="max-w-[1280px] mx-auto px-margin flex flex-col gap-space-xl"><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-lg"><div class="lg:col-span-2 flex flex-col gap-space-sm"><div class="flex items-center gap-space-sm"><img alt="SpeedRacing Footer Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY"/><span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-pure-white">SPEED<span class="text-racing-red">RACING</span></span></div><p class="font-body-md text-body-md text-secondary-fixed max-w-md">Automobilismo mundial e nacional com rigor técnico, telemetria e bastidores. Credibilidade ininterrupta em notícias desde 2002.</p><div class="flex items-center gap-space-xs text-data-telemetry font-data-telemetry text-flag-yellow"><span class="material-symbols-outlined text-[18px]">verified</span><span>Cobertura FIA • CBA • IMSA • ACO</span></div></div><div class="flex flex-col gap-space-xs"><span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Fórmulas</span><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Fórmula 1</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Fórmula 2</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Fórmula E</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">IndyCar Series</a></div><div class="flex flex-col gap-space-xs"><span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Turismo &amp; Endurance</span><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Stock Car Pro Series</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">NASCAR Cup</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">FIA WEC / 24h Le Mans</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Motovelocidade</a></div><div class="flex flex-col gap-space-xs"><span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Institucional</span><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Nossa Equipe Editorial</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Código de Ética</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Política de Privacidade</a><a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="#">Fale Conosco / Anuncie</a></div></div><div class="w-full h-px bg-track-asphalt"></div><div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm font-label-meta text-label-meta text-secondary-fixed-dim"><span>© 2002–2026 SpeedRacing Comunicação Ltda. Todos os direitos reservados.</span><div class="flex items-center gap-space-md"><a class="hover:text-pure-white transition-colors" href="#">Termos de Uso</a><a class="hover:text-pure-white transition-colors" href="#">Privacidade</a><a class="hover:text-pure-white transition-colors" href="#">RSS Feed</a></div></div></div></footer></body></html>
