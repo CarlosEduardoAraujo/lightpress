@@ -259,6 +259,7 @@ $csrfToken = Security::generateCsrfToken();
                 <a href="/admin/stats.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mais Lidas 📈</a>
                 <?php if ($currentUser['role'] === 'admin'): ?>
                     <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Usuários & Autores</a>
+                    <a href="/admin/settings.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Configurações</a>
                 <?php endif; ?>
                 <a href="/admin/system.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Diagnóstico</a>
                 <a href="/" target="_blank" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Ver Site &rarr;</a>

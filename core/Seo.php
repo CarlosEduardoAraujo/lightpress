@@ -41,8 +41,8 @@ class Seo
             $image = !empty($rawImage) ? ImageProcessor::toWebpUrl($rawImage) : '';
             $type = 'article';
         } else {
-            $title = $siteName . ' - Portal de Notícias de Alta Performance';
-            $description = 'Notícias, coberturas em tempo real e análises aprofundadas com máxima velocidade.';
+            $title = $siteName . ' - ' . (!empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Portal de Notícias');
+            $description = !empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Notícias, coberturas em tempo real e análises aprofundadas com máxima velocidade.';
             $url = "{$canonicalOrigin}/";
             $image = "{$canonicalOrigin}/assets/og-default.jpg";
             $type = 'website';

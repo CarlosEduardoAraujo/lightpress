@@ -72,13 +72,26 @@ if (empty($trendingTags)) {
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title><?= Security::e($pageTitle ?? 'SpeedRacing - Automobilismo e Velocidade') ?></title>
+    <title><?= Security::e($pageTitle ?? ($config['app']['name'] ?? 'SpeedRacing') . ' - Automobilismo e Velocidade') ?></title>
     <?php if (!empty($post['seo_description'])): ?>
         <meta name="description" content="<?= Security::e($post['seo_description']) ?>">
     <?php elseif (!empty($post['summary'])): ?>
         <meta name="description" content="<?= Security::e($post['summary']) ?>">
+    <?php elseif (!empty($config['app']['description'])): ?>
+        <meta name="description" content="<?= Security::e($config['app']['description']) ?>">
     <?php endif; ?>
-    <link rel="alternate" type="application/rss+xml" title="Feed RSS - SpeedRacing" href="/feed.xml">
+    <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($config['app']['name'] ?? 'SpeedRacing') ?>" href="/feed.xml">
+
+    <!-- Favicon do Site Dinâmico -->
+    <?php 
+    $siteFavicon = $config['app']['favicon'] ?? '';
+    if (!empty($siteFavicon)): 
+    ?>
+        <link rel="icon" href="<?= Security::e($siteFavicon) ?>">
+        <link rel="apple-touch-icon" href="<?= Security::e($siteFavicon) ?>">
+    <?php else: ?>
+        <link rel="icon" href="/favicon.ico">
+    <?php endif; ?>
 
     <!-- Open Graph & Twitter Cards -->
     <?= Seo::renderMetaTags($post ?? null, $config) ?>

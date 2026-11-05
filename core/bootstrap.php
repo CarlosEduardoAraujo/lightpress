@@ -37,6 +37,9 @@ $config = require $configFile;
 // Inicializar Camada de Banco de Dados
 \LightPress\Core\Database::init($config['database']);
 
+// Aplicar Configurações Dinâmicas do Banco de Dados
+\LightPress\Core\Settings::applyToConfig($config);
+
 // Configuração de Erros
 if (!empty($config['app']['debug'])) {
     ini_set('display_errors', '1');

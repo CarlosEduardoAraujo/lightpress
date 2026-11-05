@@ -417,6 +417,7 @@ function buildFilterUrl(array $overrides = []): string {
                 <a href="/admin/stats.php">Mais Lidas 📈</a>
                 <?php if ($currentUser['role'] === 'admin'): ?>
                     <a href="/admin/users.php">Usuários & Autores</a>
+                    <a href="/admin/settings.php">Configurações</a>
                     <a href="/admin/system.php">Diagnóstico</a>
                 <?php endif; ?>
                 <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>

@@ -199,4 +199,12 @@ CREATE TABLE IF NOT EXISTS pages (
     INDEX idx_page_status_slug (status, slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 14. Tabela de Configurações Dinâmicas do Site (Título, Favicon, Fuso Horário, etc.)
+CREATE TABLE IF NOT EXISTS settings (
+    `key` VARCHAR(64) NOT NULL PRIMARY KEY,
+    `value` MEDIUMTEXT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -137,6 +137,8 @@ class Schema
     public static function dropAll(PDO $pdo, string $driver = 'mysql'): void
     {
         $tables = [
+            'settings',
+            'pages',
             'redirects',
             'migration_map',
             'cache_purge_jobs',

@@ -333,6 +333,7 @@ $csrfToken = Security::generateCsrfToken();
                 <a href="/admin/categories.php">Categorias</a>
                 <a href="/admin/stats.php">Mais Lidas 📈</a>
                 <a href="/admin/users.php" class="active">Usuários & Autores</a>
+                <a href="/admin/settings.php">Configurações</a>
                 <a href="/admin/system.php">Diagnóstico</a>
                 <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>
             </nav>

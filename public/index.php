@@ -78,7 +78,7 @@ $router->get('/', function () use ($config): void {
         [$nowUtc, $perPage]
     );
 
-    $pageTitle = $config['app']['name'] . ' - Portal de Notícias';
+    $pageTitle = $config['app']['name'] . ' - ' . (!empty($config['app']['description']) ? $config['app']['description'] : 'Portal de Notícias');
     require $config['paths']['templates'] . '/home.php';
 });
 
