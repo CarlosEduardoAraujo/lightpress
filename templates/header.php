@@ -70,7 +70,7 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.2s, color 0.2s; }
         
-        .site-header { background: var(--surface); border-bottom: 1px solid var(--border); transition: background 0.2s, border-color 0.2s; }
+        .site-header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; transition: background 0.2s, border-color 0.2s; }
         .container { max-width: 1900px; margin: 0 auto; padding: 0 1.5rem; }
         .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 1rem; }
         

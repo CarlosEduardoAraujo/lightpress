@@ -7,6 +7,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Adicionado
+- **Menu Superior Fixo (Sticky Header):** O cabeçalho global `.site-header` foi configurado com `position: sticky; top: 0; z-index: 100;`, mantendo a logo, campo de busca, links de categorias e alternador de tema sempre visíveis e acessíveis durante a navegação, enquanto as notícias e artigos passam normalmente por baixo sem qualquer conflito.
+
 ### Corrigido
 - **BUG Sobreposição Visual no Scroll da Notícia (`templates/header.php`):** O seletor CSS genérico `header { position: sticky; top: 0; }` estava sendo herdado indevidamente pela tag `<header>` interna do `<article>`, fazendo com que todo o cabeçalho da notícia (título, metadados e barra de compartilhamento) ficasse fixado no topo da tela e sobreposto à imagem e ao texto durante a rolagem da página (especialmente crítico no celular). O cabeçalho global agora utiliza a classe isolada `.site-header` com rolagem estática nativa, eliminando qualquer sobreposição.
 - **BUG Redirecionamento 301 em Chamadas POST de API (`core/Router.php`):** Corrigido comportamento do roteador que aplicava redirecionamento 301 de trailing slash (SEO) indiscriminadamente a requisições `POST` em rotas da API (`/api/view/{id}`). Esse 301 forçava os navegadores a transformar o `POST` em `GET /api/view/{id}/`, resultando em erro 404. O roteador agora restringe a canonicalização de barra final estritamente a requisições `GET` e fora do prefixo `/api/`, e o micro-endpoint passa a aceitar variações com ou sem barra final.
