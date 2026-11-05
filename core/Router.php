@@ -90,8 +90,8 @@ class Router
             exit;
         }
 
-        // Canonicalização de barra final para rotas públicas amigáveis (sem extensão de arquivo)
-        if ($path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
+        // Canonicalização de barra final para rotas públicas amigáveis (apenas requisições GET e fora de /api/)
+        if ($method === 'GET' && !str_starts_with($path, '/api/') && $path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
             $queryString = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
             header('Location: ' . $path . '/' . $queryString, true, 301);
             exit;

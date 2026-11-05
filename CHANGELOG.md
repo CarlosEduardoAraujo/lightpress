@@ -8,6 +8,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Corrigido
+- **BUG Redirecionamento 301 em Chamadas POST de API (`core/Router.php`):** Corrigido comportamento do roteador que aplicava redirecionamento 301 de trailing slash (SEO) indiscriminadamente a requisições `POST` em rotas da API (`/api/view/{id}`). Esse 301 forçava os navegadores a transformar o `POST` em `GET /api/view/{id}/`, resultando em erro 404. O roteador agora restringe a canonicalização de barra final estritamente a requisições `GET` e fora do prefixo `/api/`, e o micro-endpoint passa a aceitar variações com ou sem barra final.
 - **BUG Erro 500 na Página Inicial (`Database::fetchValue`):** Implementado o método ausente `Database::fetchValue()` utilizado para contagem de registros na paginação da Home e Categorias.
 - **Tratamento Global de Exceções e Logs em Produção:** Adicionado bloco `try/catch` de segurança no ponto de entrada (`public/index.php`), gravação automática de falhas no log `/storage/logs/error.log` e template visual limpo `templates/500.php` sem exposição de credenciais ou stack traces sensíveis.
 - **Expurgo Abrangente de Cache FastCGI:** 

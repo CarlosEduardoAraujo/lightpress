@@ -327,11 +327,13 @@ $router->get('/sitemap.xml', function () use ($config): void {
     <?php
 });
 
-// Rota 7: Contador de Visualizações (POST /api/view/{id})
-$router->post('/api/view/{id}', function (array $params): void {
+// Rota 7: Contador de Visualizações (POST /api/view/{id} com ou sem barra final)
+$viewHandler = function (array $params): void {
     $_GET['id'] = $params['id'] ?? 0;
     require __DIR__ . '/api/view.php';
-});
+};
+$router->post('/api/view/{id}', $viewHandler);
+$router->post('/api/view/{id}/', $viewHandler);
 
 // Rota 8: Redirecionamento conveniente para o painel administrativo
 $router->get('/admin', function (): void {
