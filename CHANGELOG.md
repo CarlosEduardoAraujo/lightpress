@@ -8,6 +8,40 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Módulo Administrativo de Configurações Gerais do Site (`/admin/settings.php` e `core/Settings.php`):**
+  - Nova interface no Painel Editorial exclusiva para administradores com suporte nativo a Modo Escuro/Claro.
+  - Tabela `settings` criada automaticamente com persistência chave-valor (`setting_key`, `setting_value`), cache em memória por requisição e fallback seguro.
+  - Campos gerenciáveis:
+    - **Título do Site (Site Title):** Propagado automaticamente para `<title>`, feeds RSS, Open Graph, Twitter Cards e copyright.
+    - **Descrição Editorial (Tagline / Meta Description):** Utilizada como meta description padrão na Home, feeds RSS, Schema.org e rodapé.
+    - **Ícone do Site (Favicon):** Integração com a Biblioteca de Mídias via modal com busca em tempo real, upload direto de ícones (`.ico`, `.png`, `.svg`, `.webp`, `.avif`) e simulador ao vivo de aba de navegador (preview em 32x32 e 48x48 px).
+    - **Fuso Horário (Timezone):** Seleção ampla agrupada com fusos recomendados (ex: `America/Sao_Paulo (UTC-3 - Brasília)`, `UTC (UTC+0)`, `Europe/London`, `America/New_York`) e escala completa fixa de **UTC-12** até **UTC+14**, com relógio em tempo real calculando a hora estimada no fuso escolhido.
+  - Invalidação automática de cache FastCGI ao salvar para propagação instantânea das alterações aos visitantes.
+- **Metatags Open Graph & Twitter Cards Dinâmicas com Favicon em WebP (`core/Seo.php`):**
+  - Para a página **Home**, páginas de **Categorias** (`/categoria/{slug}/`) e páginas de **Tags** (`/tag/{slug}/`), as tags `og:image` e `twitter:image` passam a consumir dinamicamente o Favicon configurado no painel.
+  - Conversão compulsória para o formato **`.webp`** através de `ImageProcessor::toWebpUrl()` e geração de URLs absolutas com o domínio canônico configurado.
+- **Módulo Administrativo de Páginas Institucionais (`/admin/pages.php`, `/admin/page-edit.php`, `templates/page.php`):**
+  - Tabela `pages` criada e gerenciada com campos `slug`, `title`, `content_html`, `seo_title`, `seo_description`, `status` (`published`, `draft`, `archived`) e `views`.
+  - Painel com listagem, busca, contadores, filtro por status e ações rápidas (edição, link direto, exclusão com expurgo de cache).
+  - Roteamento nativo na raiz `/{slug}/` (ex: `/nossa-equipe/`, `/contato/`, `/termos-de-uso/`, `/politica-de-privacidade/`, `/codigo-de-etica/`).
+  - Auto-seeding e auto-migração garantindo que páginas institucionais padrão existam sem comandos SQL manuais.
+- **Banners Oficiais de Parceiros em Toda a Rede:**
+  - Atualizado o primeiro espaço de banner da barra lateral de todas as páginas públicas (`home.php`, `post.php`, `category.php`, `tag.php`, `page.php`, `search.php`) com a arte oficial `/uploads/2026/10/banner-vertical-qr-site.avif` utilizando elemento responsivo `<picture>` com fallback em `.webp`.
+  - Preservado o segundo banner da matéria (`post.php`) para anúncios adicionais.
+- **Biblioteca de Ícones Vetoriais SVG Inline Leve (`core/Icon.php`):**
+  - Substituição da fonte externa pesada Material Symbols Outlined (+1 MB por carregamento) por biblioteca estática de SVGs embutidos, eliminando completamente dependências de fontes externas e acelerando a pontuação Core Web Vitals (LCP/CLS).
+- **Layout Kinetic Apex Editorial nas Páginas de Categoria e Tag:**
+  - Remoção do mosaico assimétrico com 4 caixas nas páginas de categoria e tag para exibição linear de todas as matérias no feed de 8 colunas com barra lateral editorial de 4 colunas.
+
+### Corrigido
+- **BUG Erro 500 no Rodapé (`templates/footer.php`):** Adicionada a importação `use LightPress\Core\Security;` no topo do arquivo `footer.php`, corrigindo erro fatal do PHP (`Class "Security" not found`) ao sanitizar a descrição dinâmica do site e assinatura de copyright.
+- **Remoção de Logotipo Externo Quebrado no Header e Rodapé:** Removidas as tags `<img>` que apontavam para URL externa inacessível no Googleusercontent em `header.php` e `footer.php`, padronizando o logotipo do portal como marca tipográfica pura em CSS (`SPEEDRACING`).
+- **BUG Ordenação no Gerenciador de Notícias (`admin/dashboard.php`):** Corrigida a consulta de listagem de matérias para ordenar estritamente por data de criação/publicação (`ORDER BY COALESCE(p.published_at, p.updated_at) DESC, p.id DESC`), garantindo que as matérias mais recentes apareçam no topo da lista.
+- **BUG Undefined Method `Security::validateCsrfToken()`:** Corrigida a chamada de validação CSRF em `admin/settings.php` para `Security::verifyCsrfToken()` e criado alias `Security::validateCsrfToken()` em `core/Security.php` para compatibilidade total.
+- **Sintaxe SQL Segura de Configurações (`core/Settings.php`):** Substituído `ON DUPLICATE KEY UPDATE` por `REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, NOW())` com tratamento de exceções, evitando incompatibilidades com palavras reservadas em versões estritas do MariaDB/MySQL.
+- **BUG Erro 500 na Paginação da Home (`/page/2/`):** Inicialização defensiva de `$featuredPosts = []` nas rotas paginadas e vinculação estrita de tipo `PDO::PARAM_INT` para inteiros em `Database::query()` para parâmetros de `LIMIT` e `OFFSET`.
+- **Permissões de Diretórios de Uploads (`core/ImageProcessor.php`):** Ajustadas permissões de criação de pastas para `0775` e arquivos para `0664`, garantindo permissão mútua de escrita e exclusão entre o processo web (`www-data`) e usuários FTP/SSH.
+- **Restauração da Barra de Rolagem Nativa:** Remoção de regras CSS que ocultavam barras de rolagem globais do navegador.
 - **Nomenclatura Limpa de Imagens (Sem Sufixo -1920) e Copiar URL estritamente .AVIF:**
   - A variante original/full de máxima resolução é gravada sem nenhum sufixo numérico (ex: `foto.avif` e `foto.webp`), preservando o nome original do upload. As variantes complementares mantêm `-1024` e `-thumb`.
   - Os botões de copiar URL na Biblioteca de Mídias (`/admin/media.php`) agora copiam estritamente a variante `.avif` (Original/Full, 1024px e Thumb).

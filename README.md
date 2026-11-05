@@ -186,6 +186,8 @@ Além do DDL editorial acima, a implementação deve criar estruturas persistent
 | `cache_purge_jobs` | ID, payload versionado com URLs/evento, estado, tentativas, próxima execução, lease, último erro e data de conclusão; inserção na transação editorial e ausência de exclusão em cascata com o artigo |
 | `migration_map` | Chave única `(source, entity_type, source_id)`, ID de destino, checksum e estado; a origem é identificador configurado e estável |
 | `redirects` | Caminho antigo, hash indexável único do caminho e destino interno canônico; conferir o caminho integral em caso de colisão de hash; impedir ciclos e destinos externos |
+| `pages` | Páginas institucionais isoladas (`slug`, `title`, `content_html`, `featured_image`, `seo_title`, `seo_description`, `status`, `views`). Permite gerenciar páginas estáticas (ex: Equipe, Contato, Termos) servidas diretamente na raiz `/{slug}/` |
+| `settings` | Configurações dinâmicas chave-valor (`key`, `value`, `updated_at`). Armazena Título do Site, Descrição (Tagline), Favicon e Fuso Horário propagados para todo o ecossistema |
 
 Campos JSON dessas estruturas usam esquema versionado e validação na aplicação, sem depender de diferenças de implementação do tipo JSON entre bancos. Tarefas de limpeza possuem limites por lote e só removem registros expirados ou órfãos comprovados; jobs pendentes, snapshots e mídia referenciada não expiram por simples idade. A concessão de permissões e a marcação de uma revisão como aplicada não são feitas por jobs de limpeza.
 
@@ -267,38 +269,56 @@ A raiz pública do servidor aponta exclusivamente para a pasta `/public`, isolan
 ```text
 lightpress/
 ├── config.php                 # Parâmetros de banco de dados e ambiente (chmod 600/640)
-├── core/                      # Core minimalista do CMS
+├── core/                      # Core minimalista do CMS (Zero dependências Composer)
 │   ├── Database.php           # Camada de conexão PDO unificada e segura
 │   ├── Router.php             # Roteador regex leve de alta velocidade
 │   ├── ImageProcessor.php     # Algoritmo GD de corte, conversão e fallback
 │   ├── BlockCompiler.php      # Compilador JSON -> HTML semântico com sanitização
-│   ├── CacheManager.php       # Invalidador nativo de cache em disco
+│   ├── CacheManager.php       # Invalidador nativo de cache em disco Nginx
 │   ├── Authorization.php      # Perfis, ações e autorização por artigo/campo
 │   ├── PostService.php        # Revisões, conflitos e publicação transacional
-│   └── Security.php           # Utilitários de CSRF, sanitização e rate-limiting
+│   ├── Security.php           # Utilitários de CSRF, sanitização e rate-limiting
+│   ├── Seo.php                # Metatags Open Graph, Twitter Cards e Schema.org JSON-LD
+│   ├── Settings.php           # Gerenciador central de configurações dinâmicas do portal
+│   └── Icon.php               # Biblioteca estática de ícones vetoriais SVG inline ultra-leves
 ├── storage/                   # Dados privados; acesso web proibido
 │   ├── staging/               # Originais temporários e conversões em andamento
 │   ├── migration/             # Backups de origem, checkpoints e relatórios
 │   └── logs/                  # Logs técnicos sem senhas ou tokens em claro
 ├── templates/                 # Views em PHP nativo com escape contextual explícito
-│   ├── header.php
-│   ├── footer.php
-│   ├── home.php               # Grid inicial (destaques + últimas notícias)
-│   ├── post.php               # Notícia individual com schema SEO
-│   └── category.php           # Listagens de categoria
+│   ├── header.php             # Cabeçalho global, navegação e metatags
+│   ├── footer.php             # Rodapé institucional com links dinâmicos e copyright
+│   ├── home.php               # Grid inicial (Destaques + Feed de notícias)
+│   ├── post.php               # Notícia individual com schema SEO e banners
+│   ├── category.php           # Listagem editorial de categorias com sidebar
+│   ├── tag.php                # Listagem editorial por tópico/tag
+│   ├── page.php               # Páginas institucionais isoladas (Equipe, Contato, etc.)
+│   ├── search.php             # Resultados de busca pública
+│   ├── 404.php                # Página de erro 404 customizada
+│   └── 500.php                # Página de erro 500 elegante sem vazamento de dados
 ├── bin/                       # Ferramentas CLI
 │   ├── migrate-wp.php         # Importador em lotes, retomável e auditável
 │   ├── retry-cache-purge.php  # Retentativa de purgas persistidas
 │   └── cleanup.php            # Expiração de tokens, deduplicação e staging
 └── public/                    # Web Root (Nginx / Servidor Web)
     ├── index.php              # Ponto único de entrada (Front Controller)
-    ├── admin/                 # Painel administrativo enxuto protegido
+    ├── admin/                 # Painel administrativo enxuto protegido (< 50 KiB)
     │   ├── login.php          # Autenticação com proteção contra força bruta
-    │   ├── dashboard.php      # Gestão de publicações e métricas
-    │   ├── editor.php         # Editor visual de blocos sem dependências
-    │   └── media.php          # Catálogo e upload de imagens
+    │   ├── dashboard.php      # Gestão de publicações ordenada por data de criação
+    │   ├── editor.php         # Editor visual de blocos com suporte a copiar/colar Word/Docs
+    │   ├── pages.php          # Módulo de Páginas Institucionais (Equipe, Contato, etc.)
+    │   ├── page-edit.php      # Editor de Páginas Institucionais
+    │   ├── settings.php       # Configurações do Site (Título, Tagline, Favicon, Timezone)
+    │   ├── media.php          # Catálogo e upload de imagens (AVIF/WebP)
+    │   ├── categories.php     # Gestão completa de categorias
+    │   ├── users.php          # Gestão de usuários, autores e links de ativação
+    │   ├── stats.php          # Painel de Mais Lidas e métricas de audiência
+    │   ├── profile.php        # Perfil do usuário e alteração de senha
+    │   └── system.php         # Diagnóstico de integridade, PHP-GD, OPcache e permissões
     ├── api/                   # Micro-endpoints públicos de baixa latência
-    │   └── view.php           # Incremento assíncrono de visualizações
+    │   ├── view.php           # Incremento assíncrono de visualizações
+    │   ├── search.php         # Autocomplete e busca instantânea
+    │   └── posts.php          # Leitura pública de matérias (Headless)
     ├── assets/                # JS puro do editor e folhas de estilo CSS
     └── uploads/               # Diretório estático público (execução de scripts bloqueada)
 ```
@@ -594,6 +614,40 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; prelo
 
 add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'self';" always;
 ```
+
+### 8.7. Permissões de Pastas e Coexistência com FTP/SSH (0775 / 0664)
+
+Para viabilizar fluxos mistos em que fotos e acervos são manipulados tanto pela aplicação web (usuário `www-data`) quanto por clientes SFTP/FTP (ex: FileZilla com usuário de sistema `notebook`), o sistema adota:
+* **Diretórios de Upload:** Criados com máscara octal `0775` (`rwxrwxr-x`) e SGID ativo (`chmod g+s`), garantindo que novas pastas herdem automaticamente o grupo proprietário (`www-data`).
+* **Arquivos de Mídia Gerados:** Criados com permissão `0664` (`rw-rw-r--`), permitindo leitura e exclusão mútua por ambos os usuários sem conflitos de propriedade.
+
+### 8.8. Configurações Dinâmicas do Portal (`core/Settings.php` e `/admin/settings.php`)
+
+O gerenciamento de metadados fundamentais do portal opera desacoplado de arquivos estáticos, permitindo ajustes em tempo real via Painel Administrativo com propagação imediata:
+* **Tabela `settings`:** Modelo chave-valor (`key`, `value`, `updated_at`) com persistência via `REPLACE INTO` atômico e cache em memória durante o ciclo de vida da requisição.
+* **Propagação Central (`core/bootstrap.php`):** Sobrescreve dinamicamente `$config['app']['name']`, `$config['app']['description']`, `$config['app']['favicon']` e `$config['app']['display_timezone']`.
+* **Invalidação Proativa de Cache:** Salvar as configurações expurga imediatamente o FastCGI Cache da Home (`/`), sitemap e feeds RSS (`/feed.xml`).
+* **Seletor de Fuso Horário:** Catálogo com fusos recomendados para motorsport e lista completa de offsets fixos de UTC-12 a UTC+14, ajustando `date_default_timezone_set()` de ponta a ponta.
+
+### 8.9. SEO Dinâmico e Compartilhamento Social Otimizado em WebP (`core/Seo.php`)
+
+Para maximizar a compatibilidade com redes sociais (WhatsApp, X/Twitter, Facebook, LinkedIn) que rejeitam formatos como AVIF em cards de pré-visualização:
+* **Home, Categorias e Tags:** As tags `<meta property="og:image">` e `<meta name="twitter:image">` consomem dinamicamente o Favicon configurado no portal.
+* **Conversão Forçada para WebP:** O método `ImageProcessor::toWebpUrl()` substitui extensões `.avif`, `.png`, `.jpg` ou `.ico` pela variante correspondente `.webp`, acompanhada do domínio canônico absoluto (`https://...`).
+* **Artigos Individuais:** A imagem de destaque da matéria (`featured_image`) é convertida automaticamente para WebP de alta resolução nas metatags sociais.
+
+### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `templates/page.php`)
+
+Páginas estáticas corporativas (ex: *Nossa Equipe Editorial*, *Contato / Fale Conosco*, *Termos de Uso*, *Política de Privacidade*, *Código de Ética*) são gerenciadas isoladamente na tabela `pages`:
+* **URLs Amigáveis na Raiz:** Servidas diretamente em `/{slug}/` com verificação transparente de colisão com notícias.
+* **Métricas de Leitura:** Contabilização atômica de visualizações (`views`) na tabela de páginas.
+* **Auto-migração de Slugs:** O esquema migra automaticamente slugs legados (ex: `quem-somos` para `nossa-equipe`) mantendo links internos íntegros.
+
+### 8.11. Biblioteca de Ícones Vetoriais SVG Inline (`core/Icon.php`)
+
+Para eliminar o peso excessivo de fontes de ícones de terceiros (como Material Symbols Outlined, que excedia 1 MiB):
+* Os ícones do sistema (`campaign`, `verified`, `sports_score`, `article`, `menu`, etc.) são renderizados diretamente como elementos `<svg>` puros embutidos no HTML.
+* Zero dependência de CDN externa, zero requisições HTTP adicionais e suporte nativo às classes utilitárias de cor e tamanho do Tailwind CSS.
 
 ---
 
