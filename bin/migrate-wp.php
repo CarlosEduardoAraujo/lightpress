@@ -34,6 +34,7 @@ $options = getopt('', [
     'offset::',
     'all',
     'users-only',
+    'asc',
 ]);
 
 $isDryRun = isset($options['dry-run']);
@@ -46,10 +47,12 @@ $isAll = isset($options['all']);
 $limit = $isAll ? 100000 : (int)($options['limit'] ?? 10);
 $offset = (int)($options['offset'] ?? 0);
 $usersOnly = isset($options['users-only']);
+$order = isset($options['asc']) ? 'ASC' : 'DESC';
 
 echo "[Configuração de Conexão]\n";
 echo "  Modo: " . ($isDryRun ? "DRY-RUN (Simulação - Nenhuma alteração será gravada)" : "PRODUÇÃO / GRAVAÇÃO REAL") . "\n";
 echo "  Origem WordPress: {$wpUser}@{$wpHost}:{$wpPort}/{$wpDb}\n";
+echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)" : "Mais antigas primeiro (ID ASC)") . "\n";
 echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n\n";
 
 // 1. Conexão com a base de dados do WordPress
@@ -106,6 +109,29 @@ $tblPostmeta = "{$wpPrefix}postmeta";
 $tblTerms = "{$wpPrefix}terms";
 $tblTermTax = "{$wpPrefix}term_taxonomy";
 $tblTermRel = "{$wpPrefix}term_relationships";
+
+// Detecção de tabelas do Independent Analytics
+$iaPagesTable = null;
+$iaViewsTable = null;
+foreach (["{$wpPrefix}ia_pages", "{$wpPrefix}_ia_pages", "wp_ia_pages"] as $tp) {
+    try {
+        if ($wpPdo->query("SHOW TABLES LIKE '{$tp}'")->fetchColumn()) {
+            $iaPagesTable = $tp;
+            break;
+        }
+    } catch (\Throwable $e) {}
+}
+foreach (["{$wpPrefix}ia_views", "{$wpPrefix}_ia_views", "wp_ia_views"] as $tv) {
+    try {
+        if ($wpPdo->query("SHOW TABLES LIKE '{$tv}'")->fetchColumn()) {
+            $iaViewsTable = $tv;
+            break;
+        }
+    } catch (\Throwable $e) {}
+}
+if ($iaPagesTable && $iaViewsTable) {
+    echo "[OK] Plugin Independent Analytics detectado: '{$iaPagesTable}' e '{$iaViewsTable}'\n";
+}
 
 // 3. Migração e Mapeamento de Usuários
 echo "========================================================\n";
@@ -197,7 +223,7 @@ $postsStmt = $wpPdo->prepare(
     "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
      FROM {$tblPosts}
      WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')
-     ORDER BY ID ASC
+     ORDER BY ID {$order}
      LIMIT :limit OFFSET :offset"
 );
 $postsStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -345,21 +371,38 @@ foreach ($articles as $p) {
     $sanitizedHtml = BlockCompiler::sanitizeHtml($cleanHtml);
     $contentJson = BlockCompiler::htmlToBlocks($sanitizedHtml);
 
-    // 4.5 Visualizações (Views)
+    // 4.5 Visualizações (Views - Suporte a Independent Analytics e Postmeta)
     $views = 0;
-    // Tentar ler postmeta de visualizações
-    $viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count') LIMIT 1");
-    $viewsStmt->execute([$wpPostId]);
-    $metaViews = $viewsStmt->fetchColumn();
-    if ($metaViews !== false && is_numeric($metaViews)) {
-        $views = (int)$metaViews;
+    if ($iaPagesTable && $iaViewsTable) {
+        try {
+            $iaStmt = $wpPdo->prepare(
+                "SELECT COUNT(*) FROM {$iaViewsTable} v 
+                 JOIN {$iaPagesTable} p ON p.id = v.page_id 
+                 WHERE p.post_id = ?"
+            );
+            $iaStmt->execute([$wpPostId]);
+            $iaCount = (int)$iaStmt->fetchColumn();
+            if ($iaCount > 0) {
+                $views = $iaCount;
+            }
+        } catch (\Throwable $e) {}
+    }
+
+    if ($views === 0) {
+        // Tentar ler postmeta de visualizações tradicionais
+        $viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count', 'ia_views') LIMIT 1");
+        $viewsStmt->execute([$wpPostId]);
+        $metaViews = $viewsStmt->fetchColumn();
+        if ($metaViews !== false && is_numeric($metaViews)) {
+            $views = (int)$metaViews;
+        }
     }
 
     echo "--------------------------------------------------------\n";
     echo "WP #{$wpPostId}: {$title}\n";
     echo "  Slug: /{$slug}/\n";
     echo "  Categoria: {$categorySlug} | Tags: " . ($tagsString ?: '(nenhuma)') . "\n";
-    echo "  Autor ID: #{$targetUserId} | Status: {$status} | Data: " . ($publishedAt ?: 'N/A') . "\n";
+    echo "  Autor ID: #{$targetUserId} | Status: {$status} | Data: " . ($publishedAt ?: 'N/A') . " | Views: {$views}\n";
     echo "  Foto Capa: " . ($featuredImage ?: '(sem imagem)') . "\n";
     if ($seoTitle || $focusKw) {
         echo "  SEO: [Kw: {$focusKw}] Title: {$seoTitle}\n";
