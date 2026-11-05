@@ -32,9 +32,12 @@ $options = getopt('', [
     'prefix::',
     'limit::',
     'offset::',
+    'chunk::',
     'all',
     'users-only',
     'asc',
+    'verbose',
+    'skip-existing',
 ]);
 
 $isDryRun = isset($options['dry-run']);
@@ -46,14 +49,24 @@ $wpPass = $options['wp-pass'] ?? ($config['database']['password'] ?? ($config['d
 $isAll = isset($options['all']);
 $limit = $isAll ? 100000 : (int)($options['limit'] ?? 10);
 $offset = (int)($options['offset'] ?? 0);
+$chunkSize = (int)($options['chunk'] ?? 500);
+if ($chunkSize < 50) $chunkSize = 50;
+if ($chunkSize > 2000) $chunkSize = 2000;
 $usersOnly = isset($options['users-only']);
 $order = isset($options['asc']) ? 'ASC' : 'DESC';
+$isVerbose = ($limit <= 20) || isset($options['verbose']);
+$skipExisting = isset($options['skip-existing']);
 
 echo "[Configuração de Conexão]\n";
 echo "  Modo: " . ($isDryRun ? "DRY-RUN (Simulação - Nenhuma alteração será gravada)" : "PRODUÇÃO / GRAVAÇÃO REAL") . "\n";
 echo "  Origem WordPress: {$wpUser}@{$wpHost}:{$wpPort}/{$wpDb}\n";
 echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)" : "Mais antigas primeiro (ID ASC)") . "\n";
-echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n\n";
+echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n";
+echo "  Modo de Exibição: " . ($isVerbose ? "Detalhado (Card a Card)" : "Alta Performance (Barra de Progresso com lotes de {$chunkSize})") . "\n";
+if ($skipExisting) {
+    echo "  Otimização: Pular artigos já migrados (--skip-existing ATIVADO)\n";
+}
+echo "\n";
 
 // 1. Conexão com a base de dados do WordPress e Atualização de Schema
 if (!$isDryRun) {
@@ -294,387 +307,454 @@ echo "========================================================\n";
 
 $countEligible = (int)$wpPdo->query("SELECT COUNT(*) FROM {$tblPosts} WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')")->fetchColumn();
 echo "Total geral de artigos elegíveis no WordPress: {$countEligible}\n";
-echo "Extraindo lote de {$limit} artigos (Offset {$offset})...\n\n";
+$totalTarget = min($limit, $countEligible);
+echo "Artigos a processar nesta execução: {$totalTarget} (Offset {$offset}, Lotes de {$chunkSize})...\n\n";
 
-$postsStmt = $wpPdo->prepare(
+// 4.1 Pré-compilação e Otimização de Consultas (Prepared Statements Reuse)
+$taxStmt = $wpPdo->prepare(
+    "SELECT t.name, t.slug, tt.taxonomy 
+     FROM {$tblTermRel} tr
+     JOIN {$tblTermTax} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+     JOIN {$tblTerms} t ON t.term_id = tt.term_id
+     WHERE tr.object_id = ?"
+);
+$metaThumbStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key = '_thumbnail_id' LIMIT 1");
+$fileStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key = '_wp_attached_file' LIMIT 1");
+$guidStmt = $wpPdo->prepare("SELECT guid FROM {$tblPosts} WHERE ID = ? LIMIT 1");
+
+$seoStmt = $wpPdo->prepare(
+    "SELECT meta_key, meta_value FROM {$tblPostmeta} 
+     WHERE post_id = ? AND meta_key IN (
+         '_siteseo_titles_title', '_seopress_titles_title', '_yoast_wpseo_title',
+         '_siteseo_titles_desc', '_seopress_titles_desc', '_yoast_wpseo_metadesc',
+         '_siteseo_analysis_target_kw', '_seopress_analysis_target_kw', '_yoast_wpseo_focuskw'
+     )"
+);
+
+$iaStmt = null;
+if ($iaViewsTable && $iaResourcesTable && $iaResourcePostIdCol) {
+    try {
+        $iaStmt = $wpPdo->prepare(
+            "SELECT COUNT(*) FROM {$iaViewsTable} v 
+             JOIN {$iaResourcesTable} r ON r.id = v.resource_id 
+             WHERE r.{$iaResourcePostIdCol} = ?"
+        );
+    } catch (\Throwable $e) {}
+}
+
+$iaDirectStmt = null;
+if ($iaViewsTable) {
+    try {
+        $iaDirectStmt = $wpPdo->prepare("SELECT COUNT(*) FROM {$iaViewsTable} WHERE resource_id = ?");
+    } catch (\Throwable $e) {}
+}
+
+$pvcStmt = null;
+if ($pvcTable && $pvcPostIdCol && $pvcCountCol) {
+    try {
+        $pvcStmt = $wpPdo->prepare("SELECT SUM({$pvcCountCol}) FROM {$pvcTable} WHERE {$pvcPostIdCol} = ?");
+    } catch (\Throwable $e) {}
+}
+
+$viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count', 'ia_views') LIMIT 1");
+
+// Pré-carregar categorias existentes e preparar statements do SpeedPress
+$knownCategories = [];
+$checkMapStmt = null;
+$updatePostStmt = null;
+$insertPostStmt = null;
+$upsertStatsStmt = null;
+$insertMapStmt = null;
+$insertRedirectStmt = null;
+$insertCatStmt = null;
+
+if (!$isDryRun) {
+    try {
+        $existingCats = Database::fetchAll("SELECT slug FROM categories");
+        foreach ($existingCats as $ec) {
+            $knownCategories[$ec['slug']] = true;
+        }
+    } catch (\Throwable $e) {}
+
+    $lpConn = Database::getConnection();
+    $insertCatStmt = $lpConn->prepare("INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)");
+    $checkMapStmt = $lpConn->prepare("SELECT target_id FROM migration_map WHERE source = 'wordpress' AND entity_type = 'post' AND source_id = ? LIMIT 1");
+    $updatePostStmt = $lpConn->prepare(
+        "UPDATE posts SET 
+            user_id = ?, slug = ?, title = ?, summary = ?, category = ?, tags = ?,
+            featured_image = ?, content_json = ?, content_html = ?, status = ?,
+            is_featured = ?,
+            seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = ?
+         WHERE id = ?"
+    );
+    $insertPostStmt = $lpConn->prepare(
+        "INSERT INTO posts (
+            user_id, slug, title, summary, category, tags, featured_image,
+            content_json, content_html, status, is_featured, version,
+            seo_title, seo_description, focus_keyword, published_at, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, 1,
+            ?, ?, ?, ?, ?
+        )"
+    );
+    $upsertStatsStmt = $lpConn->prepare(
+        "INSERT INTO post_stats (post_id, views) VALUES (?, ?) ON DUPLICATE KEY UPDATE views = ?"
+    );
+    $insertMapStmt = $lpConn->prepare(
+        "INSERT INTO migration_map (source, entity_type, source_id, target_id, status) VALUES ('wordpress', 'post', ?, ?, 'completed')"
+    );
+    $insertRedirectStmt = $lpConn->prepare(
+        "INSERT IGNORE INTO redirects (old_path, path_hash, target_path, status_code) VALUES (?, ?, ?, 301)"
+    );
+}
+
+// 4.2 Execução em Streaming por Chunks de Memória Controlada
+$postsQuery = $wpPdo->prepare(
     "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
      FROM {$tblPosts}
      WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')
      ORDER BY ID {$order}
      LIMIT :limit OFFSET :offset"
 );
-$postsStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-$postsStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-$postsStmt->execute();
-$articles = $postsStmt->fetchAll();
 
+$processed = 0;
 $converted = 0;
 $skipped = 0;
+$alreadyExisted = 0;
+$currentOffset = $offset;
+$startTime = microtime(true);
 
-foreach ($articles as $p) {
-    $wpPostId = (int)$p['ID'];
-    $title = trim($p['post_title']);
-    if (empty($title)) {
-        $title = "Publicação #{$wpPostId}";
+while ($processed < $totalTarget) {
+    $batchLimit = min($chunkSize, $totalTarget - $processed);
+    $postsQuery->bindValue(':limit', $batchLimit, PDO::PARAM_INT);
+    $postsQuery->bindValue(':offset', $currentOffset, PDO::PARAM_INT);
+    $postsQuery->execute();
+    $articles = $postsQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($articles)) {
+        break;
     }
 
-    $slug = !empty($p['post_name']) ? Security::slugify($p['post_name']) : Security::slugify($title);
-    $rawContent = (string)$p['post_content'];
-    $summary = !empty($p['post_excerpt']) ? trim($p['post_excerpt']) : null;
-    $wpAuthorId = (int)$p['post_author'];
-    $targetUserId = $userMap[$wpAuthorId] ?? (reset($userMap) ?: 1);
+    foreach ($articles as $p) {
+        $wpPostId = (int)$p['ID'];
 
-    // Mapeamento de Status
-    $status = match ($p['post_status']) {
-        'publish' => 'published',
-        'future' => 'scheduled',
-        'pending' => 'pending_review',
-        'trash' => 'archived',
-        default => 'draft',
-    };
-
-    $publishedAt = ($status === 'published' || $status === 'scheduled')
-        ? (!empty($p['post_date_gmt']) && $p['post_date_gmt'] !== '0000-00-00 00:00:00' ? $p['post_date_gmt'] : $p['post_date'])
-        : null;
-
-    $updatedAt = !empty($p['post_modified']) && $p['post_modified'] !== '0000-00-00 00:00:00' ? $p['post_modified'] : ($publishedAt ?: date('Y-m-d H:i:s'));
-
-    // 4.1 Mapeamento Inteligente de Categorias, Tags e Destaques da Home
-    $taxStmt = $wpPdo->prepare(
-        "SELECT t.name, t.slug, tt.taxonomy 
-         FROM {$tblTermRel} tr
-         JOIN {$tblTermTax} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
-         JOIN {$tblTerms} t ON t.term_id = tt.term_id
-         WHERE tr.object_id = ?"
-    );
-    $taxStmt->execute([$wpPostId]);
-    $termsData = $taxStmt->fetchAll();
-
-    $categorySlug = 'geral';
-    $categoriesList = [];
-    $tagsList = [];
-    $isFeatured = 0;
-
-    foreach ($termsData as $tRow) {
-        if ($tRow['taxonomy'] === 'category') {
-            $catSlug = Security::slugify($tRow['slug']);
-            // Se pertencer à categoria 'destaques', marca para o Hero Quad Grid da Home no SpeedPress
-            if (in_array($catSlug, ['destaque', 'destaques', 'destaques-home', 'featured'], true)) {
-                $isFeatured = 1;
+        // Otimização: pular registros já migrados se --skip-existing estiver ativo
+        if ($skipExisting && !$isDryRun && $checkMapStmt) {
+            $checkMapStmt->execute([(string)$wpPostId]);
+            if ($checkMapStmt->fetchColumn()) {
+                $alreadyExisted++;
+                $processed++;
+                $currentOffset++;
                 continue;
             }
-            if (!empty($catSlug) && !in_array($catSlug, ['sem-categoria', 'uncategorized'], true)) {
-                $categoriesList[] = [
-                    'slug' => $catSlug,
-                    'name' => trim($tRow['name']),
-                ];
-            }
-        } elseif ($tRow['taxonomy'] === 'post_tag') {
-            $tagName = trim($tRow['name']);
-            if (!empty($tagName)) {
-                $tagsList[] = $tagName;
-            }
         }
-    }
 
-    // A primeira categoria temática real vira a categoria principal do artigo
-    if (!empty($categoriesList)) {
-        $primaryCat = array_shift($categoriesList);
-        $categorySlug = $primaryCat['slug'];
-        if (!$isDryRun) {
-            Database::query(
-                "INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)",
-                [$primaryCat['slug'], $primaryCat['name']]
-            );
+        $title = trim($p['post_title']);
+        if (empty($title)) {
+            $title = "Publicação #{$wpPostId}";
         }
-        // As demais categorias secundárias viram tags adicionais (ex: eventos multiplataforma)
-        foreach ($categoriesList as $secCat) {
-            $tagsList[] = $secCat['name'];
-            if (!$isDryRun) {
-                Database::query(
-                    "INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)",
-                    [$secCat['slug'], $secCat['name']]
-                );
-            }
-        }
-    }
 
-    $tagsString = !empty($tagsList) ? implode(', ', array_unique($tagsList)) : null;
+        $slug = !empty($p['post_name']) ? Security::slugify($p['post_name']) : Security::slugify($title);
+        $rawContent = (string)$p['post_content'];
+        $summary = !empty($p['post_excerpt']) ? trim($p['post_excerpt']) : null;
+        $wpAuthorId = (int)$p['post_author'];
+        $targetUserId = $userMap[$wpAuthorId] ?? (reset($userMap) ?: 1);
 
-    // 4.2 Imagem Destacada (Featured Image / Thumbnail)
-    $metaThumbStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key = '_thumbnail_id' LIMIT 1");
-    $metaThumbStmt->execute([$wpPostId]);
-    $thumbAttachmentId = (int)$metaThumbStmt->fetchColumn();
+        // Mapeamento de Status
+        $status = match ($p['post_status']) {
+            'publish' => 'published',
+            'future' => 'scheduled',
+            'pending' => 'pending_review',
+            'trash' => 'archived',
+            default => 'draft',
+        };
 
-    $featuredImage = null;
-    if ($thumbAttachmentId > 0) {
-        // Buscar arquivo anexo
-        $fileStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key = '_wp_attached_file' LIMIT 1");
-        $fileStmt->execute([$thumbAttachmentId]);
-        $attachedFile = $fileStmt->fetchColumn();
+        $publishedAt = ($status === 'published' || $status === 'scheduled')
+            ? (!empty($p['post_date_gmt']) && $p['post_date_gmt'] !== '0000-00-00 00:00:00' ? $p['post_date_gmt'] : $p['post_date'])
+            : null;
 
-        if (!empty($attachedFile)) {
-            $featuredImage = "/uploads/" . ltrim($attachedFile, '/');
-        } else {
-            // Tentar guid do attachment
-            $guidStmt = $wpPdo->prepare("SELECT guid FROM {$tblPosts} WHERE ID = ? LIMIT 1");
-            $guidStmt->execute([$thumbAttachmentId]);
-            $guid = (string)$guidStmt->fetchColumn();
-            if (!empty($guid)) {
-                $parsed = parse_url($guid, PHP_URL_PATH);
-                if ($parsed && str_contains($parsed, '/uploads/')) {
-                    $featuredImage = substr($parsed, strpos($parsed, '/uploads/'));
+        $updatedAt = !empty($p['post_modified']) && $p['post_modified'] !== '0000-00-00 00:00:00' ? $p['post_modified'] : ($publishedAt ?: date('Y-m-d H:i:s'));
+
+        // Taxonomias (Categorias, Tags e Destaques)
+        $taxStmt->execute([$wpPostId]);
+        $termsData = $taxStmt->fetchAll();
+
+        $categorySlug = 'geral';
+        $categoriesList = [];
+        $tagsList = [];
+        $isFeatured = 0;
+
+        foreach ($termsData as $tRow) {
+            if ($tRow['taxonomy'] === 'category') {
+                $catSlug = Security::slugify($tRow['slug']);
+                if (in_array($catSlug, ['destaque', 'destaques', 'destaques-home', 'featured'], true)) {
+                    $isFeatured = 1;
+                    continue;
+                }
+                if (!empty($catSlug) && !in_array($catSlug, ['sem-categoria', 'uncategorized'], true)) {
+                    $categoriesList[] = [
+                        'slug' => $catSlug,
+                        'name' => trim($tRow['name']),
+                    ];
+                }
+            } elseif ($tRow['taxonomy'] === 'post_tag') {
+                $tagName = trim($tRow['name']);
+                if (!empty($tagName)) {
+                    $tagsList[] = $tagName;
                 }
             }
         }
-    }
 
-    // 4.3 SEO - Suporte ao SiteSEO Pro / SEOPress / Yoast
-    $seoStmt = $wpPdo->prepare(
-        "SELECT meta_key, meta_value FROM {$tblPostmeta} 
-         WHERE post_id = ? AND meta_key IN (
-             '_siteseo_titles_title', '_seopress_titles_title', '_yoast_wpseo_title',
-             '_siteseo_titles_desc', '_seopress_titles_desc', '_yoast_wpseo_metadesc',
-             '_siteseo_analysis_target_kw', '_seopress_analysis_target_kw', '_yoast_wpseo_focuskw'
-         )"
-    );
-    $seoStmt->execute([$wpPostId]);
-    $seoRows = $seoStmt->fetchAll();
-    
-    $seoTitle = null;
-    $seoDesc = null;
-    $focusKw = null;
-
-    foreach ($seoRows as $sr) {
-        $k = $sr['meta_key'];
-        $v = trim((string)$sr['meta_value']);
-        if (empty($v)) continue;
-
-        if (in_array($k, ['_siteseo_titles_title', '_seopress_titles_title', '_yoast_wpseo_title'], true) && empty($seoTitle)) {
-            $seoTitle = $v;
-        } elseif (in_array($k, ['_siteseo_titles_desc', '_seopress_titles_desc', '_yoast_wpseo_metadesc'], true) && empty($seoDesc)) {
-            $seoDesc = $v;
-        } elseif (in_array($k, ['_siteseo_analysis_target_kw', '_seopress_analysis_target_kw', '_yoast_wpseo_focuskw'], true) && empty($focusKw)) {
-            $focusKw = $v;
+        // Categoria principal e secundárias
+        if (!empty($categoriesList)) {
+            $primaryCat = array_shift($categoriesList);
+            $categorySlug = $primaryCat['slug'];
+            if (!$isDryRun && empty($knownCategories[$primaryCat['slug']]) && $insertCatStmt) {
+                try {
+                    $insertCatStmt->execute([$primaryCat['slug'], $primaryCat['name']]);
+                    $knownCategories[$primaryCat['slug']] = true;
+                } catch (\Throwable $e) {}
+            }
+            foreach ($categoriesList as $secCat) {
+                $tagsList[] = $secCat['name'];
+                if (!$isDryRun && empty($knownCategories[$secCat['slug']]) && $insertCatStmt) {
+                    try {
+                        $insertCatStmt->execute([$secCat['slug'], $secCat['name']]);
+                        $knownCategories[$secCat['slug']] = true;
+                    } catch (\Throwable $e) {}
+                }
+            }
         }
-    }
 
-    // 4.4 Limpeza de Conteúdo Legado (Gutenberg, shortcodes do WP e Sanitização)
-    $cleanHtml = $rawContent;
-    // Remover comentários de bloco Gutenberg
-    $cleanHtml = preg_replace('/<!--\s*\/?wp:[^>]*-->/', '', $cleanHtml);
-    // Remover shortcodes de caption do WordPress [caption ...]...[/caption]
-    $cleanHtml = preg_replace('/\[caption[^\]]*\](.*?)\[\/caption\]/is', '$1', $cleanHtml);
-    // Remover outros shortcodes genéricos [shortcode]
-    $cleanHtml = preg_replace('/\[\/?[a-zA-Z0-9_-]+[^\]]*\]/', '', $cleanHtml);
+        $tagsString = !empty($tagsList) ? implode(', ', array_unique($tagsList)) : null;
 
-    // Sanitizar via BlockCompiler
-    $sanitizedHtml = BlockCompiler::sanitizeHtml($cleanHtml);
-    $contentJson = BlockCompiler::htmlToBlocks($sanitizedHtml);
+        // Imagem Destacada
+        $metaThumbStmt->execute([$wpPostId]);
+        $thumbAttachmentId = (int)$metaThumbStmt->fetchColumn();
 
-    // Se o resumo original do WP estiver vazio, gerar automaticamente a partir do início do conteúdo limpo
-    if (empty($summary) && !empty($sanitizedHtml)) {
-        $plainText = strip_tags($sanitizedHtml);
-        $plainText = html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $plainText = preg_replace('/\s+/', ' ', $plainText);
-        $plainText = trim($plainText);
-        if (!empty($plainText)) {
-            $summary = mb_strlen($plainText, 'UTF-8') > 180 
-                ? mb_substr($plainText, 0, 177, 'UTF-8') . '...' 
-                : $plainText;
+        $featuredImage = null;
+        if ($thumbAttachmentId > 0) {
+            $fileStmt->execute([$thumbAttachmentId]);
+            $attachedFile = $fileStmt->fetchColumn();
+
+            if (!empty($attachedFile)) {
+                $featuredImage = "/uploads/" . ltrim($attachedFile, '/');
+            } else {
+                $guidStmt->execute([$thumbAttachmentId]);
+                $guid = (string)$guidStmt->fetchColumn();
+                if (!empty($guid)) {
+                    $parsed = parse_url($guid, PHP_URL_PATH);
+                    if ($parsed && str_contains($parsed, '/uploads/')) {
+                        $featuredImage = substr($parsed, strpos($parsed, '/uploads/'));
+                    }
+                }
+            }
         }
-    }
 
-    // 4.5 Visualizações (Views - Suporte a Independent Analytics e Postmeta)
-    $views = 0;
-    if ($iaViewsTable) {
-        try {
-            // Tentativa A: Se existe tabela de recursos com coluna de id do post
-            if ($iaResourcesTable && $iaResourcePostIdCol) {
-                $iaStmt = $wpPdo->prepare(
-                    "SELECT COUNT(*) FROM {$iaViewsTable} v 
-                     JOIN {$iaResourcesTable} r ON r.id = v.resource_id 
-                     WHERE r.{$iaResourcePostIdCol} = ?"
-                );
+        // SEO
+        $seoStmt->execute([$wpPostId]);
+        $seoRows = $seoStmt->fetchAll();
+        $seoTitle = null;
+        $seoDesc = null;
+        $focusKw = null;
+
+        foreach ($seoRows as $sr) {
+            $k = $sr['meta_key'];
+            $v = trim((string)$sr['meta_value']);
+            if (empty($v)) continue;
+
+            if (in_array($k, ['_siteseo_titles_title', '_seopress_titles_title', '_yoast_wpseo_title'], true) && empty($seoTitle)) {
+                $seoTitle = $v;
+            } elseif (in_array($k, ['_siteseo_titles_desc', '_seopress_titles_desc', '_yoast_wpseo_metadesc'], true) && empty($seoDesc)) {
+                $seoDesc = $v;
+            } elseif (in_array($k, ['_siteseo_analysis_target_kw', '_seopress_analysis_target_kw', '_yoast_wpseo_focuskw'], true) && empty($focusKw)) {
+                $focusKw = $v;
+            }
+        }
+
+        // Limpeza de Conteúdo Legado e Blocos
+        $cleanHtml = $rawContent;
+        $cleanHtml = preg_replace('/<!--\s*\/?wp:[^>]*-->/', '', $cleanHtml);
+        $cleanHtml = preg_replace('/\[caption[^\]]*\](.*?)\[\/caption\]/is', '$1', $cleanHtml);
+        $cleanHtml = preg_replace('/\[\/?[a-zA-Z0-9_-]+[^\]]*\]/', '', $cleanHtml);
+
+        $sanitizedHtml = BlockCompiler::sanitizeHtml($cleanHtml);
+        $contentJson = BlockCompiler::htmlToBlocks($sanitizedHtml);
+
+        // Resumo Automático se vazio
+        if (empty($summary) && !empty($sanitizedHtml)) {
+            $plainText = strip_tags($sanitizedHtml);
+            $plainText = html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $plainText = preg_replace('/\s+/', ' ', $plainText);
+            $plainText = trim($plainText);
+            if (!empty($plainText)) {
+                $summary = mb_strlen($plainText, 'UTF-8') > 180 
+                    ? mb_substr($plainText, 0, 177, 'UTF-8') . '...' 
+                    : $plainText;
+            }
+        }
+
+        // Visualizações (Independent Analytics / PVC / Postmeta)
+        $views = 0;
+        if ($iaStmt) {
+            try {
                 $iaStmt->execute([$wpPostId]);
                 $views = (int)$iaStmt->fetchColumn();
-            }
-
-            // Tentativa B: Se a tabela views tem resource_id apontando diretamente para o WP Post ID
-            if ($views === 0) {
-                $iaDirectStmt = $wpPdo->prepare("SELECT COUNT(*) FROM {$iaViewsTable} WHERE resource_id = ?");
+            } catch (\Throwable $e) {}
+        }
+        if ($views === 0 && $iaDirectStmt) {
+            try {
                 $iaDirectStmt->execute([$wpPostId]);
                 $directCount = (int)$iaDirectStmt->fetchColumn();
-                if ($directCount > 0) {
-                    $views = $directCount;
-                }
-            }
-        } catch (\Throwable $e) {}
-    }
-
-    if ($views === 0 && $iaPagesTable && $iaViewsTable) {
-        try {
-            $iaStmt = $wpPdo->prepare(
-                "SELECT COUNT(*) FROM {$iaViewsTable} v 
-                 JOIN {$iaPagesTable} p ON p.id = v.page_id 
-                 WHERE p.post_id = ?"
-            );
-            $iaStmt->execute([$wpPostId]);
-            $views = (int)$iaStmt->fetchColumn();
-        } catch (\Throwable $e) {}
-    }
-
-    if ($views === 0) {
-        // Fallback A: Post Views Counter (tabela dedicada spvc)
-        if ($pvcTable && $pvcPostIdCol && $pvcCountCol) {
+                if ($directCount > 0) $views = $directCount;
+            } catch (\Throwable $e) {}
+        }
+        if ($views === 0 && $pvcStmt) {
             try {
-                $pvcStmt = $wpPdo->prepare("SELECT SUM({$pvcCountCol}) FROM {$pvcTable} WHERE {$pvcPostIdCol} = ?");
                 $pvcStmt->execute([$wpPostId]);
                 $pvcCount = (int)$pvcStmt->fetchColumn();
-                if ($pvcCount > 0) {
-                    $views = $pvcCount;
+                if ($pvcCount > 0) $views = $pvcCount;
+            } catch (\Throwable $e) {}
+        }
+        if ($views === 0) {
+            try {
+                $viewsStmt->execute([$wpPostId]);
+                $metaViews = $viewsStmt->fetchColumn();
+                if ($metaViews !== false && is_numeric($metaViews)) {
+                    $views = (int)$metaViews;
                 }
             } catch (\Throwable $e) {}
         }
-    }
 
-    if ($views === 0) {
-        // Fallback B: postmeta tradicional (views, post_views_count, ia_views)
-        $viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count', 'ia_views') LIMIT 1");
-        $viewsStmt->execute([$wpPostId]);
-        $metaViews = $viewsStmt->fetchColumn();
-        if ($metaViews !== false && is_numeric($metaViews)) {
-            $views = (int)$metaViews;
+        // Exibição Detalhada (se modo verbose ou lote pequeno <= 20)
+        if ($isVerbose) {
+            $blockCount = 0;
+            if (!empty($contentJson)) {
+                $decodedBlocks = json_decode($contentJson, true);
+                if (is_array($decodedBlocks)) $blockCount = count($decodedBlocks);
+            }
+            $contentChars = mb_strlen(strip_tags($sanitizedHtml), 'UTF-8');
+            $featuredBadge = $isFeatured ? " [⭐ DESTAQUE DA HOME]" : "";
+
+            echo "--------------------------------------------------------\n";
+            echo "WP #{$wpPostId}: {$title}{$featuredBadge}\n";
+            echo "  Slug: /{$slug}/\n";
+            echo "  Categoria: {$categorySlug} | Tags: " . ($tagsString ?: '(nenhuma)') . "\n";
+            echo "  Autor ID: #{$targetUserId} | Status: {$status} | Data: " . ($publishedAt ?: 'N/A') . " | Views: {$views}\n";
+            if (!empty($summary)) {
+                $previewSummary = mb_strlen($summary, 'UTF-8') > 90 ? mb_substr($summary, 0, 87, 'UTF-8') . '...' : $summary;
+                echo "  Resumo: \"{$previewSummary}\"\n";
+            } else {
+                echo "  Resumo: (sem resumo)\n";
+            }
+            echo "  Conteúdo: {$contentChars} caracteres | {$blockCount} blocos de editor\n";
+            echo "  Foto Capa: " . ($featuredImage ?: '(sem imagem)') . "\n";
+            if ($seoTitle || $focusKw) {
+                echo "  SEO: [Kw: {$focusKw}] Title: {$seoTitle}\n";
+            }
         }
-    }
 
-    $blockCount = 0;
-    if (!empty($contentJson)) {
-        $decodedBlocks = json_decode($contentJson, true);
-        if (is_array($decodedBlocks)) {
-            $blockCount = count($decodedBlocks);
+        if ($isDryRun) {
+            $converted++;
+            $processed++;
+            $currentOffset++;
+            continue;
         }
-    }
-    $contentChars = mb_strlen(strip_tags($sanitizedHtml), 'UTF-8');
-    $featuredBadge = $isFeatured ? " [⭐ DESTAQUE DA HOME]" : "";
 
-    echo "--------------------------------------------------------\n";
-    echo "WP #{$wpPostId}: {$title}{$featuredBadge}\n";
-    echo "  Slug: /{$slug}/\n";
-    echo "  Categoria: {$categorySlug} | Tags: " . ($tagsString ?: '(nenhuma)') . "\n";
-    echo "  Autor ID: #{$targetUserId} | Status: {$status} | Data: " . ($publishedAt ?: 'N/A') . " | Views: {$views}\n";
-    if (!empty($summary)) {
-        $previewSummary = mb_strlen($summary, 'UTF-8') > 90 ? mb_substr($summary, 0, 87, 'UTF-8') . '...' : $summary;
-        echo "  Resumo: \"{$previewSummary}\"\n";
-    } else {
-        echo "  Resumo: (sem resumo)\n";
-    }
-    echo "  Conteúdo: {$contentChars} caracteres | {$blockCount} blocos de editor\n";
-    echo "  Foto Capa: " . ($featuredImage ?: '(sem imagem)') . "\n";
-    if ($seoTitle || $focusKw) {
-        echo "  SEO: [Kw: {$focusKw}] Title: {$seoTitle}\n";
-    }
+        // Gravação Transacional de Alta Velocidade no SpeedPress
+        try {
+            Database::transaction(function (\PDO $lpPdo) use (
+                $wpPostId, $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
+                $featuredImage, $contentJson, $sanitizedHtml, $status, $isFeatured, $publishedAt, $updatedAt,
+                $seoTitle, $seoDesc, $focusKw, $views,
+                $checkMapStmt, $updatePostStmt, $insertPostStmt, $upsertStatsStmt, $insertMapStmt, $insertRedirectStmt
+            ): void {
+                $checkMapStmt->execute([(string)$wpPostId]);
+                $existingTargetId = $checkMapStmt->fetchColumn();
 
-    if ($isDryRun) {
-        $converted++;
-        continue;
-    }
-
-    // Gravação Atômica Transacional no SpeedPress
-    try {
-        Database::transaction(function (\PDO $lpPdo) use (
-            $wpPostId, $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
-            $featuredImage, $contentJson, $sanitizedHtml, $status, $isFeatured, $publishedAt, $updatedAt,
-            $seoTitle, $seoDesc, $focusKw, $views
-        ): void {
-            // Verificar se já foi migrado
-            $existing = Database::fetchOne(
-                "SELECT target_id FROM migration_map WHERE source = 'wordpress' AND entity_type = 'post' AND source_id = ? LIMIT 1",
-                [(string)$wpPostId]
-            );
-
-            if ($existing) {
-                // Atualizar dados do artigo existente
-                $targetId = (int)$existing['target_id'];
-                Database::query(
-                    "UPDATE posts SET 
-                        user_id = ?, slug = ?, title = ?, summary = ?, category = ?, tags = ?,
-                        featured_image = ?, content_json = ?, content_html = ?, status = ?,
-                        is_featured = ?,
-                        seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = ?
-                     WHERE id = ?",
-                    [
+                if ($existingTargetId) {
+                    $targetId = (int)$existingTargetId;
+                    $updatePostStmt->execute([
                         $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
                         $featuredImage, $contentJson, $sanitizedHtml, $status,
                         $isFeatured,
                         $seoTitle, $seoDesc, $focusKw, $publishedAt, $updatedAt,
                         $targetId
-                    ]
-                );
-                return;
-            }
+                    ]);
+                    $upsertStatsStmt->execute([$targetId, $views, $views]);
+                    return;
+                }
 
-            // Inserir novo artigo
-            Database::query(
-                "INSERT INTO posts (
-                    user_id, slug, title, summary, category, tags, featured_image,
-                    content_json, content_html, status, is_featured, version,
-                    seo_title, seo_description, focus_keyword, published_at, updated_at
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, 1,
-                    ?, ?, ?, ?, ?
-                )",
-                [
+                $insertPostStmt->execute([
                     $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
                     $featuredImage, $contentJson, $sanitizedHtml, $status, $isFeatured,
                     $seoTitle, $seoDesc, $focusKw, $publishedAt, $updatedAt
-                ]
-            );
+                ]);
+                $newPostId = (int)$lpPdo->lastInsertId();
 
-            $newPostId = (int)Database::lastInsertId();
+                $upsertStatsStmt->execute([$newPostId, $views, $views]);
+                $insertMapStmt->execute([(string)$wpPostId, (string)$newPostId]);
 
-            // Gravar post_stats com views do WordPress
-            Database::query(
-                "INSERT INTO post_stats (post_id, views) VALUES (?, ?) ON DUPLICATE KEY UPDATE views = ?",
-                [$newPostId, $views, $views]
-            );
+                $oldPath = "/?p={$wpPostId}";
+                $pathHash = hash('sha256', $oldPath);
+                $insertRedirectStmt->execute([$oldPath, $pathHash, "/{$slug}/"]);
+            });
 
-            // Gravar mapa de migração
-            Database::query(
-                "INSERT INTO migration_map (source, entity_type, source_id, target_id, status)
-                 VALUES ('wordpress', 'post', ?, ?, 'completed')",
-                [(string)$wpPostId, (string)$newPostId]
-            );
+            if ($isVerbose) {
+                echo "  -> [SUCESSO] Migrado com sucesso para o SpeedPress!\n";
+            }
+            $converted++;
+        } catch (\Throwable $e) {
+            if ($isVerbose) {
+                echo "  -> [ERRO] Falha ao gravar WP #{$wpPostId}: " . $e->getMessage() . "\n";
+            } else {
+                echo "\n  -> [ERRO] WP #{$wpPostId}: " . $e->getMessage() . "\n";
+            }
+            $skipped++;
+        }
 
-            // Redirecionamento canônico 301 caso o permalink original do WP tenha sido /?p=123
-            $oldPath = "/?p={$wpPostId}";
-            $pathHash = hash('sha256', $oldPath);
-            Database::query(
-                "INSERT IGNORE INTO redirects (old_path, path_hash, target_path, status_code)
-                 VALUES (?, ?, ?, 301)",
-                [$oldPath, $pathHash, "/{$slug}/"]
-            );
-        });
+        $processed++;
+        $currentOffset++;
 
-        echo "  -> [SUCESSO] Migrado com sucesso para o SpeedPress!\n";
-        $converted++;
-    } catch (\Throwable $e) {
-        echo "  -> [ERRO] Falha ao gravar WP #{$wpPostId}: " . $e->getMessage() . "\n";
-        $skipped++;
+        // Barra de Progresso em Tempo Real (para lotes médios e grandes)
+        if (!$isVerbose) {
+            if ($processed % 25 === 0 || $processed === $totalTarget) {
+                $elapsed = microtime(true) - $startTime;
+                $speed = $elapsed > 0 ? round($processed / $elapsed, 1) : 0;
+                $percent = round(($processed / $totalTarget) * 100, 1);
+                $remainingSec = $speed > 0 ? round(($totalTarget - $processed) / $speed) : 0;
+                $remMin = floor($remainingSec / 60);
+                $remSec = $remainingSec % 60;
+                $remStr = sprintf("%02dm%02ds", $remMin, $remSec);
+                
+                echo "\r[Migrando] {$processed}/{$totalTarget} ({$percent}%) | Velocidade: {$speed} art/s | Sucessos: {$converted} | Erros: {$skipped} | Restante: ~{$remStr}   ";
+                flush();
+            }
+        }
     }
+
+    gc_collect_cycles();
 }
 
-echo "\n========================================================\n";
-echo "   Resumo da Migração\n";
+$totalElapsed = microtime(true) - $startTime;
+$avgSpeed = $totalElapsed > 0 ? round($processed / $totalElapsed, 1) : 0;
+$totalMin = floor($totalElapsed / 60);
+$totalSec = round($totalElapsed - ($totalMin * 60));
+
+echo "\n\n========================================================\n";
+echo "   Resumo da Migração SpeedPress\n";
 echo "========================================================\n";
-echo "Lote solicitado: {$limit}\n";
-echo "Artigos processados: " . count($articles) . "\n";
-echo "Migrados com sucesso: {$converted}\n";
+echo "Tempo Total: {$totalMin}m {$totalSec}s (Média: {$avgSpeed} artigos/segundo)\n";
+echo "Artigos processados: {$processed}\n";
+echo "Migrados / Atualizados: {$converted}\n";
+if ($alreadyExisted > 0) {
+    echo "Pulados já existentes: {$alreadyExisted}\n";
+}
 echo "Falhas / Ignorados: {$skipped}\n";
 echo "========================================================\n\n";
 
 if ($isDryRun) {
     echo "Execute sem a flag --dry-run para aplicar a gravação real:\n";
-    echo "php bin/migrate-wp.php --limit=10\n\n";
+    echo "php bin/migrate-wp.php --limit=1000\n\n";
 }
