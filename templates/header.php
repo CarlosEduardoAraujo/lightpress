@@ -193,9 +193,38 @@ if (empty($trendingTags)) {
     <style>
         @layer base {
             html, body { margin: 0; padding: 0; }
-            body { overscroll-behavior: none; }
         }
-        ::-webkit-scrollbar { display: none; }
+        /* Barra de rolagem visível e moderna adaptada aos modos Claro e Escuro */
+        html {
+            scrollbar-color: #94a3b8 transparent;
+            scrollbar-width: thin;
+        }
+        html.dark {
+            scrollbar-color: #3b4252 #111418;
+        }
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        html.dark ::-webkit-scrollbar-thumb {
+            background: #333a48;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #E10600;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
     </style>
 </head>
 <body class="bg-surface dark:bg-carbon-black font-body-md text-on-surface dark:text-pure-white antialiased transition-colors duration-200">
