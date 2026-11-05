@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Dark Mode Completo no Painel Administrativo:**
+  - Implementado suporte a Modo Escuro instantâneo e sem flash em todas as telas administrativas (`/admin/dashboard.php`, `/admin/stats.php`, `/admin/categories.php` e `/admin/users.php`).
+  - Botão de alternância com persistência automática no `localStorage` sincronizado entre o painel e o site público.
 - **Consumo Padronizado de Miniaturas AVIF (`-thumb.avif`):**
   - Ajustado o método `ImageProcessor::toThumbUrl($url, 'avif')` para priorizar estritamente a variante `-thumb.avif` no HTML de renderização, mantendo a regra de ouro do LightPress (HTML sempre requisita AVIF, deixando WebP reservado exclusivamente para metadados sociais e fallback automático transparente no Nginx).
 - **Consumo Otimizado da Variante Thumbnail (`-thumb.webp`):**

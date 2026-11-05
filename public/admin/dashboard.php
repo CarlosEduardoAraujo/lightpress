@@ -182,6 +182,19 @@ function buildFilterUrl(array $overrides = []): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Editorial - SpeedPress</title>
+
+    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --primary: #0f172a;
@@ -194,8 +207,26 @@ function buildFilterUrl(array $overrides = []): string {
             --radius: 8px;
             --font: system-ui, -apple-system, sans-serif;
         }
+        [data-theme="dark"] {
+            --primary: #f8fafc;
+            --primary-accent: #3b82f6;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
+        
+        [data-theme="dark"] th { background: #0f172a; }
+        [data-theme="dark"] tr:hover td { background: #162036; }
+        [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; }
+        [data-theme="dark"] .btn-filter:hover { background: #334155; }
+        [data-theme="dark"] .form-select, [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
+        [data-theme="dark"] .star-inactive { background: #1e293b; color: #64748b; border-color: #334155; }
         
         .site-header { 
             background: var(--surface); 
@@ -207,6 +238,7 @@ function buildFilterUrl(array $overrides = []): string {
             position: sticky;
             top: 0;
             z-index: 100;
+            transition: background 0.2s, border-color 0.2s;
         }
         .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.35rem; }
         .brand span { color: var(--primary-accent); }
@@ -216,6 +248,22 @@ function buildFilterUrl(array $overrides = []): string {
         
         .user-menu { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
         .user-menu a.logout { color: #dc2626; text-decoration: none; font-weight: 600; }
+
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--border); }
         
         .container { max-width: 1550px; margin: 2rem auto; padding: 0 1.5rem; }
         
@@ -370,6 +418,7 @@ function buildFilterUrl(array $overrides = []): string {
         <div class="user-menu">
             <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong> (<?= Security::e($currentUser['role']) ?>)</span>
             <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Meu Perfil</a>
+            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
             <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" class="logout">Sair</a>
         </div>
     </header>
@@ -614,5 +663,22 @@ function buildFilterUrl(array $overrides = []): string {
             <?php endif; ?>
         </div>
     </div>
+    <script>
+        function updateThemeIcon() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var btn = document.getElementById('btnThemeToggle');
+            if (btn) {
+                btn.innerText = (current === 'dark') ? '☀️' : '🌙';
+            }
+        }
+        function toggleTheme() {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            updateThemeIcon();
+        }
+        updateThemeIcon();
+    </script>
 </body>
 </html>

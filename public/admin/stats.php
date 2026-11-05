@@ -80,6 +80,19 @@ $csrfToken = Security::generateCsrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estatísticas & Mais Lidas - SpeedPress Admin</title>
+
+    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --primary: #0f172a;
@@ -92,9 +105,22 @@ $csrfToken = Security::generateCsrfToken();
             --radius: 8px;
             --font: system-ui, -apple-system, sans-serif;
         }
+        [data-theme="dark"] {
+            --primary: #f8fafc;
+            --primary-accent: #3b82f6;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
         
+        [data-theme="dark"] th { background: #0f172a; }
+        [data-theme="dark"] tr:hover td { background: #162036; }
+        [data-theme="dark"] .card-header { background: #0f172a; }
+
         .site-header { 
             background: var(--surface); 
             border-bottom: 1px solid var(--border); 
@@ -105,6 +131,7 @@ $csrfToken = Security::generateCsrfToken();
             position: sticky;
             top: 0;
             z-index: 100;
+            transition: background 0.2s, border-color 0.2s;
         }
         .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
         .brand span { color: var(--primary-accent); }
@@ -113,6 +140,22 @@ $csrfToken = Security::generateCsrfToken();
         .nav-links a:hover, .nav-links a.active { color: var(--primary-accent); }
         
         .user-menu { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
+        
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .theme-btn:hover { background: var(--border); }
         
         .container { max-width: 1450px; margin: 2.5rem auto; padding: 0 1.5rem; }
         .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem; }
@@ -170,6 +213,7 @@ $csrfToken = Security::generateCsrfToken();
         </div>
         <div class="user-menu">
             <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong></span>
+            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
             <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: #dc2626; text-decoration: none; font-weight: 600;">Sair</a>
         </div>
     </header>
@@ -325,5 +369,22 @@ $csrfToken = Security::generateCsrfToken();
             </div>
         </div>
     </div>
+    <script>
+        function updateThemeIcon() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var btn = document.getElementById('btnThemeToggle');
+            if (btn) {
+                btn.innerText = (current === 'dark') ? '☀️' : '🌙';
+            }
+        }
+        function toggleTheme() {
+            var current = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = (current === 'dark') ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            updateThemeIcon();
+        }
+        updateThemeIcon();
+    </script>
 </body>
 </html>
