@@ -110,28 +110,55 @@ $tblTerms = "{$wpPrefix}terms";
 $tblTermTax = "{$wpPrefix}term_taxonomy";
 $tblTermRel = "{$wpPrefix}term_relationships";
 
-// Detecção de tabelas do Independent Analytics
+// Detecção avançada de tabelas do Independent Analytics e estatísticas
+$allTables = $wpPdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
 $iaPagesTable = null;
 $iaViewsTable = null;
-foreach (["{$wpPrefix}ia_pages", "{$wpPrefix}_ia_pages", "wp_ia_pages"] as $tp) {
+$iaResourcesTable = null;
+$iaResourcePostIdCol = null;
+$analyticsTables = [];
+
+foreach ($allTables as $tblName) {
+    $tLower = strtolower($tblName);
+    if (str_contains($tLower, 'ia_') || str_contains($tLower, 'analytics') || str_contains($tLower, 'view')) {
+        $analyticsTables[] = $tblName;
+    }
+    if (str_ends_with($tLower, 'independent_analytics_views') || str_ends_with($tLower, 'ia_views')) {
+        $iaViewsTable = $tblName;
+    }
+    if (str_ends_with($tLower, 'independent_analytics_resources') || str_ends_with($tLower, 'ia_resources')) {
+        $iaResourcesTable = $tblName;
+    }
+    if (str_ends_with($tLower, 'independent_analytics_pages') || str_ends_with($tLower, 'ia_pages')) {
+        $iaPagesTable = $tblName;
+    }
+}
+
+if (!empty($analyticsTables)) {
+    echo "[Info Analytics] Tabelas de estatísticas encontradas no banco:\n";
+    foreach ($analyticsTables as $at) {
+        echo "  - {$at}\n";
+    }
+}
+if ($iaViewsTable) {
     try {
-        if ($wpPdo->query("SHOW TABLES LIKE '{$tp}'")->fetchColumn()) {
-            $iaPagesTable = $tp;
-            break;
+        $viewsCols = $wpPdo->query("SHOW COLUMNS FROM {$iaViewsTable}")->fetchAll(PDO::FETCH_COLUMN);
+        echo "[Info Analytics] Tabela de visualizações: {$iaViewsTable} (" . implode(', ', $viewsCols) . ")\n";
+    } catch (\Throwable $e) {}
+}
+if ($iaResourcesTable) {
+    try {
+        $resCols = $wpPdo->query("SHOW COLUMNS FROM {$iaResourcesTable}")->fetchAll(PDO::FETCH_COLUMN);
+        echo "[Info Analytics] Tabela de recursos: {$iaResourcesTable} (" . implode(', ', $resCols) . ")\n";
+        foreach (['post_id', 'resource_id', 'object_id', 'wp_id'] as $cand) {
+            if (in_array($cand, $resCols, true)) {
+                $iaResourcePostIdCol = $cand;
+                break;
+            }
         }
     } catch (\Throwable $e) {}
 }
-foreach (["{$wpPrefix}ia_views", "{$wpPrefix}_ia_views", "wp_ia_views"] as $tv) {
-    try {
-        if ($wpPdo->query("SHOW TABLES LIKE '{$tv}'")->fetchColumn()) {
-            $iaViewsTable = $tv;
-            break;
-        }
-    } catch (\Throwable $e) {}
-}
-if ($iaPagesTable && $iaViewsTable) {
-    echo "[OK] Plugin Independent Analytics detectado: '{$iaPagesTable}' e '{$iaViewsTable}'\n";
-}
+echo "\n";
 
 // 3. Migração e Mapeamento de Usuários
 echo "========================================================\n";
@@ -262,7 +289,7 @@ foreach ($articles as $p) {
 
     $updatedAt = !empty($p['post_modified']) && $p['post_modified'] !== '0000-00-00 00:00:00' ? $p['post_modified'] : ($publishedAt ?: date('Y-m-d H:i:s'));
 
-    // 4.1 Mapeamento de Categorias e Tags (Taxonomias do WordPress)
+    // 4.1 Mapeamento Inteligente de Categorias, Tags e Destaques da Home
     $taxStmt = $wpPdo->prepare(
         "SELECT t.name, t.slug, tt.taxonomy 
          FROM {$tblTermRel} tr
@@ -274,26 +301,50 @@ foreach ($articles as $p) {
     $termsData = $taxStmt->fetchAll();
 
     $categorySlug = 'geral';
+    $categoriesList = [];
     $tagsList = [];
+    $isFeatured = 0;
 
     foreach ($termsData as $tRow) {
         if ($tRow['taxonomy'] === 'category') {
-            $catCandidate = Security::slugify($tRow['slug']);
-            if (!empty($catCandidate) && $catCandidate !== 'sem-categoria' && $catCandidate !== 'uncategorized') {
-                $categorySlug = $catCandidate;
-                
-                // Se não for simulação, garantir que a categoria existe no SpeedPress
-                if (!$isDryRun) {
-                    Database::query(
-                        "INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)",
-                        [$categorySlug, trim($tRow['name'])]
-                    );
-                }
+            $catSlug = Security::slugify($tRow['slug']);
+            // Se pertencer à categoria 'destaques', marca para o Hero Quad Grid da Home no SpeedPress
+            if (in_array($catSlug, ['destaque', 'destaques', 'destaques-home', 'featured'], true)) {
+                $isFeatured = 1;
+                continue;
+            }
+            if (!empty($catSlug) && !in_array($catSlug, ['sem-categoria', 'uncategorized'], true)) {
+                $categoriesList[] = [
+                    'slug' => $catSlug,
+                    'name' => trim($tRow['name']),
+                ];
             }
         } elseif ($tRow['taxonomy'] === 'post_tag') {
             $tagName = trim($tRow['name']);
             if (!empty($tagName)) {
                 $tagsList[] = $tagName;
+            }
+        }
+    }
+
+    // A primeira categoria temática real vira a categoria principal do artigo
+    if (!empty($categoriesList)) {
+        $primaryCat = array_shift($categoriesList);
+        $categorySlug = $primaryCat['slug'];
+        if (!$isDryRun) {
+            Database::query(
+                "INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)",
+                [$primaryCat['slug'], $primaryCat['name']]
+            );
+        }
+        // As demais categorias secundárias viram tags adicionais (ex: eventos multiplataforma)
+        foreach ($categoriesList as $secCat) {
+            $tagsList[] = $secCat['name'];
+            if (!$isDryRun) {
+                Database::query(
+                    "INSERT IGNORE INTO categories (slug, name, is_active) VALUES (?, ?, 1)",
+                    [$secCat['slug'], $secCat['name']]
+                );
             }
         }
     }
@@ -371,9 +422,47 @@ foreach ($articles as $p) {
     $sanitizedHtml = BlockCompiler::sanitizeHtml($cleanHtml);
     $contentJson = BlockCompiler::htmlToBlocks($sanitizedHtml);
 
+    // Se o resumo original do WP estiver vazio, gerar automaticamente a partir do início do conteúdo limpo
+    if (empty($summary) && !empty($sanitizedHtml)) {
+        $plainText = strip_tags($sanitizedHtml);
+        $plainText = html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plainText = preg_replace('/\s+/', ' ', $plainText);
+        $plainText = trim($plainText);
+        if (!empty($plainText)) {
+            $summary = mb_strlen($plainText, 'UTF-8') > 180 
+                ? mb_substr($plainText, 0, 177, 'UTF-8') . '...' 
+                : $plainText;
+        }
+    }
+
     // 4.5 Visualizações (Views - Suporte a Independent Analytics e Postmeta)
     $views = 0;
-    if ($iaPagesTable && $iaViewsTable) {
+    if ($iaViewsTable) {
+        try {
+            // Tentativa A: Se existe tabela de recursos com coluna de id do post
+            if ($iaResourcesTable && $iaResourcePostIdCol) {
+                $iaStmt = $wpPdo->prepare(
+                    "SELECT COUNT(*) FROM {$iaViewsTable} v 
+                     JOIN {$iaResourcesTable} r ON r.id = v.resource_id 
+                     WHERE r.{$iaResourcePostIdCol} = ?"
+                );
+                $iaStmt->execute([$wpPostId]);
+                $views = (int)$iaStmt->fetchColumn();
+            }
+
+            // Tentativa B: Se a tabela views tem resource_id apontando diretamente para o WP Post ID
+            if ($views === 0) {
+                $iaDirectStmt = $wpPdo->prepare("SELECT COUNT(*) FROM {$iaViewsTable} WHERE resource_id = ?");
+                $iaDirectStmt->execute([$wpPostId]);
+                $directCount = (int)$iaDirectStmt->fetchColumn();
+                if ($directCount > 0) {
+                    $views = $directCount;
+                }
+            }
+        } catch (\Throwable $e) {}
+    }
+
+    if ($views === 0 && $iaPagesTable && $iaViewsTable) {
         try {
             $iaStmt = $wpPdo->prepare(
                 "SELECT COUNT(*) FROM {$iaViewsTable} v 
@@ -381,15 +470,12 @@ foreach ($articles as $p) {
                  WHERE p.post_id = ?"
             );
             $iaStmt->execute([$wpPostId]);
-            $iaCount = (int)$iaStmt->fetchColumn();
-            if ($iaCount > 0) {
-                $views = $iaCount;
-            }
+            $views = (int)$iaStmt->fetchColumn();
         } catch (\Throwable $e) {}
     }
 
     if ($views === 0) {
-        // Tentar ler postmeta de visualizações tradicionais
+        // Fallback: postmeta tradicional (views, post_views_count, ia_views)
         $viewsStmt = $wpPdo->prepare("SELECT meta_value FROM {$tblPostmeta} WHERE post_id = ? AND meta_key IN ('views', 'post_views_count', '_post_views_count', 'ia_views') LIMIT 1");
         $viewsStmt->execute([$wpPostId]);
         $metaViews = $viewsStmt->fetchColumn();
@@ -398,11 +484,28 @@ foreach ($articles as $p) {
         }
     }
 
+    $blockCount = 0;
+    if (!empty($contentJson)) {
+        $decodedBlocks = json_decode($contentJson, true);
+        if (is_array($decodedBlocks)) {
+            $blockCount = count($decodedBlocks);
+        }
+    }
+    $contentChars = mb_strlen(strip_tags($sanitizedHtml), 'UTF-8');
+    $featuredBadge = $isFeatured ? " [⭐ DESTAQUE DA HOME]" : "";
+
     echo "--------------------------------------------------------\n";
-    echo "WP #{$wpPostId}: {$title}\n";
+    echo "WP #{$wpPostId}: {$title}{$featuredBadge}\n";
     echo "  Slug: /{$slug}/\n";
     echo "  Categoria: {$categorySlug} | Tags: " . ($tagsString ?: '(nenhuma)') . "\n";
     echo "  Autor ID: #{$targetUserId} | Status: {$status} | Data: " . ($publishedAt ?: 'N/A') . " | Views: {$views}\n";
+    if (!empty($summary)) {
+        $previewSummary = mb_strlen($summary, 'UTF-8') > 90 ? mb_substr($summary, 0, 87, 'UTF-8') . '...' : $summary;
+        echo "  Resumo: \"{$previewSummary}\"\n";
+    } else {
+        echo "  Resumo: (sem resumo)\n";
+    }
+    echo "  Conteúdo: {$contentChars} caracteres | {$blockCount} blocos de editor\n";
     echo "  Foto Capa: " . ($featuredImage ?: '(sem imagem)') . "\n";
     if ($seoTitle || $focusKw) {
         echo "  SEO: [Kw: {$focusKw}] Title: {$seoTitle}\n";
@@ -417,7 +520,7 @@ foreach ($articles as $p) {
     try {
         Database::transaction(function (\PDO $lpPdo) use (
             $wpPostId, $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
-            $featuredImage, $contentJson, $sanitizedHtml, $status, $publishedAt, $updatedAt,
+            $featuredImage, $contentJson, $sanitizedHtml, $status, $isFeatured, $publishedAt, $updatedAt,
             $seoTitle, $seoDesc, $focusKw, $views
         ): void {
             // Verificar se já foi migrado
@@ -433,11 +536,13 @@ foreach ($articles as $p) {
                     "UPDATE posts SET 
                         user_id = ?, slug = ?, title = ?, summary = ?, category = ?, tags = ?,
                         featured_image = ?, content_json = ?, content_html = ?, status = ?,
+                        is_featured = ?,
                         seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = ?
                      WHERE id = ?",
                     [
                         $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
                         $featuredImage, $contentJson, $sanitizedHtml, $status,
+                        $isFeatured,
                         $seoTitle, $seoDesc, $focusKw, $publishedAt, $updatedAt,
                         $targetId
                     ]
@@ -453,12 +558,12 @@ foreach ($articles as $p) {
                     seo_title, seo_description, focus_keyword, published_at, updated_at
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, 0, 1,
+                    ?, ?, ?, ?, 1,
                     ?, ?, ?, ?, ?
                 )",
                 [
                     $targetUserId, $slug, $title, $summary, $categorySlug, $tagsString,
-                    $featuredImage, $contentJson, $sanitizedHtml, $status,
+                    $featuredImage, $contentJson, $sanitizedHtml, $status, $isFeatured,
                     $seoTitle, $seoDesc, $focusKw, $publishedAt, $updatedAt
                 ]
             );
