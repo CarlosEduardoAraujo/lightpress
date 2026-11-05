@@ -71,7 +71,7 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.2s, color 0.2s; }
         
         header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; transition: background 0.2s, border-color 0.2s; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+        .container { max-width: 1900px; margin: 0 auto; padding: 0 1.5rem; }
         .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 1rem; }
         
         .brand { font-size: 1.45rem; font-weight: 900; letter-spacing: -0.03em; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.35rem; }
@@ -101,7 +101,7 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         .badge { display: inline-block; padding: 0.25rem 0.65rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; background: var(--badge-bg); color: var(--badge-color); border-radius: 6px; }
         
         /* Grid de Cards */
-        .grid-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1.75rem; margin-top: 1.5rem; }
+        .grid-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.75rem; margin-top: 1.5rem; }
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--card-shadow); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
         .card:hover { transform: translateY(-4px); box-shadow: var(--card-hover-shadow); }
         .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: var(--border); display: block; }
@@ -111,6 +111,141 @@ $navCategories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_
         .card-title a:hover { color: var(--primary-accent); }
         .card-summary { font-size: 0.92rem; color: var(--text-muted); margin-bottom: 1.25rem; flex-grow: 1; line-height: 1.6; }
         .card-meta { font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 0.85rem; }
+
+        /* Hero Quad Grid (4 Notícias Destacadas no Topo da Home) */
+        .hero-quad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            margin-bottom: 3rem;
+        }
+        @media (max-width: 1280px) {
+            .hero-quad-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .hero-quad-grid { grid-template-columns: 1fr; }
+        }
+        .hero-quad-card {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            aspect-ratio: 16 / 10;
+            min-height: 220px;
+            background: #090d16;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s;
+            display: block;
+            text-decoration: none;
+            border: 1px solid var(--border);
+        }
+        .hero-quad-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--card-hover-shadow);
+        }
+        .hero-quad-card:hover .hero-quad-img {
+            transform: scale(1.05);
+        }
+        .hero-quad-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .hero-quad-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.6) 45%, rgba(0, 0, 0, 0.05) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 1.25rem 1rem 1rem;
+            color: #ffffff;
+            pointer-events: none;
+        }
+        .hero-quad-badge {
+            align-self: flex-start;
+            background: rgba(37, 99, 235, 0.9);
+            backdrop-filter: blur(4px);
+            color: #ffffff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        .hero-quad-title {
+            color: #ffffff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.35;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Botões de Compartilhamento Social (Sem rastreadores externos) */
+        .share-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.6rem;
+            margin: 1.5rem 0 2rem;
+            padding: 0.9rem 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+        .share-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-right: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .share-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: #ffffff;
+            transition: opacity 0.2s, transform 0.15s;
+            cursor: pointer;
+            border: none;
+        }
+        .share-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .share-btn svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
+        .share-wa { background: #25D366; }
+        .share-x { background: #000000; }
+        [data-theme="dark"] .share-x { background: #24292e; border: 1px solid #444; }
+        .share-fb { background: #1877F2; }
+        .share-tg { background: #229ED9; }
+        .share-copy {
+            background: var(--badge-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .share-copy:hover {
+            background: var(--border);
+        }
 
         /* Super Destaque Hero */
         .hero-card { display: grid; grid-template-columns: 1.2fr 1fr; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--card-shadow); margin-bottom: 3rem; }

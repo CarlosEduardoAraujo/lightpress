@@ -6,42 +6,30 @@ use LightPress\Core\Security;
 require __DIR__ . '/header.php';
 ?>
 
-<?php if (!empty($featured)): ?>
+<?php if (!empty($featuredPosts)): ?>
     <section>
-        <article class="hero-card">
-            <?php if (!empty($featured['featured_image'])): ?>
-                <a href="/<?= Security::e($featured['slug']) ?>/" style="display: block; overflow: hidden;">
-                    <img src="<?= Security::e(ImageProcessor::toAvifUrl($featured['featured_image'])) ?>" alt="<?= Security::e($featured['title']) ?>" class="hero-img">
+        <div class="hero-quad-grid">
+            <?php foreach ($featuredPosts as $feat): ?>
+                <a href="/<?= Security::e($feat['slug']) ?>/" class="hero-quad-card" title="<?= Security::e($feat['title']) ?>">
+                    <?php if (!empty($feat['featured_image'])): ?>
+                        <img src="<?= Security::e(ImageProcessor::toAvifUrl($feat['featured_image'])) ?>" alt="<?= Security::e($feat['title']) ?>" class="hero-quad-img">
+                    <?php else: ?>
+                        <div class="hero-quad-img" style="display: flex; align-items: center; justify-content: center; background: #1e293b; color: #94a3b8; font-size: 0.85rem;">Sem imagem</div>
+                    <?php endif; ?>
+                    <div class="hero-quad-overlay">
+                        <span class="hero-quad-badge"><?= Security::e($feat['category']) ?></span>
+                        <h2 class="hero-quad-title"><?= Security::e($feat['title']) ?></h2>
+                    </div>
                 </a>
-            <?php else: ?>
-                <div class="hero-img" style="display: flex; align-items: center; justify-content: center; color: var(--text-muted); background: var(--border);">Sem imagem</div>
-            <?php endif; ?>
-            <div class="hero-body">
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span class="badge" style="background: #fef3c7; color: #b45309;">Destaque</span>
-                    <a href="/categoria/<?= Security::e($featured['category']) ?>/" class="badge" style="text-decoration: none;">
-                        <?= Security::e($featured['category']) ?>
-                    </a>
-                </div>
-                <h1 class="hero-title">
-                    <a href="/<?= Security::e($featured['slug']) ?>/">
-                        <?= Security::e($featured['title']) ?>
-                    </a>
-                </h1>
-                <p class="card-summary" style="font-size: 1.05rem;"><?= Security::e($featured['summary'] ?? '') ?></p>
-                <div class="card-meta">
-                    <span>Publicado em <?= date('d/m/Y \à\s H:i', strtotime($featured['published_at'])) ?></span>
-                    <a href="/<?= Security::e($featured['slug']) ?>/" style="color: var(--primary-accent); text-decoration: none; font-weight: 700;">Ler matéria &rarr;</a>
-                </div>
-            </div>
-        </article>
+            <?php endforeach; ?>
+        </div>
     </section>
 <?php endif; ?>
 
 <section>
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; border-left: 4px solid var(--primary-accent); padding-left: 0.85rem; color: var(--primary);">
-            <?= (!empty($featured)) ? 'Mais Notícias' : 'Últimas Publicações' ?>
+            <?= (!empty($featuredPosts)) ? 'Mais Notícias' : 'Últimas Publicações' ?>
         </h2>
     </div>
 

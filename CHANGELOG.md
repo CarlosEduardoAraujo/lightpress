@@ -35,6 +35,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - Adicionado arquivo de modelo limpo `config.local.php.example`.
 
 ### Adicionado
+- **Layout Panorâmico Full HD (1900px) e Grid Quádruplo de Destaques:**
+  - Expansão do container global para `max-width: 1900px;` preenchendo monitores Full HD (1920x1080) e ultrawide com proporções fluidas e fim do excesso de margens laterais.
+  - **Hero Quad Grid no Topo da Home:** Substituição do hero card único por uma faixa superior de **4 notícias destacadas** lado a lado em cards 16:10 com overlay degradê escuro, tipografia branca sobreposta, selos de categoria e preenchimento automático (*backfill*) com as últimas matérias publicadas caso existam menos de 4 marcadas como destaque.
+  - Exclusão inteligente dos 4 destaques exibidos no topo para não haver repetição desnecessária no grid secundário de publicações.
+- **Botões Rápidos de Compartilhamento Social (100% Leves e Sem Rastreadores):**
+  - Implementada barra de compartilhamento com botões otimizados para **WhatsApp**, **X (Twitter)**, **Facebook**, **Telegram** e botão interativo **Copiar Link**.
+  - O botão Copiar Link utiliza a Clipboard API nativa com feedback visual instantâneo (*"✓ Link Copiado!"*) e fallback seguro.
+  - Zero dependência externa ou SDKs de terceiros, garantindo máxima velocidade de carregamento, total conformidade com a política CSP e respeito à privacidade dos leitores (sem scripts de rastreamento).
+- **Módulo de Notícias Relacionadas com 4 Artigos:**
+  - Ampliação do bloco de retenção de leitura na página de artigo para 4 matérias recomendadas em linha com grid responsivo de até 1400px.
 - **URLs Canônicas de Notícias na Raiz (`/{slug}/`):** 
   - Notícias agora possuem links diretos de alto impacto na raiz do domínio (ex: `https://lightpress.suainternet.com/gp-sao-paulo-2026/`).
   - Redirecionamento permanente HTTP 301 automático de `/noticia/{slug}/` e `/noticia/{slug}` para `/{slug}/`, garantindo integridade de links antigos e retrocompatibilidade total.

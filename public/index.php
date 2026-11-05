@@ -21,7 +21,7 @@ use LightPress\Core\Security;
 
 $router = new Router();
 
-// Rota 1: Home Grid (Últimas notícias e destaques)
+// Rota 1: Home Grid (Últimas notícias e 4 destaques principais)
 $router->get('/', function () use ($config): void {
     $query = trim($_GET['q'] ?? '');
     if (!empty($query)) {
@@ -32,14 +32,30 @@ $router->get('/', function () use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
     
-    // Buscar artigo em destaque principal
-    $featured = Database::fetchOne(
+    // Buscar até 4 artigos em destaque principal
+    $featuredPosts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
          WHERE status = 'published' AND is_featured = 1 AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 1",
+         ORDER BY published_at DESC LIMIT 4",
         [$nowUtc]
     );
+
+    // Se houver menos de 4 marcados com is_featured, completa com as matérias publicadas mais recentes
+    $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
+    if (count($featuredPosts) < 4) {
+        $needed = 4 - count($featuredPosts);
+        $excludeSql = !empty($featuredIds) ? "AND id NOT IN (" . implode(',', $featuredIds) . ")" : "";
+        $extraPosts = Database::fetchAll(
+            "SELECT id, slug, title, summary, category, featured_image, published_at 
+             FROM posts 
+             WHERE status = 'published' AND published_at <= ? {$excludeSql}
+             ORDER BY published_at DESC LIMIT {$needed}",
+            [$nowUtc]
+        );
+        $featuredPosts = array_merge($featuredPosts, $extraPosts);
+        $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
+    }
 
     // Total de posts para cálculo de paginação
     $totalPosts = (int)Database::fetchValue(
@@ -49,14 +65,14 @@ $router->get('/', function () use ($config): void {
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Buscar últimas publicações (12 por página)
-    $featuredId = $featured ? (int)$featured['id'] : 0;
+    // Buscar publicações para o grid principal excluindo os 4 destaques do topo
+    $excludeSql = !empty($featuredIds) ? "AND id NOT IN (" . implode(',', $featuredIds) . ")" : "";
     $posts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
-         WHERE status = 'published' AND published_at <= ? AND id != ?
+         WHERE status = 'published' AND published_at <= ? {$excludeSql}
          ORDER BY published_at DESC LIMIT ?",
-        [$nowUtc, $featuredId, $perPage]
+        [$nowUtc, $perPage]
     );
 
     $pageTitle = $config['app']['name'] . ' - Portal de Notícias';
@@ -213,12 +229,12 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         return;
     }
 
-    // Buscar até 3 notícias relacionadas da mesma categoria para retenção de audiência
+    // Buscar até 4 notícias relacionadas da mesma categoria para retenção de audiência
     $relatedPosts = Database::fetchAll(
         "SELECT id, slug, title, summary, category, featured_image, published_at 
          FROM posts 
          WHERE category = ? AND status = 'published' AND id != ? AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 3",
+         ORDER BY published_at DESC LIMIT 4",
         [$post['category'], (int)$post['id'], $nowUtc]
     );
 
