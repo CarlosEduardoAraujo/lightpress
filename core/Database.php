@@ -135,12 +135,26 @@ class Database
     }
 
     /**
-     * Executa uma consulta preparada com parâmetros vinculados.
+     * Executa uma consulta preparada com parâmetros vinculados tipados.
      */
     public static function query(string $sql, array $params = []): \PDOStatement
     {
         $stmt = self::getConnection()->prepare($sql);
-        $stmt->execute($params);
+        if (!empty($params)) {
+            foreach ($params as $key => $val) {
+                $paramType = match (true) {
+                    is_int($val) => PDO::PARAM_INT,
+                    is_bool($val) => PDO::PARAM_BOOL,
+                    is_null($val) => PDO::PARAM_NULL,
+                    default => PDO::PARAM_STR,
+                };
+                $paramKey = is_int($key) ? $key + 1 : $key;
+                $stmt->bindValue($paramKey, $val, $paramType);
+            }
+            $stmt->execute();
+        } else {
+            $stmt->execute();
+        }
         return $stmt;
     }
 

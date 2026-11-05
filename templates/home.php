@@ -34,9 +34,10 @@ $getSubtopic = function(?string $tagsStr, string $fallback = 'Velocidade Máxima
     return !empty($parts[0]) ? $parts[0] : $fallback;
 };
 
-// Separar o grande destaque principal dos 3 secundários
+// Separar o grande destaque principal dos 3 secundários (apenas na página 1)
+$featuredPosts = is_array($featuredPosts ?? null) ? $featuredPosts : [];
 $mainLead = $featuredPosts[0] ?? null;
-$secondaryLeads = array_slice($featuredPosts, 1, 3);
+$secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [];
 ?>
 
 <?php if (!empty($mainLead) && ($currentPage ?? 1) === 1): ?>
@@ -178,6 +179,12 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
         <?php if (!empty($totalPages) && $totalPages > 1): ?>
             <nav aria-label="Navegação de páginas" class="w-full bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-wrap items-center justify-between gap-space-sm mt-space-sm">
                 <div class="flex items-center gap-1.5 font-headline-sm text-data-telemetry">
+                    <?php if ($currentPage > 1): ?>
+                        <a href="<?= $currentPage === 2 ? '/' : '/page/' . ($currentPage - 1) . '/' ?>" class="px-space-sm h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center gap-1 text-label-category font-label-category uppercase tracking-wider transition-colors mr-1" title="Página Anterior">
+                            <?= Icon::svg('chevron_right', 'rotate-180', 14) ?> <span class="hidden sm:inline">Anterior</span>
+                        </a>
+                    <?php endif; ?>
+
                     <?php if ($currentPage === 1): ?>
                         <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold">1</span>
                     <?php else: ?>

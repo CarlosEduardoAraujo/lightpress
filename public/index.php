@@ -102,10 +102,10 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-        [$nowUtc, $perPage, $offset]
+        [$nowUtc, (int)$perPage, (int)$offset]
     );
 
-    $featured = null; // Apenas na primeira página
+    $featuredPosts = []; // Apenas na primeira página há o mosaico de 4 destaques
     $pageTitle = "Página {$page} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/home.php';
 });
