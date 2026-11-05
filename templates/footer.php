@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 use LightPress\Core\Icon;
+use LightPress\Core\Security;
 ?>
         </div>
     </main>
@@ -10,7 +11,6 @@ use LightPress\Core\Icon;
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-lg">
                 <div class="lg:col-span-2 flex flex-col gap-space-sm">
                     <div class="flex items-center gap-space-sm">
-                        <img alt="SpeedRacing Footer Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY" onerror="this.style.display='none'"/>
                         <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-pure-white">SPEED<span class="text-racing-red">RACING</span></span>
                     </div>
                     <p class="font-body-md text-body-md text-secondary-fixed max-w-md"><?= Security::e(!empty($config['app']['description']) ? $config['app']['description'] : 'Automobilismo mundial e nacional com rigor técnico, telemetria e bastidores. Credibilidade ininterrupta em notícias desde 2002.') ?></p>

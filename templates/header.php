@@ -263,7 +263,6 @@ if (empty($trendingTags)) {
         <div class="h-20 max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between gap-space-md">
             <div class="flex items-center gap-space-lg">
                 <a class="flex items-center gap-space-sm shrink-0" href="/">
-                    <img alt="SpeedRacing Logo" class="h-9 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY" onerror="this.style.display='none'"/>
                     <div class="flex flex-col">
                         <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-carbon-black dark:text-pure-white leading-none">SPEED<span class="text-racing-red">RACING</span></span>
                         <span class="font-label-category text-[9px] tracking-widest text-secondary dark:text-secondary-fixed uppercase">Desde 2002</span>
