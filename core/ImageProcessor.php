@@ -77,6 +77,37 @@ class ImageProcessor
     }
 
     /**
+     * Obtém a URL da variante Thumbnail (-thumb.webp ou -thumb.avif, 300x169px) para listagens e painéis leves.
+     *
+     * @param string $url URL de qualquer variante da imagem
+     * @param string $format 'webp' (padrão) ou 'avif'
+     * @return string URL apontando diretamente para a versão -thumb
+     */
+    public static function toThumbUrl(string $url, string $format = 'webp'): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+
+        $targetExt = ($format === 'avif') ? 'avif' : 'webp';
+
+        // Se já tiver -thumb no nome, apenas ajusta a extensão
+        if (str_contains($url, '-thumb.')) {
+            return ($targetExt === 'avif') ? self::toAvifUrl($url) : self::toWebpUrl($url);
+        }
+
+        // Substitui sufixos de resolução conhecidos (-1024, -1920) por -thumb
+        $replaced = preg_replace('~-(1024|1920)\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
+        if ($replaced !== null && $replaced !== $url) {
+            return $replaced;
+        }
+
+        // Caso seja a imagem original sem sufixo
+        $replaced = preg_replace('~\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
+        return $replaced ?? $url;
+    }
+
+    /**
      * Processa um arquivo enviado via upload ($_FILES).
      *
      * @param string $tmpFilePath Caminho temporário do arquivo

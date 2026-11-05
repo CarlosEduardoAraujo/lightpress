@@ -487,7 +487,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <div style="display: flex; align-items: center; gap: 1rem;">
                                         <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
                                             <?php if (!empty($p['featured_image'])): ?>
-                                                <img src="<?= Security::e(ImageProcessor::toAvifUrl($p['featured_image'])) ?>" 
+                                                <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'webp')) ?>" 
                                                      alt="" 
                                                      loading="lazy" 
                                                      style="width: 76px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">

@@ -8,6 +8,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Consumo Otimizado da Variante Thumbnail (`-thumb.webp`):**
+  - Implementado o método estático `ImageProcessor::toThumbUrl($url, 'webp')` para converter automaticamente URLs de qualquer resolução para a variante de corte 16:9 (`-thumb.webp`, 300x169px).
+  - O painel administrativo (`/admin/dashboard.php` e `/admin/stats.php`) agora requisita estritamente o arquivo minúsculo `-thumb.webp` (~3 a 6 KiB) em vez do arquivo intermediário de 1024px, economizando banda e acelerando o carregamento da lista de publicações.
 - **Thumbnails Visuais de Notícias no Painel Administrativo:**
   - Adicionadas miniaturas das imagens em destaque (`featured_image`) na listagem de publicações do **Gerenciador de Notícias (`/admin/dashboard.php`)** e no ranking do **Painel de Mais Lidas (`/admin/stats.php`)**.
   - As miniaturas contam com proporção 16:9, carregamento preguiçoso (`loading="lazy"`), link direto de clique para o editor e placeholder elegante (*"Sem foto"*) para matérias sem imagem atribuída.
