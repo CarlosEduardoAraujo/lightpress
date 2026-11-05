@@ -280,7 +280,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
 
             <!-- 2. Feature Hero Image Block -->
             <?php if (!empty($post['featured_image'])): ?>
-                <figure class="flex flex-col gap-space-xs -mx-margin-mobile sm:mx-0">
+                <figure class="-mx-margin-mobile sm:mx-0">
                     <div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group bg-carbon-black border border-subtle-border dark:border-[#2a303c]">
                         <img alt="<?= Security::e($post['title']) ?>" 
                              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" 
@@ -289,19 +289,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                             <span class="w-2 h-2 rounded-full bg-flag-green"></span>
                             <span>SPEEDRACING • <?= Security::e(strtoupper($post['category'])) ?></span>
                         </div>
-                        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-carbon-black/90 via-carbon-black/40 to-transparent p-space-md text-pure-white flex items-end justify-between">
-                            <div class="text-label-meta font-label-meta text-surface-container-lowest/90 truncate max-w-sm sm:max-w-md">
-                                <span><?= Security::e($post['title']) ?></span>
-                            </div>
-                            <span class="font-label-category text-[10px] text-surface-variant uppercase tracking-widest bg-carbon-surface/70 px-2 py-0.5 rounded shrink-0">
-                                Foto: Acervo SpeedRacing
-                            </span>
-                        </div>
                     </div>
-                    <figcaption class="px-space-xs text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim flex items-center justify-between">
-                        <span class="truncate"><?= Security::e($post['title']) ?></span>
-                        <span class="shrink-0 text-carbon-black dark:text-pure-white font-semibold">SpeedRacing Press</span>
-                    </figcaption>
                 </figure>
             <?php endif; ?>
 
@@ -310,21 +298,15 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <?= $post['content_html'] ?>
             </section>
 
-            <!-- 4. Tags & Social Engagement Strip -->
+            <!-- 4. Tags Strip -->
             <?php if (!empty($tagsList)): ?>
-                <div class="flex flex-wrap items-center justify-between gap-space-sm py-space-md border-t border-b border-subtle-border dark:border-[#2a303c]">
-                    <div class="flex items-center gap-space-xs flex-wrap">
-                        <span class="font-label-category text-label-category text-secondary dark:text-secondary-fixed uppercase">Tags:</span>
-                        <?php foreach ($tagsList as $tItem): ?>
-                            <a class="px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded text-label-meta font-label-meta text-carbon-black dark:text-pure-white hover:bg-racing-red hover:text-pure-white dark:hover:bg-racing-red transition-colors border border-subtle-border dark:border-[#2a303c]" href="/tag/<?= urlencode(Security::slugify($tItem)) ?>/">
-                                #<?= Security::e($tItem) ?>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                    <button class="flex items-center gap-2 px-space-md py-2 bg-canvas-cream dark:bg-carbon-surface hover:bg-surface-container dark:hover:bg-[#252b36] rounded-lg text-carbon-black dark:text-pure-white font-label-category text-label-category transition-colors border border-subtle-border dark:border-[#2a303c]" id="like-btn" onclick="toggleLike(<?= (int)$post['id'] ?>)">
-                        <span class="material-symbols-outlined text-racing-red text-[18px]" id="like-icon">favorite</span>
-                        <span>CURTIR ANÁLISE (<span id="like-count">184</span>)</span>
-                    </button>
+                <div class="flex items-center gap-space-xs flex-wrap py-space-md border-t border-b border-subtle-border dark:border-[#2a303c]">
+                    <span class="font-label-category text-label-category text-secondary dark:text-secondary-fixed uppercase">Tags:</span>
+                    <?php foreach ($tagsList as $tItem): ?>
+                        <a class="px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded text-label-meta font-label-meta text-carbon-black dark:text-pure-white hover:bg-racing-red hover:text-pure-white dark:hover:bg-racing-red transition-colors border border-subtle-border dark:border-[#2a303c]" href="/tag/<?= urlencode(Security::slugify($tItem)) ?>/">
+                            #<?= Security::e($tItem) ?>
+                        </a>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
 
@@ -477,41 +459,6 @@ function copyPostLink(btn, url) {
         prompt('Copie o link:', url);
     }
 }
-
-function toggleLike(postId) {
-    var key = 'sr_liked_' + postId;
-    var countEl = document.getElementById('like-count');
-    var iconEl = document.getElementById('like-icon');
-    var btn = document.getElementById('like-btn');
-    if (!countEl) return;
-
-    var cur = parseInt(countEl.textContent, 10) || 184;
-    var isLiked = localStorage.getItem(key) === '1';
-
-    if (isLiked) {
-        localStorage.removeItem(key);
-        countEl.textContent = cur - 1;
-        if (iconEl) iconEl.textContent = 'favorite_border';
-        if (btn) btn.classList.remove('border-racing-red');
-    } else {
-        localStorage.setItem(key, '1');
-        countEl.textContent = cur + 1;
-        if (iconEl) iconEl.textContent = 'favorite';
-        if (btn) btn.classList.add('border-racing-red');
-    }
-}
-
-// Inicializar estado de curtida
-(function() {
-    var postId = <?= (int)$post['id'] ?>;
-    var isLiked = localStorage.getItem('sr_liked_' + postId) === '1';
-    var iconEl = document.getElementById('like-icon');
-    var btn = document.getElementById('like-btn');
-    if (isLiked) {
-        if (iconEl) iconEl.textContent = 'favorite';
-        if (btn) btn.classList.add('border-racing-red');
-    }
-})();
 </script>
 
 <!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->
