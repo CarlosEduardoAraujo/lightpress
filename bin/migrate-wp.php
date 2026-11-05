@@ -38,30 +38,36 @@ $options = getopt('', [
     'asc',
     'verbose',
     'skip-existing',
+    'post-id::',
 ]);
 
 $isDryRun = isset($options['dry-run']);
+$singlePostId = isset($options['post-id']) ? (int)$options['post-id'] : null;
 $wpHost = $options['wp-host'] ?? ($config['database']['host'] ?? '127.0.0.1');
 $wpPort = (int)($options['wp-port'] ?? ($config['database']['port'] ?? 3306));
 $wpDb = $options['wp-db'] ?? 'suaint41_speed';
 $wpUser = $options['wp-user'] ?? ($config['database']['username'] ?? ($config['database']['user'] ?? 'root'));
 $wpPass = $options['wp-pass'] ?? ($config['database']['password'] ?? ($config['database']['pass'] ?? ''));
 $isAll = isset($options['all']);
-$limit = $isAll ? 100000 : (int)($options['limit'] ?? 10);
+$limit = $singlePostId ? 1 : ($isAll ? 100000 : (int)($options['limit'] ?? 10));
 $offset = (int)($options['offset'] ?? 0);
 $chunkSize = (int)($options['chunk'] ?? 500);
 if ($chunkSize < 50) $chunkSize = 50;
 if ($chunkSize > 2000) $chunkSize = 2000;
 $usersOnly = isset($options['users-only']);
 $order = isset($options['asc']) ? 'ASC' : 'DESC';
-$isVerbose = ($limit <= 20) || isset($options['verbose']);
+$isVerbose = ($limit <= 20) || isset($options['verbose']) || ($singlePostId !== null);
 $skipExisting = isset($options['skip-existing']);
 
 echo "[Configuração de Conexão]\n";
 echo "  Modo: " . ($isDryRun ? "DRY-RUN (Simulação - Nenhuma alteração será gravada)" : "PRODUÇÃO / GRAVAÇÃO REAL") . "\n";
 echo "  Origem WordPress: {$wpUser}@{$wpHost}:{$wpPort}/{$wpDb}\n";
-echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)" : "Mais antigas primeiro (ID ASC)") . "\n";
-echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n";
+if ($singlePostId) {
+    echo "  Alvo Específico: WP Artigo ID #{$singlePostId}\n";
+} else {
+    echo "  Ordenação: " . ($order === 'DESC' ? "Mais recentes primeiro (ID DESC)" : "Mais antigas primeiro (ID ASC)") . "\n";
+    echo "  Lote de Notícias: " . ($isAll ? "TODAS (até 100.000)" : "{$limit} artigos (Offset: {$offset})") . "\n";
+}
 echo "  Modo de Exibição: " . ($isVerbose ? "Detalhado (Card a Card)" : "Alta Performance (Barra de Progresso com lotes de {$chunkSize})") . "\n";
 if ($skipExisting) {
     echo "  Otimização: Pular artigos já migrados (--skip-existing ATIVADO)\n";
@@ -74,13 +80,14 @@ if (!$isDryRun) {
         $lpPdo = Database::getConnection();
         $driver = Database::getDriver();
         if ($driver === 'mysql') {
+            $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN title VARCHAR(500) NOT NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN tags TEXT NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN summary TEXT NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN featured_image VARCHAR(500) NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN seo_title VARCHAR(255) NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN seo_description VARCHAR(500) NULL");
             $lpPdo->exec("ALTER TABLE posts MODIFY COLUMN focus_keyword VARCHAR(150) NULL");
-            echo "[SpeedPress DB] Estrutura da tabela 'posts' verificada e atualizada com sucesso (tags TEXT, summary TEXT).\n";
+            echo "[SpeedPress DB] Estrutura da tabela 'posts' verificada e atualizada com sucesso (title VARCHAR(500), tags TEXT, summary TEXT).\n";
         }
     } catch (\Throwable $e) {
         echo "[Aviso SpeedPress DB] Falha ao ajustar colunas: " . $e->getMessage() . "\n";
@@ -305,10 +312,16 @@ echo "\n========================================================\n";
 echo "  [Etapa 2] Migração de Notícias e Conteúdo Relacionado\n";
 echo "========================================================\n";
 
-$countEligible = (int)$wpPdo->query("SELECT COUNT(*) FROM {$tblPosts} WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')")->fetchColumn();
-echo "Total geral de artigos elegíveis no WordPress: {$countEligible}\n";
-$totalTarget = min($limit, $countEligible);
-echo "Artigos a processar nesta execução: {$totalTarget} (Offset {$offset}, Lotes de {$chunkSize})...\n\n";
+if ($singlePostId) {
+    $countEligible = 1;
+    $totalTarget = 1;
+    echo "Processando artigo avulso: WP ID #{$singlePostId}...\n\n";
+} else {
+    $countEligible = (int)$wpPdo->query("SELECT COUNT(*) FROM {$tblPosts} WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')")->fetchColumn();
+    echo "Total geral de artigos elegíveis no WordPress: {$countEligible}\n";
+    $totalTarget = min($limit, $countEligible);
+    echo "Artigos a processar nesta execução: {$totalTarget} (Offset {$offset}, Lotes de {$chunkSize})...\n\n";
+}
 
 // 4.1 Pré-compilação e Otimização de Consultas (Prepared Statements Reuse)
 $taxStmt = $wpPdo->prepare(
@@ -410,13 +423,23 @@ if (!$isDryRun) {
 }
 
 // 4.2 Execução em Streaming por Chunks de Memória Controlada
-$postsQuery = $wpPdo->prepare(
-    "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
-     FROM {$tblPosts}
-     WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')
-     ORDER BY ID {$order}
-     LIMIT :limit OFFSET :offset"
-);
+if ($singlePostId) {
+    $postsQuery = $wpPdo->prepare(
+        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
+         FROM {$tblPosts}
+         WHERE ID = :single_id
+         LIMIT 1"
+    );
+    $postsQuery->bindValue(':single_id', $singlePostId, PDO::PARAM_INT);
+} else {
+    $postsQuery = $wpPdo->prepare(
+        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
+         FROM {$tblPosts}
+         WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')
+         ORDER BY ID {$order}
+         LIMIT :limit OFFSET :offset"
+    );
+}
 
 $processed = 0;
 $converted = 0;
@@ -426,11 +449,16 @@ $currentOffset = $offset;
 $startTime = microtime(true);
 
 while ($processed < $totalTarget) {
-    $batchLimit = min($chunkSize, $totalTarget - $processed);
-    $postsQuery->bindValue(':limit', $batchLimit, PDO::PARAM_INT);
-    $postsQuery->bindValue(':offset', $currentOffset, PDO::PARAM_INT);
-    $postsQuery->execute();
-    $articles = $postsQuery->fetchAll(PDO::FETCH_ASSOC);
+    if ($singlePostId) {
+        $postsQuery->execute();
+        $articles = $postsQuery->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $batchLimit = min($chunkSize, $totalTarget - $processed);
+        $postsQuery->bindValue(':limit', $batchLimit, PDO::PARAM_INT);
+        $postsQuery->bindValue(':offset', $currentOffset, PDO::PARAM_INT);
+        $postsQuery->execute();
+        $articles = $postsQuery->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     if (empty($articles)) {
         break;
