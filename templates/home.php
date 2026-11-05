@@ -42,7 +42,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 <!-- 1. HERO EDITORIAL & ASYMMETRIC NEWS MOSAIC -->
 <section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-stretch">
     <!-- Master Lead Story (8 Cols) -->
-    <article class="lg:col-span-8 group relative flex flex-col justify-end min-h-[460px] lg:min-h-[540px] rounded-xl overflow-hidden bg-carbon-black shadow-md cursor-pointer border border-subtle-border">
+    <article class="lg:col-span-8 group relative flex flex-col justify-end min-h-[460px] lg:min-h-[540px] rounded-xl overflow-hidden bg-carbon-black shadow-md cursor-pointer border border-subtle-border dark:border-[#2a303c]">
         <a href="/<?= Security::e($mainLead['slug']) ?>/" class="absolute inset-0 z-0 overflow-hidden block">
             <?php if (!empty($mainLead['featured_image'])): ?>
                 <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
@@ -90,23 +90,23 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
     <!-- Secondary Trio Column (4 Cols) -->
     <div class="lg:col-span-4 flex flex-col gap-space-md justify-between">
         <?php foreach ($secondaryLeads as $sec): ?>
-            <article class="group flex-1 flex flex-col justify-between p-space-md rounded-xl bg-pure-white shadow-xs border border-subtle-border hover:shadow-md transition-shadow">
+            <article class="group flex-1 flex flex-col justify-between p-space-md rounded-xl bg-pure-white dark:bg-carbon-surface shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all">
                 <div class="flex items-center justify-between gap-2 mb-space-xs">
-                    <span class="px-2 py-0.5 bg-surface-container font-label-category text-label-category text-carbon-black uppercase rounded">
+                    <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] font-label-category text-label-category text-carbon-black dark:text-pure-white uppercase rounded">
                         <?= Security::e($sec['category']) ?>
                     </span>
-                    <span class="font-label-meta text-label-meta text-secondary">
+                    <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
                         <?= date('H:i', strtotime($sec['published_at'])) ?>
                     </span>
                 </div>
-                <h2 class="font-headline-sm text-headline-sm text-carbon-black group-hover:text-racing-red transition-colors line-clamp-3 font-bold">
+                <h2 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors line-clamp-3 font-bold">
                     <a href="/<?= Security::e($sec['slug']) ?>/">
                         <?= Security::e($sec['title']) ?>
                     </a>
                 </h2>
-                <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta mt-space-sm pt-space-xs">
-                    <span class="text-tertiary font-medium">Oficial Paddock</span>
-                    <a href="/<?= Security::e($sec['slug']) ?>/" class="material-symbols-outlined text-[18px] text-secondary group-hover:text-racing-red transition-transform group-hover:translate-x-1" title="Ler matéria">arrow_forward</a>
+                <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-sm pt-space-xs">
+                    <span class="text-tertiary dark:text-racing-red font-medium">Oficial Paddock</span>
+                    <a href="/<?= Security::e($sec['slug']) ?>/" class="material-symbols-outlined text-[18px] text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1" title="Ler matéria">arrow_forward</a>
                 </div>
             </article>
         <?php endforeach; ?>
@@ -114,23 +114,23 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 </section>
 
 <!-- 2. LIVE FAST-NEWS TELEMETRY STRIP -->
-<section class="w-full bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-col md:flex-row items-stretch md:items-center gap-space-md">
-    <div class="flex items-center gap-2 shrink-0 bg-carbon-black text-pure-white px-space-md py-1.5 rounded-lg">
+<section class="w-full bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-col md:flex-row items-stretch md:items-center gap-space-md">
+    <div class="flex items-center gap-2 shrink-0 bg-carbon-black dark:bg-[#0d121c] text-pure-white px-space-md py-1.5 rounded-lg border border-transparent dark:border-[#2a303c]">
         <span class="w-2.5 h-2.5 rounded-full bg-racing-red animate-pulse"></span>
         <span class="font-data-telemetry text-data-telemetry tracking-wider uppercase font-bold text-flag-yellow">PIT WALL FEED</span>
     </div>
-    <div class="flex-1 flex flex-wrap md:flex-nowrap items-center gap-space-lg overflow-x-auto text-body-sm font-body-sm text-on-surface">
+    <div class="flex-1 flex flex-wrap md:flex-nowrap items-center gap-space-lg overflow-x-auto text-body-sm font-body-sm text-on-surface dark:text-pure-white">
         <?php foreach (array_slice($posts, 0, 3) as $pit): ?>
             <div class="flex items-center gap-2 shrink-0">
-                <span class="font-data-telemetry text-data-telemetry text-secondary"><?= date('H:i', strtotime($pit['published_at'])) ?></span>
-                <a href="/<?= Security::e($pit['slug']) ?>/" class="font-medium text-carbon-black hover:text-racing-red transition-colors line-clamp-1">
+                <span class="font-data-telemetry text-data-telemetry text-secondary dark:text-secondary-fixed-dim"><?= date('H:i', strtotime($pit['published_at'])) ?></span>
+                <a href="/<?= Security::e($pit['slug']) ?>/" class="font-medium text-carbon-black dark:text-pure-white hover:text-racing-red dark:hover:text-racing-red transition-colors line-clamp-1">
                     <?= Security::e($pit['title']) ?>
                 </a>
             </div>
         <?php endforeach; ?>
     </div>
     <div class="shrink-0 flex items-center justify-end">
-        <a href="#feed" class="text-label-meta font-label-meta text-racing-red hover:text-tertiary flex items-center gap-1 font-semibold uppercase">
+        <a href="#feed" class="text-label-meta font-label-meta text-racing-red hover:text-tertiary dark:hover:text-racing-red flex items-center gap-1 font-semibold uppercase">
             Feed Completo <span class="material-symbols-outlined text-[16px]">chevron_right</span>
         </a>
     </div>
@@ -144,24 +144,24 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
         <div class="flex items-center justify-between pb-space-xs">
             <div class="flex items-center gap-2">
                 <span class="w-2.5 h-6 bg-racing-red rounded-sm"></span>
-                <h2 class="font-headline-lg text-headline-md md:text-headline-lg text-carbon-black font-bold">
+                <h2 class="font-headline-lg text-headline-md md:text-headline-lg text-carbon-black dark:text-pure-white font-bold">
                     <?= ($currentPage ?? 1) > 1 ? "Página {$currentPage} - Notícias" : "Últimas Notícias" ?>
                 </h2>
             </div>
-            <span class="font-label-meta text-label-meta text-secondary">Atualizado em tempo real</span>
+            <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">Atualizado em tempo real</span>
         </div>
 
         <!-- Editorial Articles List -->
         <div class="flex flex-col gap-space-md">
             <?php foreach ($posts as $item): ?>
-                <article class="group bg-pure-white p-space-md rounded-xl shadow-xs border border-subtle-border hover:shadow-md transition-all flex flex-col sm:flex-row gap-space-md items-start">
-                    <a href="/<?= Security::e($item['slug']) ?>/" class="w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0 relative bg-surface-container block">
+                <article class="group bg-pure-white dark:bg-carbon-surface p-space-md rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all flex flex-col sm:flex-row gap-space-md items-start">
+                    <a href="/<?= Security::e($item['slug']) ?>/" class="w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0 relative bg-surface-container dark:bg-[#151920] block">
                         <?php if (!empty($item['featured_image'])): ?>
                             <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                  src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
                                  alt="<?= Security::e($item['title']) ?>" loading="lazy">
                         <?php else: ?>
-                            <div class="w-full h-full flex items-center justify-center text-secondary text-xs">Sem foto</div>
+                            <div class="w-full h-full flex items-center justify-center text-secondary dark:text-secondary-fixed-dim text-xs">Sem foto</div>
                         <?php endif; ?>
                         <span class="absolute top-2 left-2 bg-carbon-black/85 backdrop-blur-sm text-pure-white font-label-category text-label-category px-1.5 py-0.5 rounded uppercase">
                             <?= Security::e($item['category']) ?>
@@ -169,19 +169,19 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                     </a>
                     <div class="flex-1 flex flex-col justify-between h-full w-full">
                         <div class="space-y-space-xs">
-                            <div class="flex items-center gap-space-xs text-secondary font-label-meta text-label-meta">
+                            <div class="flex items-center gap-space-xs text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
                                 <span class="material-symbols-outlined text-[14px]">calendar_today</span>
                                 <time datetime="<?= $item['published_at'] ?>"><?= $formatPtDate($item['published_at']) ?></time>
                                 <span>•</span>
                                 <span class="capitalize"><?= Security::e($getSubtopic($item['tags'] ?? null, $item['category'])) ?></span>
                             </div>
-                            <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black group-hover:text-racing-red transition-colors font-bold leading-snug">
+                            <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors font-bold leading-snug">
                                 <a href="/<?= Security::e($item['slug']) ?>/">
                                     <?= Security::e($item['title']) ?>
                                 </a>
                             </h3>
                             <?php if (!empty($item['summary'])): ?>
-                                <p class="font-body-md text-body-sm md:text-body-md text-secondary line-clamp-2">
+                                <p class="font-body-md text-body-sm md:text-body-md text-secondary dark:text-[#a0a5b1] line-clamp-2">
                                     <?= Security::e($item['summary']) ?>
                                 </p>
                             <?php endif; ?>
@@ -198,41 +198,41 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 
         <!-- REFINED MINIMAL PAGINATION (Reflete a Imagem 3 do Usuário) -->
         <?php if (!empty($totalPages) && $totalPages > 1): ?>
-            <nav aria-label="Navegação de páginas" class="w-full bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-wrap items-center justify-between gap-space-sm mt-space-sm">
+            <nav aria-label="Navegação de páginas" class="w-full bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-wrap items-center justify-between gap-space-sm mt-space-sm">
                 <div class="flex items-center gap-1.5 font-headline-sm text-data-telemetry">
                     <?php if ($currentPage === 1): ?>
                         <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold">1</span>
                     <?php else: ?>
-                        <a href="/" class="w-9 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors">1</a>
+                        <a href="/" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors">1</a>
                     <?php endif; ?>
 
                     <?php if ($currentPage > 3): ?>
-                        <span class="w-8 h-9 flex items-center justify-center text-secondary">…</span>
+                        <span class="w-8 h-9 flex items-center justify-center text-secondary dark:text-secondary-fixed-dim">…</span>
                     <?php endif; ?>
 
                     <?php for ($p = max(2, $currentPage - 1); $p <= min($totalPages - 1, $currentPage + 1); $p++): ?>
                         <?php if ($p === $currentPage): ?>
                             <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= $p ?></span>
                         <?php else: ?>
-                            <a href="/page/<?= $p ?>/" class="w-9 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors"><?= $p ?></a>
+                            <a href="/page/<?= $p ?>/" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors"><?= $p ?></a>
                         <?php endif; ?>
                     <?php endfor; ?>
 
                     <?php if ($currentPage < $totalPages - 2): ?>
-                        <span class="w-8 h-9 flex items-center justify-center text-secondary">…</span>
+                        <span class="w-8 h-9 flex items-center justify-center text-secondary dark:text-secondary-fixed-dim">…</span>
                     <?php endif; ?>
 
                     <?php if ($totalPages > 1): ?>
                         <?php if ($currentPage === $totalPages): ?>
                             <span class="px-2.5 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= number_format($totalPages, 0, ',', '.') ?></span>
                         <?php else: ?>
-                            <a href="/page/<?= $totalPages ?>/" class="px-2.5 h-9 rounded-lg bg-surface-container hover:bg-surface-container-high text-carbon-black flex items-center justify-center transition-colors"><?= number_format($totalPages, 0, ',', '.') ?></a>
+                            <a href="/page/<?= $totalPages ?>/" class="px-2.5 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors"><?= number_format($totalPages, 0, ',', '.') ?></a>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
                 <?php if ($currentPage < $totalPages): ?>
-                    <a class="px-space-md py-2 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs" href="/page/<?= $currentPage + 1 ?>/">
+                    <a class="px-space-md py-2 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs border border-transparent dark:border-[#2a303c] dark:bg-[#252b36] dark:hover:bg-racing-red" href="/page/<?= $currentPage + 1 ?>/">
                         Próxima Página <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
                 <?php endif; ?>
@@ -243,58 +243,58 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
     <!-- RIGHT: RACE WEEKEND & OPINION SIDEBAR (4 COLS) -->
     <aside class="lg:col-span-4 flex flex-col gap-space-lg">
         <!-- WIDGET 1: RACE RADAR / UPCOMING EVENTS -->
-        <div class="bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md space-y-space-md">
+        <div class="bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md space-y-space-md">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-racing-red text-[20px]">sports_score</span>
-                    <h3 class="font-headline-sm text-headline-sm text-carbon-black uppercase tracking-tight font-bold">Próximas Etapas</h3>
+                    <h3 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white uppercase tracking-tight font-bold">Próximas Etapas</h3>
                 </div>
-                <span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-category text-[10px]">CALENDÁRIO</span>
+                <span class="px-2 py-0.5 rounded bg-surface-container dark:bg-[#252b36] text-secondary dark:text-secondary-fixed font-label-category text-[10px]">CALENDÁRIO</span>
             </div>
             <div class="space-y-space-sm">
                 <!-- Event 1: F1 Interlagos -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
                     <div class="flex items-center justify-between text-label-category font-label-category">
                         <span class="text-racing-red font-bold">FÓRMULA 1</span>
-                        <span class="text-secondary font-data-telemetry">06 - 08 NOV</span>
+                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">06 - 08 NOV</span>
                     </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Grande Prêmio de São Paulo</div>
-                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Grande Prêmio de São Paulo</div>
+                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
                         <span>Autódromo de Interlagos</span>
                         <span class="px-1.5 py-0.5 rounded bg-flag-green/10 text-flag-green font-semibold">T-02 Dias</span>
                     </div>
                 </div>
 
                 <!-- Event 2: NASCAR Homestead -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
                     <div class="flex items-center justify-between text-label-category font-label-category">
-                        <span class="text-carbon-black font-bold">NASCAR CUP</span>
-                        <span class="text-secondary font-data-telemetry">08 NOV</span>
+                        <span class="text-carbon-black dark:text-pure-white font-bold">NASCAR CUP</span>
+                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">08 NOV</span>
                     </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Homestead-Miami Championship 4</div>
-                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Homestead-Miami Championship 4</div>
+                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
                         <span>Homestead Speedway</span>
-                        <span class="text-secondary">Decisão de Título</span>
+                        <span class="text-secondary dark:text-secondary-fixed-dim">Decisão de Título</span>
                     </div>
                 </div>
 
                 <!-- Event 3: Stock Car Goiânia -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest hover:bg-surface-container-low transition-colors space-y-1 border border-subtle-border/60">
+                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
                     <div class="flex items-center justify-between text-label-category font-label-category">
-                        <span class="text-flag-yellow font-bold text-carbon-black">STOCK CAR PRO</span>
-                        <span class="text-secondary font-data-telemetry">15 NOV</span>
+                        <span class="text-flag-yellow font-bold">STOCK CAR PRO</span>
+                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">15 NOV</span>
                     </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black">Etapa de Goiânia • Anel Externo</div>
-                    <div class="flex items-center justify-between text-secondary font-label-meta text-label-meta">
+                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Etapa de Goiânia • Anel Externo</div>
+                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
                         <span>Ayrton Senna, GO</span>
-                        <span class="text-secondary">Corrida Principal</span>
+                        <span class="text-secondary dark:text-secondary-fixed-dim">Corrida Principal</span>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- WIDGET 2: SPECIAL COLUMN - OPINIÃO / REDAÇÃO -->
-        <div class="bg-carbon-black text-pure-white rounded-xl shadow-md p-space-md relative overflow-hidden">
+        <div class="bg-carbon-black text-pure-white rounded-xl shadow-md p-space-md relative overflow-hidden border border-subtle-border/30 dark:border-[#2a303c]">
             <div class="absolute -right-6 -bottom-6 opacity-10">
                 <span class="material-symbols-outlined text-[160px] text-pure-white">speed</span>
             </div>
@@ -319,36 +319,36 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
         </div>
 
         <!-- WIDGET 3: INSTAGRAM COMMUNITY CARD -->
-        <div class="bg-pure-white rounded-xl shadow-xs border border-subtle-border p-space-md flex flex-col gap-space-sm items-center text-center">
+        <div class="bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-col gap-space-sm items-center text-center">
             <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-flag-yellow via-racing-red to-primary flex items-center justify-center text-pure-white shadow-md">
                 <span class="material-symbols-outlined text-[32px]">photo_camera</span>
             </div>
             <div>
-                <h4 class="font-headline-sm text-headline-sm text-carbon-black font-bold">@speedracing.com.br</h4>
-                <p class="font-body-sm text-body-sm text-secondary">Bastidores, telemetria em tempo real e fotografias exclusivas direto do paddock.</p>
+                <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">@speedracing.com.br</h4>
+                <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">Bastidores, telemetria em tempo real e fotografias exclusivas direto do paddock.</p>
             </div>
-            <a class="w-full py-2.5 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-xs" href="https://www.instagram.com/speedracing.com.br/" rel="noopener noreferrer" target="_blank">
+            <a class="w-full py-2.5 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-xs border border-transparent dark:border-[#2a303c] dark:bg-[#252b36] dark:hover:bg-racing-red" href="https://www.instagram.com/speedracing.com.br/" rel="noopener noreferrer" target="_blank">
                 <span>Seguir no Instagram</span>
                 <span class="material-symbols-outlined text-[16px]">open_in_new</span>
             </a>
         </div>
 
         <!-- WIDGET 4: FAST NEWSLETTER -->
-        <div id="newsletter" class="bg-surface-container-low rounded-xl p-space-md space-y-space-sm border border-subtle-border">
-            <div class="flex items-center gap-2 text-carbon-black font-headline-sm text-headline-sm font-bold">
+        <div id="newsletter" class="bg-surface-container-low dark:bg-carbon-surface rounded-xl p-space-md space-y-space-sm border border-subtle-border dark:border-[#2a303c]">
+            <div class="flex items-center gap-2 text-carbon-black dark:text-pure-white font-headline-sm text-headline-sm font-bold">
                 <span class="material-symbols-outlined text-racing-red text-[20px]">mark_email_read</span>
                 <span>Grid SpeedRacing</span>
             </div>
-            <p class="font-body-sm text-body-sm text-secondary">
+            <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">
                 O resumo técnico e os bastidores das principais categorias do automobilismo todo dia às 7h no seu e-mail.
             </p>
             <form class="flex flex-col gap-2" onsubmit="event.preventDefault(); alert('Obrigado por se inscrever no Grid SpeedRacing!');">
-                <input class="w-full px-space-sm py-2 rounded-lg bg-pure-white text-carbon-black placeholder:text-secondary font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-racing-red border border-subtle-border" placeholder="Seu melhor e-mail" type="email" required/>
+                <input class="w-full px-space-sm py-2 rounded-lg bg-pure-white dark:bg-[#151920] text-carbon-black dark:text-pure-white placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c]" placeholder="Seu melhor e-mail" type="email" required/>
                 <button class="w-full py-2 rounded-lg bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold transition-colors" type="submit">
                     Inscrever-se Grátis
                 </button>
             </form>
-            <span class="block text-[11px] text-secondary font-label-meta text-center">Sem spam. Desinscreva-se a qualquer momento.</span>
+            <span class="block text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta text-center">Sem spam. Desinscreva-se a qualquer momento.</span>
         </div>
     </aside>
 </div>
