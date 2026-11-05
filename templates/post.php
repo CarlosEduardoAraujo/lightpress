@@ -274,11 +274,6 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                         <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da matéria">
                             <span class="material-symbols-outlined text-[18px]">link</span>
                         </button>
-                        <div class="h-4 w-px bg-surface-variant dark:bg-[#2a303c] mx-1"></div>
-                        <a class="flex items-center gap-1 px-space-xs py-1 rounded-lg text-label-meta font-label-meta text-secondary dark:text-secondary-fixed hover:text-carbon-black dark:hover:text-pure-white" href="#comments-anchor">
-                            <span class="material-symbols-outlined text-[16px]">mode_comment</span>
-                            <span class="font-semibold text-carbon-black dark:text-pure-white">Debater</span>
-                        </a>
                     </div>
                 </div>
             </header>
@@ -334,7 +329,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
             <?php endif; ?>
 
             <!-- 5. Author Profile Dossier Box -->
-            <aside class="p-space-lg bg-canvas-cream dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md">
+            <aside class="p-space-lg bg-canvas-cream dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col sm:flex-row items-start sm:items-center gap-space-md">
                 <div class="flex items-center gap-space-md">
                     <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-md bg-surface-container dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white text-xl">
                         <?php if (!empty($post['author_avatar'])): ?>
@@ -352,176 +347,47 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                 Redação Oficial
                             </span>
                         </div>
-                        <p class="font-body-sm text-body-sm text-secondary dark:text-secondary-fixed-dim mt-1 max-w-lg">
+                        <p class="font-body-sm text-body-sm text-secondary dark:text-secondary-fixed-dim mt-1 max-w-xl">
                             <?= Security::e($post['author_bio'] ?? 'Cobertura técnica in loco, telemetria de precisão e bastidores do automobilismo mundial pelo SpeedRacing desde 2002.') ?>
                         </p>
                     </div>
                 </div>
-                <a href="#newsletter" class="shrink-0 px-space-md py-2 bg-carbon-black hover:bg-racing-red dark:bg-[#252b36] dark:hover:bg-racing-red text-pure-white rounded font-label-category text-label-category uppercase tracking-wider transition-colors shadow-xs">
-                    + Seguir Colunista
-                </a>
             </aside>
-
-            <!-- 6. Debate no Pit Lane (Comments & Discussion Anchor) -->
-            <section class="flex flex-col gap-space-md mt-space-sm" id="comments-anchor">
-                <div class="flex items-center justify-between">
-                    <h3 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold flex items-center gap-2">
-                        <span class="material-symbols-outlined text-racing-red">forum</span>
-                        Debate no Pit Lane
-                    </h3>
-                    <span class="text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">Moderação ativa SpeedRacing</span>
-                </div>
-
-                <!-- Formulário de Comentário -->
-                <div class="flex flex-col gap-space-xs p-space-md bg-canvas-cream dark:bg-carbon-surface rounded-xl border border-subtle-border dark:border-[#2a303c]">
-                    <textarea id="comment-input" class="w-full p-space-sm rounded-lg bg-pure-white dark:bg-[#151920] text-carbon-black dark:text-pure-white font-body-sm text-body-sm focus:outline-none focus:ring-1 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c] resize-none shadow-xs placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim" placeholder="O que você achou desta análise técnica? Participe da discussão no paddock..." rows="3"></textarea>
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
-                        <span class="text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">Respeite as diretrizes da comunidade motorsport.</span>
-                        <button type="button" onclick="submitComment()" class="px-space-md py-2 bg-racing-red hover:bg-tertiary-container text-pure-white font-label-category text-label-category uppercase rounded font-bold transition-colors shadow-xs">
-                            Publicar Comentário
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Comentário em Destaque -->
-                <div class="p-space-md bg-canvas-cream dark:bg-carbon-surface rounded-xl flex flex-col gap-space-xs shadow-xs border border-subtle-border dark:border-[#2a303c]" id="comments-list">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-surface-container-high dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white text-body-sm">
-                                MT
-                            </div>
-                            <div>
-                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Marcelo Toledo</span>
-                                <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim ml-2">Há 45 minutos</span>
-                            </div>
-                        </div>
-                        <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] rounded text-label-category text-[10px] text-secondary dark:text-secondary-fixed uppercase font-semibold">Engenheiro Mecânico</span>
-                    </div>
-                    <p class="font-body-md text-body-md text-carbon-black dark:text-pure-white mt-1">
-                        A análise técnica está impecável. As configurações de asa e carga aerodinâmica são determinantes para o ritmo de corrida nos trechos de alta velocidade. Parabéns à redação SpeedRacing pela cobertura com rigor técnico!
-                    </p>
-                    <div class="flex items-center gap-space-md mt-1 text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">
-                        <button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">thumb_up</span> 18</button>
-                        <button class="flex items-center gap-1 hover:text-racing-red"><span class="material-symbols-outlined text-[15px]">reply</span> Responder</button>
-                    </div>
-                </div>
-            </section>
         </article>
 
         <!-- Right Column (Trackside Technical Sidebar - 4 Cols) -->
         <aside class="lg:col-span-4 flex flex-col gap-space-lg">
             
-            <!-- Widget 1: Track Weather Radar & Paddock Telemetry -->
-            <div class="bg-carbon-black text-pure-white rounded-xl p-space-md shadow-md flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
-                <div class="flex items-center justify-between pb-2 border-b border-track-asphalt">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-flag-green animate-pulse"></span>
-                        <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Paddock Radar • Ao Vivo</span>
-                    </div>
-                    <span class="font-data-telemetry text-data-telemetry text-flag-yellow">INTERLAGOS <?= date('H:i') ?></span>
+            <!-- Banner Parceiro 1 (Substitui Paddock Radar) -->
+            <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
+                <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
+                    <span>Publicidade</span>
+                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
-                <div class="grid grid-cols-2 gap-space-xs pt-1">
-                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
-                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura da Pista</span>
-                        <span class="font-data-telemetry text-[22px] font-bold text-racing-red mt-1">42.8° C</span>
-                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Asfalto aquecido</span>
-                    </div>
-                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
-                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Temperatura do Ar</span>
-                        <span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">26.2° C</span>
-                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Umidade: 58%</span>
-                    </div>
-                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
-                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Vento no Circuito</span>
-                        <span class="font-data-telemetry text-[22px] font-bold text-pure-white mt-1">14.1 <span class="text-xs">km/h</span></span>
-                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Direção: Noroeste</span>
-                    </div>
-                    <div class="p-space-sm bg-carbon-surface rounded-lg flex flex-col border border-[#2a303c]/60">
-                        <span class="text-[11px] font-label-category uppercase text-secondary-fixed">Risco de Chuva</span>
-                        <span class="font-data-telemetry text-[22px] font-bold text-flag-yellow mt-1">20%</span>
-                        <span class="text-[10px] font-label-meta text-surface-container-high/60">Nuvens sobre o vale</span>
-                    </div>
-                </div>
-                <div class="mt-1 p-2 bg-carbon-surface/60 rounded flex items-center gap-2 text-label-meta text-[11px] text-surface-container-high">
-                    <span class="material-symbols-outlined text-[16px] text-flag-green">sensors</span>
-                    <span>Sensores oficiais FIA / CBA sincronizados em tempo real.</span>
+                <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
+                    <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">campaign</span>
+                    <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
+                    <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
+                    <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
+                        Anuncie Aqui
+                    </a>
                 </div>
             </div>
 
-            <!-- Widget 2: World Championship Standings 2026 -->
-            <div class="bg-pure-white dark:bg-carbon-surface rounded-xl p-space-md shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col gap-space-sm">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-racing-red text-[20px]">emoji_events</span>
-                        <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">Mundial de Construtores</h4>
-                    </div>
-                    <span class="text-label-category text-[10px] bg-surface-container dark:bg-[#252b36] px-2 py-0.5 rounded font-bold text-secondary dark:text-secondary-fixed uppercase">Temporada <?= date('Y') ?></span>
+            <!-- Banner Parceiro 2 (Substitui Mundial de Construtores) -->
+            <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
+                <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
+                    <span>Publicidade</span>
+                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
-                <p class="font-body-sm text-body-sm text-secondary dark:text-secondary-fixed-dim">
-                    Disputa acirrada pelo topo da tabela nas principais categorias do automobilismo mundial.
-                </p>
-                <!-- Tabela de Classificação -->
-                <div class="flex flex-col gap-1.5 mt-1">
-                    <!-- Row 1 (Mercedes) -->
-                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border-l-4 border-racing-red border border-subtle-border/60 dark:border-[#2a303c]">
-                        <div class="flex items-center gap-2">
-                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white w-4">1</span>
-                            <div class="flex flex-col">
-                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Mercedes-AMG</span>
-                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Russell / Antonelli</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end">
-                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">512 pts</span>
-                            <span class="text-[10px] text-flag-green font-semibold">Líder</span>
-                        </div>
-                    </div>
-                    <!-- Row 2 (Ferrari) -->
-                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
-                        <div class="flex items-center gap-2">
-                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">2</span>
-                            <div class="flex flex-col">
-                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Scuderia Ferrari</span>
-                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Leclerc / Hamilton</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end">
-                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">489 pts</span>
-                            <span class="text-[10px] text-racing-red font-semibold">-23 pts</span>
-                        </div>
-                    </div>
-                    <!-- Row 3 (McLaren) -->
-                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
-                        <div class="flex items-center gap-2">
-                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">3</span>
-                            <div class="flex flex-col">
-                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">McLaren F1 Team</span>
-                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Norris / Piastri</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end">
-                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">462 pts</span>
-                            <span class="text-[10px] text-secondary dark:text-secondary-fixed-dim font-semibold">-50 pts</span>
-                        </div>
-                    </div>
-                    <!-- Row 4 (Red Bull) -->
-                    <div class="flex items-center justify-between p-2.5 bg-canvas-cream dark:bg-[#151920] rounded-lg shadow-2xs border border-subtle-border/60 dark:border-[#2a303c]">
-                        <div class="flex items-center gap-2">
-                            <span class="font-data-telemetry text-body-md font-bold text-secondary dark:text-secondary-fixed w-4">4</span>
-                            <div class="flex flex-col">
-                                <span class="font-headline-sm text-body-md text-carbon-black dark:text-pure-white font-bold">Red Bull Racing</span>
-                                <span class="text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta">Verstappen / Lawson</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col items-end">
-                            <span class="font-data-telemetry text-body-md font-bold text-carbon-black dark:text-pure-white">398 pts</span>
-                            <span class="text-[10px] text-secondary dark:text-secondary-fixed-dim font-semibold">-114 pts</span>
-                        </div>
-                    </div>
+                <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
+                    <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">verified</span>
+                    <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
+                    <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
+                    <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
+                        Anuncie Aqui
+                    </a>
                 </div>
-                <a class="text-center pt-2 text-label-category font-label-category text-racing-red hover:underline uppercase tracking-wider text-[11px] font-bold" href="/categoria/formula-1/">
-                    Ver Calendário e Notícias de F1 →
-                </a>
             </div>
 
             <!-- Widget 3: Matérias Relacionadas do Banco de Dados -->
@@ -633,17 +499,6 @@ function toggleLike(postId) {
         if (iconEl) iconEl.textContent = 'favorite';
         if (btn) btn.classList.add('border-racing-red');
     }
-}
-
-function submitComment() {
-    var input = document.getElementById('comment-input');
-    var text = input ? input.value.trim() : '';
-    if (!text) {
-        alert('Por favor, escreva um comentário antes de publicar.');
-        return;
-    }
-    alert('Comentário enviado com sucesso para a moderação da redação SpeedRacing!');
-    if (input) input.value = '';
 }
 
 // Inicializar estado de curtida
