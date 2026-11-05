@@ -354,8 +354,15 @@ $router->get('/feed.xml', function () use ($config): void {
   <channel>
     <title><?= Security::e($config['app']['name']) ?></title>
     <link><?= Security::e($canonicalOrigin) ?>/</link>
-    <description>Feed de notícias do <?= Security::e($config['app']['name']) ?></description>
+    <description><?= Security::e(!empty($config['app']['description']) ? $config['app']['description'] : 'Feed de notícias do ' . $config['app']['name']) ?></description>
     <language>pt-BR</language>
+    <?php if (!empty($config['app']['favicon'])): ?>
+    <image>
+      <url><?= Security::e(str_starts_with($config['app']['favicon'], 'http') ? $config['app']['favicon'] : "{$canonicalOrigin}{$config['app']['favicon']}") ?></url>
+      <title><?= Security::e($config['app']['name']) ?></title>
+      <link><?= Security::e($canonicalOrigin) ?>/</link>
+    </image>
+    <?php endif; ?>
     <atom:link href="<?= Security::e($canonicalOrigin) ?>/feed.xml" rel="self" type="application/rss+xml" />
     <?php foreach ($posts as $item): ?>
       <item>

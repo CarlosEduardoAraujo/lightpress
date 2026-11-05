@@ -109,11 +109,18 @@ class Seo
                     '@type' => 'Person',
                     'name' => $post['author_name'] ?? 'Redação',
                 ],
-                'publisher' => [
+                'publisher' => array_merge([
                     '@type' => 'Organization',
                     'name' => $siteName,
                     'url' => $canonicalOrigin,
-                ],
+                ], !empty($appConfig['app']['favicon']) ? [
+                    'logo' => [
+                        '@type' => 'ImageObject',
+                        'url' => str_starts_with($appConfig['app']['favicon'], 'http')
+                            ? $appConfig['app']['favicon']
+                            : "{$canonicalOrigin}{$appConfig['app']['favicon']}",
+                    ],
+                ] : []),
             ];
 
             if (!empty($post['featured_image'])) {
@@ -127,10 +134,11 @@ class Seo
                 '@context' => 'https://schema.org',
                 '@type' => 'WebSite',
                 'name' => $siteName,
+                'description' => $appConfig['app']['description'] ?? '',
                 'url' => "{$canonicalOrigin}/",
                 'potentialAction' => [
                     '@type' => 'SearchAction',
-                    'target' => "{$canonicalOrigin}/?q={search_term_string}",
+                    'target' => "{$canonicalOrigin}/busca?q={search_term_string}",
                     'query-input' => 'required name=search_term_string',
                 ],
             ];

@@ -13,7 +13,7 @@ use LightPress\Core\Icon;
                         <img alt="SpeedRacing Footer Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UOsBZfJDdPHi-XRJwnIgrTQ59llngu7hLaIpF2kDSZd2_HEO75qlogsHTlyraBKg5ZuGiiBGklemmXVS51IAtXUjVbp5AQilfc2PZ9B9IyHCgnPTctlYI9k9KXyDqFfiEbh8dQNld9zXHAcTs1kzjhg6W4uspAkTfyyaTUClDqg2oXRHHvJ0Y1-MFMwQClZZq3yFrWQWtWHtVzuoum0dfUIp_RjS0Vaod5uRrg5ZBY" onerror="this.style.display='none'"/>
                         <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-pure-white">SPEED<span class="text-racing-red">RACING</span></span>
                     </div>
-                    <p class="font-body-md text-body-md text-secondary-fixed max-w-md">Automobilismo mundial e nacional com rigor técnico, telemetria e bastidores. Credibilidade ininterrupta em notícias desde 2002.</p>
+                    <p class="font-body-md text-body-md text-secondary-fixed max-w-md"><?= Security::e(!empty($config['app']['description']) ? $config['app']['description'] : 'Automobilismo mundial e nacional com rigor técnico, telemetria e bastidores. Credibilidade ininterrupta em notícias desde 2002.') ?></p>
                     <div class="flex items-center gap-space-xs text-data-telemetry font-data-telemetry text-flag-yellow">
                         <?= Icon::svg('verified', 'text-flag-yellow', 18) ?>
                         <span>Cobertura FIA • CBA • IMSA • ACO</span>
@@ -48,7 +48,7 @@ use LightPress\Core\Icon;
             <div class="w-full h-px bg-track-asphalt"></div>
 
             <div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm font-label-meta text-label-meta text-secondary-fixed-dim">
-                <span>© 2002–<?= date('Y') ?> SpeedRacing Comunicação Ltda. Todos os direitos reservados.</span>
+                <span>© 2002–<?= date('Y') ?> <?= Security::e($config['app']['name'] ?? 'SpeedRacing') ?> Comunicação Ltda. Todos os direitos reservados.</span>
                 <div class="flex items-center gap-space-md">
                     <a class="hover:text-pure-white transition-colors" href="/termos-de-uso/">Termos de Uso</a>
                     <a class="hover:text-pure-white transition-colors" href="/politica-de-privacidade/">Privacidade</a>

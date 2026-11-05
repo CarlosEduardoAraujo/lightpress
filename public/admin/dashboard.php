@@ -188,6 +188,9 @@ function buildFilterUrl(array $overrides = []): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Editorial - SpeedPress</title>
+    <?php if (!empty($config['app']['favicon'])): ?>
+        <link rel="icon" href="<?= Security::e($config['app']['favicon']) ?>">
+    <?php endif; ?>
 
     <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
     <script>
