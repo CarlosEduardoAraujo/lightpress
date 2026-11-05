@@ -112,29 +112,6 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
         <?php endforeach; ?>
     </div>
 </section>
-
-<!-- 2. LIVE FAST-NEWS TELEMETRY STRIP -->
-<section class="w-full bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-col md:flex-row items-stretch md:items-center gap-space-md">
-    <div class="flex items-center gap-2 shrink-0 bg-carbon-black dark:bg-[#0d121c] text-pure-white px-space-md py-1.5 rounded-lg border border-transparent dark:border-[#2a303c]">
-        <span class="w-2.5 h-2.5 rounded-full bg-racing-red animate-pulse"></span>
-        <span class="font-data-telemetry text-data-telemetry tracking-wider uppercase font-bold text-flag-yellow">PIT WALL FEED</span>
-    </div>
-    <div class="flex-1 flex flex-wrap md:flex-nowrap items-center gap-space-lg overflow-x-auto text-body-sm font-body-sm text-on-surface dark:text-pure-white">
-        <?php foreach (array_slice($posts, 0, 3) as $pit): ?>
-            <div class="flex items-center gap-2 shrink-0">
-                <span class="font-data-telemetry text-data-telemetry text-secondary dark:text-secondary-fixed-dim"><?= date('H:i', strtotime($pit['published_at'])) ?></span>
-                <a href="/<?= Security::e($pit['slug']) ?>/" class="font-medium text-carbon-black dark:text-pure-white hover:text-racing-red dark:hover:text-racing-red transition-colors line-clamp-1">
-                    <?= Security::e($pit['title']) ?>
-                </a>
-            </div>
-        <?php endforeach; ?>
-    </div>
-    <div class="shrink-0 flex items-center justify-end">
-        <a href="#feed" class="text-label-meta font-label-meta text-racing-red hover:text-tertiary dark:hover:text-racing-red flex items-center gap-1 font-semibold uppercase">
-            Feed Completo <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-        </a>
-    </div>
-</section>
 <?php endif; ?>
 
 <!-- 3. MAIN TWO-COLUMN BODY LAYOUT -->
@@ -242,78 +219,18 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 
     <!-- RIGHT: RACE WEEKEND & OPINION SIDEBAR (4 COLS) -->
     <aside class="lg:col-span-4 flex flex-col gap-space-lg">
-        <!-- WIDGET 1: RACE RADAR / UPCOMING EVENTS -->
-        <div class="bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md space-y-space-md">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-racing-red text-[20px]">sports_score</span>
-                    <h3 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white uppercase tracking-tight font-bold">Próximas Etapas</h3>
-                </div>
-                <span class="px-2 py-0.5 rounded bg-surface-container dark:bg-[#252b36] text-secondary dark:text-secondary-fixed font-label-category text-[10px]">CALENDÁRIO</span>
+        <!-- Banner Parceiro Oficial (Substitui Próximas Etapas) -->
+        <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
+            <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
+                <span>Publicidade</span>
+                <span class="text-racing-red font-bold">Parceiro Oficial</span>
             </div>
-            <div class="space-y-space-sm">
-                <!-- Event 1: F1 Interlagos -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
-                    <div class="flex items-center justify-between text-label-category font-label-category">
-                        <span class="text-racing-red font-bold">FÓRMULA 1</span>
-                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">06 - 08 NOV</span>
-                    </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Grande Prêmio de São Paulo</div>
-                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
-                        <span>Autódromo de Interlagos</span>
-                        <span class="px-1.5 py-0.5 rounded bg-flag-green/10 text-flag-green font-semibold">T-02 Dias</span>
-                    </div>
-                </div>
-
-                <!-- Event 2: NASCAR Homestead -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
-                    <div class="flex items-center justify-between text-label-category font-label-category">
-                        <span class="text-carbon-black dark:text-pure-white font-bold">NASCAR CUP</span>
-                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">08 NOV</span>
-                    </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Homestead-Miami Championship 4</div>
-                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
-                        <span>Homestead Speedway</span>
-                        <span class="text-secondary dark:text-secondary-fixed-dim">Decisão de Título</span>
-                    </div>
-                </div>
-
-                <!-- Event 3: Stock Car Goiânia -->
-                <div class="p-space-sm rounded-lg bg-surface-container-lowest dark:bg-[#151920] hover:bg-surface-container-low dark:hover:bg-[#1d222b] transition-colors space-y-1 border border-subtle-border/60 dark:border-[#2a303c]">
-                    <div class="flex items-center justify-between text-label-category font-label-category">
-                        <span class="text-flag-yellow font-bold">STOCK CAR PRO</span>
-                        <span class="text-secondary dark:text-secondary-fixed-dim font-data-telemetry">15 NOV</span>
-                    </div>
-                    <div class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Etapa de Goiânia • Anel Externo</div>
-                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
-                        <span>Ayrton Senna, GO</span>
-                        <span class="text-secondary dark:text-secondary-fixed-dim">Corrida Principal</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- WIDGET 2: SPECIAL COLUMN - OPINIÃO / REDAÇÃO -->
-        <div class="bg-carbon-black text-pure-white rounded-xl shadow-md p-space-md relative overflow-hidden border border-subtle-border/30 dark:border-[#2a303c]">
-            <div class="absolute -right-6 -bottom-6 opacity-10">
-                <span class="material-symbols-outlined text-[160px] text-pure-white">speed</span>
-            </div>
-            <div class="relative z-10 space-y-space-sm">
-                <div class="flex items-center gap-space-sm">
-                    <div class="w-12 h-12 rounded-full overflow-hidden bg-carbon-surface shrink-0 shadow flex items-center justify-center font-bold text-racing-red text-lg">
-                        SR
-                    </div>
-                    <div>
-                        <span class="font-label-category text-[10px] text-racing-red uppercase tracking-widest block font-bold">Coluna de Opinião</span>
-                        <h4 class="font-headline-sm text-headline-sm text-pure-white font-bold leading-none">Carlos Araújo</h4>
-                        <span class="font-label-meta text-label-meta text-secondary-fixed">Diretor Geral SpeedRacing</span>
-                    </div>
-                </div>
-                <p class="font-body-md text-body-sm text-surface-container italic pt-space-xs leading-relaxed">
-                    "A velocidade pura não perdoa erros. Do asfalto quente de Interlagos aos circuitos da NASCAR, a precisão e a coragem definem os campeões da era moderna."
-                </p>
-                <a class="inline-flex items-center gap-1.5 text-flag-yellow hover:text-pure-white font-label-category text-label-category uppercase tracking-wider transition-colors pt-space-xs" href="/categoria/opiniao/">
-                    Ler todas as análises <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+            <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
+                <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">campaign</span>
+                <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
+                <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
+                <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
+                    Anuncie Aqui
                 </a>
             </div>
         </div>

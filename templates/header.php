@@ -17,8 +17,54 @@ $menuCategories = [
     ['slug' => 'motovelocidade', 'name' => 'Motovelocidade'],
 ];
 
-// Tags em alta
-$trendingTags = ['GPSãoPaulo2026', 'RafaelCamara', 'NASCARHomestead', 'LeMansUltimate', 'TelemetriaF1'];
+// Tags em alta no dia atual (dinâmicas a partir do banco de dados)
+$trendingTags = [];
+try {
+    // 1. Buscar tags das notícias publicadas nas últimas 24 horas
+    $recentTagsRaw = Database::fetchAll(
+        "SELECT tags FROM posts 
+         WHERE status = 'published' 
+           AND published_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
+           AND tags IS NOT NULL AND tags != '' 
+         LIMIT 50"
+    );
+
+    // Se hoje tiver poucas matérias com tags, busca das últimas 50 matérias publicadas
+    if (count($recentTagsRaw) < 3) {
+        $recentTagsRaw = Database::fetchAll(
+            "SELECT tags FROM posts 
+             WHERE status = 'published' 
+               AND tags IS NOT NULL AND tags != '' 
+             ORDER BY published_at DESC LIMIT 50"
+        );
+    }
+
+    $tagCounts = [];
+    foreach ($recentTagsRaw as $row) {
+        $parts = array_map('trim', explode(',', $row['tags']));
+        foreach ($parts as $p) {
+            if ($p === '' || mb_strlen($p) < 2) continue;
+            $key = mb_strtolower($p);
+            if (!isset($tagCounts[$key])) {
+                $tagCounts[$key] = ['name' => $p, 'count' => 0];
+            }
+            $tagCounts[$key]['count']++;
+        }
+    }
+
+    // Ordenar pelas tags mais frequentes
+    uasort($tagCounts, fn($a, $b) => $b['count'] <=> $a['count']);
+    $topTags = array_slice($tagCounts, 0, 6);
+    foreach ($topTags as $t) {
+        $trendingTags[] = $t['name'];
+    }
+} catch (\Throwable $e) {
+    // Fallback silencioso
+}
+
+if (empty($trendingTags)) {
+    $trendingTags = ['Fórmula 1', 'Stock Car', 'NASCAR', 'IndyCar', 'Le Mans'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -154,26 +200,19 @@ $trendingTags = ['GPSãoPaulo2026', 'RafaelCamara', 'NASCARHomestead', 'LeMansUl
 </head>
 <body class="bg-surface dark:bg-carbon-black font-body-md text-on-surface dark:text-pure-white antialiased transition-colors duration-200">
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">
-        <!-- 1. Top Strip (Ao Vivo / Próxima Etapa) -->
+        <!-- 1. Top Strip -->
         <div class="w-full bg-carbon-black text-on-tertiary">
             <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between h-9 text-label-meta font-label-meta">
                 <div class="flex items-center gap-space-md">
-                    <span class="flex items-center gap-space-xs text-flag-yellow font-semibold">
-                        <span class="w-2 h-2 rounded-full bg-racing-red animate-ping"></span>AO VIVO
-                    </span>
-                    <span class="text-secondary-fixed-dim hidden sm:inline">|</span>
-                    <span class="text-surface-container-lowest tracking-tight">Próxima Etapa: GP de São Paulo 2026 • Interlagos (F1)</span>
+                    <span class="text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
                 </div>
-                <div class="flex items-center gap-space-md">
-                    <span class="hidden md:inline text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
-                    <div class="flex items-center gap-space-sm">
-                        <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#newsletter">
-                            <span class="material-symbols-outlined text-[15px]">mail</span><span class="hidden lg:inline">Newsletter</span>
-                        </a>
-                        <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
-                            <span class="material-symbols-outlined text-[15px]">share</span><span class="hidden lg:inline">Social</span>
-                        </a>
-                    </div>
+                <div class="flex items-center gap-space-sm">
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#newsletter">
+                        <span class="material-symbols-outlined text-[15px]">mail</span><span class="hidden lg:inline">Newsletter</span>
+                    </a>
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
+                        <span class="material-symbols-outlined text-[15px]">share</span><span class="hidden lg:inline">Social</span>
+                    </a>
                 </div>
             </div>
         </div>
