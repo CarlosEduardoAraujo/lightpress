@@ -78,11 +78,14 @@ class ImageProcessor
 
     /**
      * Obtém a URL da variante Thumbnail (-thumb.avif ou -thumb.webp, 300x169px) para listagens e painéis leves.
-     * Padrão do sistema: SEMPRE AVIF no HTML (Nginx realiza fallback automático para WebP quando necessário).
+     * Suporta nativamente:
+     * 1. Novas imagens com variante -thumb.avif
+     * 2. Acervos legados do WordPress com sufixos proporcionais (-300x... ou -299x299)
+     * 3. Fallback inteligente e transparente para a imagem original em AVIF
      *
      * @param string $url URL de qualquer variante da imagem
      * @param string $format 'avif' (padrão) ou 'webp'
-     * @return string URL apontando diretamente para a versão -thumb
+     * @return string URL apontando diretamente para a melhor versão de miniatura disponível
      */
     public static function toThumbUrl(string $url, string $format = 'avif'): string
     {
@@ -97,15 +100,43 @@ class ImageProcessor
             return ($targetExt === 'webp') ? self::toWebpUrl($url) : self::toAvifUrl($url);
         }
 
-        // Substitui sufixos de resolução conhecidos (-1024, -1920) por -thumb
+        // Gera candidato padrão SpeedPress: -thumb.avif
         $replaced = preg_replace('~-(1024|1920)\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
-        if ($replaced !== null && $replaced !== $url) {
-            return $replaced;
+        if ($replaced === null || $replaced === $url) {
+            $replaced = preg_replace('~\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
         }
 
-        // Caso seja a imagem original sem sufixo
-        $replaced = preg_replace('~\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
-        return $replaced ?? $url;
+        $candidate = $replaced ?? $url;
+
+        // Verificar existência física no sistema de arquivos para compatibilidade híbrida
+        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
+
+        if (file_exists($candidatePath)) {
+            return $candidate;
+        }
+
+        // Se não encontrar o -thumb físico, busca por variantes proporcionais legadas do WordPress (-300x... ou -299x299)
+        $dir = dirname($candidatePath);
+        if (is_dir($dir)) {
+            $pathInfo = pathinfo($candidatePath);
+            $baseWithoutThumb = preg_replace('~-thumb$~', '', $pathInfo['filename']);
+
+            // Testar se existe miniatura proporcional do WordPress (ex: -300x169.avif)
+            $matches = glob($dir . '/' . $baseWithoutThumb . '-300x*.' . $targetExt);
+            if (!empty($matches)) {
+                return dirname($candidate) . '/' . basename($matches[0]);
+            }
+
+            // Testar se existe miniatura quadrada do WordPress (ex: -299x299.avif)
+            $squareMatch = $dir . '/' . $baseWithoutThumb . '-299x299.' . $targetExt;
+            if (file_exists($squareMatch)) {
+                return dirname($candidate) . '/' . basename($squareMatch);
+            }
+        }
+
+        // Fallback transparente: retorna a imagem original em AVIF
+        return self::toAvifUrl($url);
     }
 
     /**
