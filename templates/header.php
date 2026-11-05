@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 use LightPress\Core\Database;
+use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\Seo;
@@ -99,11 +100,10 @@ if (empty($trendingTags)) {
         })();
     </script>
 
-    <!-- Tipografia e Ícones do Design System SpeedRacing (Kinetic Apex Editorial) -->
+    <!-- Tipografia do Design System SpeedRacing (Kinetic Apex Editorial) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 
     <!-- Tailwind CSS com a Paleta Exata do DESIGN.md -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -236,11 +236,11 @@ if (empty($trendingTags)) {
                     <span class="text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
                 </div>
                 <div class="flex items-center gap-space-sm">
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="#newsletter">
-                        <span class="material-symbols-outlined text-[15px]">mail</span><span class="hidden lg:inline">Newsletter</span>
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1.5" href="#newsletter">
+                        <?= Icon::svg('mail', 'text-surface-container-lowest', 15) ?><span class="hidden lg:inline">Newsletter</span>
                     </a>
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
-                        <span class="material-symbols-outlined text-[15px]">share</span><span class="hidden lg:inline">Social</span>
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1.5" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
+                        <?= Icon::svg('share', 'text-surface-container-lowest', 15) ?><span class="hidden lg:inline">Social</span>
                     </a>
                 </div>
             </div>
@@ -271,22 +271,22 @@ if (empty($trendingTags)) {
                 <form action="/busca" method="GET" class="relative flex items-center">
                     <input type="text" name="q" placeholder="Buscar no portal..." value="<?= Security::e($_GET['q'] ?? '') ?>" class="hidden md:block w-36 focus:w-52 transition-all duration-200 text-body-sm py-1.5 px-3 rounded-lg bg-surface-container dark:bg-carbon-surface text-carbon-black dark:text-pure-white placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim focus:outline-none focus:ring-1 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c]">
                     <button type="submit" aria-label="Buscar no portal" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-carbon-surface flex items-center justify-center text-on-surface dark:text-pure-white hover:bg-surface-container-high dark:hover:bg-[#252b35] transition-colors md:absolute md:right-0">
-                        <span class="material-symbols-outlined text-[20px]">search</span>
+                        <?= Icon::svg('search', 'w-4 h-4', 18) ?>
                     </button>
                 </form>
 
                 <!-- Botão de Alternância de Tema Claro / Escuro -->
                 <button type="button" onclick="toggleTheme()" id="btnThemeToggle" aria-label="Alternar modo claro/escuro" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-carbon-surface dark:text-pure-white flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-[#252b35] transition-colors border border-subtle-border dark:border-[#2a303c]" title="Alternar Modo Claro/Escuro">
-                    <span class="material-symbols-outlined text-[20px]" id="themeIcon">light_mode</span>
+                    <span id="themeIcon"><?= Icon::svg('light_mode', 'w-4 h-4', 18) ?></span>
                 </button>
                 
-                <div class="hidden sm:flex items-center px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded-lg text-label-category font-label-category text-carbon-black dark:text-pure-white uppercase tracking-wider gap-1 border border-subtle-border dark:border-[#2a303c]">
-                    <span class="material-symbols-outlined text-[14px] text-racing-red">language</span>
+                <div class="hidden sm:flex items-center px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded-lg text-label-category font-label-category text-carbon-black dark:text-pure-white uppercase tracking-wider gap-1.5 border border-subtle-border dark:border-[#2a303c]">
+                    <?= Icon::svg('language', 'text-racing-red', 14) ?>
                     <span>BR</span>
                 </div>
 
                 <a href="/admin/login.php" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 text-pure-white hover:opacity-90 transition-opacity" title="Acessar Painel">
-                    <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+                    <?= Icon::svg('person', 'text-pure-white', 16) ?>
                 </a>
             </div>
         </div>
@@ -294,8 +294,8 @@ if (empty($trendingTags)) {
         <!-- 3. Em Alta Ticker Strip -->
         <div class="bg-surface-container-low dark:bg-[#0d121c] border-t border-subtle-border/60 dark:border-[#1e2533]">
             <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin h-11 flex items-center gap-space-sm overflow-x-auto">
-                <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red shrink-0 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[14px]">trending_up</span>Em Alta:
+                <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red shrink-0 flex items-center gap-1.5">
+                    <?= Icon::svg('trending_up', 'text-racing-red', 14) ?>Em Alta:
                 </span>
                 <div class="flex items-center gap-space-xs font-label-meta text-label-meta">
                     <?php foreach ($trendingTags as $tTag): ?>
@@ -310,12 +310,15 @@ if (empty($trendingTags)) {
         <div class="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin space-y-space-xl pb-space-xl">
 
     <script>
+        var SUN_SVG = '<?= addslashes(Icon::svg("light_mode", "w-4 h-4", 18)) ?>';
+        var MOON_SVG = '<?= addslashes(Icon::svg("dark_mode", "w-4 h-4", 18)) ?>';
+
         function updateThemeButton() {
             var isDark = document.documentElement.classList.contains('dark');
             var icon = document.getElementById('themeIcon');
             var btn = document.getElementById('btnThemeToggle');
             if (icon) {
-                icon.innerText = isDark ? 'light_mode' : 'dark_mode';
+                icon.innerHTML = isDark ? SUN_SVG : MOON_SVG;
             }
             if (btn) {
                 btn.setAttribute('title', isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro');

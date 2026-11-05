@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
@@ -76,7 +77,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 
             <div class="flex items-center gap-space-md pt-space-xs text-secondary-fixed font-label-meta text-label-meta">
                 <span class="flex items-center gap-1.5 text-pure-white font-semibold">
-                    <span class="material-symbols-outlined text-[16px] text-racing-red">edit_note</span>
+                    <?= Icon::svg('edit_note', 'text-racing-red', 16) ?>
                     Por <?= Security::e($mainLead['author_name'] ?? 'Redação SpeedRacing') ?>
                 </span>
                 <span>•</span>
@@ -104,7 +105,9 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                 </h2>
                 <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-sm pt-space-xs">
                     <span class="text-tertiary dark:text-racing-red font-medium"></span>
-                    <a href="/<?= Security::e($sec['slug']) ?>/" class="material-symbols-outlined text-[18px] text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1" title="Ler matéria">arrow_forward</a>
+                    <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
+                        <?= Icon::svg('arrow_forward', '', 18) ?>
+                    </a>
                 </div>
             </article>
         <?php endforeach; ?>
@@ -145,7 +148,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                     <div class="flex-1 flex flex-col justify-between h-full w-full">
                         <div class="space-y-space-xs">
                             <div class="flex items-center gap-space-xs text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta">
-                                <span class="material-symbols-outlined text-[14px]">calendar_today</span>
+                                <?= Icon::svg('calendar_today', '', 14) ?>
                                 <time datetime="<?= $item['published_at'] ?>"><?= $formatPtDate($item['published_at']) ?></time>
                                 <span>•</span>
                                 <span class="capitalize"><?= Security::e($getSubtopic($item['tags'] ?? null, $item['category'])) ?></span>
@@ -163,7 +166,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                         </div>
                         <div class="pt-space-sm flex items-center text-racing-red font-label-category text-label-category uppercase tracking-wider gap-1">
                             <a href="/<?= Security::e($item['slug']) ?>/" class="flex items-center gap-1 hover:underline">
-                                Ler matéria completa <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                Ler matéria completa <?= Icon::svg('arrow_forward', '', 14) ?>
                             </a>
                         </div>
                     </div>
@@ -208,7 +211,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
 
                 <?php if ($currentPage < $totalPages): ?>
                     <a class="px-space-md py-2 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs border border-transparent dark:border-[#2a303c] dark:bg-[#252b36] dark:hover:bg-racing-red" href="/page/<?= $currentPage + 1 ?>/">
-                        Próxima Página <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        Próxima Página <?= Icon::svg('arrow_forward', 'text-pure-white', 16) ?>
                     </a>
                 <?php endif; ?>
             </nav>
@@ -224,7 +227,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
                 <span class="text-racing-red font-bold">Parceiro Oficial</span>
             </div>
             <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
-                <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">campaign</span>
+                <?= Icon::svg('campaign', 'text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
                 <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
                 <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
                 <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
@@ -236,7 +239,7 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
         <!-- WIDGET 3: INSTAGRAM COMMUNITY CARD -->
         <div class="bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-col gap-space-sm items-center text-center">
             <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-flag-yellow via-racing-red to-primary flex items-center justify-center text-pure-white shadow-md">
-                <span class="material-symbols-outlined text-[32px]">photo_camera</span>
+                <?= Icon::svg('photo_camera', 'text-pure-white', 30) ?>
             </div>
             <div>
                 <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">@speedracing.com.br</h4>
@@ -244,14 +247,14 @@ $secondaryLeads = array_slice($featuredPosts, 1, 3);
             </div>
             <a class="w-full py-2.5 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-xs border border-transparent dark:border-[#2a303c] dark:bg-[#252b36] dark:hover:bg-racing-red" href="https://www.instagram.com/speedracing.com.br/" rel="noopener noreferrer" target="_blank">
                 <span>Seguir no Instagram</span>
-                <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                <?= Icon::svg('open_in_new', 'text-pure-white', 16) ?>
             </a>
         </div>
 
         <!-- WIDGET 4: FAST NEWSLETTER -->
         <div id="newsletter" class="bg-surface-container-low dark:bg-carbon-surface rounded-xl p-space-md space-y-space-sm border border-subtle-border dark:border-[#2a303c]">
             <div class="flex items-center gap-2 text-carbon-black dark:text-pure-white font-headline-sm text-headline-sm font-bold">
-                <span class="material-symbols-outlined text-racing-red text-[20px]">mark_email_read</span>
+                <?= Icon::svg('mail', 'text-racing-red', 20) ?>
                 <span>Grid SpeedRacing</span>
             </div>
             <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">

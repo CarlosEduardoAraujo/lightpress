@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+use LightPress\Core\Icon;
 ?>
         </div>
     </main>
@@ -14,7 +15,7 @@ declare(strict_types=1);
                     </div>
                     <p class="font-body-md text-body-md text-secondary-fixed max-w-md">Automobilismo mundial e nacional com rigor técnico, telemetria e bastidores. Credibilidade ininterrupta em notícias desde 2002.</p>
                     <div class="flex items-center gap-space-xs text-data-telemetry font-data-telemetry text-flag-yellow">
-                        <span class="material-symbols-outlined text-[18px]">verified</span>
+                        <?= Icon::svg('verified', 'text-flag-yellow', 18) ?>
                         <span>Cobertura FIA • CBA • IMSA • ACO</span>
                     </div>
                 </div>

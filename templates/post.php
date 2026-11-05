@@ -2,6 +2,7 @@
 declare(strict_types=1);
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
+use LightPress\Core\Icon;
 
 require __DIR__ . '/header.php';
 
@@ -182,14 +183,14 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
     <nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pb-space-md">
         <div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
             <a class="hover:text-racing-red transition-colors flex items-center gap-1" href="/">
-                <span class="material-symbols-outlined text-[16px]">home</span>
+                <?= Icon::svg('home', '', 15) ?>
                 Home
             </a>
-            <span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+            <?= Icon::svg('chevron_right', 'text-secondary-fixed-dim', 13) ?>
             <a class="hover:text-racing-red transition-colors capitalize" href="/categoria/<?= Security::e($post['category']) ?>/">
                 <?= Security::e($post['category']) ?>
             </a>
-            <span class="material-symbols-outlined text-[14px] text-secondary-fixed-dim">chevron_right</span>
+            <?= Icon::svg('chevron_right', 'text-secondary-fixed-dim', 13) ?>
             <span class="text-carbon-black dark:text-pure-white font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                 <?= Security::e($primarySubtopic) ?>
             </span>
@@ -216,7 +217,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                         <?= Security::e($primarySubtopic) ?>
                     </span>
                     <span class="bg-surface-container-high dark:bg-[#252b36] text-on-surface-variant dark:text-secondary-fixed text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[13px]">military_tech</span>
+                        <?= Icon::svg('military_tech', 'text-on-surface-variant dark:text-secondary-fixed', 13) ?>
                         Temporada <?= date('Y') ?>
                     </span>
                 </div>
@@ -248,13 +249,13 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                 <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">
                                     <?= Security::e($post['author_name'] ?? 'Redação SpeedRacing') ?>
                                 </span>
-                                <span class="material-symbols-outlined text-flag-green text-[15px]" title="Jornalista Verificado SpeedRacing">verified</span>
+                                <span title="Jornalista Verificado SpeedRacing"><?= Icon::svg('verified', 'text-flag-green', 15) ?></span>
                             </div>
                             <div class="flex items-center gap-2 text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">
                                 <time datetime="<?= $post['published_at'] ?>"><?= $formatPtFullDate($post['published_at']) ?></time>
                                 <span>•</span>
                                 <span class="flex items-center gap-1 text-carbon-black dark:text-pure-white">
-                                    <span class="material-symbols-outlined text-[14px]">schedule</span> <?= (int)($readingTime ?? 3) ?> min de leitura
+                                    <?= Icon::svg('schedule', 'text-carbon-black dark:text-pure-white', 14) ?> <?= (int)($readingTime ?? 3) ?> min de leitura
                                 </span>
                             </div>
                         </div>
@@ -266,13 +267,13 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                             <span class="font-headline-sm text-[12px] font-bold">𝕏</span>
                         </a>
                         <a href="https://api.whatsapp.com/send?text=<?= $postTitleEncoded ?>%20-%20<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-flag-green flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no WhatsApp">
-                            <span class="material-symbols-outlined text-[18px]">chat</span>
+                            <?= Icon::svg('chat', 'text-flag-green', 18) ?>
                         </a>
                         <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-racing-red flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no Telegram">
-                            <span class="material-symbols-outlined text-[18px]">send</span>
+                            <?= Icon::svg('send', 'text-racing-red', 18) ?>
                         </a>
                         <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da matéria">
-                            <span class="material-symbols-outlined text-[18px]">link</span>
+                            <span id="copy-icon"><?= Icon::svg('link', 'text-carbon-black dark:text-pure-white', 18) ?></span>
                         </button>
                     </div>
                 </div>
@@ -347,7 +348,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                     <span class="text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
-                    <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">campaign</span>
+                    <?= Icon::svg('campaign', 'text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
                     <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
                     <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
                     <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
@@ -363,7 +364,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                     <span class="text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
-                    <span class="material-symbols-outlined text-[42px] text-racing-red mb-2 group-hover:scale-110 transition-transform">verified</span>
+                    <?= Icon::svg('verified', 'text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
                     <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
                     <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
                     <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
@@ -377,10 +378,10 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <div class="bg-pure-white dark:bg-carbon-surface rounded-xl p-space-md shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col gap-space-sm">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-racing-red text-[20px]">recommend</span>
+                            <?= Icon::svg('recommend', 'text-racing-red', 20) ?>
                             <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">Notícias Relacionadas</h4>
                         </div>
-                        <span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
+                        <?= Icon::svg('trending_up', 'text-secondary dark:text-secondary-fixed-dim', 18) ?>
                     </div>
                     <div class="flex flex-col gap-space-sm mt-1">
                         <?php foreach ($relatedPosts as $rel): ?>
@@ -413,7 +414,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
             <div id="newsletter" class="bg-carbon-black text-pure-white rounded-xl p-space-lg shadow-md relative overflow-hidden flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
                 <div class="w-24 h-24 rounded-full bg-racing-red/20 blur-2xl absolute -top-8 -right-8 pointer-events-none"></div>
                 <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-racing-red text-[24px]">mark_email_unread</span>
+                    <?= Icon::svg('mail', 'text-racing-red', 24) ?>
                     <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Grid SpeedRacing</span>
                 </div>
                 <h4 class="font-headline-sm text-headline-sm text-pure-white leading-tight font-bold">
@@ -426,7 +427,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                     <input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red border border-[#2a303c]" placeholder="Seu melhor e-mail" required="" type="email"/>
                     <button class="w-full py-2.5 bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm" type="submit">
                         <span>Garantir Vaga no Grid</span>
-                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                        <?= Icon::svg('chevron_right', 'text-pure-white', 16) ?>
                     </button>
                 </form>
                 <span class="text-[10px] font-label-meta text-surface-container-high/60 text-center">
@@ -440,15 +441,18 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
 
 <!-- Scripts de Interação da Matéria -->
 <script>
+const LINK_SVG = '<?= addslashes(Icon::svg("link", "text-carbon-black dark:text-pure-white", 18)) ?>';
+const CHECK_SVG = '<?= addslashes(Icon::svg("check", "text-flag-green", 18)) ?>';
+
 function copyPostLink(btn, url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(function() {
-            var icon = btn.querySelector('.material-symbols-outlined');
-            if (icon) {
-                icon.textContent = 'check';
+            var iconContainer = document.getElementById('copy-icon');
+            if (iconContainer) {
+                iconContainer.innerHTML = CHECK_SVG;
                 btn.classList.add('text-flag-green');
                 setTimeout(function() {
-                    icon.textContent = 'link';
+                    iconContainer.innerHTML = LINK_SVG;
                     btn.classList.remove('text-flag-green');
                 }, 2000);
             }
