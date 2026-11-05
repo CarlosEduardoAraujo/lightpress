@@ -164,7 +164,7 @@ $querySql = "SELECT p.id, p.title, p.slug, p.category, p.tags, p.featured_image,
              JOIN users u ON u.id = p.user_id
              LEFT JOIN post_stats s ON s.post_id = p.id
              WHERE {$whereSql}
-             ORDER BY p.id DESC
+             ORDER BY COALESCE(p.published_at, p.updated_at) DESC, p.id DESC
              LIMIT ? OFFSET ?";
 
 $queryParams = array_merge($params, [$perPage, $offset]);

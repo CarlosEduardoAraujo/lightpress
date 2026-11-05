@@ -40,7 +40,7 @@ $errorMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (!Security::validateCsrfToken($_POST['_csrf_token'] ?? null)) {
+        if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? null)) {
             $errorMessage = 'Token de segurança CSRF inválido ou expirado. Recarregue a página e tente novamente.';
         } else {
             $siteTitle = trim($_POST['site_title'] ?? 'SpeedRacing');

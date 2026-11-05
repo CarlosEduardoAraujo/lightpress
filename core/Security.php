@@ -48,6 +48,14 @@ class Security
     }
 
     /**
+     * Alias para verifyCsrfToken para compatibilidade de nomenclatura.
+     */
+    public static function validateCsrfToken(?string $token): bool
+    {
+        return self::verifyCsrfToken($token);
+    }
+
+    /**
      * Inicia a sessão com parâmetros rigorosos de hardening (cookies HttpOnly, Secure, SameSite=Strict).
      */
     public static function startSecureSession(array $appConfig = []): void
