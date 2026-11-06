@@ -12,14 +12,37 @@ $ptMonths = [
     5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
     9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
 ];
-$formatPtDate = function(?string $dateStr) use ($ptMonths): string {
+$formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     if (empty($dateStr)) return date('d/m/Y');
-    $t = strtotime($dateStr);
-    $d = date('j', $t);
-    $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
-    $y = date('Y', $t);
-    $h = date('H:i', $t);
-    return "{$d} de {$m} de {$y}, {$h}";
+    try {
+        $tz = new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo');
+        $dt = new \DateTime($dateStr, new \DateTimeZone('UTC'));
+        $dt->setTimezone($tz);
+        $d = $dt->format('j');
+        $m = $ptMonths[(int)$dt->format('n')] ?? $dt->format('m');
+        $y = $dt->format('Y');
+        $h = $dt->format('H:i');
+        return "{$d} de {$m} de {$y}, {$h}";
+    } catch (\Throwable) {
+        $t = strtotime($dateStr);
+        $d = date('j', $t);
+        $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
+        $y = date('Y', $t);
+        $h = date('H:i', $t);
+        return "{$d} de {$m} de {$y}, {$h}";
+    }
+};
+
+$formatTime = function(?string $dateStr) use ($config): string {
+    if (empty($dateStr)) return '';
+    try {
+        $tz = new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo');
+        $dt = new \DateTime($dateStr, new \DateTimeZone('UTC'));
+        $dt->setTimezone($tz);
+        return $dt->format('H:i');
+    } catch (\Throwable) {
+        return date('H:i', strtotime($dateStr));
+    }
 };
 
 $calcReadingTime = function(?string $html): string {
@@ -96,7 +119,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                         <?= Security::e($sec['category']) ?>
                     </span>
                     <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-                        <?= date('H:i', strtotime($sec['published_at'])) ?>
+                        <?= $formatTime($sec['published_at']) ?>
                     </span>
                 </div>
                 <h2 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors line-clamp-3 font-bold">

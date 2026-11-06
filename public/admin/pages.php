@@ -12,6 +12,7 @@ use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\Schema;
+use LightPress\Core\CacheManager;
 
 Security::startSecureSession($config);
 
@@ -53,6 +54,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         $target = Database::fetchOne("SELECT id, title, slug FROM pages WHERE id = ? LIMIT 1", [$deleteId]);
         if ($target) {
             Database::query("DELETE FROM pages WHERE id = ?", [$deleteId]);
+            try {
+                $cacheMgr = new CacheManager($config);
+                $cacheMgr->purgeUrls(["/{$target['slug']}/", "/sitemap.xml"]);
+            } catch (\Throwable) {}
             header("Location: /admin/pages.php?deleted=1");
             exit;
         } else {

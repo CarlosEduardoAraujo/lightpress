@@ -13,6 +13,10 @@ public/uploads/*
 config.local.php
 .env
 
+# Dependências Node / Tailwind
+node_modules/
+package-lock.json
+
 # Logs e arquivos do sistema
 *.log
 .DS_Store

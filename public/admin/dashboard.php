@@ -158,7 +158,7 @@ $filteredCount = (int)Database::fetchValue(
 );
 $totalPages = max(1, (int)ceil($filteredCount / $perPage));
 
-$querySql = "SELECT p.id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
+$querySql = "SELECT p.id, p.user_id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
                     u.name as author_name, COALESCE(s.views, 0) as views
              FROM posts p
              JOIN users u ON u.id = p.user_id
@@ -171,6 +171,18 @@ $queryParams = array_merge($params, [$perPage, $offset]);
 $posts = Database::fetchAll($querySql, $queryParams);
 
 $csrfToken = Security::generateCsrfToken();
+
+$displayTz = new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo');
+$formatDisplayDate = function(?string $dateStr, string $format = 'd/m/Y \à\s H:i') use ($displayTz): string {
+    if (empty($dateStr)) return '';
+    try {
+        $dt = new \DateTime($dateStr, new \DateTimeZone('UTC'));
+        $dt->setTimezone($displayTz);
+        return $dt->format($format);
+    } catch (\Throwable) {
+        return date($format, strtotime($dateStr));
+    }
+};
 
 // Função auxiliar para montar links de paginação e filtros
 function buildFilterUrl(array $overrides = []): string {
@@ -611,8 +623,8 @@ function buildFilterUrl(array $overrides = []): string {
                                         $isSched = ($p['status'] === 'scheduled') || ($p['status'] === 'published' && !empty($p['published_at']) && strtotime($p['published_at']) > time());
                                     ?>
                                     <?php if ($isSched): ?>
-                                        <span class="status-badge" style="background: #fef3c7; color: #b45309;" title="Agendado para <?= date('d/m/Y \à\s H:i', strtotime($p['published_at'])) ?>">
-                                            📅 Agendado (<?= date('d/m H:i', strtotime($p['published_at'])) ?>)
+                                        <span class="status-badge" style="background: #fef3c7; color: #b45309;" title="Agendado para <?= $formatDisplayDate($p['published_at']) ?>">
+                                            📅 Agendado (<?= $formatDisplayDate($p['published_at'], 'd/m H:i') ?>)
                                         </span>
                                     <?php else: ?>
                                         <span class="status-badge status-<?= Security::e($p['status']) ?>">
@@ -630,7 +642,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <?= number_format((int)$p['views'], 0, ',', '.') ?>
                                 </td>
                                 <td style="font-size: 0.82rem; color: var(--text-muted);">
-                                    <?= date('d/m/Y \à\s H:i', strtotime($p['published_at'] ?? $p['updated_at'])) ?>
+                                    <?= $formatDisplayDate($p['published_at'] ?? $p['updated_at']) ?>
                                 </td>
                                 <td style="text-align: right; white-space: nowrap;">
                                     <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: #eff6ff; color: #2563eb;">
@@ -644,7 +656,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <?php endif; ?>
 
                                     <?php 
-                                    $canDelete = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)$currentUser['id'] === (int)$p['id']); 
+                                    $canDelete = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)$currentUser['id'] === (int)$p['user_id']); 
                                     if ($canDelete):
                                     ?>
                                         <a href="<?= buildFilterUrl(['delete_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 

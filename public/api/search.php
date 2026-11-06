@@ -43,7 +43,7 @@ $posts = Database::fetchAll(
 );
 
 foreach ($posts as &$item) {
-    $item['url'] = "{$canonicalOrigin}/noticia/{$item['slug']}/";
+    $item['url'] = "{$canonicalOrigin}/{$item['slug']}/";
 }
 unset($item);
 

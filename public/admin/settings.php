@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Expurgar cache do Nginx para propagar mudanças instantaneamente
             try {
                 $cacheManager = new CacheManager($config);
-                $cacheManager->purge(['/', '/feed.xml', '/sitemap.xml']);
+                $cacheManager->purgeUrls(['/', '/feed.xml', '/sitemap.xml']);
             } catch (\Throwable) {
                 // Silencioso em ambiente de desenvolvimento
             }
@@ -853,7 +853,7 @@ $csrfToken = Security::generateCsrfToken();
             document.getElementById('modalLoading').style.display = 'block';
             document.getElementById('modalLoading').innerText = 'Enviando e processando ícone...';
 
-            fetch('/admin/upload.php', {
+            fetch('/admin/media.php', {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData

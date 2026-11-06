@@ -649,6 +649,42 @@ Para eliminar o peso excessivo de fontes de ícones de terceiros (como Material 
 * Os ícones do sistema (`campaign`, `verified`, `sports_score`, `article`, `menu`, etc.) são renderizados diretamente como elementos `<svg>` puros embutidos no HTML.
 * Zero dependência de CDN externa, zero requisições HTTP adicionais e suporte nativo às classes utilitárias de cor e tamanho do Tailwind CSS.
 
+### 8.12. Pipeline de CSS Estático de Produção (Tailwind CSS)
+
+Para assegurar nota máxima (**100/100**) no Google PageSpeed Insights (Mobile e Desktop), eliminar custos de processamento no navegador do leitor (TBT/LCP) e dispensar `unsafe-inline` na CSP, o portal utiliza uma compilação estática e minificada do Tailwind CSS:
+
+* **Ponto de Entrada:** `src/input.css` (diretivas `@tailwind base`, `@tailwind components`, `@tailwind utilities` e personalizações globais de scrollbar para modos claro e escuro).
+* **Configuração Oficial:** `tailwind.config.js` com suporte a `darkMode: 'class'`, varredura automática de templates (`./templates/**/*.php`, `./public/**/*.php`, `./core/**/*.php`) e mapeamento integral do design system Kinetic Apex Editorial (cores `racing-red`, `carbon-black`, tipografias `Space Grotesk` e `Work Sans`).
+* **Saída Minificada:** `public/assets/style.css` (~29 KiB raw / ~5 a 6 KiB transferidos via gzip/brotli no Nginx).
+* **Inclusão Otimizada com Cache-Busting (`templates/header.php`):**
+  ```php
+  <?php 
+  $compiledCssPath = dirname(__DIR__) . '/public/assets/style.css';
+  if (file_exists($compiledCssPath)): 
+  ?>
+      <link rel="stylesheet" href="/assets/style.css?v=<?= filemtime($compiledCssPath) ?>">
+  <?php else: ?>
+      <!-- Fallback automático para Play CDN caso style.css não exista em desenvolvimento -->
+      <script src="https://cdn.tailwindcss.com"></script>
+  <?php endif; ?>
+  ```
+
+#### Comandos de Desenvolvimento e Produção:
+
+Sempre que novas classes de estilo ou modificações de layout forem feitas nos templates:
+
+* **Compilar para Produção (Minificado):**
+  ```bash
+  npm run build:css
+  ```
+  *Executa `tailwindcss -i ./src/input.css -o ./public/assets/style.css --minify` gerando a versão de distribuição otimizada.*
+
+* **Desenvolvimento Contínuo (Compilação Automática / Watch):**
+  ```bash
+  npm run watch:css
+  ```
+  *Monitora alterações em qualquer template ou arquivo PHP e recompila o CSS instantaneamente a cada salvamento.*
+
 ---
 
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)

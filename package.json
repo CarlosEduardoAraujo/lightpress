@@ -1,0 +1,12 @@
+{
+  "name": "speedracing-portal",
+  "version": "1.0.0",
+  "description": "SpeedRacing - Portal de Automobilismo",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/input.css -o ./public/assets/style.css --minify",
+    "watch:css": "tailwindcss -i ./src/input.css -o ./public/assets/style.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

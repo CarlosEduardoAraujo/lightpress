@@ -12,6 +12,8 @@ use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\Schema;
+use LightPress\Core\BlockCompiler;
+use LightPress\Core\CacheManager;
 
 Security::startSecureSession($config);
 
@@ -90,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (in_array(strtolower($slug), $reserved, true)) {
                     $error = "O slug '{$slug}' é reservado pelo sistema. Por favor, escolha outro.";
                 } else {
+                    $contentHtml = BlockCompiler::sanitizeHtml($contentHtml);
+
                     if ($pageId === 0) {
                         // Criar nova página
                         Database::query(
@@ -98,6 +102,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             [(int)$currentUser['id'], $slug, $title, $contentHtml, $featuredImage ?: null, $seoTitle ?: null, $seoDesc ?: null, $status]
                         );
                         $newId = (int)Database::lastInsertId();
+
+                        // Purga de Cache no Nginx
+                        try {
+                            $cacheMgr = new CacheManager($config);
+                            $cacheMgr->purgeUrls(["/{$slug}/", "/sitemap.xml"]);
+                        } catch (\Throwable) {}
+
                         header("Location: /admin/page-edit.php?id={$newId}&saved=1");
                         exit;
                     } else {
@@ -108,6 +119,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                              WHERE id = ?",
                             [$slug, $title, $contentHtml, $featuredImage ?: null, $seoTitle ?: null, $seoDesc ?: null, $status, $pageId]
                         );
+
+                        // Purga de Cache no Nginx
+                        try {
+                            $cacheMgr = new CacheManager($config);
+                            $purgeUrls = ["/{$slug}/", "/sitemap.xml"];
+                            if (!empty($page['slug']) && $page['slug'] !== $slug) {
+                                $purgeUrls[] = "/{$page['slug']}/";
+                            }
+                            $cacheMgr->purgeUrls($purgeUrls);
+                        } catch (\Throwable) {}
+
                         header("Location: /admin/page-edit.php?id={$pageId}&saved=1");
                         exit;
                     }

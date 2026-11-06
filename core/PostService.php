@@ -172,10 +172,10 @@ class PostService
             $seoDesc = $data['seo_description'] ?? null;
             $focusKw = $data['focus_keyword'] ?? null;
 
-            // Tratamento de Data de Publicação e Agendamento
+            // Tratamento de Data de Publicação e Agendamento (em UTC estrito)
             $nowUtc = gmdate('Y-m-d H:i:s');
             if (!empty($data['published_at'])) {
-                $publishedAt = date('Y-m-d H:i:s', strtotime($data['published_at']));
+                $publishedAt = gmdate('Y-m-d H:i:s', strtotime($data['published_at']));
             } else {
                 $publishedAt = $current['published_at'] ?: $nowUtc;
             }

@@ -53,7 +53,7 @@ $posts = Database::fetchAll(
 
 // Formatar URLs canônicas
 foreach ($posts as &$item) {
-    $item['url'] = "{$canonicalOrigin}/noticia/{$item['slug']}/";
+    $item['url'] = "{$canonicalOrigin}/{$item['slug']}/";
     $item['views'] = (int)$item['views'];
 }
 unset($item);

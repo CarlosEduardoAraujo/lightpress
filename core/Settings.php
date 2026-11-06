@@ -150,7 +150,6 @@ class Settings
             }
             if (!empty($settings['site_timezone'])) {
                 $config['app']['display_timezone'] = $settings['site_timezone'];
-                @date_default_timezone_set($settings['site_timezone']);
             }
         } catch (Throwable) {
             // Em caso de falha de conexão inicial, preserva $config padrão

@@ -70,7 +70,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $focusKeyword = trim($_POST['focus_keyword'] ?? '');
         $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
         $publishedAtRaw = trim($_POST['published_at'] ?? '');
-        $publishedAt = !empty($publishedAtRaw) ? date('Y-m-d H:i:s', strtotime($publishedAtRaw)) : null;
+        $displayTzName = $config['app']['display_timezone'] ?? 'America/Sao_Paulo';
+        $publishedAt = null;
+        if (!empty($publishedAtRaw)) {
+            try {
+                $dt = new \DateTime($publishedAtRaw, new \DateTimeZone($displayTzName));
+                $dt->setTimezone(new \DateTimeZone('UTC'));
+                $publishedAt = $dt->format('Y-m-d H:i:s');
+            } catch (\Throwable) {
+                $publishedAt = gmdate('Y-m-d H:i:s', strtotime($publishedAtRaw));
+            }
+        }
         $knownVersion = (int)($_POST['version'] ?? 1);
 
         $payload = [
@@ -107,8 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion);
                     
                     $isFuture = (!empty($publishedAt) && strtotime($publishedAt) > time());
+                    $schedFormatted = $publishedAt ?? '';
+                    if (!empty($publishedAt)) {
+                        try {
+                            $dt = new \DateTime($publishedAt, new \DateTimeZone('UTC'));
+                            $dt->setTimezone(new \DateTimeZone($displayTzName));
+                            $schedFormatted = $dt->format('d/m/Y \à\s H:i');
+                        } catch (\Throwable) {
+                            $schedFormatted = date('d/m/Y \à\s H:i', strtotime($publishedAt));
+                        }
+                    }
                     $message = $isFuture 
-                        ? "Matéria agendada com sucesso para " . date('d/m/Y \à\s H:i', strtotime($publishedAt)) . "!"
+                        ? "Matéria agendada com sucesso para {$schedFormatted}!"
                         : "Publicação atualizada e cache invalidado com sucesso!";
                 } else {
                     // Salvar rascunho
@@ -424,14 +444,25 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                         <?php if ($post): ?>
                             <?php 
                                 $isSched = ($post['status'] === 'scheduled') || ($post['status'] === 'published' && !empty($post['published_at']) && strtotime($post['published_at']) > time());
+                                $displayTzName = $config['app']['display_timezone'] ?? 'America/Sao_Paulo';
+                                $postDisplayFormatted = '';
+                                if (!empty($post['published_at'])) {
+                                    try {
+                                        $dt = new \DateTime($post['published_at'], new \DateTimeZone('UTC'));
+                                        $dt->setTimezone(new \DateTimeZone($displayTzName));
+                                        $postDisplayFormatted = $dt->format('d/m/Y \à\s H:i');
+                                    } catch (\Throwable) {
+                                        $postDisplayFormatted = date('d/m/Y \à\s H:i', strtotime($post['published_at']));
+                                    }
+                                }
                             ?>
                             <?php if ($isSched): ?>
                                 <div style="background: #fef3c7; color: #b45309; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #fde68a;">
-                                    📅 Matéria Agendada para <?= date('d/m/Y \à\s H:i', strtotime($post['published_at'])) ?>
+                                    📅 Matéria Agendada para <?= $postDisplayFormatted ?>
                                 </div>
                             <?php elseif ($post['status'] === 'published'): ?>
                                 <div style="background: #dcfce7; color: #15803d; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #bbf7d0;">
-                                    ✓ Publicada no Ar (<?= date('d/m/Y \à\s H:i', strtotime($post['published_at'])) ?>)
+                                    ✓ Publicada no Ar (<?= $postDisplayFormatted ?>)
                                 </div>
                             <?php else: ?>
                                 <div style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid var(--border);">
@@ -443,8 +474,20 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                         <!-- Data e Hora de Publicação / Agendamento -->
                         <div class="form-group">
                             <label for="published_at">Data de Publicação / Agendamento</label>
+                            <?php
+                                $postInputVal = '';
+                                if (!empty($post['published_at'])) {
+                                    try {
+                                        $dt = new \DateTime($post['published_at'], new \DateTimeZone('UTC'));
+                                        $dt->setTimezone(new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo'));
+                                        $postInputVal = $dt->format('Y-m-d\TH:i');
+                                    } catch (\Throwable) {
+                                        $postInputVal = date('Y-m-d\TH:i', strtotime($post['published_at']));
+                                    }
+                                }
+                            ?>
                             <input type="datetime-local" id="published_at" name="published_at" 
-                                   value="<?= !empty($post['published_at']) ? date('Y-m-d\TH:i', strtotime($post['published_at'])) : '' ?>"
+                                   value="<?= $postInputVal ?>"
                                    onchange="updatePublishButtonLabel()" oninput="updatePublishButtonLabel()">
                             <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
                                 Deixe vazio para publicar agora ou escolha data futura para <strong>agendamento automático</strong>.

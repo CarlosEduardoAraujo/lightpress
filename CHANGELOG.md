@@ -8,6 +8,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Adicionado
+- **Pipeline de CSS Estático de Produção (Tailwind CSS Otimizado & Compilado):**
+  - Implementação de compilação estática do Tailwind CSS para produção via Node.js / CLI, eliminando o Play CDN em tempo de execução (`cdn.tailwindcss.com`), zerando o Total Blocking Time (TBT) e garantindo compatibilidade estrita com Content Security Policy sem `unsafe-inline`.
+  - Configuração oficial em `tailwind.config.js` com tokens do design system Kinetic Apex Editorial (`Space Grotesk`, `Work Sans`, cores `racing-red`, `carbon-black`, etc.) e varredura profunda de classes em `templates/`, `public/` e `core/`.
+  - Ponto de entrada CSS em `src/input.css` contendo diretivas Tailwind e customizações globais de scrollbar para modos claro e escuro.
+  - Folha de estilos compilada e minificada em `public/assets/style.css` (~29 KiB raw / ~5 a 6 KiB transferidos via gzip/brotli pelo Nginx).
+  - Atualização do `templates/header.php` para carregar `public/assets/style.css` com cache-busting automático baseado em timestamp (`?v=filemtime`), mantendo fallback transparente para o Play CDN caso o arquivo não exista em desenvolvimento.
+  - Adição de scripts de automação no `package.json`:
+    - `npm run build:css`: compilação minificada de alta performance para produção.
+    - `npm run watch:css`: monitoramento e recompilação em tempo real a cada salvamento em ambiente de desenvolvimento.
+
+### Corrigido
+- **Efeito Colateral de Timezone Global e Agendamento Preciso (`core/Settings.php`, `core/bootstrap.php`, `public/admin/editor.php`, `core/PostService.php`):**
+  - Removido `@date_default_timezone_set` em `Settings::applyToConfig()`, assegurando que o PHP opere estritamente em **UTC** em todo o ciclo de vida da aplicação (`core/bootstrap.php`).
+  - No `public/admin/editor.php`, o datetime-local recebido do formulário agora é convertido explicitamente do fuso local do site (`display_timezone`) para UTC antes de ser persistido no banco de dados, e reconvertido para exibição local ao renderizar o formulário.
+  - No `core/PostService.php`, datas de publicação são formatadas estritamente em UTC (`gmdate`), sanando a defasagem de 3 horas em matérias agendadas.
+  - Funções de data dos templates do front-end (`formatPtDate`, `formatPtFullDate`) atualizadas para exibir datas no fuso horário configurado do portal a partir do timestamp UTC do banco.
+- **Chamadas de Métodos e Endpoints em Configurações (`public/admin/settings.php`):**
+  - Corrigida a purga de cache após salvar configurações de `$cacheManager->purge()` para `$cacheManager->purgeUrls(['/', '/feed.xml', '/sitemap.xml'])`.
+  - Corrigido o endpoint de upload de ícone/favicon no modal de mídia de `/admin/upload.php` para `/admin/media.php`, processando adequadamente o campo `media_file`.
+- **Permissão de Exclusão de Artigos para Autores (`public/admin/dashboard.php`):**
+  - Adicionado `p.user_id` na query de listagem e ajustada a verificação para `(int)$currentUser['id'] === (int)$p['user_id']`.
+- **Sanitização e Purga de Cache de Páginas Institucionais (`public/admin/page-edit.php`, `public/admin/pages.php`):**
+  - Adicionada sanitização com `BlockCompiler::sanitizeHtml($contentHtml)` antes do INSERT/UPDATE de páginas.
+  - Implementada a purga automática de cache FastCGI via `CacheManager::purgeUrls()` ao salvar, editar ou excluir páginas institucionais.
+- **URLs Canônicas na Raiz da API Pública (`public/api/posts.php`, `public/api/search.php`):**
+  - Ajustadas as propriedades `url` nos retornos JSON de `/{slug}/` (raiz), removendo o prefixo legado `/noticia/`.
+- **Chave de Configuração da URL Canônica (`templates/post.php`):**
+  - Substituída a chave `$config['app']['url']` por `$config['app']['canonical_origin']` na linha 25.
 - **Módulo Administrativo de Configurações Gerais do Site (`/admin/settings.php` e `core/Settings.php`):**
   - Nova interface no Painel Editorial exclusiva para administradores com suporte nativo a Modo Escuro/Claro.
   - Tabela `settings` criada automaticamente com persistência chave-valor (`setting_key`, `setting_value`), cache em memória por requisição e fallback seguro.

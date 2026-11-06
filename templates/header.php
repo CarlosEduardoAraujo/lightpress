@@ -118,127 +118,132 @@ if (empty($trendingTags)) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS com a Paleta Exata do DESIGN.md -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "surface-bright": "#f6faff",
-                        "surface-container": "#e6eff8",
-                        "surface-container-high": "#e0e9f2",
-                        "surface-container-highest": "#dbe4ed",
-                        "surface-container-low": "#ecf5fe",
-                        "surface-container-lowest": "#ffffff",
-                        "carbon-black": "#111418",
-                        "carbon-surface": "#1A1E24",
-                        "racing-red": "#E10600",
-                        "primary": "#b30400",
-                        "primary-container": "#e10600",
-                        "tertiary": "#af101a",
-                        "tertiary-container": "#d32f2f",
-                        "secondary": "#5c5e63",
-                        "secondary-container": "#dedfe5",
-                        "secondary-fixed": "#e1e2e8",
-                        "secondary-fixed-dim": "#c5c6cc",
-                        "track-asphalt": "#272727",
-                        "pure-white": "#FFFFFF",
-                        "canvas-cream": "#F9FAFB",
-                        "subtle-border": "#E5E7EB",
-                        "flag-green": "#00A859",
-                        "flag-yellow": "#FFB800",
-                        "surface": "#f6faff",
-                        "on-surface": "#141d23",
-                        "on-surface-variant": "#5e3f3a",
-                        "on-primary": "#ffffff",
-                        "on-tertiary": "#ffffff",
-                    },
-                    borderRadius: {
-                        DEFAULT: "0.125rem",
-                        lg: "0.25rem",
-                        xl: "0.5rem",
-                        full: "0.75rem",
-                    },
-                    spacing: {
-                        "gutter-mobile": "0.75rem",
-                        "space-xs": "0.25rem",
-                        "space-sm": "0.5rem",
-                        "space-md": "1rem",
-                        "space-lg": "1.5rem",
-                        "space-xl": "2.5rem",
-                        "margin-mobile": "1rem",
-                        "margin": "2rem",
-                        "gutter": "1.5rem",
-                    },
-                    fontFamily: {
-                        "display-hero": ["Space Grotesk", "sans-serif"],
-                        "headline-lg": ["Space Grotesk", "sans-serif"],
-                        "headline-md": ["Space Grotesk", "sans-serif"],
-                        "headline-sm": ["Space Grotesk", "sans-serif"],
-                        "label-category": ["Space Grotesk", "sans-serif"],
-                        "data-telemetry": ["Space Grotesk", "sans-serif"],
-                        "body-lg": ["Work Sans", "sans-serif"],
-                        "body-md": ["Work Sans", "sans-serif"],
-                        "body-sm": ["Work Sans", "sans-serif"],
-                        "label-meta": ["Work Sans", "sans-serif"],
-                    },
-                    fontSize: {
-                        "display-hero": ["48px", { lineHeight: "54px", letterSpacing: "-0.03em", fontWeight: "700" }],
-                        "display-hero-mobile": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
-                        "headline-lg": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
-                        "headline-lg-mobile": ["24px", { lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700" }],
-                        "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
-                        "headline-sm": ["18px", { lineHeight: "24px", fontWeight: "600" }],
-                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
-                        "body-md": ["15px", { lineHeight: "22px", fontWeight: "400" }],
-                        "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
-                        "label-category": ["11px", { lineHeight: "14px", letterSpacing: "0.08em", fontWeight: "700" }],
-                        "label-meta": ["12px", { lineHeight: "16px", fontWeight: "500" }],
-                        "data-telemetry": ["13px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+    <!-- CSS do Portal: Estático Compilado para Máxima Performance (100/100 PageSpeed) com Fallback Seguro -->
+    <?php 
+    $compiledCssPath = dirname(__DIR__) . '/public/assets/style.css';
+    if (file_exists($compiledCssPath)): 
+    ?>
+        <link rel="stylesheet" href="/assets/style.css?v=<?= filemtime($compiledCssPath) ?>">
+    <?php else: ?>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script id="tailwind-config">
+            tailwind.config = {
+                darkMode: "class",
+                theme: {
+                    extend: {
+                        colors: {
+                            "surface-bright": "#f6faff",
+                            "surface-container": "#e6eff8",
+                            "surface-container-high": "#e0e9f2",
+                            "surface-container-highest": "#dbe4ed",
+                            "surface-container-low": "#ecf5fe",
+                            "surface-container-lowest": "#ffffff",
+                            "carbon-black": "#111418",
+                            "carbon-surface": "#1A1E24",
+                            "racing-red": "#E10600",
+                            "primary": "#b30400",
+                            "primary-container": "#e10600",
+                            "tertiary": "#af101a",
+                            "tertiary-container": "#d32f2f",
+                            "secondary": "#5c5e63",
+                            "secondary-container": "#dedfe5",
+                            "secondary-fixed": "#e1e2e8",
+                            "secondary-fixed-dim": "#c5c6cc",
+                            "track-asphalt": "#272727",
+                            "pure-white": "#FFFFFF",
+                            "canvas-cream": "#F9FAFB",
+                            "subtle-border": "#E5E7EB",
+                            "flag-green": "#00A859",
+                            "flag-yellow": "#FFB800",
+                            "surface": "#f6faff",
+                            "on-surface": "#141d23",
+                            "on-surface-variant": "#5e3f3a",
+                            "on-primary": "#ffffff",
+                            "on-tertiary": "#ffffff",
+                        },
+                        borderRadius: {
+                            DEFAULT: "0.125rem",
+                            lg: "0.25rem",
+                            xl: "0.5rem",
+                            full: "0.75rem",
+                        },
+                        spacing: {
+                            "gutter-mobile": "0.75rem",
+                            "space-xs": "0.25rem",
+                            "space-sm": "0.5rem",
+                            "space-md": "1rem",
+                            "space-lg": "1.5rem",
+                            "space-xl": "2.5rem",
+                            "margin-mobile": "1rem",
+                            "margin": "2rem",
+                            "gutter": "1.5rem",
+                        },
+                        fontFamily: {
+                            "display-hero": ["Space Grotesk", "sans-serif"],
+                            "headline-lg": ["Space Grotesk", "sans-serif"],
+                            "headline-md": ["Space Grotesk", "sans-serif"],
+                            "headline-sm": ["Space Grotesk", "sans-serif"],
+                            "label-category": ["Space Grotesk", "sans-serif"],
+                            "data-telemetry": ["Space Grotesk", "sans-serif"],
+                            "body-lg": ["Work Sans", "sans-serif"],
+                            "body-md": ["Work Sans", "sans-serif"],
+                            "body-sm": ["Work Sans", "sans-serif"],
+                            "label-meta": ["Work Sans", "sans-serif"],
+                        },
+                        fontSize: {
+                            "display-hero": ["48px", { lineHeight: "54px", letterSpacing: "-0.03em", fontWeight: "700" }],
+                            "display-hero-mobile": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                            "headline-lg": ["32px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                            "headline-lg-mobile": ["24px", { lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700" }],
+                            "headline-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+                            "headline-sm": ["18px", { lineHeight: "24px", fontWeight: "600" }],
+                            "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                            "body-md": ["15px", { lineHeight: "22px", fontWeight: "400" }],
+                            "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+                            "label-category": ["11px", { lineHeight: "14px", letterSpacing: "0.08em", fontWeight: "700" }],
+                            "label-meta": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+                            "data-telemetry": ["13px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+                        }
                     }
                 }
+            };
+        </script>
+        <style>
+            @layer base {
+                html, body { margin: 0; padding: 0; }
             }
-        };
-    </script>
-
-    <style>
-        @layer base {
-            html, body { margin: 0; padding: 0; }
-        }
-        /* Barra de rolagem visível e moderna adaptada aos modos Claro e Escuro */
-        html {
-            scrollbar-color: #94a3b8 transparent;
-            scrollbar-width: thin;
-        }
-        html.dark {
-            scrollbar-color: #3b4252 #111418;
-        }
-        ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 6px;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
-        html.dark ::-webkit-scrollbar-thumb {
-            background: #333a48;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #E10600;
-            border: 2px solid transparent;
-            background-clip: content-box;
-        }
-    </style>
+            html {
+                scrollbar-color: #94a3b8 transparent;
+                scrollbar-width: thin;
+            }
+            html.dark {
+                scrollbar-color: #3b4252 #111418;
+            }
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 6px;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            html.dark ::-webkit-scrollbar-thumb {
+                background: #333a48;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #E10600;
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }
+        </style>
+    <?php endif; ?>
 </head>
 <body class="bg-surface dark:bg-carbon-black font-body-md text-on-surface dark:text-pure-white antialiased transition-colors duration-200">
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">

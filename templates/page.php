@@ -12,13 +12,23 @@ $ptMonths = [
     5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
     9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
 ];
-$formatPtDate = function(?string $dateStr) use ($ptMonths): string {
+$formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     if (empty($dateStr)) return date('d/m/Y');
-    $t = strtotime($dateStr);
-    $d = date('j', $t);
-    $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
-    $y = date('Y', $t);
-    return "{$d} de {$m} de {$y}";
+    try {
+        $tz = new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo');
+        $dt = new \DateTime($dateStr, new \DateTimeZone('UTC'));
+        $dt->setTimezone($tz);
+        $d = $dt->format('j');
+        $m = $ptMonths[(int)$dt->format('n')] ?? $dt->format('m');
+        $y = $dt->format('Y');
+        return "{$d} de {$m} de {$y}";
+    } catch (\Throwable) {
+        $t = strtotime($dateStr);
+        $d = date('j', $t);
+        $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
+        $y = date('Y', $t);
+        return "{$d} de {$m} de {$y}";
+    }
 };
 ?>
 

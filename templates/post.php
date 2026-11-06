@@ -12,17 +12,28 @@ $ptMonths = [
     5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
     9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro'
 ];
-$formatPtFullDate = function(?string $dateStr) use ($ptMonths): string {
+$formatPtFullDate = function(?string $dateStr) use ($ptMonths, $config): string {
     if (empty($dateStr)) return date('d/m/Y');
-    $t = strtotime($dateStr);
-    $d = date('j', $t);
-    $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
-    $y = date('Y', $t);
-    $h = date('H:i', $t);
-    return sprintf('%02d de %s de %d às %s', $d, $m, $y, $h);
+    try {
+        $tz = new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo');
+        $dt = new \DateTime($dateStr, new \DateTimeZone('UTC'));
+        $dt->setTimezone($tz);
+        $d = (int)$dt->format('j');
+        $m = $ptMonths[(int)$dt->format('n')] ?? $dt->format('m');
+        $y = (int)$dt->format('Y');
+        $h = $dt->format('H:i');
+        return sprintf('%02d de %s de %d às %s', $d, $m, $y, $h);
+    } catch (\Throwable) {
+        $t = strtotime($dateStr);
+        $d = date('j', $t);
+        $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
+        $y = date('Y', $t);
+        $h = date('H:i', $t);
+        return sprintf('%02d de %s de %d às %s', $d, $m, $y, $h);
+    }
 };
 
-$canonicalBase = rtrim($config['app']['url'] ?? 'https://lightpress.suainternet.com', '/');
+$canonicalBase = rtrim($config['app']['canonical_origin'] ?? 'https://www.speedracing.com.br', '/');
 $postUrl = $canonicalBase . '/' . rawurlencode($post['slug']) . '/';
 $postTitleEncoded = rawurlencode($post['title']);
 $postUrlEncoded = rawurlencode($postUrl);
