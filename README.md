@@ -148,6 +148,7 @@ CREATE TABLE post_revisions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
+* **Agendamento Automático e Self-Healing de Schema:** O status `'scheduled'` permite programar matérias para publicação automática futura com suporte ao worker periódico (`bin/cleanup.php`). O serviço `PostService` inclui auto-migração DDL que detecta dinamicamente instalações legadas no MySQL e atualiza as colunas ENUM em tempo de execução para evitar erros de truncamento (MySQL Warning 1265).
 * `payload_json` possui versão de esquema e snapshot dos campos editoriais: título, slug, resumo, categoria, tags, imagem, autoria, SEO, destaque e `content_json`. Campos controlados pelo servidor, como estatísticas e permissões, nunca são aceitos nesse payload.
 * O HTML é gerado pelo `BlockCompiler` no servidor; nunca é aceito como HTML confiável enviado pelo navegador. As permissões sobre cada campo são verificadas antes da persistência e novamente antes da aplicação.
 * Cada salvamento efetivo cria um snapshot; conteúdo de snapshots anteriores é preservado. A aplicação de uma revisão marca seu estado como `applied` na mesma transação que atualiza `posts`.
@@ -261,6 +262,32 @@ Imagens menores não são ampliadas. As variantes proporcionais usam a menor lar
   └── {slug-da-imagem}-thumb.webp
 ```
 
+### 4.7. Catalogação em Lote de Acervos Massivos (`bin/catalog-media.php`)
+
+Para instalações com grandes volumes de imagens pré-existentes (ex: acervos migrados com mais de 30.000 fotos já convertidas em WebP e AVIF), o LightPress disponibiliza um utilitário CLI de alta performance para catalogação imediata no banco de dados sem recodificação gráfica:
+
+* **Zero Consumo de CPU/GD:** Não descompacta nem recodifica bitmaps. As dimensões e tipos MIME são lidos diretamente dos primeiros bytes do arquivo via `@getimagesize()` em microssegundos.
+* **Agrupamento Inteligente de Variantes:** Varre recursivamente `/public/uploads/{ano}/{mes}/`, identifica sufixos (`-1920`, `-1024`, `-thumb` e dimensões legadas como `-300x169`) e agrupa todas as extensões em uma única entidade de mídia com manifesto `variants_manifest` JSON.
+* **Vínculos Automáticos (`media_refs`):** Pré-carrega as imagens em uso nas matérias (`posts.featured_image`) em um mapa de hash em memória com complexidade O(1), vinculando instantaneamente cada imagem ao seu respectivo artigo.
+* **Transações em Lotes ACID:** Executa a gravação em lotes configuráveis (padrão `--chunk=500`), garantindo commits rápidos e permitindo interrupção/retomada segura a qualquer momento sem duplicatas.
+
+```bash
+# Simulação sem gravação no banco (Dry-Run)
+php bin/catalog-media.php --dry-run
+
+# Execução real em produção em lotes de 500 itens
+php bin/catalog-media.php --chunk=500
+```
+
+### 4.8. Biblioteca de Mídias Reativa e Busca em Tempo Real (`public/admin/media.php`)
+
+A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rápida com acervos de 30.000+ fotos:
+
+* **Busca em Tempo Real com Debounce (300ms):** Conforme o usuário digita no campo de busca, o painel realiza a consulta assíncrona ao servidor e atualiza a grade de fotos, contadores e paginação sem piscar ou recarregar a página inteira.
+* **Paginação Fluida Assíncrona:** Grade configurada para 48 itens por página (harmônica para layouts responsivos de 2, 3, 4 e 6 colunas) com navegação numerada instantânea via AJAX.
+* **Ordenação Flexível:** Seletor de ordenação permitindo alternar entre ordem cronológica original (antigas primeiro - padrão) e ordem decrescente (recentes primeiro).
+* **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
+
 ---
 
 ## 5. Arquitetura do Sistema e Estrutura de Pastas
@@ -299,6 +326,8 @@ lightpress/
 │   ├── 404.php                # Página de erro 404 customizada
 │   └── 500.php                # Página de erro 500 elegante sem vazamento de dados
 ├── bin/                       # Ferramentas CLI
+│   ├── catalog-media.php      # Catalogador em lote para acervos massivos de uploads
+│   ├── migrate-scheduled.php  # Migração idempotente de ENUM para agendamentos
 │   ├── migrate-wp.php         # Importador em lotes, retomável e auditável
 │   ├── retry-cache-purge.php  # Retentativa de purgas persistidas
 │   ├── purge-cache.php        # Utilitário CLI para purga seletiva/total (Cloudflare e Nginx)
