@@ -213,11 +213,18 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
+// Ordenação (padrão 'asc' - ordem cronológica inversa da anterior)
+$filterOrder = strtolower($_GET['order'] ?? 'asc');
+if (!in_array($filterOrder, ['asc', 'desc'], true)) {
+    $filterOrder = 'asc';
+}
+$orderSql = ($filterOrder === 'desc') ? 'm.created_at DESC, m.id DESC' : 'm.created_at ASC, m.id ASC';
+
 $querySql = "SELECT m.*, u.name as uploader_name 
              FROM media m
              JOIN users u ON u.id = m.user_id
              {$whereSql}
-             ORDER BY m.created_at DESC, m.id DESC 
+             ORDER BY {$orderSql} 
              LIMIT ? OFFSET ?";
 
 $queryParams = array_merge($params, [$perPage, $offset]);
@@ -459,22 +466,29 @@ function buildMediaUrl(array $overrides = []): string {
             </form>
         </div>
 
-        <!-- Barra de Busca de Mídias -->
+        <!-- Barra de Busca de Mídias em Tempo Real e Ordenação -->
         <div class="filter-bar">
-            <form method="GET" action="/admin/media.php" style="display: flex; gap: 0.75rem; align-items: center; width: 100%; max-width: 600px;">
-                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="🔍 Buscar fotos por nome ou palavra-chave..." class="form-input" style="flex: 1;">
+            <form id="mediaSearchForm" method="GET" action="/admin/media.php" style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 320px; max-width: 750px;" onsubmit="event.preventDefault(); triggerLiveSearch(1);">
+                <input type="text" id="searchInput" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="🔍 Digite para buscar fotos em tempo real..." class="form-input" style="flex: 1;" autocomplete="off">
+                <select name="order" id="orderSelect" class="form-input" style="cursor: pointer; padding-right: 1.25rem;" onchange="triggerLiveSearch(1)">
+                    <option value="asc" <?= $filterOrder === 'asc' ? 'selected' : '' ?>>Antigas primeiro (Ordem Inversa)</option>
+                    <option value="desc" <?= $filterOrder === 'desc' ? 'selected' : '' ?>>Recentes primeiro</option>
+                </select>
                 <button type="submit" class="btn-filter btn-primary">Buscar</button>
-                <?php if (!empty($filterSearch)): ?>
-                    <a href="/admin/media.php" class="btn-filter">Limpar</a>
-                <?php endif; ?>
+                <a href="/admin/media.php" id="btnClearSearch" class="btn-filter" style="<?= empty($filterSearch) ? 'display: none;' : '' ?>" onclick="clearSearch(event)">Limpar</a>
             </form>
-            <div style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">
+            <div id="mediaCountText" style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">
                 <?php if (!empty($filterSearch)): ?>
                     Encontradas <strong><?= number_format($totalCount, 0, ',', '.') ?></strong> imagens para "<em><?= Security::e($filterSearch) ?></em>"
                 <?php else: ?>
                     Total: <strong><?= number_format($totalCount, 0, ',', '.') ?></strong> imagens cadastradas
                 <?php endif; ?>
             </div>
+        </div>
+
+        <div id="searchSpinner" style="display: none; text-align: center; padding: 0.75rem 1rem; margin-bottom: 1rem; color: var(--primary-accent); font-weight: 600; font-size: 0.9rem; background: #eff6ff; border-radius: var(--radius);">
+            <span style="display: inline-block; animation: spin 1s linear infinite; margin-right: 0.5rem;">⏳</span>
+            Buscando imagens em tempo real no acervo...
         </div>
 
         <!-- Grade de Fotos -->
@@ -603,39 +617,41 @@ function buildMediaUrl(array $overrides = []): string {
         </div>
 
         <!-- Rodapé com Paginação -->
-        <?php if ($totalPages > 1): ?>
-            <div class="pagination">
-                <div>
-                    Página <strong><?= $page ?></strong> de <strong><?= $totalPages ?></strong> (Exibindo <?= count($mediaList) ?> de <?= number_format($totalCount, 0, ',', '.') ?> imagens)
-                </div>
-                <div class="page-links">
-                    <?php if ($page > 1): ?>
-                        <a href="<?= buildMediaUrl(['page' => $page - 1]) ?>" class="page-num">&larr; Anterior</a>
-                    <?php endif; ?>
+        <div id="mediaPagination">
+            <?php if ($totalPages > 1): ?>
+                <div class="pagination">
+                    <div>
+                        Página <strong><?= $page ?></strong> de <strong><?= $totalPages ?></strong> (Exibindo <?= count($mediaList) ?> de <?= number_format($totalCount, 0, ',', '.') ?> imagens)
+                    </div>
+                    <div class="page-links">
+                        <?php if ($page > 1): ?>
+                            <a href="<?= buildMediaUrl(['page' => $page - 1]) ?>" class="page-num">&larr; Anterior</a>
+                        <?php endif; ?>
 
-                    <?php 
-                    $startPage = max(1, $page - 2);
-                    $endPage = min($totalPages, $page + 2);
-                    if ($startPage > 1) {
-                        echo '<a href="' . buildMediaUrl(['page' => 1]) . '" class="page-num">1</a>';
-                        if ($startPage > 2) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
-                    }
-                    for ($i = $startPage; $i <= $endPage; $i++) {
-                        $active = ($i === $page) ? ' active' : '';
-                        echo '<a href="' . buildMediaUrl(['page' => $i]) . '" class="page-num' . $active . '">' . $i . '</a>';
-                    }
-                    if ($endPage < $totalPages) {
-                        if ($endPage < $totalPages - 1) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
-                        echo '<a href="' . buildMediaUrl(['page' => $totalPages]) . '" class="page-num">' . $totalPages . '</a>';
-                    }
-                    ?>
+                        <?php 
+                        $startPage = max(1, $page - 2);
+                        $endPage = min($totalPages, $page + 2);
+                        if ($startPage > 1) {
+                            echo '<a href="' . buildMediaUrl(['page' => 1]) . '" class="page-num">1</a>';
+                            if ($startPage > 2) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
+                        }
+                        for ($i = $startPage; $i <= $endPage; $i++) {
+                            $active = ($i === $page) ? ' active' : '';
+                            echo '<a href="' . buildMediaUrl(['page' => $i]) . '" class="page-num' . $active . '">' . $i . '</a>';
+                        }
+                        if ($endPage < $totalPages) {
+                            if ($endPage < $totalPages - 1) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
+                            echo '<a href="' . buildMediaUrl(['page' => $totalPages]) . '" class="page-num">' . $totalPages . '</a>';
+                        }
+                        ?>
 
-                    <?php if ($page < $totalPages): ?>
-                        <a href="<?= buildMediaUrl(['page' => $page + 1]) ?>" class="page-num">Próxima &rarr;</a>
-                    <?php endif; ?>
+                        <?php if ($page < $totalPages): ?>
+                            <a href="<?= buildMediaUrl(['page' => $page + 1]) ?>" class="page-num">Próxima &rarr;</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </div>
 
     <script>
@@ -743,6 +759,113 @@ function buildMediaUrl(array $overrides = []): string {
             updateThemeIcon();
         }
         updateThemeIcon();
+    
+        // ========================================================
+        // Busca em Tempo Real e Paginação Assíncrona Instantânea
+        // ========================================================
+        let liveSearchTimer = null;
+        const searchInput = document.getElementById('searchInput');
+        const orderSelect = document.getElementById('orderSelect');
+        const btnClear = document.getElementById('btnClearSearch');
+        const searchSpinner = document.getElementById('searchSpinner');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(liveSearchTimer);
+                const val = this.value.trim();
+                if (btnClear) {
+                    btnClear.style.display = val ? 'inline-flex' : 'none';
+                }
+                liveSearchTimer = setTimeout(function() {
+                    triggerLiveSearch(1);
+                }, 300);
+            });
+        }
+
+        function clearSearch(e) {
+            if (e) e.preventDefault();
+            if (searchInput) searchInput.value = '';
+            if (btnClear) btnClear.style.display = 'none';
+            triggerLiveSearch(1);
+        }
+
+        function triggerLiveSearch(page) {
+            const query = searchInput ? searchInput.value.trim() : '';
+            const order = orderSelect ? orderSelect.value : 'asc';
+            const pageNum = page || 1;
+
+            const params = new URLSearchParams();
+            if (query) params.set('q', query);
+            if (order && order !== 'asc') params.set('order', order);
+            if (pageNum > 1) params.set('page', pageNum);
+
+            const targetUrl = '/admin/media.php' + (params.toString() ? '?' + params.toString() : '');
+            
+            // Atualiza URL no navegador sem recarregar a página para persistir histórico
+            history.replaceState(null, '', targetUrl);
+
+            const grid = document.getElementById('mediaGrid');
+            const paginationContainer = document.getElementById('mediaPagination');
+            
+            if (searchSpinner) searchSpinner.style.display = 'block';
+            if (grid) grid.style.opacity = '0.4';
+
+            fetch(targetUrl)
+                .then(function(res) { return res.text(); })
+                .then(function(html) {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    const newGrid = doc.getElementById('mediaGrid');
+                    const newCount = doc.getElementById('mediaCountText');
+                    const newPagination = doc.getElementById('mediaPagination');
+
+                    if (newGrid && grid) {
+                        grid.innerHTML = newGrid.innerHTML;
+                        grid.style.opacity = '1';
+                    }
+
+                    if (newCount && document.getElementById('mediaCountText')) {
+                        document.getElementById('mediaCountText').innerHTML = newCount.innerHTML;
+                    }
+
+                    if (paginationContainer) {
+                        paginationContainer.innerHTML = newPagination ? newPagination.innerHTML : '';
+                    }
+
+                    if (searchSpinner) searchSpinner.style.display = 'none';
+                    attachPaginationListeners();
+                })
+                .catch(function(err) {
+                    if (grid) grid.style.opacity = '1';
+                    if (searchSpinner) searchSpinner.style.display = 'none';
+                });
+        }
+
+        function attachPaginationListeners() {
+            const paginationContainer = document.getElementById('mediaPagination');
+            if (!paginationContainer) return;
+
+            const links = paginationContainer.querySelectorAll('a.page-num');
+            links.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const href = this.getAttribute('href');
+                    if (href) {
+                        const urlObj = new URL(href, window.location.origin);
+                        const page = urlObj.searchParams.get('page') || 1;
+                        triggerLiveSearch(page);
+                        const filterBar = document.querySelector('.filter-bar');
+                        if (filterBar) {
+                            window.scrollTo({ top: filterBar.offsetTop - 20, behavior: 'smooth' });
+                        }
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', attachPaginationListeners);
+
     </script>
 </body>
 </html>

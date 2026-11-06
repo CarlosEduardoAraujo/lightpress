@@ -7,6 +7,38 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Cache, Invalidação de Borda & Cloudflare API v4
+- **Invalidador Seletivo de Borda na Cloudflare (`core/CloudflareCache.php`):**
+  - Implementação do serviço de purga seletiva de cache via Cloudflare API v4 (`POST /client/v4/zones/{zone_id}/purge_cache`), invalidando pontualmente as páginas impactadas (Home `/`, feeds RSS/Atom `/feed.xml` e `/feed/`, `/sitemap.xml`, a notícia recém-publicada `/{slug}/` e sua respectiva categoria `/categoria/{slug}/`) sem derrubar o cache global de imagens, CSS e JavaScript.
+  - Normalização automática de URLs canônicas a partir de `$config['app']['canonical_origin']` (`https://www.speedracing.com.br`), aceitando indistintamente URIs relativas ou URLs completas.
+  - Agrupamento determinístico em lotes de até 30 URLs por requisição (respeitando o teto máximo de arquivos por chamada da Cloudflare API).
+  - Execução estritamente não-bloqueante (timeout de 5s, conexão rápida de 3s) e tratamento defensivo via `error_log`, garantindo que oscilações de rede ou indisponibilidades temporárias na API da Cloudflare nunca travem a redação nem causem erro 500 no salvamento de matérias.
+  - Suporte duplo de namespace PSR-4 nativo: `LightPress\Core\CloudflareCache` e alias `Core\Services\CloudflareCache` com carregamento automático transparente em `core/bootstrap.php`.
+  - Métodos estáticos fornecidos:
+    - `purgeUrls(array $urls): bool`: Purga seletiva de lista de URLs/URIs na Cloudflare.
+    - `purgeOnPostPublish(string $postUrl, ?string $categoryUrl = null): bool`: Disparo automático pós-publicação com sincronização dupla (Cloudflare + Nginx local).
+    - `purgeEverything(): bool`: Purga global da zona para manutenções estruturais e redesigns.
+    - `testConnection(): array`: Validação direta de credenciais e permissão real de purga através de requisição de sonda controlada.
+- **Orquestração Híbrida de Cache (Edge + Origem) (`core/CacheManager.php`):**
+  - Refatoração dos métodos `getCacheFilePath()` e `purgeUrls()` para suporte nativo e robusto a URLs absolutas completas (`https://www.speedracing.com.br/slug/`), realizando o parse do caminho e host antes do cálculo do hash MD5 (`levels=1:2`).
+  - Sincronização automática com a Cloudflare: quando `cloudflare.enabled` estiver ativo, o `CacheManager` despacha as URLs afetadas para o `CloudflareCache`, propagando a invalidação simultaneamente no disco do servidor (`/var/cache/nginx/wordpress`) e na CDN global.
+  - Benefício arquitetural imediato: todas as ações editoriais do LightPress (publicação e atualização em `PostService`, exclusão de matérias em `dashboard.php`, edição de categorias em `categories.php`, páginas institucionais em `page-edit.php`/`pages.php`, configurações em `settings.php` e retentativa em fila de background via `bin/retry-cache-purge.php`) agora invalidam a borda Cloudflare de maneira 100% automatizada e transparente.
+  - Adição do método utilitário `clearLocalCacheFolder()` para esvaziamento completo e recursivo do diretório de cache FastCGI em manutenções.
+- **Utilitário CLI de Purga e Diagnóstico (`bin/purge-cache.php`):**
+  - Criação de ferramenta CLI interativa para administração e testes no terminal do servidor:
+    - `php bin/purge-cache.php --test`: Valida conectividade, Token e Zone ID diretamente na API da Cloudflare.
+    - `php bin/purge-cache.php --slug="<slug>"`: Purga a matéria específica, a home, os feeds e o sitemap.
+    - `php bin/purge-cache.php --url="<URL>"`: Purga uma URL arbitrária.
+    - `php bin/purge-cache.php --home`: Purga Home, feeds e sitemap.
+    - `php bin/purge-cache.php --all`: Dispara Purge Everything na Cloudflare e esvazia o cache FastCGI local em disco.
+- **Painel Administrativo - Diagnóstico de Borda (`public/admin/system.php`):**
+  - Adição do card informativo **Cloudflare Edge Cache (API v4)** na página de Saúde do Sistema, exibindo em tempo real o status de ativação, Zone ID mascarado, integridade do API Token e modalidade de purga seletiva ativa.
+- **Configuração Central e Exemplos (`config.php`, `config.local.php.example`):**
+  - Inclusão do bloco padronizado `'cloudflare' => ['enabled' => false, 'zone_id' => '', 'api_token' => '', 'timeout' => 5]` no arquivo central `config.php`.
+  - Atualização do `config.local.php.example` com o modelo de configuração para servidores de produção com Cloudflare e FastCGI Nginx (`/var/cache/nginx/wordpress`).
+- **Suíte de Testes Automatizados (`bin/test.php`):**
+  - Adicionados testes de integridade para cálculo de hash MD5 a partir de URLs absolutas completas, verificação de carregamento de classes e compatibilidade de alias de namespace `Core\Services\CloudflareCache`.
+
 ### Ferramentas CLI & Gestão de Mídias em Produção
 - **Catalogação em Lote de Mídias Existentes em Produção (`bin/catalog-media.php`):**
   - Implementação de utilitário CLI de alta performance para escanear acervos legados em `/public/uploads/` sem reprocessamento gráfico, sem consumo excessivo de CPU e com footprint de memória mínimo (< 32 MB).
@@ -14,6 +46,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Extração de dimensões e tipos MIME diretamente dos cabeçalhos binários (`@getimagesize`), gerando o manifesto de variantes compatível com o `ImageProcessor` e o painel administrativo.
   - Mapeamento bidirecional e indexação em `media_refs` associando cada mídia às matérias que a utilizam em `featured_image` com complexidade O(1).
   - Suporte a `--dry-run`, `--limit=N`, `--chunk=500`, `--update-posts` e `--verbose`.
+- **Busca em Tempo Real e Ordenação na Biblioteca de Mídias (`public/admin/media.php`):**
+  - Implementação de busca reativa em tempo real com debounce de 300ms e atualização assíncrona do grid via `fetch` e `DOMParser`, eliminando recarregamentos de página.
+  - Inversão da ordenação padrão de mídias para ordem cronológica (`ORDER BY m.created_at ASC, m.id ASC`), acompanhada de seletor dropdown na barra de filtros para alternância dinâmica entre mais antigas e mais recentes.
+  - Paginação assíncrona com interceptação de cliques e rolagem suave (`window.scrollTo`), preservando histórico no navegador com `history.replaceState`.
 - **Paginação e Busca Rápida na Biblioteca de Mídias (`public/admin/media.php`, `public/admin/api/media.php`, `public/admin/editor.php`):**
   - Implementação de barra de busca textual e sistema de paginação de alta velocidade (48 itens por página) com navegação dinâmica e contadores totais em `public/admin/media.php`.
   - Endpoint de API interna (`public/admin/api/media.php`) aprimorado para consultar simultaneamente por nome original, manifesto de variantes e identificador único de mídia.
