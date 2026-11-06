@@ -14,6 +14,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Extração de dimensões e tipos MIME diretamente dos cabeçalhos binários (`@getimagesize`), gerando o manifesto de variantes compatível com o `ImageProcessor` e o painel administrativo.
   - Mapeamento bidirecional e indexação em `media_refs` associando cada mídia às matérias que a utilizam em `featured_image` com complexidade O(1).
   - Suporte a `--dry-run`, `--limit=N`, `--chunk=500`, `--update-posts` e `--verbose`.
+- **Paginação e Busca Rápida na Biblioteca de Mídias (`public/admin/media.php`, `public/admin/api/media.php`, `public/admin/editor.php`):**
+  - Implementação de barra de busca textual e sistema de paginação de alta velocidade (48 itens por página) com navegação dinâmica e contadores totais em `public/admin/media.php`.
+  - Endpoint de API interna (`public/admin/api/media.php`) aprimorado para consultar simultaneamente por nome original, manifesto de variantes e identificador único de mídia.
+  - Conexão do modal de seleção de fotos no editor de notícias (`public/admin/editor.php`) com busca assíncrona com debounce de 300ms, permitindo pesquisar e filtrar instantaneamente entre todas as 30.000 imagens diretamente na redação.
 - **Otimização de Índices para Acervos Massivos (`bin/schema.sql`, `core/Schema.php`):**
   - Adição do índice composto `INDEX idx_media_created (created_at DESC)` na tabela `media`, garantindo que a listagem de fotos no painel administrativo ([`public/admin/media.php`](file:///c:/Web/lightpress/public/admin/media.php)) execute em < 1ms mesmo com mais de 30.000 imagens catalogadas.
 

@@ -1024,13 +1024,14 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             document.getElementById('mediaModal').style.display = 'none';
         }
 
-        function loadMediaCatalog() {
+        function loadMediaCatalog(query) {
             var grid = document.getElementById('modalMediaGrid');
             var loading = document.getElementById('modalLoading');
             grid.innerHTML = '';
             loading.style.display = 'block';
 
-            fetch('/admin/api/media.php')
+            var url = '/admin/api/media.php' + (query ? '?q=' + encodeURIComponent(query) : '');
+            fetch(url)
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
                     loading.style.display = 'none';
@@ -1104,16 +1105,13 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
             });
         }
 
+        var searchDebounceTimer = null;
         function filterMediaItems(query) {
-            query = query.toLowerCase().trim();
-            if (!query) {
-                renderModalGrid(modalMediaList);
-                return;
-            }
-            var filtered = modalMediaList.filter(function(item) {
-                return item.original_name.toLowerCase().includes(query);
-            });
-            renderModalGrid(filtered);
+            query = query.trim();
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(function() {
+                loadMediaCatalog(query);
+            }, 300);
         }
 
         function uploadFromModal(input) {

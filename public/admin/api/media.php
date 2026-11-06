@@ -23,10 +23,10 @@ if (!empty($search)) {
     $items = Database::fetchAll(
         "SELECT id, original_name, file_size, variants_manifest, created_at 
          FROM media 
-         WHERE original_name LIKE ? 
+         WHERE original_name LIKE ? OR variants_manifest LIKE ? OR id = ?
          ORDER BY created_at DESC 
          LIMIT ?",
-        ['%' . $search . '%', $limit]
+        ['%' . $search . '%', '%' . $search . '%', $search, $limit]
     );
 } else {
     $items = Database::fetchAll(

@@ -184,16 +184,55 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
     }
 }
 
-// 3. Listar mídias cadastradas (mais recentes primeiro)
-$mediaList = Database::fetchAll(
-    "SELECT m.*, u.name as uploader_name 
-     FROM media m
-     JOIN users u ON u.id = m.user_id
-     ORDER BY m.created_at DESC 
-     LIMIT 60"
+// 3. Filtro de Busca e Paginação de Mídias
+$filterSearch = trim($_GET['q'] ?? '');
+$whereClauses = [];
+$params = [];
+
+if (!empty($filterSearch)) {
+    $whereClauses[] = "(m.original_name LIKE ? OR m.variants_manifest LIKE ? OR m.id = ?)";
+    $params[] = '%' . $filterSearch . '%';
+    $params[] = '%' . $filterSearch . '%';
+    $params[] = $filterSearch;
+}
+
+$whereSql = !empty($whereClauses) ? "WHERE " . implode(" AND ", $whereClauses) : "";
+
+// Paginação
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 48; // Múltiplo amigável de 2, 3, 4 e 6 para grid responsivo
+
+$totalCount = (int)Database::fetchValue(
+    "SELECT COUNT(*) FROM media m {$whereSql}",
+    $params
 );
 
+$totalPages = max(1, (int)ceil($totalCount / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+
+$querySql = "SELECT m.*, u.name as uploader_name 
+             FROM media m
+             JOIN users u ON u.id = m.user_id
+             {$whereSql}
+             ORDER BY m.created_at DESC, m.id DESC 
+             LIMIT ? OFFSET ?";
+
+$queryParams = array_merge($params, [$perPage, $offset]);
+$mediaList = Database::fetchAll($querySql, $queryParams);
+
 $csrfToken = Security::generateCsrfToken();
+
+// Função auxiliar para montar URLs com parâmetros de busca e paginação
+function buildMediaUrl(array $overrides = []): string {
+    $current = $_GET;
+    unset($current['_csrf_token'], $current['delete_id']);
+    $merged = array_merge($current, $overrides);
+    $cleaned = array_filter($merged, function($v) { return $v !== '' && $v !== null && $v !== 0; });
+    return '/admin/media.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -260,6 +299,82 @@ $csrfToken = Security::generateCsrfToken();
         .container { max-width: 1350px; margin: 2rem auto; padding: 0 1.5rem; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .card-upload { background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; margin-bottom: 2rem; }
+        .filter-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .form-input {
+            padding: 0.6rem 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            background: var(--surface);
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .form-input:focus { border-color: var(--primary-accent); }
+        .btn-filter {
+            padding: 0.6rem 1rem;
+            background: #f1f5f9;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.15s;
+        }
+        .btn-filter:hover { background: #e2e8f0; }
+        .btn-filter.btn-primary { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+        .btn-filter.btn-primary:hover { background: #1d4ed8; }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-top: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .page-links { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .page-num {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+        .page-num:hover:not(.active) { background: #f1f5f9; }
+
+        [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; border-color: #334155; }
+        [data-theme="dark"] .btn-filter:hover { background: #334155; }
+        [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+        [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
+
         .grid-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
         .media-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
         .media-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e2e8f0; }
@@ -342,6 +457,24 @@ $csrfToken = Security::generateCsrfToken();
                     <span id="uploadStatusText">Enviando e processando imagem em 3 resoluções...</span>
                 </div>
             </form>
+        </div>
+
+        <!-- Barra de Busca de Mídias -->
+        <div class="filter-bar">
+            <form method="GET" action="/admin/media.php" style="display: flex; gap: 0.75rem; align-items: center; width: 100%; max-width: 600px;">
+                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="🔍 Buscar fotos por nome ou palavra-chave..." class="form-input" style="flex: 1;">
+                <button type="submit" class="btn-filter btn-primary">Buscar</button>
+                <?php if (!empty($filterSearch)): ?>
+                    <a href="/admin/media.php" class="btn-filter">Limpar</a>
+                <?php endif; ?>
+            </form>
+            <div style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">
+                <?php if (!empty($filterSearch)): ?>
+                    Encontradas <strong><?= number_format($totalCount, 0, ',', '.') ?></strong> imagens para "<em><?= Security::e($filterSearch) ?></em>"
+                <?php else: ?>
+                    Total: <strong><?= number_format($totalCount, 0, ',', '.') ?></strong> imagens cadastradas
+                <?php endif; ?>
+            </div>
         </div>
 
         <!-- Grade de Fotos -->
@@ -468,6 +601,41 @@ $csrfToken = Security::generateCsrfToken();
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
+
+        <!-- Rodapé com Paginação -->
+        <?php if ($totalPages > 1): ?>
+            <div class="pagination">
+                <div>
+                    Página <strong><?= $page ?></strong> de <strong><?= $totalPages ?></strong> (Exibindo <?= count($mediaList) ?> de <?= number_format($totalCount, 0, ',', '.') ?> imagens)
+                </div>
+                <div class="page-links">
+                    <?php if ($page > 1): ?>
+                        <a href="<?= buildMediaUrl(['page' => $page - 1]) ?>" class="page-num">&larr; Anterior</a>
+                    <?php endif; ?>
+
+                    <?php 
+                    $startPage = max(1, $page - 2);
+                    $endPage = min($totalPages, $page + 2);
+                    if ($startPage > 1) {
+                        echo '<a href="' . buildMediaUrl(['page' => 1]) . '" class="page-num">1</a>';
+                        if ($startPage > 2) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
+                    }
+                    for ($i = $startPage; $i <= $endPage; $i++) {
+                        $active = ($i === $page) ? ' active' : '';
+                        echo '<a href="' . buildMediaUrl(['page' => $i]) . '" class="page-num' . $active . '">' . $i . '</a>';
+                    }
+                    if ($endPage < $totalPages) {
+                        if ($endPage < $totalPages - 1) echo '<span class="page-num" style="border:none; cursor:default; background:transparent;">...</span>';
+                        echo '<a href="' . buildMediaUrl(['page' => $totalPages]) . '" class="page-num">' . $totalPages . '</a>';
+                    }
+                    ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="<?= buildMediaUrl(['page' => $page + 1]) ?>" class="page-num">Próxima &rarr;</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 
     <script>
