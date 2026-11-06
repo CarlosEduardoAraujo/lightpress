@@ -267,60 +267,65 @@ class CloudflareCache
 
         $zoneId = trim((string)$config['cloudflare']['zone_id']);
         $token  = trim((string)$config['cloudflare']['api_token']);
+        $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'https://www.speedracing.com.br', '/');
 
-        // 1. Testa validação do token
-        $ch = curl_init("https://api.cloudflare.com/client/v4/user/tokens/verify");
+        // Validação direta via Purga de Sonda (Probe URL inofensiva)
+        // Tokens de Purga de Cache possuem permissão estrita de "Zone.Cache Purge.Purge",
+        // portanto validar via /user/tokens/verify ou /zones/{id} falha com 401 por falta de permissão de leitura.
+        // O teste direto no endpoint de purga com URL fictícia valida a permissão real de execução sem afetar o cache do site.
+        $probeUrl = "{$canonicalOrigin}/cf-probe-check-" . time();
+        $endpoint = "https://api.cloudflare.com/client/v4/zones/{$zoneId}/purge_cache";
+        $payload = json_encode(['files' => [$probeUrl]], JSON_UNESCAPED_SLASHES);
+
+        $ch = curl_init($endpoint);
         curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => [
                 'Authorization: Bearer ' . $token,
                 'Content-Type: application/json',
             ],
-            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_TIMEOUT        => 8,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
         ]);
+
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
-        $tokenData = json_decode((string)$response, true);
-        if ($httpCode !== 200 || empty($tokenData['success'])) {
-            $err = $tokenData['errors'][0]['message'] ?? 'Token inválido ou expirado';
+        if ($response === false || !empty($curlError)) {
             return [
                 'success' => false,
                 'http_code' => $httpCode,
-                'message' => "Falha na verificação do token: {$err}",
+                'message' => "Erro de conexão cURL: {$curlError}",
             ];
         }
 
-        // 2. Testa acesso à zona específica
-        $ch = curl_init("https://api.cloudflare.com/client/v4/zones/{$zoneId}");
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Bearer ' . $token,
-                'Content-Type: application/json',
-            ],
-            CURLOPT_TIMEOUT        => 5,
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $zoneData = json_decode((string)$response, true);
-        if ($httpCode === 200 && !empty($zoneData['success'])) {
-            $zoneName = $zoneData['result']['name'] ?? 'desconhecida';
+        $data = json_decode((string)$response, true);
+        if ($httpCode === 200 && !empty($data['success'])) {
             return [
                 'success' => true,
                 'http_code' => 200,
-                'message' => "Conexão bem-sucedida! Zona identificada: {$zoneName} (ID: {$zoneId}).",
+                'message' => "Conexão e permissão de Purga validadas com sucesso na Cloudflare para a Zona {$zoneId}!",
             ];
         }
 
-        $err = $zoneData['errors'][0]['message'] ?? 'Zona não encontrada ou sem permissão';
+        $errorMsg = 'Erro desconhecido';
+        if (!empty($data['errors']) && is_array($data['errors'])) {
+            $messages = array_map(function ($err) {
+                return is_array($err) ? ($err['message'] ?? json_encode($err)) : (string)$err;
+            }, $data['errors']);
+            $errorMsg = implode('; ', $messages);
+        }
+
         return [
             'success' => false,
             'http_code' => $httpCode,
-            'message' => "Falha ao acessar zona {$zoneId}: {$err}",
+            'message' => "Falha na validação com a Cloudflare (HTTP {$httpCode}): {$errorMsg}",
         ];
     }
 }
