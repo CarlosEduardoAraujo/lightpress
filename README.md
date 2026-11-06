@@ -513,14 +513,15 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
 
 ### 8.2. Prevenção Contra Cross-Site Scripting (XSS)
 
-* **Compilação estruturada:** O `BlockCompiler` valida tipos, tamanhos, profundidade e versão do esquema JSON. A primeira fase admite títulos h2/h3, parágrafos, negrito/ênfase, links, listas, citações e imagens com legenda. O HTML é construído por tipo de bloco, com tags como `h2`, `h3`, `p`, `strong`, `em`, `a`, `ul`, `ol`, `li`, `blockquote`, `figure`, `figcaption`, `picture`, `source` e `img` e atributos específicos permitidos por elemento. Blocos desconhecidos são rejeitados com erro identificável, sem saída HTML arbitrária.
-* **URLs e atributos:** Links aceitam somente esquemas explicitamente permitidos (`https`, `http` e `mailto`) ou caminhos internos validados. Imagens referenciam mídia conhecida do servidor; `srcset`, `type`, dimensões e variantes são gerados a partir do manifesto persistido. Proibir eventos `on*`, scripts, iframes, estilos arbitrários e URLs `javascript:`. Formatação inline também usa nós estruturados; strings de texto não são tratadas como HTML.
-* **Escape em Templates:** PHP nativo não oferece escape automático. Texto e atributos dinâmicos devem usar função de escape consistente com flags completas:
+* **Compilação estruturada e Sanitização Rigorosa por DOMDocument:** O `BlockCompiler` valida tipos, tamanhos, profundidade e versão do esquema JSON. A primeira fase admite títulos h2/h3, parágrafos, negrito/ênfase, links, listas, citações e imagens com legenda. O HTML é construído por tipo de bloco e sanitizado via `\DOMDocument` através de uma whitelist estrita de tags e atributos autorizados por elemento (eliminando completamente eventos `on*`, atributos inline `style`, tags `<script>` e tags `<style>`, mesmo em casos de sintaxe HTML5 sem espaços como `<img/src="x"/onerror=alert(1)>`). Blocos desconhecidos são rejeitados com erro identificável, sem saída HTML arbitrária.
+* **URLs e atributos:** Links aceitam somente esquemas explicitamente permitidos (`https`, `http` e `mailto`) ou caminhos internos validados. Imagens referenciam mídia conhecida do servidor; `srcset`, `type`, dimensões e variantes são gerados a partir do manifesto persistido. Proibir eventos `on*`, scripts, iframes, estilos arbitrários e URLs `javascript:` ou protocolo-relativas (`//`). Formatação inline também usa nós estruturados; strings de texto não são tratadas como HTML.
+* **Escape em Templates & Defesa em Profundidade:** PHP nativo não oferece escape automático. Texto e atributos dinâmicos devem usar função de escape consistente com flags completas:
   ```php
   function e(string|null $value): string {
       return htmlspecialchars($value ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
   }
   ```
+  Páginas institucionais (`templates/page.php`) executam sanitização defensiva em profundidade via `BlockCompiler::sanitizeHtml()` antes da exibição para neutralizar qualquer possibilidade de XSS armazenado.
 * **HTML compilado:** Somente `content_html` produzido pelo compilador e armazenado pelo fluxo autorizado pode ser renderizado como HTML sem passar por `e()` novamente. JSON-LD e dados inseridos em scripts usam serialização JSON apropriada ao contexto, não apenas escape HTML. A migração obedece à mesma fronteira de confiança.
 
 ### 8.3. Proteção Contra Cross-Site Request Forgery (CSRF)
@@ -549,9 +550,9 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
   ]);
   ```
 * **Regeneração de Sessão:** Chamada obrigatória a `session_regenerate_id(true)` após login com sucesso para prevenir ataques de fixação de sessão.
-* **Proteção contra Força Bruta:** Limitação de tentativas de login incorretas (bloqueio temporário por IP e conta após 5 falhas consecutivas).
-* **Sessões revogáveis:** A sessão guarda ID de usuário e `session_version`. Em cada requisição administrativa, buscar o estado atual da conta e rejeitar sessão se `is_active = 0`, a versão divergir ou a senha exigir redefinição. Mudança de perfil, bloqueio, troca/redefinição de senha e encerramento global incrementam `session_version`; nunca confiar em perfil antigo guardado apenas no cookie/sessão.
-* **Tokens:** Ativação expira em até 24 horas; redefinição, em até 1 hora. Tokens são de uso único e armazenados apenas como hash na tabela da seção 3.5. Limitar solicitação e validação por IP e conta, usar mensagens que não revelem a existência do e-mail e não registrar tokens/URLs completas em logs.
+* **Proteção contra Força Bruta e Spoofing de IP:** Validação de proxies reversos confiáveis (Cloudflare, localhost) em `Security::getClientIp()` antes de confiar em cabeçalhos como `X-Forwarded-For` ou `CF-Connecting-IP`. Limitação estrita de tentativas de login baseada no IP real do cliente (`Security::checkLoginRateLimit()`), bloqueando ataques distribuídos e de dicionário mesmo que o cliente descarte o cookie de sessão.
+* **Sessões Revogáveis e Centralização de Autenticação (`Security::requireAuth`):** Todas as rotas administrativas e APIs internas validam o acesso através de `Security::requireAuth(?string $action, ?array $roles, ?array $config)`, que consulta em tempo real o estado da conta e a versão da sessão (`session_version`). Caso a conta seja desativada (`is_active = 0`), a senha redefinida ou o usuário deslogado remotamente, qualquer requisição (página HTML ou chamada assíncrona AJAX/JSON) é imediatamente rejeitada e a sessão invalidada.
+* **Tokens e Bloqueio Concorrente:** Ativação expira em até 24 horas; redefinição, em até 1 hora. Tokens são de uso único, validados com CSRF obrigatório e protegidos contra race conditions através de lock pessimista (`SELECT ... FOR UPDATE`) dentro de transações de banco de dados. Limitar solicitação e validação por IP e conta, usar mensagens que não revelem a existência do e-mail e não registrar tokens/URLs completas em logs.
 * **Conclusão segura:** Ao definir senha Argon2id, consumir o token, remover `password_reset_required` e revogar os demais tokens e sessões em uma transação. Somente na ativação válida de conta pendente, liberar também `is_active`; um bloqueio administrativo revoga tokens de ativação e não pode ser desfeito por simples redefinição de senha. Não autenticar automaticamente após redefinição.
 
 ### 8.4.1. Autorização por Perfil, Artigo e Campo

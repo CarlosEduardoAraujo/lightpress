@@ -12,24 +12,7 @@ use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || empty($currentUser['is_active'])) {
-    session_destroy();
-    header('Location: /admin/login.php');
-    exit;
-}
+$currentUser = Security::requireAuth();
 
 $message = '';
 $error = '';
@@ -113,31 +96,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
     }
 }
 
-// 2. Exclusão de Mídia Segura (Verifica se está vinculada a artigos)
+// 2. Exclusão de Mídia Segura (Verifica permissão e se está vinculada a artigos/páginas)
 if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
     $mediaId = trim($_GET['delete_id']);
-    
-    // Verificar se há referências ativas em media_refs
-    $refsCount = (int)(Database::fetchOne("SELECT COUNT(*) as c FROM media_refs WHERE media_id = ?", [$mediaId])['c'] ?? 0);
+    $mediaItem = Database::fetchOne("SELECT * FROM media WHERE id = ? LIMIT 1", [$mediaId]);
 
-    if ($refsCount > 0) {
-        $error = "Esta imagem não pode ser excluída pois está vinculada a artigos publicados ou revisões.";
+    if (!$mediaItem) {
+        $error = "Imagem não encontrada.";
     } else {
-        $mediaItem = Database::fetchOne("SELECT * FROM media WHERE id = ?", [$mediaId]);
-        if ($mediaItem) {
-            // Remover arquivos físicos
+        $canDelete = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)($mediaItem['user_id'] ?? 0) === (int)$currentUser['id']);
+        if (!$canDelete) {
+            $error = "Você não tem permissão para excluir esta imagem da biblioteca.";
+        } else {
+            // Verificar se alguma das variantes está em uso no banco
+            $isInUse = false;
             $variants = json_decode($mediaItem['variants_manifest'], true) ?? [];
             foreach ($variants as $res => $formats) {
+                if (!is_array($formats)) continue;
                 foreach ($formats as $fmt => $info) {
-                    $localPath = $config['paths']['public'] . ($info['url'] ?? '');
-                    if (file_exists($localPath)) {
-                        @unlink($localPath);
+                    $url = $info['url'] ?? '';
+                    if (!empty($url)) {
+                        $inPostsFeatured = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE featured_image = ?", [$url]);
+                        if ($inPostsFeatured > 0) { $isInUse = true; break 2; }
+                        $inPostsContent = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE content_html LIKE ?", ['%' . $url . '%']);
+                        if ($inPostsContent > 0) { $isInUse = true; break 2; }
+                        $inPages = (int)Database::fetchValue("SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?", [$url, '%' . $url . '%']);
+                        if ($inPages > 0) { $isInUse = true; break 2; }
                     }
                 }
             }
 
-            Database::query("DELETE FROM media WHERE id = ?", [$mediaId]);
-            $message = "Mídia excluída com sucesso!";
+            if ($isInUse) {
+                $error = "Esta imagem não pode ser excluída pois está em uso como destaque ou no conteúdo de matérias ou páginas ativas.";
+            } else {
+                $publicPath = $config['paths']['public'] ?? (dirname(__DIR__, 2) . '/public');
+                foreach ($variants as $res => $formats) {
+                    if (!is_array($formats)) continue;
+                    foreach ($formats as $fmt => $info) {
+                        $localPath = $publicPath . ($info['url'] ?? '');
+                        if (file_exists($localPath)) {
+                            @unlink($localPath);
+                        }
+                    }
+                }
+
+                Database::query("DELETE FROM media_refs WHERE media_id = ?", [$mediaId]);
+                Database::query("DELETE FROM media WHERE id = ?", [$mediaId]);
+                $message = "Mídia excluída com sucesso!";
+            }
         }
     }
 }
@@ -409,11 +415,16 @@ $csrfToken = Security::generateCsrfToken();
                                 </button>
                             <?php endif; ?>
 
-                            <a href="/admin/media.php?delete_id=<?= urlencode($item['id']) ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
-                               class="btn-delete"
-                               onclick="return confirm('Deseja excluir esta mídia? Esta ação removerá os arquivos em disco se a imagem não estiver vinculada a nenhum artigo.');">
-                                Excluir Imagem
-                            </a>
+                            <?php 
+                            $canDeleteItem = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)($item['user_id'] ?? 0) === (int)$currentUser['id']);
+                            if ($canDeleteItem): 
+                            ?>
+                                <a href="/admin/media.php?delete_id=<?= urlencode($item['id']) ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
+                                   class="btn-delete"
+                                   onclick="return confirm('Deseja excluir esta mídia? Esta ação removerá os arquivos em disco se a imagem não estiver vinculada a nenhum artigo.');">
+                                    Excluir Imagem
+                                </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>

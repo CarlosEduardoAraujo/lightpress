@@ -161,7 +161,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
 
             <!-- Page Body Content -->
             <div class="article-body mt-2">
-                <?= $page['content_html'] ?>
+                <?= \LightPress\Core\BlockCompiler::sanitizeHtml($page['content_html'] ?? '') ?>
             </div>
 
         </article>

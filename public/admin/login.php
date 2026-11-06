@@ -19,9 +19,17 @@ if (!empty($_SESSION['user_id'])) {
 }
 
 $error = '';
+$trustedProxies = $config['security']['trusted_proxies'] ?? ['127.0.0.1', '::1'];
+$clientIp = Security::getClientIp($trustedProxies);
 $maxAttempts = (int)($config['security']['rate_limit']['login_max_attempts'] ?? 5);
+$lockoutSeconds = (int)($config['security']['rate_limit']['login_lockout_seconds'] ?? 900);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// 1. Verificação de Bloqueio por IP (independente de cookies/sessão)
+$lockRemaining = Security::checkLoginRateLimit($clientIp, $maxAttempts, $lockoutSeconds);
+if ($lockRemaining !== null) {
+    $min = (int)ceil($lockRemaining / 60);
+    $error = "Muitas tentativas incorretas a partir deste IP. Bloqueio ativo por mais {$min} minuto(s).";
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['_csrf_token'] ?? '';
     if (!Security::verifyCsrfToken($token)) {
         $error = 'Sessão expirada ou requisição inválida. Tente novamente.';
@@ -29,12 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['username'] ?? '');
         $password = (string)($_POST['password'] ?? '');
 
-        // Controle básico de tentativas por IP na sessão
         $_SESSION['login_failures'] = ($_SESSION['login_failures'] ?? 0);
 
-        if ($_SESSION['login_failures'] >= $maxAttempts) {
-            $error = 'Muitas tentativas incorretas. Aguarde alguns minutos antes de tentar novamente.';
-        } elseif (empty($username) || empty($password)) {
+        if (empty($username) || empty($password)) {
             $error = 'Informe o usuário e a senha.';
         } else {
             $user = Database::fetchOne(
@@ -44,19 +49,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             if ($user && !empty($user['is_active']) && Security::verifyPassword($password, $user['password_hash'])) {
-                // Login com sucesso: regenerar ID de sessão
+                // Sucesso: limpar bloqueio por IP e sessão
+                Security::clearLoginFailures($clientIp);
+                unset($_SESSION['login_failures']);
+
                 Security::regenerateSession();
                 $_SESSION['user_id'] = (int)$user['id'];
                 $_SESSION['user_name'] = $user['name'];
                 $_SESSION['user_role'] = $user['role'];
                 $_SESSION['session_version'] = (int)$user['session_version'];
-                unset($_SESSION['login_failures']);
 
                 header('Location: /admin/dashboard.php');
                 exit;
             } else {
+                // Falha: registrar no IP e na sessão
+                Security::recordLoginFailure($clientIp, $maxAttempts, $lockoutSeconds);
                 $_SESSION['login_failures']++;
-                $error = 'Usuário ou senha incorretos.';
+
+                $lockRemaining = Security::checkLoginRateLimit($clientIp, $maxAttempts, $lockoutSeconds);
+                if ($lockRemaining !== null) {
+                    $min = (int)ceil($lockRemaining / 60);
+                    $error = "Muitas tentativas incorretas. Acesso bloqueado para este IP por {$min} minuto(s).";
+                } else {
+                    $error = 'Usuário ou senha incorretos.';
+                }
             }
         }
     }

@@ -141,6 +141,18 @@ if (is_dir($cachePath)) {
     echo "  [INFO] {$cachePath} não encontrado localmente (esperado em ambiente Linux/Nginx em produção).\n";
 }
 
+// 7. Chave HMAC Anti-Abuso (Segurança)
+echo "\n[Chave Secreta HMAC (Anti-Abuso de Views)]\n";
+$hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
+if ($hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32) {
+    echo "  [AVISO CRÍTICO] hmac_secret é a chave padrão ou possui menos de 32 caracteres!\n";
+    echo "  -> Qualquer pessoa ou robô pode forjar contagem de visualizações (/api/view.php).\n";
+    echo "  -> Configure 'security' => ['hmac_secret' => '" . bin2hex(random_bytes(32)) . "'] em config.local.php.\n";
+    $warnings[] = "Chave de segurança hmac_secret vulnerável (padrão ou < 32 caracteres). Configure uma chave forte em config.local.php.";
+} else {
+    echo "  [OK] hmac_secret configurado com comprimento seguro (" . strlen($hmacSecret) . " caracteres).\n";
+}
+
 // Resumo Final
 echo "\n========================================================\n";
 echo "   Resumo do Diagnóstico\n";

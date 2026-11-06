@@ -142,19 +142,230 @@ class Security
     }
 
     /**
-     * Obtém o IP do cliente de forma segura (considerando proxies reversos confiáveis).
+     * Obtém o IP do cliente com proteção estrita contra spoofing de cabeçalhos.
+     * Só avalia cabeçalhos HTTP_X_FORWARDED_FOR, HTTP_X_REAL_IP ou HTTP_CF_CONNECTING_IP
+     * se a conexão física ($_SERVER['REMOTE_ADDR']) partir de um proxy reverso confiável.
+     *
+     * @param string[]|null $trustedProxies Lista de IPs de proxies confiáveis
      */
-    public static function getClientIp(): string
+    public static function getClientIp(?array $trustedProxies = null): string
     {
-        // Se houver Nginx / proxy local configurado
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $trusted = $trustedProxies ?? ['127.0.0.1', '::1'];
+
+        // Se a requisição não partiu de um proxy confiável, utiliza estritamente o endereço de conexão
+        if (!in_array($remoteAddr, $trusted, true)) {
+            return filter_var($remoteAddr, FILTER_VALIDATE_IP) ?: '127.0.0.1';
+        }
+
+        // 1. Cabeçalho Cloudflare (quando aplicável)
+        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            $cfIp = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
+            if (filter_var($cfIp, FILTER_VALIDATE_IP)) {
+                return $cfIp;
+            }
+        }
+
+        // 2. Cabeçalho X-Real-IP configurado pelo Nginx
+        if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+            $realIp = trim($_SERVER['HTTP_X_REAL_IP']);
+            if (filter_var($realIp, FILTER_VALIDATE_IP)) {
+                return $realIp;
+            }
+        }
+
+        // 3. Cabeçalho X-Forwarded-For
         if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
             $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            return trim($ips[0]);
+            foreach ($ips as $candidate) {
+                $candidate = trim($candidate);
+                if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    return $candidate;
+                }
+            }
         }
-        if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
-            return trim($_SERVER['HTTP_X_REAL_IP']);
+
+        return filter_var($remoteAddr, FILTER_VALIDATE_IP) ?: '127.0.0.1';
+    }
+
+    /**
+     * Verifica se o IP está bloqueado por excesso de tentativas de login (Rate-Limiting).
+     *
+     * @return int|null Retorna os segundos restantes de bloqueio ou null se liberado.
+     */
+    public static function checkLoginRateLimit(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900): ?int
+    {
+        $ipHash = hash('sha256', $ip);
+        $file = dirname(__DIR__) . '/storage/logs/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+
+        if (!file_exists($file)) {
+            return null;
         }
-        return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+        $data = json_decode((string)@file_get_contents($file), true);
+        if (!is_array($data)) {
+            @unlink($file);
+            return null;
+        }
+
+        $now = time();
+        $attempts = (int)($data['attempts'] ?? 0);
+        $firstAttempt = (int)($data['first_attempt'] ?? $now);
+        $lockoutUntil = (int)($data['lockout_until'] ?? 0);
+
+        if ($lockoutUntil > $now) {
+            return $lockoutUntil - $now;
+        }
+
+        if (($now - $firstAttempt) > $lockoutSeconds) {
+            @unlink($file);
+            return null;
+        }
+
+        if ($attempts >= $maxAttempts) {
+            return max(1, $lockoutSeconds - ($now - $firstAttempt));
+        }
+
+        return null;
+    }
+
+    /**
+     * Registra uma tentativa falha de login para o IP.
+     */
+    public static function recordLoginFailure(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900): void
+    {
+        $ipHash = hash('sha256', $ip);
+        $dir = dirname(__DIR__) . '/storage/logs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $file = $dir . '/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+
+        $data = ['attempts' => 0, 'first_attempt' => time(), 'lockout_until' => 0];
+        if (file_exists($file)) {
+            $parsed = json_decode((string)@file_get_contents($file), true);
+            if (is_array($parsed)) {
+                $data = $parsed;
+            }
+        }
+
+        $now = time();
+        if (($now - ((int)($data['first_attempt'] ?? $now))) > $lockoutSeconds) {
+            $data['attempts'] = 0;
+            $data['first_attempt'] = $now;
+            $data['lockout_until'] = 0;
+        }
+
+        $data['attempts'] = ((int)($data['attempts'] ?? 0)) + 1;
+        $data['last_attempt'] = $now;
+
+        if ($data['attempts'] >= $maxAttempts) {
+            $data['lockout_until'] = $now + $lockoutSeconds;
+        }
+
+        @file_put_contents($file, json_encode($data), LOCK_EX);
+    }
+
+    /**
+     * Limpa o histórico de tentativas falhas de login após sucesso.
+     */
+    public static function clearLoginFailures(string $ip): void
+    {
+        $ipHash = hash('sha256', $ip);
+        $file = dirname(__DIR__) . '/storage/logs/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+        if (file_exists($file)) {
+            @unlink($file);
+        }
+    }
+
+    /**
+     * Valida de forma rigorosa e centralizada a autenticação para todas as páginas e APIs do painel.
+     * Verifica:
+     * 1. Presença de $_SESSION['user_id']
+     * 2. Existência do usuário no banco
+     * 3. Conta ativa (is_active == 1)
+     * 4. Validade da versão de sessão (session_version coincide com o registro no banco)
+     * 5. Restrição opcional por papéis ($requiredRoles)
+     * 6. Restrição opcional por ação RBAC ($requiredAction via Authorization::can)
+     *
+     * @param string|null $requiredAction
+     * @param string[]|null $requiredRoles
+     * @param array|null $config
+     * @return array<string, mixed>
+     */
+    public static function requireAuth(?string $requiredAction = null, ?array $requiredRoles = null, ?array $config = null): array
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            self::startSecureSession($config ?? []);
+        }
+
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $sessionVersion = (int)($_SESSION['session_version'] ?? 0);
+
+        $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+               || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
+
+        if ($userId <= 0) {
+            if ($isAjax) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'Não autenticado.']);
+                exit;
+            }
+            header('Location: /admin/login.php');
+            exit;
+        }
+
+        $user = Database::fetchOne(
+            "SELECT id, name, username, email, role, bio, password_hash, is_active, session_version 
+             FROM users WHERE id = ? LIMIT 1",
+            [$userId]
+        );
+
+        if (!$user || empty($user['is_active']) || (int)$user['session_version'] !== $sessionVersion) {
+            $_SESSION = [];
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                setcookie(session_name(), '', time() - 42000,
+                    $params["path"], $params["domain"],
+                    $params["secure"], $params["httponly"]
+                );
+            }
+            @session_destroy();
+
+            if ($isAjax) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'Sessão revogada ou conta inativa. Faça login novamente.']);
+                exit;
+            }
+            header('Location: /admin/login.php?revoked=1');
+            exit;
+        }
+
+        if ($requiredRoles !== null && !in_array($user['role'], $requiredRoles, true)) {
+            if ($isAjax) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'Acesso negado para o seu perfil.']);
+                exit;
+            }
+            http_response_code(403);
+            die("Acesso negado: seu perfil ({$user['role']}) não tem permissão para acessar esta área.");
+        }
+
+        if ($requiredAction !== null && !Authorization::can($user, $requiredAction)) {
+            if ($isAjax) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'Acesso negado para esta operação.']);
+                exit;
+            }
+            http_response_code(403);
+            die("Acesso negado: você não possui permissão para executar esta ação.");
+        }
+
+        return $user;
     }
 
     /**

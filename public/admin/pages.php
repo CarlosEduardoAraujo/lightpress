@@ -14,28 +14,7 @@ use LightPress\Core\Security;
 use LightPress\Core\Schema;
 use LightPress\Core\CacheManager;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || empty($currentUser['is_active'])) {
-    session_destroy();
-    header('Location: /admin/login.php');
-    exit;
-}
-
-if (!in_array($currentUser['role'], ['admin', 'editor'], true)) {
-    die("Acesso restrito a Administradores e Editores.");
-}
+$currentUser = Security::requireAuth(null, ['admin', 'editor'], $config);
 
 // Garantir que a tabela pages exista e tenha páginas iniciais
 Schema::ensurePagesTable();

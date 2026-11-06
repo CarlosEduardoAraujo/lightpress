@@ -13,22 +13,7 @@ use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\CacheManager;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || !Authorization::can($currentUser, Authorization::ACTION_MANAGE_CATEGORIES)) {
-    die("Acesso restrito a Administradores e Editores.");
-}
+$currentUser = Security::requireAuth(Authorization::ACTION_MANAGE_CATEGORIES);
 
 $cacheMgr = new CacheManager($config);
 $message = '';

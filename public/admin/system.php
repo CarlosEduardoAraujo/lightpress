@@ -11,22 +11,7 @@ use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || !in_array($currentUser['role'], ['editor', 'admin'], true)) {
-    die("Acesso restrito.");
-}
+$currentUser = Security::requireAuth(null, ['admin', 'editor'], $config);
 
 // 1. Estatísticas do Banco de Dados
 $totalPosts = (int)(Database::fetchOne("SELECT COUNT(*) as c FROM posts")['c'] ?? 0);
@@ -52,6 +37,9 @@ $cacheWritable = $cacheExists && is_writable($cachePath);
 
 $uploadDir = $config['media']['upload_dir'] ?? '';
 $uploadWritable = is_dir($uploadDir) && is_writable($uploadDir);
+
+$hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
+$isDefaultHmac = ($hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32);
 
 $csrfToken = Security::generateCsrfToken();
 ?>
@@ -173,6 +161,19 @@ $csrfToken = Security::generateCsrfToken();
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1.5rem;">Diagnóstico e Saúde da Infraestrutura</h1>
 
+        <?php if ($isDefaultHmac): ?>
+            <div style="background: rgba(239, 68, 68, 0.12); border: 2px solid #ef4444; color: #dc2626; border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 2rem;">
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <span style="font-size: 1.6rem; line-height: 1;">⚠️</span>
+                    <div>
+                        <strong style="font-size: 1.05rem; display: block; margin-bottom: 0.35rem; color: #ef4444;">Alerta de Segurança: Chave HMAC Insegura ou Padrão</strong>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.5rem; line-height: 1.4;">A chave <code>hmac_secret</code> configurada ainda é o valor padrão de desenvolvimento ou possui menos de 32 caracteres. Em produção, isso permite que terceiros forjem tokens e inflem visualizações no endpoint <code>/api/view.php</code>.</p>
+                        <p style="font-size: 0.85rem; line-height: 1.4;"><strong>Correção recomendada:</strong> Configure uma chave de 64 caracteres em seu <code>config.local.php</code>:<br><code style="display: inline-block; margin-top: 0.25rem;">'security' => ['hmac_secret' => '<?= bin2hex(random_bytes(32)) ?>']</code></p>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- Métricas Rápidas -->
         <div class="grid-stats">
             <div class="stat-card">
@@ -291,6 +292,10 @@ $csrfToken = Security::generateCsrfToken();
                 <div class="info-row">
                     <span>Deduplicação de Views</span>
                     <span class="badge-ok">HMAC-SHA-256 Anonimizado</span>
+                </div>
+                <div class="info-row">
+                    <span>Segredo HMAC</span>
+                    <span><?= $isDefaultHmac ? '<span class="badge-err">Inseguro (Padrão ou &lt;32 chars)</span>' : '<span class="badge-ok">Configurado (' . strlen($hmacSecret) . ' chars)</span>' ?></span>
                 </div>
                 <div class="info-row">
                     <span>Nome da Sessão</span>

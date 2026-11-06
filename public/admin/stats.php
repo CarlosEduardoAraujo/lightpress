@@ -12,26 +12,7 @@ use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-// 1. Verificação de Autenticação
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-// 2. Verificação de Sessão Revogável
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || empty($currentUser['is_active']) || (int)$currentUser['session_version'] !== (int)$_SESSION['session_version']) {
-    session_destroy();
-    header('Location: /admin/login.php');
-    exit;
-}
+$currentUser = Security::requireAuth(null, null, $config);
 
 // Top 20 Notícias Mais Lidas
 $topPosts = Database::fetchAll(

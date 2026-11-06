@@ -10,6 +10,8 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
+Security::startSecureSession($config);
+
 $token = trim($_GET['token'] ?? $_POST['token'] ?? '');
 $error = '';
 $success = false;
@@ -36,7 +38,11 @@ if (!$tokenRecord) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $password = (string)($_POST['password'] ?? '');
+    $csrfToken = $_POST['_csrf_token'] ?? '';
+    if (!Security::verifyCsrfToken($csrfToken)) {
+        $error = "Token CSRF inválido ou expirado. Recarregue a página e tente novamente.";
+    } else {
+        $password = (string)($_POST['password'] ?? '');
     $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 
     if (strlen($password) < 8) {
@@ -45,7 +51,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "As senhas não coincidem.";
     } else {
         try {
-            Database::transaction(function (\PDO $pdo) use ($tokenRecord, $tokenHash, $password, $nowUtc): void {
+            Database::transaction(function (\PDO $pdo) use ($tokenHash, $password, $nowUtc): void {
+                $lockedToken = Database::fetchOne(
+                    "SELECT t.*, u.id as user_id 
+                     FROM user_reset_tokens t
+                     JOIN users u ON u.id = t.user_id
+                     WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > ?
+                     LIMIT 1 FOR UPDATE",
+                    [$tokenHash, $nowUtc]
+                );
+
+                if (!$lockedToken) {
+                    throw new RuntimeException("Este link de ativação expirou ou já foi utilizado.");
+                }
+
                 $newHash = Security::hashPassword($password);
 
                 // 1. Atualizar senha do usuário, ativar conta e limpar flag de reset obrigatório
@@ -53,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "UPDATE users 
                      SET password_hash = ?, is_active = 1, password_reset_required = 0, session_version = session_version + 1
                      WHERE id = ?",
-                    [$newHash, (int)$tokenRecord['user_id']]
+                    [$newHash, (int)$lockedToken['user_id']]
                 );
 
                 // 2. Marcar token como consumido
@@ -69,6 +88,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+}
+
+$csrfToken = Security::generateCsrfToken();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -124,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </p>
 
             <form method="POST">
+                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
                 <input type="hidden" name="token" value="<?= Security::e($token) ?>">
 
                 <div class="form-group">

@@ -14,14 +14,7 @@ use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-// 1. Verificação de Autenticação
-if (empty($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Acesso não autorizado']);
-    exit;
-}
+$currentUser = Security::requireAuth();
 
 // 2. Verificação de CSRF
 $csrfToken = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';

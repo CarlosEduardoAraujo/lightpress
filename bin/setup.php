@@ -16,6 +16,27 @@ echo "========================================================\n";
 echo "   LightPress / SpeedPress - Instalação de Banco de Dados\n";
 echo "========================================================\n\n";
 
+// Garantir chave secreta HMAC aleatória segura em config.local.php
+$configLocalFile = dirname(__DIR__) . '/config.local.php';
+if (!file_exists($configLocalFile)) {
+    $generatedHmac = bin2hex(random_bytes(32));
+    $initialConfig = "<?php\ndeclare(strict_types=1);\n\n/**\n * Configurações Locais e de Produção (sobrescreve config.php)\n */\nreturn [\n    'security' => [\n        'hmac_secret' => '{$generatedHmac}',\n    ],\n];\n";
+    @file_put_contents($configLocalFile, $initialConfig);
+    echo "[CONFIG] Arquivo config.local.php gerado automaticamente com hmac_secret seguro (64 caracteres).\n\n";
+} else {
+    $localConfig = @include $configLocalFile;
+    if (is_array($localConfig)) {
+        $localHmac = (string)($localConfig['security']['hmac_secret'] ?? '');
+        if (empty($localHmac) || $localHmac === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($localHmac) < 32) {
+            $generatedHmac = bin2hex(random_bytes(32));
+            $localConfig['security']['hmac_secret'] = $generatedHmac;
+            $exported = "<?php\ndeclare(strict_types=1);\n\nreturn " . var_export($localConfig, true) . ";\n";
+            @file_put_contents($configLocalFile, $exported);
+            echo "[CONFIG] Chave hmac_secret atualizada automaticamente em config.local.php.\n\n";
+        }
+    }
+}
+
 $driver = $config['database']['driver'] ?? 'mysql';
 $isFresh = in_array('--fresh', $argv, true);
 

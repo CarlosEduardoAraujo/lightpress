@@ -14,13 +14,7 @@ $config = require dirname(__DIR__, 3) . '/core/bootstrap.php';
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Acesso não autorizado']);
-    exit;
-}
+$currentUser = Security::requireAuth();
 
 $search = trim($_GET['q'] ?? '');
 $limit = min(max((int)($_GET['limit'] ?? 60), 1), 100);

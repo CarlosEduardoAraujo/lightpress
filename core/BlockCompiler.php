@@ -73,64 +73,178 @@ class BlockCompiler
     /**
      * Sanitiza conteúdo HTML permitindo apenas tags semânticas limpas e eliminando classes,
      * estilos sujos do Word/Google Docs e qualquer vetor de script malicioso (XSS).
+     * Utiliza DOMDocument com whitelist estrita de tags e atributos (imune a evasões de parser/regex).
      */
     public static function sanitizeHtml(string $html): string
     {
-        if (trim($html) === '') {
+        $trimmed = trim($html);
+        if ($trimmed === '') {
             return '';
         }
 
-        // 1. Remover tags proibidas e vetores ativos
-        $clean = preg_replace('~<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>~i', '', $html);
-        $clean = preg_replace('~<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>~i', '', $clean);
-        $clean = preg_replace('~<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>~i', '', $clean);
-        $clean = preg_replace('~<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>~i', '', $clean);
+        // Whitelist estrita de tags autorizadas no jornalismo e páginas
+        $allowedTags = [
+            'h2', 'h3', 'h4', 'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'u', 's',
+            'blockquote', 'cite', 'ul', 'ol', 'li', 'a', 'figure', 'picture', 'source',
+            'img', 'figcaption', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+        ];
 
-        // 2. Filtrar apenas tags semânticas do jornalismo moderno
-        $allowedTags = '<h2><h3><h4><p><br><hr><strong><b><em><i><u><s><blockquote><cite><ul><ol><li><a><figure><picture><source><img><figcaption>';
-        $clean = strip_tags($clean, $allowedTags);
+        // Tags ativas/perigosas cujo nó e todo o conteúdo interno devem ser eliminados
+        $dangerousTags = [
+            'script', 'style', 'iframe', 'object', 'embed', 'applet', 'meta',
+            'link', 'form', 'input', 'textarea', 'button', 'select', 'option',
+            'svg', 'math', 'base'
+        ];
 
-        // 3. Remover atributos de eventos (on*), estilos inline (MsoNormal, font-size, etc.) e IDs
-        $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
-        $clean = preg_replace('/\s+style\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
-        $clean = preg_replace('/\s+class\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
-        $clean = preg_replace('/\s+id\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean);
+        // Whitelist estrita de atributos autorizados por tag
+        $allowedAttributes = [
+            'a' => ['href', 'target', 'rel', 'title'],
+            'img' => ['src', 'alt', 'width', 'height', 'loading', 'title'],
+            'source' => ['srcset', 'media', 'type'],
+            'blockquote' => ['cite'],
+            'th' => ['colspan', 'rowspan', 'scope'],
+            'td' => ['colspan', 'rowspan'],
+        ];
 
-        // 4. Sanitizar links <a> para evitar javascript: e adicionar rel="noopener noreferrer"
-        $clean = preg_replace_callback('~<a\s+([^>]+)>(.*?)</a>~i', function (array $m): string {
-            $attributes = $m[1];
-            $linkText = $m[2];
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        // Container com declaração UTF-8 explícita para evitar má interpretação de acentuação
+        $dom->loadHTML('<?xml encoding="UTF-8"><div id="lp-sanitizer-root">' . $trimmed . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
 
-            if (preg_match('~href=[\'"]([^\'"]+)[\'"]~i', $attributes, $hrefMatch)) {
-                $safeHref = self::sanitizeUrl($hrefMatch[1]);
-                if (!empty($safeHref)) {
-                    return "<a href=\"{$safeHref}\" rel=\"noopener noreferrer\" target=\"_blank\">{$linkText}</a>";
+        $root = $dom->getElementById('lp-sanitizer-root');
+        if (!$root) {
+            return '';
+        }
+
+        self::cleanDomNode($root, $allowedTags, $dangerousTags, $allowedAttributes);
+
+        $cleanHtml = '';
+        foreach ($root->childNodes as $child) {
+            $cleanHtml .= $dom->saveHTML($child);
+        }
+
+        return trim($cleanHtml);
+    }
+
+    /**
+     * Limpa recursivamente nós do DOMDocument aplicando whitelist de tags e atributos.
+     *
+     * @param \DOMNode $node
+     * @param string[] $allowedTags
+     * @param string[] $dangerousTags
+     * @param array<string, string[]> $allowedAttributes
+     */
+    private static function cleanDomNode(\DOMNode $node, array $allowedTags, array $dangerousTags, array $allowedAttributes): void
+    {
+        $children = [];
+        if ($node->hasChildNodes()) {
+            foreach ($node->childNodes as $child) {
+                $children[] = $child;
+            }
+        }
+
+        foreach ($children as $child) {
+            if ($child->nodeType === XML_TEXT_NODE) {
+                continue;
+            }
+
+            if ($child->nodeType !== XML_ELEMENT_NODE) {
+                $node->removeChild($child);
+                continue;
+            }
+
+            /** @var \DOMElement $child */
+            $tagName = strtolower($child->nodeName);
+
+            // 1. Tags perigosas -> remover nó e conteúdo
+            if (in_array($tagName, $dangerousTags, true)) {
+                $node->removeChild($child);
+                continue;
+            }
+
+            // 2. Tags não autorizadas -> desembrulhar conteúdo (manter texto/filhos, remover tag)
+            if (!in_array($tagName, $allowedTags, true)) {
+                self::cleanDomNode($child, $allowedTags, $dangerousTags, $allowedAttributes);
+                while ($child->firstChild) {
+                    $node->insertBefore($child->firstChild, $child);
+                }
+                $node->removeChild($child);
+                continue;
+            }
+
+            // 3. Tag permitida -> inspecionar e filtrar atributos
+            if ($child->hasAttributes()) {
+                $attrsToRemove = [];
+                $validAttrs = $allowedAttributes[$tagName] ?? [];
+
+                foreach ($child->attributes as $attr) {
+                    $attrName = strtolower($attr->nodeName);
+
+                    // Rejeitar qualquer atributo fora da whitelist (style, id, class, on*, etc.)
+                    if (!in_array($attrName, $validAttrs, true)) {
+                        $attrsToRemove[] = $attrName;
+                        continue;
+                    }
+
+                    $val = trim($attr->nodeValue ?? '');
+
+                    if (in_array($attrName, ['href', 'src', 'cite'], true)) {
+                        $safeUrl = self::sanitizeUrl($val);
+                        if ($safeUrl === '') {
+                            $attrsToRemove[] = $attrName;
+                        } else {
+                            $child->setAttribute($attrName, $safeUrl);
+                        }
+                    } elseif ($attrName === 'target') {
+                        $val = strtolower($val);
+                        if (!in_array($val, ['_blank', '_self'], true)) {
+                            $attrsToRemove[] = $attrName;
+                        } else {
+                            $child->setAttribute('target', $val);
+                        }
+                    } elseif ($attrName === 'rel') {
+                        $parts = array_filter(explode(' ', strtolower($val)));
+                        $safeRel = array_intersect($parts, ['noopener', 'noreferrer', 'nofollow']);
+                        if (empty($safeRel)) {
+                            $attrsToRemove[] = $attrName;
+                        } else {
+                            $child->setAttribute('rel', implode(' ', $safeRel));
+                        }
+                    }
+                }
+
+                foreach ($attrsToRemove as $removeName) {
+                    $child->removeAttribute($removeName);
                 }
             }
-            return $linkText;
-        }, $clean);
 
-        // 5. Sanitizar tags <img> para garantir URLs válidas e lazy loading
-        $clean = preg_replace_callback('~<img\s+([^>]+)>~i', function (array $m): string {
-            $attributes = $m[1];
-            $src = '';
-            $alt = '';
-
-            if (preg_match('~src=[\'"]([^\'"]+)[\'"]~i', $attributes, $srcMatch)) {
-                $src = self::sanitizeUrl($srcMatch[1]);
+            // Regras obrigatórias específicas
+            if ($tagName === 'a') {
+                $href = $child->getAttribute('href');
+                if ($href === '') {
+                    while ($child->firstChild) {
+                        $node->insertBefore($child->firstChild, $child);
+                    }
+                    $node->removeChild($child);
+                    continue;
+                }
+                $rel = $child->getAttribute('rel');
+                if (empty($rel)) {
+                    $child->setAttribute('rel', 'noopener noreferrer');
+                }
+            } elseif ($tagName === 'img') {
+                $src = $child->getAttribute('src');
+                if ($src === '') {
+                    $node->removeChild($child);
+                    continue;
+                }
+                $child->setAttribute('loading', 'lazy');
             }
-            if (preg_match('~alt=[\'"]([^\'"]*)[\'"]~i', $attributes, $altMatch)) {
-                $alt = htmlspecialchars($altMatch[1], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            }
 
-            if (empty($src)) {
-                return '';
-            }
-
-            return "<img src=\"{$src}\" alt=\"{$alt}\" loading=\"lazy\">";
-        }, $clean);
-
-        return trim($clean);
+            // Processar filhos recursivamente
+            self::cleanDomNode($child, $allowedTags, $dangerousTags, $allowedAttributes);
+        }
     }
 
     /**
@@ -358,44 +472,44 @@ class BlockCompiler
      */
     private static function sanitizeInline(string $text): string
     {
-        if (trim($text) === '') {
-            return '';
-        }
-
-        // Remove tags perigosas e permite apenas tags semânticas básicas
-        $stripped = strip_tags($text, '<strong><b><em><i><a>');
-
-        // Tratamento seguro de links <a> para evitar javascript: e target abusivo
-        return preg_replace_callback('~<a\s+([^>]+)>(.*?)</a>~i', function (array $m): string {
-            $attributes = $m[1];
-            $linkText = $m[2];
-
-            if (preg_match('~href=[\'"]([^\'"]+)[\'"]~i', $attributes, $hrefMatch)) {
-                $safeHref = self::sanitizeUrl($hrefMatch[1]);
-                if (!empty($safeHref)) {
-                    return "<a href=\"{$safeHref}\" rel=\"noopener noreferrer\">{$linkText}</a>";
-                }
-            }
-            return $linkText;
-        }, $stripped) ?? '';
+        return self::sanitizeHtml($text);
     }
 
     /**
-     * Valida esquemas de URLs autorizados (https, http, mailto ou caminhos relativos internos).
+     * Valida esquemas de URLs autorizados (https, http, mailto, tel ou caminhos relativos internos).
+     * Rejeita caracteres de controle, caminhos protocol-relative (//) e esquemas perigosos (javascript:, data:).
      */
     public static function sanitizeUrl(string $url): string
     {
         $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
 
-        // Caminhos internos
+        // Bloquear caracteres de controle, quebras de linha e tabulações (bypasses em parsers)
+        if (preg_match('/[\x00-\x1f\x7f]/', $url)) {
+            return '';
+        }
+
+        // Bloquear caminhos protocol-relative (//evil.com)
+        if (str_starts_with($url, '//') || str_starts_with($url, '/\\')) {
+            return '';
+        }
+
+        // Caminhos internos seguros iniciando com /
         if (str_starts_with($url, '/')) {
             return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         // Esquemas permitidos
-        $allowedProtocols = ['http://', 'https://', 'mailto:'];
+        $allowedProtocols = ['https://', 'http://', 'mailto:', 'tel:'];
         foreach ($allowedProtocols as $protocol) {
             if (stripos($url, $protocol) === 0) {
+                if (str_starts_with(strtolower($url), 'http')) {
+                    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                        return '';
+                    }
+                }
                 return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             }
         }

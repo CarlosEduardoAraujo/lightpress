@@ -12,22 +12,7 @@ use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || !Authorization::can($currentUser, Authorization::ACTION_MANAGE_USERS)) {
-    die("Acesso restrito a Administradores.");
-}
+$currentUser = Security::requireAuth(Authorization::ACTION_MANAGE_USERS);
 
 $message = '';
 $error = '';

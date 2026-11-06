@@ -14,26 +14,7 @@ use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\CacheManager;
 
-Security::startSecureSession($config);
-
-// 1. Verificação de Autenticação
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-// 2. Verificação de Sessão Revogável (is_active e session_version)
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active, session_version 
-     FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || empty($currentUser['is_active']) || (int)$currentUser['session_version'] !== (int)$_SESSION['session_version']) {
-    session_destroy();
-    header('Location: /admin/login.php');
-    exit;
-}
+$currentUser = Security::requireAuth();
 
 // Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
@@ -68,10 +49,7 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
     $targetPost = Database::fetchOne("SELECT id, slug, category, user_id FROM posts WHERE id = ? LIMIT 1", [$deleteId]);
     
     if ($targetPost) {
-        $isAuthor = ((int)$targetPost['user_id'] === (int)$currentUser['id']);
-        $isAdminOrEditor = in_array($currentUser['role'], ['admin', 'editor'], true);
-        
-        if ($isAdminOrEditor || $isAuthor) {
+        if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST)) {
             Database::transaction(function (\PDO $pdo) use ($deleteId, $targetPost, $cacheMgr): void {
                 Database::query("DELETE FROM post_stats WHERE post_id = ?", [$deleteId]);
                 Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$deleteId]);
@@ -656,7 +634,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <?php endif; ?>
 
                                     <?php 
-                                    $canDelete = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)$currentUser['id'] === (int)$p['user_id']); 
+                                    $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST); 
                                     if ($canDelete):
                                     ?>
                                         <a href="<?= buildFilterUrl(['delete_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 

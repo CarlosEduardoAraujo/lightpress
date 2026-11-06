@@ -18,22 +18,7 @@ use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\Settings;
 
-Security::startSecureSession($config);
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: /admin/login.php');
-    exit;
-}
-
-$currentUser = Database::fetchOne(
-    "SELECT id, name, username, role, is_active FROM users WHERE id = ? LIMIT 1",
-    [(int)$_SESSION['user_id']]
-);
-
-if (!$currentUser || $currentUser['role'] !== 'admin') {
-    header('Location: /admin/dashboard.php');
-    exit;
-}
+$currentUser = Security::requireAuth(null, ['admin']);
 
 $successMessage = '';
 $errorMessage = '';

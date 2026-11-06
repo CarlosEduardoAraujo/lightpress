@@ -7,6 +7,30 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Segurança (Auditoria Completa & Hardening)
+- **Sanitização de XSS Estruturada via DOMDocument (`core/BlockCompiler.php`):**
+  - Substituição da limpeza baseada em expressões regulares vulnerável a atributos colados sem espaço (como `<img/src="x"/onerror=alert(1)>`) por parser estruturado com `\DOMDocument`.
+  - Whitelist estrita de tags HTML permitidas e atributos autorizados por elemento (ex: `href`, `title`, `target`, `rel` para `<a>`; `src`, `alt`, `loading`, `decoding` para `<img>`), eliminando sumariamente eventos JavaScript (`on*`), atributos inline `style`, tags `<script>` e `<style>`.
+  - Normalização e validação rígida de URLs em atributos (`sanitizeUrl()`), bloqueando esquemas perigosos (`javascript:`, `vbscript:`, `data:` para links) e referências protocolo-relativas (`//`).
+- **Defesa em Profundidade nas Páginas Institucionais (`public/admin/page-edit.php`, `templates/page.php`):**
+  - Sanitização via `BlockCompiler::sanitizeHtml()` tanto na persistência quanto na renderização de páginas institucionais para proteção absoluta contra XSS armazenado.
+- **Prevenção contra Spoofing de IP e Ataques de Força Bruta (`core/Security.php`, `public/admin/login.php`):**
+  - Validação rigorosa de proxies confiáveis em `Security::getClientIp()`: cabeçalhos `CF-Connecting-IP`, `X-Real-IP` e `X-Forwarded-For` agora só são aceitos quando a conexão remota direta (`REMOTE_ADDR`) for originada de proxies confiáveis configurados (faixas Cloudflare, localhost, loopback). Conexões diretas utilizam estritamente `REMOTE_ADDR`.
+  - Rate limiting baseado no endereço IP real para proteção contra ataques de força bruta no login (`Security::checkLoginRateLimit()` e `Security::recordLoginFailure()`), bloqueando tentativas sucessivas mesmo que cookies de sessão sejam descartados pelo atacante.
+- **Proteção CSRF e Bloqueio de Concorrência na Ativação de Usuários (`public/admin/activate.php`):**
+  - Adição de token CSRF (`_csrf_token`) obrigatório e validado no formulário de ativação de conta e redefinição de senha.
+  - Bloqueio pessimista de concorrência (`SELECT ... FOR UPDATE`) dentro de transação de banco de dados, prevenindo race conditions no consumo de tokens de ativação descartáveis.
+- **Controle de Acesso RBAC Estrito e Proteção contra Exclusão Indevida (`public/admin/dashboard.php`, `public/admin/media.php`):**
+  - Enforçamento de `Authorization::ACTION_DELETE_POST` para remoção definitiva de matérias, restringindo a operação estritamente a administradores conforme a matriz de privilégios.
+  - Restrição de exclusão de mídias em `public/admin/media.php`: apenas administradores, editores ou o próprio autor que enviou o arquivo podem excluir.
+  - Verificação de integridade referencial antes da exclusão de qualquer imagem: imagens em uso nas colunas `featured_image` ou `content_html` das tabelas `posts` ou `pages` têm sua remoção bloqueada com aviso orientativo.
+- **Centralização do Controle de Acesso e Revogação Imediata de Sessões (`core/Security.php`, todos os scripts de `public/admin/`):**
+  - Implementação do método unificado `Security::requireAuth(?string $requiredAction, ?array $requiredRoles, ?array $config): array` aplicado em todos os 15 endpoints administrativos e APIs internas (`categories.php`, `dashboard.php`, `editor.php`, `media.php`, `page-edit.php`, `pages.php`, `preview.php`, `profile.php`, `revisions.php`, `settings.php`, `stats.php`, `system.php`, `upload.php`, `users.php`, `api/media.php`).
+  - Validação contínua e em tempo real do estado da conta (`is_active == 1`) e da versão da sessão (`session_version`), garantindo que usuários desativados ou com senhas redefinidas desloguem imediatamente em qualquer requisição normal ou AJAX.
+- **Alerta e Geração Automática de Chaves Criptográficas Fortes (`public/admin/system.php`, `bin/diagnose.php`, `bin/setup.php`):**
+  - Alerta visual em destaque no painel de diagnóstico (`public/admin/system.php`) e na CLI (`bin/diagnose.php`) quando `hmac_secret` mantiver o valor padrão ou tiver menos de 32 caracteres.
+  - Geração automática de chave criptográfica aleatória de 64 caracteres (`bin2hex(random_bytes(32))`) durante a execução de `bin/setup.php` para criação segura do `config.local.php`.
+
 ### Adicionado
 - **Pipeline de CSS Estático de Produção (Tailwind CSS Otimizado & Compilado):**
   - Implementação de compilação estática do Tailwind CSS para produção via Node.js / CLI, eliminando o Play CDN em tempo de execução (`cdn.tailwindcss.com`), zerando o Total Blocking Time (TBT) e garantindo compatibilidade estrita com Content Security Policy sem `unsafe-inline`.
