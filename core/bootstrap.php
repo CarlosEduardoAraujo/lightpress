@@ -40,6 +40,9 @@ $config = require $configFile;
 // Aplicar Configurações Dinâmicas do Banco de Dados
 \LightPress\Core\Settings::applyToConfig($config);
 
+// Disponibilizar globalmente para helpers de infraestrutura
+$GLOBALS['config'] = $config;
+
 // Configuração de Erros
 if (!empty($config['app']['debug'])) {
     ini_set('display_errors', '1');

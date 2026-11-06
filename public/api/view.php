@@ -57,7 +57,7 @@ $nowUtc = gmdate('Y-m-d H:i:s');
 $throttleSeconds = (int)($config['security']['rate_limit']['view_throttle_seconds'] ?? 30);
 $expiresAt = gmdate('Y-m-d H:i:s', time() + $throttleSeconds);
 
-$ip = Security::getClientIp();
+$ip = Security::getClientIp($config['security']['trusted_proxies'] ?? null);
 $secret = $config['security']['hmac_secret'] ?? 'lightpress_default_secret';
 $ipHash = Security::hashIp($ip, $secret);
 

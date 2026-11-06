@@ -99,7 +99,7 @@ class BlockCompiler
         // Whitelist estrita de atributos autorizados por tag
         $allowedAttributes = [
             'a' => ['href', 'target', 'rel', 'title'],
-            'img' => ['src', 'alt', 'width', 'height', 'loading', 'title'],
+            'img' => ['src', 'alt', 'width', 'height', 'loading', 'title', 'srcset'],
             'source' => ['srcset', 'media', 'type'],
             'blockquote' => ['cite'],
             'th' => ['colspan', 'rowspan', 'scope'],
@@ -194,7 +194,38 @@ class BlockCompiler
                         if ($safeUrl === '') {
                             $attrsToRemove[] = $attrName;
                         } else {
-                            $child->setAttribute($attrName, $safeUrl);
+                            // DOMDocument::setAttribute faz o escape nativo ao salvar (saveHTML).
+                            // Decodifica entidades prévias (ex: &amp;) para evitar duplo escape (&amp;amp;).
+                            $child->setAttribute($attrName, html_entity_decode($safeUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                        }
+                    } elseif ($attrName === 'srcset') {
+                        // Validação estrita de cada candidato em srcset (ex: "/img.webp 1024w, /img-2x.webp 2x")
+                        $candidates = explode(',', $val);
+                        $safeCandidates = [];
+                        foreach ($candidates as $cand) {
+                            $cand = trim($cand);
+                            if ($cand === '') {
+                                continue;
+                            }
+                            $parts = preg_split('/\s+/', $cand, 2);
+                            $candUrl = $parts[0] ?? '';
+                            $candDesc = $parts[1] ?? '';
+
+                            $safeCandUrl = self::sanitizeUrl($candUrl);
+                            if ($safeCandUrl !== '') {
+                                $rawCandUrl = html_entity_decode($safeCandUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                                // Validar descritor para conter apenas especificações válidas (ex: 1024w, 2x, 1.5x)
+                                if ($candDesc !== '' && !preg_match('/^[0-9.]+[wx]$/i', $candDesc)) {
+                                    continue;
+                                }
+                                $safeCandidates[] = $candDesc !== '' ? "{$rawCandUrl} {$candDesc}" : $rawCandUrl;
+                            }
+                        }
+
+                        if (empty($safeCandidates)) {
+                            $attrsToRemove[] = $attrName;
+                        } else {
+                            $child->setAttribute('srcset', implode(', ', $safeCandidates));
                         }
                     } elseif ($attrName === 'target') {
                         $val = strtolower($val);

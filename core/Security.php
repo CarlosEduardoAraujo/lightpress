@@ -151,7 +151,8 @@ class Security
     public static function getClientIp(?array $trustedProxies = null): string
     {
         $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $trusted = $trustedProxies ?? ['127.0.0.1', '::1'];
+        $trusted = $trustedProxies 
+            ?? ($GLOBALS['config']['security']['trusted_proxies'] ?? ['127.0.0.1', '::1']);
 
         // Se a requisição não partiu de um proxy confiável, utiliza estritamente o endereço de conexão
         if (!in_array($remoteAddr, $trusted, true)) {

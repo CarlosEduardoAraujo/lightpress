@@ -8,6 +8,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Segurança (Auditoria Completa & Hardening)
+- **Correção de Duplo Escape em URLs e Validação Rigorosa de `srcset` (`core/BlockCompiler.php`):**
+  - Decodificação de entidades prévias (`html_entity_decode`) antes de passar valores sanitizados para `DOMElement::setAttribute`, evitando que query strings com `&` em links sofram escape duplo (`&amp;amp;`) na serialização nativa do `DOMDocument::saveHTML`.
+  - Validação estrita de cada candidato de imagem em atributos `srcset` (em tags `<source>` e `<img>`), sanitizando URLs individualmente e validando descritores de largura e densidade (`w`/`x`).
+- **Resolução Automática de Proxies Confiáveis em Toda a Aplicação (`core/Security.php`, `core/bootstrap.php`, `public/api/view.php`, `core/Logger.php`):**
+  - `Security::getClientIp()` passa a ler automaticamente `$config['security']['trusted_proxies']` disponibilizado no bootstrap quando invocado sem argumentos explícitos, garantindo que `Logger::security()` e `public/api/view.php` reconheçam proxies configurados com consistência.
 - **Sanitização de XSS Estruturada via DOMDocument (`core/BlockCompiler.php`):**
   - Substituição da limpeza baseada em expressões regulares vulnerável a atributos colados sem espaço (como `<img/src="x"/onerror=alert(1)>`) por parser estruturado com `\DOMDocument`.
   - Whitelist estrita de tags HTML permitidas e atributos autorizados por elemento (ex: `href`, `title`, `target`, `rel` para `<a>`; `src`, `alt`, `loading`, `decoding` para `<img>`), eliminando sumariamente eventos JavaScript (`on*`), atributos inline `style`, tags `<script>` e `<style>`.
