@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS posts (
     INDEX idx_featured (is_featured, status, published_at DESC),
     INDEX idx_category (category, status, published_at DESC),
     INDEX idx_author (user_id),
+    FULLTEXT INDEX idx_fulltext_search (title, summary, tags),
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -45,9 +45,13 @@ $formatTime = function(?string $dateStr) use ($config): string {
     }
 };
 
-$calcReadingTime = function(?string $html): string {
-    $chars = mb_strlen(strip_tags($html ?? ''));
-    $min = max(2, (int)ceil($chars / 1100));
+$calcReadingTime = function($val): string {
+    if (is_numeric($val)) {
+        $min = max(2, (int)ceil((int)$val / 1100));
+    } else {
+        $chars = mb_strlen(strip_tags((string)($val ?? '')));
+        $min = max(2, (int)ceil($chars / 1100));
+    }
     return "{$min} min de leitura";
 };
 
@@ -89,7 +93,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                     <?= Security::e($getSubtopic($mainLead['tags'] ?? null, 'GP de Velocidade')) ?>
                 </span>
                 <span class="text-secondary-fixed font-label-meta text-label-meta ml-auto hidden sm:inline">
-                    <?= $calcReadingTime($mainLead['content_html'] ?? null) ?>
+                    <?= $calcReadingTime($mainLead['content_len'] ?? $mainLead['content_html'] ?? null) ?>
                 </span>
             </div>
 

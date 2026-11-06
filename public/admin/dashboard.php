@@ -136,10 +136,27 @@ if ($filterAuthor > 0) {
 }
 
 if (!empty($filterSearch)) {
-    $whereClauses[] = "(p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)";
-    $params[] = '%' . $filterSearch . '%';
-    $params[] = '%' . $filterSearch . '%';
-    $params[] = '%' . $filterSearch . '%';
+    // Busca FULLTEXT booleana de alta performance (InnoDB) com fallback para LIKE
+    $driver = $config['database']['driver'] ?? 'mysql';
+    $words = array_filter(preg_split('/\s+/', $filterSearch));
+    $boolQuery = '';
+    foreach ($words as $w) {
+        $cleanW = preg_replace('/[+\-><()~*\"@]+/', '', $w);
+        if (strlen($cleanW) >= 2) {
+            $boolQuery .= "+{$cleanW}* ";
+        }
+    }
+    $boolQuery = trim($boolQuery);
+
+    if ($driver === 'mysql' && !empty($boolQuery)) {
+        $whereClauses[] = "MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)";
+        $params[] = $boolQuery;
+    } else {
+        $whereClauses[] = "(p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)";
+        $params[] = '%' . $filterSearch . '%';
+        $params[] = '%' . $filterSearch . '%';
+        $params[] = '%' . $filterSearch . '%';
+    }
 }
 
 if ($filterFeatured === 1) {

@@ -203,6 +203,15 @@ class Schema
         } catch (\Throwable $e) {
             // Ignora se já estiver atualizado
         }
+
+        try {
+            $hasFulltext = $pdo->query("SHOW INDEX FROM posts WHERE Key_name = 'idx_fulltext_search'")->fetch();
+            if (!$hasFulltext) {
+                $pdo->exec("ALTER TABLE posts ADD FULLTEXT INDEX idx_fulltext_search (title, summary, tags)");
+            }
+        } catch (\Throwable $e) {
+            // Ignora se já estiver criado ou não suportado
+        }
     }
 
     /**

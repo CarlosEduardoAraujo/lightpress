@@ -33,9 +33,9 @@ $router->get('/', function () use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
     
-    // Buscar até 4 artigos em destaque principal
+    // Buscar até 4 artigos em destaque principal (traz apenas content_len para estimativa de leitura, sem carregar MEDIUMTEXT)
     $featuredPosts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
@@ -49,7 +49,7 @@ $router->get('/', function () use ($config): void {
         $needed = 4 - count($featuredPosts);
         $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
         $extraPosts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
              WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
@@ -68,10 +68,10 @@ $router->get('/', function () use ($config): void {
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Buscar publicações para o feed principal excluindo os 4 destaques do topo
+    // Buscar publicações para o feed principal excluindo os 4 destaques do topo (sem MEDIUMTEXT content_html)
     $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
@@ -99,7 +99,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $currentPage = $page;
 
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
@@ -138,7 +138,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     $currentPage = 1;
 
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
@@ -178,7 +178,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     $currentPage = $page;
 
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
@@ -200,14 +200,48 @@ $router->get('/busca', function () use ($config): void {
 
     $posts = [];
     if (strlen($query) >= 2) {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
-             ORDER BY p.published_at DESC LIMIT 30",
-            [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
-        );
+        // 1. Tenta busca FULLTEXT booleana de alta performance (InnoDB MySQL/MariaDB)
+        $driver = $config['database']['driver'] ?? 'mysql';
+        if ($driver === 'mysql') {
+            try {
+                $words = array_filter(preg_split('/\s+/', $query));
+                $boolQuery = '';
+                foreach ($words as $w) {
+                    $cleanW = preg_replace('/[+\-><()~*\"@]+/', '', $w);
+                    if (strlen($cleanW) >= 2) {
+                        $boolQuery .= "+{$cleanW}* ";
+                    }
+                }
+                $boolQuery = trim($boolQuery);
+
+                if (!empty($boolQuery)) {
+                    $posts = Database::fetchAll(
+                        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name,
+                                MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE) AS score
+                         FROM posts p
+                         LEFT JOIN users u ON u.id = p.user_id
+                         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                         ORDER BY score DESC, p.published_at DESC LIMIT 30",
+                        [$boolQuery, $nowUtc, $boolQuery]
+                    );
+                }
+            } catch (\Throwable) {
+                $posts = [];
+            }
+        }
+
+        // 2. Fallback via LIKE caso o FULLTEXT não retorne resultados ou o driver seja SQLite
+        if (empty($posts)) {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
+                 ORDER BY p.published_at DESC LIMIT 30",
+                [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
+            );
+        }
     }
 
     $pageTitle = "Busca: {$query} - " . $config['app']['name'];
@@ -233,7 +267,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
     $currentPage = 1;
 
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
@@ -267,7 +301,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     $currentPage = $page;
 
     $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, p.content_html, u.name AS author_name 
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
@@ -388,22 +422,55 @@ $router->get('/feed.xml', function () use ($config): void {
     <?php
 });
 
-// Rota 6: Sitemap XML (/sitemap.xml)
+// Rota 6: Sitemap XML (Sitemap Index & Partições Paginadas)
 $router->get('/sitemap.xml', function () use ($config): void {
     header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Sitemap XML (LP-09)
     header('Content-Type: application/xml; charset=utf-8');
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $posts = Database::fetchAll(
-        "SELECT slug, updated_at 
+    $countRow = Database::fetchOne(
+        "SELECT COUNT(*) AS total, MAX(updated_at) AS latest_mod 
          FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
-         ORDER BY updated_at DESC LIMIT 1000",
+         WHERE status IN ('published', 'scheduled') AND published_at <= ?",
         [$nowUtc]
     );
 
-    $categories = Database::fetchAll("SELECT slug FROM categories WHERE is_active = 1");
+    $totalPosts = (int)($countRow['total'] ?? 0);
+    $latestMod = $countRow['latest_mod'] ?? gmdate('Y-m-d H:i:s');
+    $latestIso = date('c', strtotime($latestMod));
+
+    $postsPerPage = 5000;
+    $totalPages = (int)ceil($totalPosts / $postsPerPage);
+    if ($totalPages < 1) {
+        $totalPages = 1;
+    }
+
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    ?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc><?= Security::e($canonicalOrigin) ?>/sitemap-main.xml</loc>
+    <lastmod><?= $latestIso ?></lastmod>
+  </sitemap>
+  <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+  <sitemap>
+    <loc><?= Security::e($canonicalOrigin) ?>/sitemap-posts-<?= $i ?>.xml</loc>
+    <lastmod><?= $latestIso ?></lastmod>
+  </sitemap>
+  <?php endfor; ?>
+</sitemapindex>
+    <?php
+});
+
+// Sub-sitemap: Páginas Principais (Home, Categorias e Páginas Institucionais)
+$router->get('/sitemap-main.xml', function () use ($config): void {
+    header('X-Accel-Expires: 300');
+    header('Content-Type: application/xml; charset=utf-8');
+    $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
+
+    $categories = Database::fetchAll("SELECT slug FROM categories WHERE is_active = 1 ORDER BY name ASC");
+    $pages = Database::fetchAll("SELECT slug, updated_at FROM pages WHERE status = 'published' ORDER BY id ASC");
 
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>
@@ -420,12 +487,47 @@ $router->get('/sitemap.xml', function () use ($config): void {
       <priority>0.8</priority>
     </url>
   <?php endforeach; ?>
+  <?php foreach ($pages as $p): ?>
+    <url>
+      <loc><?= Security::e($canonicalOrigin) ?>/<?= Security::e($p['slug']) ?>/</loc>
+      <lastmod><?= date('c', strtotime($p['updated_at'])) ?></lastmod>
+      <changefreq>monthly</changefreq>
+      <priority>0.5</priority>
+    </url>
+  <?php endforeach; ?>
+</urlset>
+    <?php
+});
+
+// Sub-sitemap: Partições de Artigos (/sitemap-posts-{part}.xml)
+$router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300');
+    header('Content-Type: application/xml; charset=utf-8');
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
+
+    $part = max(1, (int)($params['part'] ?? 1));
+    $limit = 5000;
+    $offset = ($part - 1) * $limit;
+
+    $posts = Database::fetchAll(
+        "SELECT slug, updated_at 
+         FROM posts 
+         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
+         ORDER BY published_at DESC 
+         LIMIT ? OFFSET ?",
+        [$nowUtc, $limit, $offset]
+    );
+
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <?php foreach ($posts as $p): ?>
     <url>
       <loc><?= Security::e($canonicalOrigin) ?>/<?= Security::e($p['slug']) ?>/</loc>
       <lastmod><?= date('c', strtotime($p['updated_at'])) ?></lastmod>
       <changefreq>monthly</changefreq>
-      <priority>0.6</priority>
+      <priority>0.7</priority>
     </url>
   <?php endforeach; ?>
 </urlset>

@@ -101,6 +101,7 @@ CREATE TABLE posts (
     INDEX idx_featured (is_featured, status, published_at DESC),
     INDEX idx_category (category, status, published_at DESC),
     INDEX idx_author (user_id),
+    FULLTEXT INDEX idx_fulltext_search (title, summary, tags),
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
@@ -417,7 +418,7 @@ A entrega de uma página pública anônima já armazenada não executa a aplica�
 
 ### 7.1. Elegibilidade, Rotas e Chave Canônica
 
-Rotas públicas iniciais: `/`, `/page/{n}/`, `/noticia/{slug}/`, `/categoria/{slug}/`, `/categoria/{slug}/page/{n}/`, `/feed.xml` e `/sitemap.xml`. A paginação inicia em 2; página 1 redireciona para a listagem principal. Slugs são validados e únicos no seu escopo. Host, HTTPS e política de barra final são canônicos e aplicados antes do cache. URLs legadas são tratadas pela migração, sem mudar silenciosamente os links antigos.
+Rotas públicas iniciais: `/`, `/page/{n}/`, `/noticia/{slug}/`, `/categoria/{slug}/`, `/categoria/{slug}/page/{n}/`, `/feed.xml`, `/sitemap.xml`, `/sitemap-main.xml` e `/sitemap-posts-{part}.xml`. A paginação inicia em 2; página 1 redireciona para a listagem principal. O `/sitemap.xml` gera um `<sitemapindex>` padrão particionado (5.000 URLs por arquivo em `/sitemap-posts-{part}.xml` e páginas/categorias em `/sitemap-main.xml`), suportando a indexação de mais de 50.000 artigos sem sobrecarga de memória ou timeout. Slugs são validados e únicos no seu escopo. Host, HTTPS e política de barra final são canônicos e aplicados antes do cache. URLs legadas são tratadas pela migração, sem mudar silenciosamente os links antigos.
 
 | Condição | Política |
 | :--- | :--- |
