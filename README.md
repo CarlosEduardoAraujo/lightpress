@@ -775,6 +775,17 @@ Para permitir a extensão modular das capacidades do LightPress sem incorrer nos
 * **Disparo Pós-Commit e Fail-Safe:** Hooks de publicação (`post_published`) são disparados **estritamente após o commit da transação do banco e purga do cache FastCGI**, com timeouts curtos (3-4s via cURL nativo) para que falhas externas de rede nunca afetem a experiência da redação.
 * **Menu Superior com Submenu Dinâmico (`core/AdminNav.php`):** Inclusão no cabeçalho administrativo do dropdown **Plugins ▾**, contendo acesso rápido a **Gerenciar Plugins** (`/admin/plugins.php`) e submenus diretos para as páginas de configuração dos plugins ativos (`/admin/plugin-settings.php?plugin={slug}`).
 
+#### 8.13.1. Primeiro Plugin Oficial: Webhook Sender (`plugins/webhook-sender/`)
+
+O primeiro módulo construído sobre a nova arquitetura é o **Webhook Sender** (documentação completa em [`Plugin-Webhook.md`](file:///c:/Web/lightpress/Plugin-Webhook.md)):
+
+* **Multi-Servidores:** Permite cadastrar múltiplos endpoints (Discord, Slack, n8n, Zapier ou microserviços HTTP REST) separados por vírgula ou quebra de linha.
+* **Tabela Relacional Própria (`plugin_webhook_sender_logs`):** Substituição radical das chaves `_das_discord_pending` do `postmeta` legado por tabela própria com chave estrangeira indexada para `posts(id)` e `ON DELETE CASCADE`.
+* **Auto-Promoção Atômica de Agendados (`FOR UPDATE`):** Integração profunda com `PostService::promoteScheduledPosts()`, disparando notificações para notícias publicadas com data futura no momento exato em que vão ao ar.
+* **Detecção Automática de Origem Canônica em CLI/Cron:** Em execuções de terminal ou cron onde `$_SERVER['HTTP_HOST']` não existe, utiliza `$config['app']['canonical_origin']` para gerar permalinks absolutos precisos.
+* **Tolerância a Falhas de Rede (`is_success`):** Falhas transitórias externas (timeout ou HTTP 4xx/5xx) são sinalizadas como erro nos logs, permitindo retentativas manuais pelo painel ou nova execução, sem bloquear o sistema.
+* **Interface Administrativa:** Painel integrado em `/admin/plugin-settings.php?plugin=webhook-sender` com teste de ping imediato e tabela de auditoria dos últimos envios com status de entrega e botão de reenvio em 1 clique.
+
 ---
 
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)
@@ -863,6 +874,10 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Painel de Mais Lidas e Audiência (`/admin/stats.php`):** Ranking Top 20 matérias mais lidas, desempenho por categoria e produção por autor baseados em dados atômicos sem duplicidade por IP.
   - [x] **Gestão Completa de Categorias (`/admin/categories.php`):** Interface administrativa para criar, editar nome/slug com atualização em cascata de matérias vinculadas, pausar/ativar e exclusão segura com reatribuição automática para a categoria padrão `geral`, com expurgo de cache no Nginx.
   - [x] **Gestão de Usuários e Autores (`/admin/users.php`):** Cadastro e edição completa de membros da redação (repórteres, editores e administradores), biografia do autor, avatar, link seguro de ativação criptográfico de uso único ou definição direta de senha com Argon2id e revogação instantânea de sessões ativas (`session_version`).
+
+* **FASE CONCLUÍDA — Extensibilidade & Plugins (Zero Bloatware):**
+  - [x] **Arquitetura de Hooks & Plugins:** Barramento ultraleve de eventos (`Hook`), gerenciador de ciclo de vida (`PluginManager`), manifesto `plugin.json` e menu de administração dinâmico com dropdown de plugins (`AdminNav`).
+  - [x] **Primeiro Plugin Oficial (`webhook-sender`):** Disparo de webhooks para múltiplos servidores (Discord, Slack, n8n, Zapier) na publicação de matérias, com tabela relacional própria (`plugin_webhook_sender_logs`), integração atômica com agendamento de posts, resolução canônica em CLI/cron e painel de controle com testes e reenvio.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.

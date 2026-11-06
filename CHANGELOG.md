@@ -7,6 +7,28 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Documentação Técnica do Primeiro Plugin (`Plugin-Webhook.md`)
+- **Criação do Documento Arquitetural Completo (`Plugin-Webhook.md`):**
+  - Registro minucioso de todo o ciclo de engenharia do plugin `webhook-sender`.
+  - Comparativo detalhado da migração WordPress vs. LightPress (eliminação do modelo EAV `postmeta`, tipagem estrita PHP 8.4, suporte universal a múltiplos servidores de webhook, garantia transacional pós-commit e entrega de assets estáticos no Nginx).
+  - Especificação dos fluxos operacionais, esquemas DDL da tabela relacional `plugin_webhook_sender_logs`, tratamento de concorrência com `FOR UPDATE`, diagramas em Mermaid e resolução de domínio canônico em CLI/cron.
+
+### Arquitetura de Plugins e Extensões (Zero Bloatware)
+- **Barramento de Eventos Ultraleve (`core/Hook.php`):**
+  - Implementação de Actions (`addAction`, `doAction`, `hasAction`, `removeAction`) e Filters (`addFilter`, `applyFilters`, `hasFilter`, `removeFilter`) com ordenação por prioridade numérica.
+  - Injeção de pontos de extensão estratégicos: `frontend_head`, `frontend_footer` e `post_published`.
+- **Gerenciador de Ciclo de Vida (`core/PluginManager.php`):**
+  - Leitura declarativa de metadados via `plugin.json` sem avaliação prévia de código PHP.
+  - Ativação, desativação e carregamento sob demanda através de `settings.active_plugins`.
+  - Mapeamento transparente de assets estáticos de `/plugins/{slug}/assets/` para `/public/assets/plugins/{slug}/`.
+- **Navegação Administrativa Dinâmica (`core/AdminNav.php`):**
+  - Centralização do cabeçalho unificado do painel administrativo com menu suspenso **Plugins ▾** com links diretos para a listagem geral e telas de configurações dos plugins ativos.
+- **Primeiro Plugin Oficial: Webhook Sender (`plugins/webhook-sender/`):**
+  - Manifesto declarativo `plugin.json` e entrypoint `webhook-sender.php`.
+  - Suporte a múltiplos servidores/endpoints separados por vírgula ou quebras de linha.
+  - Tela administrativa `settings.php` com botão de ping de teste em tempo real, auditoria com status de entrega (`is_success`) e botão de reenvio manual em 1 clique.
+  - Resiliência de rede: cURL com timeout curto (4s) não-bloqueante; respostas de erro (4xx/5xx/timeout) são registradas com `is_success = 0` para permitir novas tentativas sem travar matérias.
+
 ### Webhooks em Matérias Agendadas (`core/PostService.php` e `plugins/webhook-sender/`)
 - **Disparo de Webhook na Auto-Promoção (`core/PostService::promoteScheduledPosts()`):**
   - Adicionado o disparo do hook `post_published` para cada matéria agendada que atinge o horário de publicação e é promovida de `scheduled` para `published`.
