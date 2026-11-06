@@ -438,4 +438,35 @@ class ImageProcessor
         imagecopyresampled($dest, $source, 0, 0, $cropX, $cropY, $targetW, $targetH, $cropW, $cropH);
         return $dest;
     }
+
+    /**
+     * Sincroniza vínculos normalizados entre mídias e artigos/revisões na tabela media_refs.
+     */
+    public static function syncRefs(int $postId, ?int $revisionId, ?string $html, ?string $featuredImage = null): void
+    {
+        $text = ($html ?? '') . ' ' . ($featuredImage ?? '');
+        if (empty(trim($text)) || $postId <= 0) {
+            return;
+        }
+
+        if (preg_match_all('~/uploads/[a-zA-Z0-9_\-\./]+~', $text, $matches)) {
+            $urls = array_unique($matches[0]);
+            foreach ($urls as $url) {
+                try {
+                    $mediaId = Database::fetchValue(
+                        "SELECT id FROM media WHERE variants_manifest LIKE ? LIMIT 1",
+                        ['%' . $url . '%']
+                    );
+                    if ($mediaId) {
+                        Database::query(
+                            "INSERT IGNORE INTO media_refs (media_id, post_id, revision_id) VALUES (?, ?, ?)",
+                            [$mediaId, $postId, $revisionId]
+                        );
+                    }
+                } catch (\Throwable) {
+                    // Ignora caso a tabela ou chave já possua o vínculo
+                }
+            }
+        }
+    }
 }

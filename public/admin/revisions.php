@@ -31,29 +31,46 @@ if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $post)) {
 $message = '';
 $error = '';
 
-// Restaurar uma revisão histórica
+// Restaurar uma revisão histórica (executado atomicamente em transação com bloqueio FOR UPDATE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id'])) {
     if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? '')) {
         $error = "Token CSRF inválido ou expirado.";
     } else {
         $revId = (int)$_POST['restore_revision_id'];
-        $rev = Database::fetchOne(
-            "SELECT * FROM post_revisions WHERE id = ? AND post_id = ? LIMIT 1",
-            [$revId, $postId]
-        );
 
-        if (!$rev) {
-            $error = "Revisão não encontrada.";
-        } else {
-            $payload = json_decode($rev['payload_json'], true) ?? [];
-            $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
+        try {
+            Database::transaction(function (\PDO $pdo) use (
+                $postId, $revId, $currentUser, &$message
+            ): void {
+                // 1. Bloqueia e relê a linha atualizada da publicação
+                $current = Database::fetchOne(
+                    "SELECT * FROM posts WHERE id = ? FOR UPDATE",
+                    [$postId]
+                );
+                if (!$current) {
+                    throw new RuntimeException("Artigo não encontrado.", 404);
+                }
 
-            try {
+                // 2. Reavalia autorização com o estado real do banco
+                if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $current)) {
+                    throw new RuntimeException("Acesso não autorizado às revisões deste artigo.", 403);
+                }
+
+                $rev = Database::fetchOne(
+                    "SELECT * FROM post_revisions WHERE id = ? AND post_id = ? LIMIT 1",
+                    [$revId, $postId]
+                );
+                if (!$rev) {
+                    throw new RuntimeException("Revisão não encontrada.", 404);
+                }
+
+                $payload = json_decode($rev['payload_json'], true) ?? [];
+                $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
+
                 if (!$canPublish) {
-                    // Autor restaurando revisão (LP-06):
-                    // 1. Se o artigo for um rascunho, restaura o conteúdo mantendo estritamente status = 'draft'
-                    // 2. Se o artigo já estiver no ar ou agendado, cria uma nova revisão privada pendente de aprovação
-                    if (in_array($post['status'], ['published', 'scheduled'], true)) {
+                    // Autor restaurando revisão (LP-06 / P1):
+                    // Se o artigo já estiver no ar ou agendado, salva SEMPRE como revisão privada pendente
+                    if (in_array($current['status'], ['published', 'scheduled'], true)) {
                         $payload['status'] = 'pending_review';
                         Database::query(
                             "INSERT INTO post_revisions (
@@ -62,68 +79,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                             [
                                 $postId,
                                 (int)$currentUser['id'],
-                                (int)$post['version'],
-                                json_encode($payload, JSON_THROW_ON_ERROR),
+                                (int)$current['version'],
+                                json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                                 $rev['content_html']
                             ]
                         );
-                        $message = "A revisão #{$revId} foi restaurada como uma NOVA REVISÃO PENDENTE de aprovação. O artigo público no ar não foi alterado.";
+
+                        $newRevId = (int)Database::getConnection()->lastInsertId();
+                        ImageProcessor::syncRefs($postId, $newRevId > 0 ? $newRevId : null, $rev['content_html'], $payload['featured_image'] ?? null);
+
+                        $message = "A revisão #{$revId} foi restaurada como uma NOVA REVISÃO PENDENTE de aprovação. O artigo público no ar permaneceu inalterado.";
                     } else {
-                        // Artigo é rascunho: restaura mantendo status = 'draft' sem auto-publicar
+                        // Artigo é rascunho: atualiza condicionalmente garantindo que o status ainda é 'draft' e versão não mudou
                         $payload['status'] = 'draft';
                         $payload['is_featured'] = 0;
-                        $newVersion = (int)$post['version'] + 1;
+                        $newVersion = (int)$current['version'] + 1;
 
-                        Database::query(
+                        $stmt = Database::query(
                             "UPDATE posts SET 
                                 title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
                                 content_json = ?, content_html = ?, seo_title = ?, 
                                 seo_description = ?, focus_keyword = ?, status = 'draft', is_featured = 0,
                                 version = ?, updated_at = CURRENT_TIMESTAMP 
-                             WHERE id = ?",
+                             WHERE id = ? AND version = ? AND status = 'draft'",
                             [
-                                $payload['title'] ?? $post['title'],
-                                $payload['slug'] ?? $post['slug'],
+                                $payload['title'] ?? $current['title'],
+                                $payload['slug'] ?? $current['slug'],
                                 $payload['summary'] ?? null,
-                                $payload['category'] ?? $post['category'],
+                                $payload['category'] ?? $current['category'],
                                 $payload['tags'] ?? null,
                                 $payload['featured_image'] ?? null,
-                                $payload['content_json'] ?? $post['content_json'],
+                                $payload['content_json'] ?? $current['content_json'],
                                 $rev['content_html'],
                                 $payload['seo_title'] ?? null,
                                 $payload['seo_description'] ?? null,
                                 $payload['focus_keyword'] ?? null,
                                 $newVersion,
-                                $postId
-                            ]
-                        );
-
-                        Database::query(
-                            "INSERT INTO post_revisions (
-                                post_id, editor_id, base_version, status, payload_json, content_html, created_at
-                             ) VALUES (?, ?, ?, 'draft', ?, ?, CURRENT_TIMESTAMP)",
-                            [
                                 $postId,
-                                (int)$currentUser['id'],
-                                $newVersion,
-                                json_encode($payload, JSON_THROW_ON_ERROR),
-                                $rev['content_html']
+                                (int)$current['version']
                             ]
                         );
 
-                        $message = "Revisão #{$revId} restaurada no rascunho com sucesso!";
+                        if ($stmt->rowCount() === 0) {
+                            // Houve publicação concorrente por outro usuário enquanto o autor restaurava!
+                            // Protege a versão aprovada criando com segurança uma revisão privada pendente
+                            $payload['status'] = 'pending_review';
+                            Database::query(
+                                "INSERT INTO post_revisions (
+                                    post_id, editor_id, base_version, status, payload_json, content_html, created_at
+                                 ) VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP)",
+                                [
+                                    $postId,
+                                    (int)$currentUser['id'],
+                                    (int)$current['version'],
+                                    json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                                    $rev['content_html']
+                                ]
+                            );
+
+                            $newRevId = (int)Database::getConnection()->lastInsertId();
+                            ImageProcessor::syncRefs($postId, $newRevId > 0 ? $newRevId : null, $rev['content_html'], $payload['featured_image'] ?? null);
+
+                            $message = "O artigo foi alterado ou publicado concorrentemente. A revisão foi restaurada com segurança como uma REVISÃO PENDENTE de aprovação para não sobrescrever a versão pública aprovada.";
+                        } else {
+                            Database::query(
+                                "INSERT INTO post_revisions (
+                                    post_id, editor_id, base_version, status, payload_json, content_html, created_at
+                                 ) VALUES (?, ?, ?, 'draft', ?, ?, CURRENT_TIMESTAMP)",
+                                [
+                                    $postId,
+                                    (int)$currentUser['id'],
+                                    $newVersion,
+                                    json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                                    $rev['content_html']
+                                ]
+                            );
+
+                            $newRevId = (int)Database::getConnection()->lastInsertId();
+                            ImageProcessor::syncRefs($postId, $newRevId > 0 ? $newRevId : null, $rev['content_html'], $payload['featured_image'] ?? null);
+
+                            $message = "Revisão #{$revId} restaurada no rascunho com sucesso!";
+                        }
                     }
                 } else {
-                    // Editor ou Administrador: aplica diretamente e publica/atualiza com purga de cache
-                    $postService = new PostService();
-                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], (int)$post['version']);
-                    $message = "Revisão #{$revId} restaurada e aplicada à versão pública com sucesso!";
-                }
+                    // Editor ou Administrador: aplicando/aprovando a revisão na publicação (P2 / Item 4)
+                    // Separa a intenção do snapshot do estado público real:
+                    // Se o artigo já estiver no ar ou agendado, a aprovação preserva o estado público ('published' ou 'scheduled')
+                    $nowUtc = gmdate('Y-m-d H:i:s');
+                    if (in_array($current['status'], ['published', 'scheduled'], true)) {
+                        $targetPubAt = !empty($payload['published_at']) ? gmdate('Y-m-d H:i:s', strtotime($payload['published_at'])) : $current['published_at'];
+                        $payload['status'] = ($targetPubAt > $nowUtc) ? 'scheduled' : 'published';
+                        $payload['published_at'] = $targetPubAt;
+                    } elseif (!empty($payload['status']) && $payload['status'] === 'pending_review') {
+                        $targetPubAt = !empty($payload['published_at']) ? gmdate('Y-m-d H:i:s', strtotime($payload['published_at'])) : $nowUtc;
+                        $payload['status'] = ($targetPubAt > $nowUtc) ? 'scheduled' : 'published';
+                        $payload['published_at'] = $targetPubAt;
+                    }
 
-                $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
-            } catch (\Throwable $e) {
-                $error = "Erro ao restaurar: " . $e->getMessage();
-            }
+                    $postService = new PostService();
+                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], (int)$current['version']);
+                    $message = "Revisão #{$revId} aprovada e aplicada à versão pública com sucesso!";
+                }
+            });
+
+            $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
+        } catch (\Throwable $e) {
+            $error = "Erro ao restaurar: " . $e->getMessage();
         }
     }
 }

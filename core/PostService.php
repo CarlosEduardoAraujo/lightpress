@@ -105,7 +105,7 @@ class PostService
                 'summary' => $summary,
                 'category' => $category,
                 'content_json' => $contentJson,
-            ]);
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
             Database::query(
                 "INSERT INTO post_revisions (
@@ -113,6 +113,9 @@ class PostService
                 ) VALUES (?, ?, 1, 'draft', ?, ?, CURRENT_TIMESTAMP)",
                 [$postId, $userId, $payload, $contentHtml]
             );
+
+            $revId = (int)Database::getConnection()->lastInsertId();
+            ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $contentHtml, $featuredImage);
 
             return $postId;
         });
@@ -130,7 +133,9 @@ class PostService
      */
     public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion): bool
     {
-        return Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion): bool {
+        $affectedUrls = [];
+
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ? FOR UPDATE",
@@ -161,10 +166,10 @@ class PostService
             if (!empty($data['content_html'])) {
                 $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
                 $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
-                    ? (is_array($data['content_json']) ? json_encode($data['content_json']) : $data['content_json'])
+                    ? (is_array($data['content_json']) ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $data['content_json'])
                     : BlockCompiler::htmlToBlocks($contentHtml);
             } else {
-                $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : ($data['content_json'] ?? '');
+                $contentJson = is_array($data['content_json']) ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : ($data['content_json'] ?? '');
                 $contentHtml = BlockCompiler::compile($contentJson);
             }
 
@@ -184,7 +189,14 @@ class PostService
             $targetStatus = ($publishedAt > $nowUtc) ? 'scheduled' : 'published';
 
             if (!empty($data['status']) && in_array($data['status'], ['draft', 'pending_review', 'archived'], true)) {
-                $targetStatus = $data['status'];
+                // P2 / Item 4: Proteção contra rebaixamento acidental de matéria pública por snapshot de revisão:
+                // Se a matéria já estava publicada ou agendada e o status vindo do payload for 'pending_review',
+                // mantém o estado público ('published' ou 'scheduled')
+                if ($data['status'] === 'pending_review' && in_array($current['status'], ['published', 'scheduled'], true)) {
+                    $targetStatus = ($publishedAt > $nowUtc) ? 'scheduled' : 'published';
+                } else {
+                    $targetStatus = $data['status'];
+                }
             }
 
             // Validação estrita de autorização no serviço editorial (LP-06)
@@ -197,29 +209,36 @@ class PostService
 
             $newVersion = (int)$current['version'] + 1;
 
-            // Atualiza o artigo
-            Database::query(
+            // Atualiza o artigo condicionalmente
+            $stmt = Database::query(
                 "UPDATE posts SET
                     slug = ?, title = ?, summary = ?, category = ?, tags = ?, featured_image = ?,
                     content_json = ?, content_html = ?, status = ?, is_featured = ?, version = ?,
                     seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?",
+                 WHERE id = ? AND version = ?",
                 [
                     $slug, $title, $summary, $category, $tags, $featuredImage,
                     $contentJson, $contentHtml, $targetStatus, $isFeatured, $newVersion,
                     $seoTitle, $seoDesc, $focusKw, $publishedAt,
-                    $postId
+                    $postId, $knownVersion
                 ]
             );
 
+            if ($stmt->rowCount() === 0) {
+                throw new RuntimeException("Conflito de concorrência detectado durante a gravação. Nenhuma linha foi alterada.", 409);
+            }
+
             // Gravar revisão histórica aplicada
-            $payload = json_encode($data);
+            $payload = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             Database::query(
                 "INSERT INTO post_revisions (
                     post_id, editor_id, base_version, status, payload_json, content_html, created_at
                 ) VALUES (?, ?, ?, 'applied', ?, ?, CURRENT_TIMESTAMP)",
                 [$postId, $editorId, $newVersion, $payload, $contentHtml]
             );
+
+            $revId = (int)Database::getConnection()->lastInsertId();
+            ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $contentHtml, $featuredImage);
 
             // Invalidação e registro de purga de cache (LP-09)
             $affectedUrls = [
@@ -253,10 +272,16 @@ class PostService
             return true;
         });
 
-        // Executa a purga física do cache estritamente após o commit (LP-09)
-        $this->cacheManager->purgeUrls($affectedUrls);
+        // Executa a purga física do cache estritamente após o commit (LP-09 / P2)
+        if ($success && !empty($affectedUrls)) {
+            try {
+                $this->cacheManager->purgeUrls($affectedUrls);
+            } catch (\Throwable $e) {
+                error_log("[PostService Cache Purge Error] " . $e->getMessage());
+            }
+        }
 
-        return true;
+        return $success;
     }
 
     /**

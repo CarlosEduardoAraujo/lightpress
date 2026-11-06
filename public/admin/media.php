@@ -108,23 +108,54 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
         if (!$canDelete) {
             $error = "Você não tem permissão para excluir esta imagem da biblioteca.";
         } else {
-            // Verificar se alguma das variantes está em uso no banco
+            // Verificar se alguma das variantes ou o media_id está em uso no banco (P2 / Item 6)
             $isInUse = false;
-            $variants = json_decode($mediaItem['variants_manifest'], true) ?? [];
-            foreach ($variants as $res => $formats) {
-                if (!is_array($formats)) continue;
-                foreach ($formats as $fmt => $info) {
-                    $url = $info['url'] ?? '';
-                    if (!empty($url)) {
-                        $inPostsFeatured = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE featured_image = ?", [$url]);
-                        if ($inPostsFeatured > 0) { $isInUse = true; break 2; }
-                        $inPostsContent = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE content_html LIKE ?", ['%' . $url . '%']);
-                        if ($inPostsContent > 0) { $isInUse = true; break 2; }
-                        $inPages = (int)Database::fetchValue("SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?", [$url, '%' . $url . '%']);
-                        if ($inPages > 0) { $isInUse = true; break 2; }
-                        // Verificar também nas revisões históricas de matérias (post_revisions)
-                        $inRevisions = (int)Database::fetchValue("SELECT COUNT(*) FROM post_revisions WHERE content_html LIKE ? OR payload_json LIKE ?", ['%' . $url . '%', '%' . $url . '%']);
-                        if ($inRevisions > 0) { $isInUse = true; break 2; }
+
+            // 1. Verificar em vínculos normalizados na tabela media_refs
+            $inMediaRefs = (int)Database::fetchValue("SELECT COUNT(*) FROM media_refs WHERE media_id = ?", [$mediaId]);
+            if ($inMediaRefs > 0) {
+                $isInUse = true;
+            }
+
+            // 2. Verificar variantes em posts, pages e post_revisions
+            if (!$isInUse) {
+                $variants = json_decode($mediaItem['variants_manifest'], true) ?? [];
+                foreach ($variants as $res => $formats) {
+                    if (!is_array($formats)) continue;
+                    foreach ($formats as $fmt => $info) {
+                        $url = $info['url'] ?? '';
+                        if (!empty($url)) {
+                            // Suporte a busca direta e com barras escapadas (\/uploads\/...) em serializações JSON legadas
+                            $escapedUrl = str_replace('/', '\/', $url);
+
+                            $inPostsFeatured = (int)Database::fetchValue(
+                                "SELECT COUNT(*) FROM posts WHERE featured_image = ? OR content_json LIKE ? OR content_json LIKE ?",
+                                [$url, '%' . $url . '%', '%' . $escapedUrl . '%']
+                            );
+                            if ($inPostsFeatured > 0) { $isInUse = true; break 2; }
+
+                            $inPostsContent = (int)Database::fetchValue(
+                                "SELECT COUNT(*) FROM posts WHERE content_html LIKE ?",
+                                ['%' . $url . '%']
+                            );
+                            if ($inPostsContent > 0) { $isInUse = true; break 2; }
+
+                            $inPages = (int)Database::fetchValue(
+                                "SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?",
+                                [$url, '%' . $url . '%']
+                            );
+                            if ($inPages > 0) { $isInUse = true; break 2; }
+
+                            // Verificar nas revisões históricas de matérias (post_revisions), cobrindo serializações com e sem escape de barra
+                            $inRevisions = (int)Database::fetchValue(
+                                "SELECT COUNT(*) FROM post_revisions 
+                                 WHERE content_html LIKE ? 
+                                    OR payload_json LIKE ? 
+                                    OR payload_json LIKE ?",
+                                ['%' . $url . '%', '%' . $url . '%', '%' . $escapedUrl . '%']
+                            );
+                            if ($inRevisions > 0) { $isInUse = true; break 2; }
+                        }
                     }
                 }
             }

@@ -7,7 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
-### Correções de Bugs (Bug Fixes)
+### Correções de Bugs & Integridade Transacional
+- **P1: Proteção Transacional contra Concorrência e Sobrescrita Editorial (`public/admin/editor.php`, `public/admin/revisions.php`):**
+  - Centralização da gravação de rascunhos e restauração de revisões em transações atômicas com bloqueio pessimista `SELECT ... FOR UPDATE` e atualização condicional `WHERE id = ? AND version = ?`.
+  - Reavaliação em tempo real das permissões sobre o estado atualizado da linha no banco. Caso uma matéria seja aprovada ou publicada concorrentemente por um editor enquanto um autor salvava ou restaurava, o sistema gera com segurança uma revisão privada pendente de aprovação (`pending_review`), preservando a versão pública aprovada intacta e neutralizando conflitos de edição concorrentes.
+- **P2: Execução Efetiva da Purga Física de Cache Pós-Commit (`core/PostService.php`):**
+  - Eliminação do retorno prematuro da transação em `PostService::publishOrUpdate()` que impedia a execução de código posterior.
+  - Escopo de `$affectedUrls` externalizado via passagem por referência na closure e chamada a `$cacheManager->purgeUrls($affectedUrls)` executada estritamente após a conclusão bem-sucedida do commit no banco de dados.
+- **P2: Preservação do Estado Público na Aplicação de Revisões (`public/admin/revisions.php`, `core/PostService.php`):**
+  - Desacoplamento do status interno do snapshot da revisão (`payload.status = 'pending_review'`) do estado da matéria pública no portal. Ao aprovar uma revisão privada em matéria já publicada ou agendada, o estado `'published'` ou `'scheduled'` é explicitamente preservado, prevenindo que o artigo seja acidentalmente retirado do ar.
+- **P2: Detecção de Mídias Históricas em JSON e Vínculos Normalizados (`public/admin/media.php`, `core/ImageProcessor.php`, `core/PostService.php`):**
+  - Verificação de uso de mídias em `post_revisions` compatível tanto com URLs diretas (`/uploads/...`) quanto com serializações legadas com barras invertidas escapadas (`\/uploads\/...`).
+  - Implementação de `ImageProcessor::syncRefs()` para cadastrar vínculos normalizados na tabela relacional `media_refs` e adoção de `JSON_UNESCAPED_SLASHES` em todos os encoders de payloads de revisão.
 - **Correção de Retorno no Roteador em PHP 8.4 (`core/Router.php`):**
   - Correção dos ramos de redirecionamento canônico (`/page/1/`, `/categoria/{slug}/page/1`, `/noticia/{slug}` e normalização de trailing slash) no método `Router::dispatch()`: substituição de instruções `return;` vazias por `return null;` explícito, cumprindo a assinatura estrita de tipo de retorno `mixed` do PHP 8.4 e eliminando o erro de compilação `Fatal error: A method with return type must return a value` que impedia a execução das rotas públicas.
 

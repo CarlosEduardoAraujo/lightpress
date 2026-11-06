@@ -114,74 +114,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? "Matéria agendada com sucesso para {$schedFormatted}!"
                         : "Publicação atualizada e cache invalidado com sucesso!";
                 } else {
-                    // Salvar rascunho
+                    // Salvar rascunho (executado atomicamente em transação com bloqueio FOR UPDATE)
                     $cleanHtml = BlockCompiler::sanitizeHtml($contentHtml);
                     $cleanJson = !empty($contentJson) && $contentJson !== '[]'
                         ? $contentJson
                         : BlockCompiler::htmlToBlocks($cleanHtml);
 
-                    $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
-                    $canFeature = Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED);
+                    Database::transaction(function (\PDO $pdo) use (
+                        $postId, $currentUser, $knownVersion, $title, $slug, $summary,
+                        $category, $tags, $featuredImage, $cleanJson, $cleanHtml,
+                        $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message
+                    ): void {
+                        // 1. Bloqueia e relê a linha atualizada do banco
+                        $current = Database::fetchOne("SELECT * FROM posts WHERE id = ? FOR UPDATE", [$postId]);
+                        if (!$current) {
+                            throw new RuntimeException("Publicação não encontrada.", 404);
+                        }
 
-                    // Autores não podem alterar destaque (is_featured) - LP-05
-                    if (!$canFeature) {
-                        $isFeatured = (int)($post['is_featured'] ?? 0);
-                    }
+                        // 2. Reavalia permissões sobre o registro atual
+                        if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $current)) {
+                            throw new RuntimeException("Você não possui permissão para editar este artigo.", 403);
+                        }
 
-                    // Se a matéria já estiver no ar ou agendada e o usuário não tiver permissão de publicar (ex: Autor):
-                    // Salva com segurança como uma REVISÃO PRIVADA pendente de aprovação, mantendo o post público intacto (LP-05)
-                    if (!$canPublish && in_array($post['status'], ['published', 'scheduled'], true)) {
-                        $revisionPayload = [
-                            'title' => $title,
-                            'slug' => !empty($slug) ? Security::slugify($slug) : $post['slug'],
-                            'summary' => $summary,
-                            'category' => $category,
-                            'tags' => $tags,
-                            'featured_image' => $featuredImage,
-                            'content_json' => $cleanJson,
-                            'content_html' => $cleanHtml,
-                            'seo_title' => $seoTitle,
-                            'seo_description' => $seoDesc,
-                            'focus_keyword' => $focusKeyword,
-                            'status' => 'pending_review',
-                        ];
+                        $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
+                        $canFeature = Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED);
 
-                        Database::query(
-                            "INSERT INTO post_revisions (
-                                post_id, editor_id, base_version, status, payload_json, content_html, created_at
-                             ) VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP)",
-                            [
-                                $postId,
-                                (int)$currentUser['id'],
-                                (int)$post['version'],
-                                json_encode($revisionPayload, JSON_THROW_ON_ERROR),
-                                $cleanHtml
-                            ]
-                        );
+                        $isFeaturedVal = $canFeature
+                            ? (!empty($_POST['is_featured']) ? 1 : 0)
+                            : (int)($current['is_featured'] ?? 0);
 
-                        $message = "Esta matéria já está no ar. Suas alterações foram salvas com segurança como uma REVISÃO PENDENTE de aprovação editorial. A versão pública atual permaneceu inalterada.";
-                    } else {
-                        // Edição normal de rascunho ou edição autorizada
-                        $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($post['slug']) ? $post['slug'] : Security::slugify($title));
-                        
-                        // Autores não podem agendar publicação
-                        $publishedAtVal = $canPublish ? (!empty($publishedAt) ? $publishedAt : ($post['published_at'] ?? null)) : ($post['published_at'] ?? null);
+                        // 3. Se a matéria já estiver publicada ou agendada e o usuário não tiver permissão de publicar (ex: Autor):
+                        // Salva com segurança como uma REVISÃO PRIVADA pendente de aprovação, mantendo o post público intacto (LP-05 / P1)
+                        if (!$canPublish && in_array($current['status'], ['published', 'scheduled'], true)) {
+                            $revisionPayload = [
+                                'title' => $title,
+                                'slug' => !empty($slug) ? Security::slugify($slug) : $current['slug'],
+                                'summary' => $summary,
+                                'category' => $category,
+                                'tags' => $tags,
+                                'featured_image' => $featuredImage,
+                                'content_json' => $cleanJson,
+                                'content_html' => $cleanHtml,
+                                'seo_title' => $seoTitle,
+                                'seo_description' => $seoDesc,
+                                'focus_keyword' => $focusKeyword,
+                                'status' => 'pending_review',
+                            ];
 
-                        $newVersion = (int)$post['version'] + 1;
+                            Database::query(
+                                "INSERT INTO post_revisions (
+                                    post_id, editor_id, base_version, status, payload_json, content_html, created_at
+                                 ) VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP)",
+                                [
+                                    $postId,
+                                    (int)$currentUser['id'],
+                                    (int)$current['version'],
+                                    json_encode($revisionPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                                    $cleanHtml
+                                ]
+                            );
 
-                        Database::query(
+                            $revId = (int)Database::getConnection()->lastInsertId();
+                            ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $cleanHtml, $featuredImage);
+
+                            $message = "Esta matéria está publicada ou agendada. Suas alterações foram salvas com segurança como uma REVISÃO PENDENTE de aprovação editorial. A versão pública atual permaneceu inalterada.";
+                            return;
+                        }
+
+                        // 4. Edição normal de rascunho ou edição autorizada:
+                        // Concorrência otimista baseada na versão conhecida
+                        if ((int)$current['version'] !== $knownVersion) {
+                            throw new RuntimeException(
+                                "Conflito de edição detectado! A matéria foi modificada por outro usuário (versão atual: {$current['version']}, versão base: {$knownVersion}). Recarregue a página para mesclar suas alterações.",
+                                409
+                            );
+                        }
+
+                        $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($current['slug']) ? $current['slug'] : Security::slugify($title));
+                        $publishedAtVal = $canPublish ? (!empty($publishedAt) ? $publishedAt : ($current['published_at'] ?? null)) : ($current['published_at'] ?? null);
+                        $newVersion = (int)$current['version'] + 1;
+
+                        $stmt = Database::query(
                             "UPDATE posts SET 
                                 title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
                                 content_json = ?, content_html = ?, seo_title = ?, 
                                 seo_description = ?, focus_keyword = ?, is_featured = ?, published_at = ?,
                                 version = ?, updated_at = CURRENT_TIMESTAMP 
-                             WHERE id = ?",
+                             WHERE id = ? AND version = ?",
                             [
                                 $title, $cleanSlug, $summary, $category, $tags, $featuredImage, 
                                 $cleanJson, $cleanHtml, $seoTitle, 
-                                $seoDesc, $focusKeyword, $isFeatured, $publishedAtVal, $newVersion, $postId
+                                $seoDesc, $focusKeyword, $isFeaturedVal, $publishedAtVal, $newVersion, $postId, $knownVersion
                             ]
                         );
+
+                        if ($stmt->rowCount() === 0) {
+                            throw new RuntimeException("Conflito de concorrência detectado durante a gravação. Nenhuma linha foi alterada.", 409);
+                        }
 
                         // Gravar snapshot de histórico
                         $snapshotPayload = [
@@ -196,7 +225,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'seo_title' => $seoTitle,
                             'seo_description' => $seoDesc,
                             'focus_keyword' => $focusKeyword,
-                            'is_featured' => $isFeatured,
+                            'is_featured' => $isFeaturedVal,
+                            'status' => $current['status'],
                         ];
 
                         Database::query(
@@ -207,13 +237,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $postId,
                                 (int)$currentUser['id'],
                                 $newVersion,
-                                json_encode($snapshotPayload, JSON_THROW_ON_ERROR),
+                                json_encode($snapshotPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                                 $cleanHtml
                             ]
                         );
 
+                        $revId = (int)Database::getConnection()->lastInsertId();
+                        ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $cleanHtml, $featuredImage);
+
                         $message = "Rascunho salvo com sucesso!";
-                    }
+                    });
                 }
                 // Recarregar dados do post
                 $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
