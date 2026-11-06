@@ -12,8 +12,8 @@ use LightPress\Core\PluginManager;
 use LightPress\Core\Security;
 
 // Acesso estritamente restrito a Administradores
-$currentUser = Security::requireAuth(roles: ['admin']);
-$csrfToken = Security::getCsrfToken();
+$currentUser = Security::requireAuth(null, ['admin']);
+$csrfToken = Security::generateCsrfToken();
 
 $pluginSlug = trim((string)($_GET['plugin'] ?? ''));
 if (empty($pluginSlug) || !preg_match('/^[a-z0-9\-_]+$/i', $pluginSlug)) {

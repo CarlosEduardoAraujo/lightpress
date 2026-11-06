@@ -56,6 +56,14 @@ class Security
     }
 
     /**
+     * Alias para generateCsrfToken para compatibilidade de nomenclatura.
+     */
+    public static function getCsrfToken(): string
+    {
+        return self::generateCsrfToken();
+    }
+
+    /**
      * Inicia a sessão com parâmetros rigorosos de hardening (cookies HttpOnly, Secure, SameSite=Strict).
      */
     public static function startSecureSession(array $appConfig = []): void

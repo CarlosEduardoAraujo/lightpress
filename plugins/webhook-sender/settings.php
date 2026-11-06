@@ -10,6 +10,10 @@ use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\Settings;
 
+if (!class_exists('WebhookSenderService', false)) {
+    require_once __DIR__ . '/webhook-sender.php';
+}
+
 $message = null;
 $error = null;
 $testResults = null;

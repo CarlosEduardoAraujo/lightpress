@@ -7,6 +7,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção do Painel de Plugins
+- Corrigidas as chamadas de autenticação e geração de token CSRF em `public/admin/plugins.php` e `public/admin/plugin-settings.php`, eliminando os erros fatais por parâmetro nomeado desconhecido (`roles`) e método inexistente (`getCsrfToken`).
+
 ### Cache, Invalidação de Borda & Cloudflare API v4
 - **Invalidador Seletivo de Borda na Cloudflare (`core/CloudflareCache.php`):**
   - Implementação do serviço de purga seletiva de cache via Cloudflare API v4 (`POST /client/v4/zones/{zone_id}/purge_cache`), invalidando pontualmente as páginas impactadas (Home `/`, feeds RSS/Atom `/feed.xml` e `/feed/`, `/sitemap.xml`, a notícia recém-publicada `/{slug}/` e sua respectiva categoria `/categoria/{slug}/`) sem derrubar o cache global de imagens, CSS e JavaScript.

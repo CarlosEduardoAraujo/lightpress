@@ -12,8 +12,8 @@ use LightPress\Core\PluginManager;
 use LightPress\Core\Security;
 
 // Acesso estritamente restrito a Administradores
-$currentUser = Security::requireAuth(roles: ['admin']);
-$csrfToken = Security::getCsrfToken();
+$currentUser = Security::requireAuth(null, ['admin']);
+$csrfToken = Security::generateCsrfToken();
 
 $message = null;
 $error = null;
