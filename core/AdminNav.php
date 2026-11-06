@@ -22,6 +22,8 @@ final class AdminNav
         $menuPlugins = $isAdmin ? PluginManager::getActiveMenuPlugins() : [];
         $currentPluginParam = $_GET['plugin'] ?? '';
 
+        $siteTitle = Settings::get('site_title', $GLOBALS['config']['app']['name'] ?? 'SpeedRacing');
+
         ob_start();
         ?>
         <style>
@@ -63,7 +65,7 @@ final class AdminNav
             .nav-dropdown-item:hover, .nav-dropdown-item.active { 
                 background: var(--bg); 
                 color: var(--primary-accent); 
-                font-weight: 700;
+                font-weight: 700; 
             }
             .nav-dropdown-divider { 
                 height: 1px; 
@@ -73,7 +75,7 @@ final class AdminNav
         </style>
         <header class="site-header">
             <div style="display: flex; align-items: center; gap: 2.5rem;">
-                <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
+                <a href="/admin/dashboard.php" class="brand"><?= Security::e($siteTitle) ?></a>
                 <nav class="nav-links">
                     <a href="/admin/dashboard.php" class="<?= $activePage === 'dashboard' ? 'active' : '' ?>">Notícias</a>
                     <a href="/admin/pages.php" class="<?= $activePage === 'pages' ? 'active' : '' ?>">Páginas</a>

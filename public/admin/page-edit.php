@@ -123,185 +123,68 @@ if (isset($_GET['saved'])) {
 }
 
 $csrfToken = Security::generateCsrfToken();
+$pageTitle = !empty($page['id']) ? 'Editar Página' : 'Nova Página';
+$activePage = 'pages';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $page ? 'Editar Página: ' . Security::e($page['title']) : 'Nova Página' ?> - SpeedPress Admin</title>
-
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
-
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #E10600;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #E10600;
-            --bg: #090d16;
-            --surface: #111827;
-            --border: #1f2937;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); padding-bottom: 4rem; }
-        .site-header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 0.85rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .brand { font-size: 1.15rem; font-weight: 800; color: var(--text); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; font-weight: 600; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--text); }
-        .user-menu { display: flex; align-items: center; gap: 1.25rem; font-size: 0.88rem; }
-        .theme-btn {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            padding: 0.35rem 0.65rem;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
-
-        .editor-grid {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: 1.5rem;
-            align-items: start;
-        }
-        @media (max-width: 900px) {
-            .editor-grid { grid-template-columns: 1fr; }
-        }
-
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        .form-group { margin-bottom: 1.25rem; }
-        .form-label { display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.4rem; color: var(--text); }
-        .form-input, .form-textarea, .form-select {
-            width: 100%;
-            padding: 0.65rem 0.85rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--bg);
-            color: var(--text);
-            font-size: 0.92rem;
-            font-family: inherit;
-        }
-        .form-input:focus, .form-textarea:focus, .form-select:focus {
-            outline: none;
-            border-color: var(--primary-accent);
-        }
-        .title-input {
-            font-size: 1.5rem;
-            font-weight: 800;
-            padding: 0.75rem 1rem;
-        }
-
-        /* Toolbar de Edição Rica */
-        .editor-toolbar {
-            display: flex;
-            gap: 0.35rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-bottom: none;
-            border-top-left-radius: var(--radius);
-            border-top-right-radius: var(--radius);
-            padding: 0.5rem;
-            flex-wrap: wrap;
-        }
-        .tb-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 0.35rem 0.65rem;
-            font-size: 0.82rem;
-            font-weight: 700;
-            cursor: pointer;
-            color: var(--text);
-        }
-        .tb-btn:hover { background: var(--border); }
-        .content-textarea {
-            width: 100%;
-            min-height: 420px;
-            padding: 1rem;
-            border: 1px solid var(--border);
-            border-bottom-left-radius: var(--radius);
-            border-bottom-right-radius: var(--radius);
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.95rem;
-            line-height: 1.6;
-            resize: vertical;
-        }
-
-        .btn-primary {
-            width: 100%;
-            background: var(--primary-accent);
-            color: white;
-            border: none;
-            padding: 0.85rem;
-            border-radius: var(--radius);
-            font-weight: 700;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-        .btn-primary:hover { opacity: 0.9; }
-
-        .btn-secondary {
-            display: inline-block;
-            text-align: center;
-            width: 100%;
-            background: transparent;
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: 0.65rem;
-            border-radius: var(--radius);
-            font-weight: 600;
-            font-size: 0.88rem;
-            text-decoration: none;
-            margin-top: 0.5rem;
-        }
-        .btn-secondary:hover { background: var(--bg); }
-
-        .alert-success { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-        .alert-error { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('pages', $currentUser, $csrfToken) ?>
+<style>
+    body { padding-bottom: 4rem; }
+    .editor-grid {
+        display: grid;
+        grid-template-columns: 2.2fr 1fr;
+        gap: 2rem;
+    }
+    @media (max-width: 900px) {
+        .editor-grid { grid-template-columns: 1fr; }
+    }
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        margin-bottom: 1.5rem;
+    }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label {
+        display: block;
+        font-weight: 700;
+        font-size: 0.88rem;
+        margin-bottom: 0.4rem;
+        color: var(--text);
+    }
+    .form-hint {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+    }
+    .form-input, .form-textarea, .form-select {
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 0.9rem;
+        font-family: inherit;
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+        outline: none;
+        border-color: var(--primary-accent);
+    }
+    .title-input {
+        font-size: 1.4rem;
+        font-weight: 800;
+    }
+    .content-textarea {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        min-height: 480px;
+        resize: vertical;
+    }
+</style>
 
     <div class="container">
         <?php if (!empty($message)): ?>
@@ -420,18 +303,7 @@ $csrfToken = Security::generateCsrfToken();
     </div>
 
     <script>
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeButton(next);
-        }
-        function updateThemeButton(theme) {
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-        }
-        updateThemeButton(document.documentElement.getAttribute('data-theme'));
+        
 
         var slugManuallyEdited = false;
         document.getElementById('page_slug').addEventListener('input', function() {
@@ -483,5 +355,4 @@ $csrfToken = Security::generateCsrfToken();
             }
         }
     </script>
-</body>
-</html>
+<?php require __DIR__ . '/footer.php'; ?>

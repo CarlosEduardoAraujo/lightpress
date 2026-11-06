@@ -56,130 +56,51 @@ $authorStats = Database::fetchAll(
 );
 
 $csrfToken = Security::generateCsrfToken();
+$pageTitle = 'Audiência & Mais Lidas';
+$activePage = 'stats';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estatísticas & Mais Lidas - SpeedPress Admin</title>
+<style>
+    [data-theme="dark"] th { background: #0f172a; }
+    [data-theme="dark"] tr:hover td { background: #162036; }
+    [data-theme="dark"] .card-header { background: #0f172a; }
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem; }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
-        
-        [data-theme="dark"] th { background: #0f172a; }
-        [data-theme="dark"] tr:hover td { background: #162036; }
-        [data-theme="dark"] .card-header { background: #0f172a; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .card-header { padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+    .card-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
 
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 600; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--primary-accent); }
-        
-        .user-menu { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
-        
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-        
-        .container { max-width: 1450px; margin: 2.5rem auto; padding: 0 1.5rem; }
-        .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: #f8fafc; padding: 0.8rem 1.25rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 0.95rem 1.25rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
 
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .card-header { padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
-        .card-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        font-weight: 900;
+        font-size: 0.82rem;
+    }
+    .rank-1 { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .rank-2 { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .rank-3 { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+    .rank-other { background: transparent; color: var(--text-muted); }
 
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th { background: #f8fafc; padding: 0.8rem 1.25rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
-        td { padding: 0.95rem 1.25rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #fafafa; }
-
-        .rank-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            font-weight: 900;
-            font-size: 0.82rem;
-        }
-        .rank-1 { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-        .rank-2 { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-        .rank-3 { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
-        .rank-other { background: transparent; color: var(--text-muted); }
-
-        .grid-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-        @media (max-width: 900px) {
-            .grid-stats { grid-template-columns: 1fr; }
-        }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('stats', $currentUser, $csrfToken) ?>
+    .grid-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+    @media (max-width: 900px) {
+        .grid-stats { grid-template-columns: 1fr; }
+    }
+</style>
 
     <div class="container">
         <h1 class="page-title">Audiência Editorial & Ranking de Notícias</h1>
@@ -248,7 +169,7 @@ $csrfToken = Security::generateCsrfToken();
                                     </div>
                                 </td>
                                 <td>
-                                    <span style="background: #eff6ff; color: #2563eb; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
+                                    <span style="background: var(--primary-light); color: var(--primary-accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
                                         <?= Security::e($p['category']) ?>
                                     </span>
                                 </td>
@@ -332,22 +253,4 @@ $csrfToken = Security::generateCsrfToken();
             </div>
         </div>
     </div>
-    <script>
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) {
-                btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-            }
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
-        }
-        updateThemeIcon();
-    </script>
-</body>
-</html>
+    <?php require __DIR__ . '/footer.php'; ?>

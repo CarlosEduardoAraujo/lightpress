@@ -340,6 +340,8 @@ lightpress/
 └── public/                    # Web Root (Nginx / Servidor Web)
     ├── index.php              # Ponto único de entrada (Front Controller)
     ├── admin/                 # Painel administrativo enxuto protegido (< 50 KiB)
+    │   ├── header.php         # Cabeçalho unificado compartilhado, marca dinâmica e estilos globais
+    │   ├── footer.php         # Rodapé unificado compartilhado com alternância de tema
     │   ├── login.php          # Autenticação com proteção contra força bruta
     │   ├── dashboard.php      # Gestão de publicações ordenada por data de criação
     │   ├── editor.php         # Editor visual de blocos com suporte a copiar/colar Word/Docs
@@ -878,6 +880,12 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 * **FASE CONCLUÍDA — Extensibilidade & Plugins (Zero Bloatware):**
   - [x] **Arquitetura de Hooks & Plugins:** Barramento ultraleve de eventos (`Hook`), gerenciador de ciclo de vida (`PluginManager`), manifesto `plugin.json` e menu de administração dinâmico com dropdown de plugins (`AdminNav`).
   - [x] **Primeiro Plugin Oficial (`webhook-sender`):** Disparo de webhooks para múltiplos servidores (Discord, Slack, n8n, Zapier) na publicação de matérias, com tabela relacional própria (`plugin_webhook_sender_logs`), integração atômica com agendamento de posts, resolução canônica em CLI/cron e painel de controle com testes e reenvio.
+
+* **FASE CONCLUÍDA — Polimento & Padronização da Área Administrativa (/admin):**
+  - [x] **Header e Footer Unificados (`header.php` e `footer.php`):** Centralização da estrutura HTML, `<head>`, metatags, script anti-flash de tema claro/escuro e navegação completa com submenu de plugins em todas as páginas do `/admin`.
+  - [x] **Identidade Dinâmica da Marca:** O nome da publicação exibido em `<a href="/admin/dashboard.php" class="brand">` reflete dinamicamente o Título do Site configurado em `Settings::get('site_title')`.
+  - [x] **Largura Universal de 1900px:** Expansão de todas as telas administrativas para `max-width: 1900px` (`.container`), proporcionando máximo aproveitamento horizontal em monitores widescreen.
+  - [x] **Padronização Visual da Paleta em Vermelho Oficial (`#E10600`):** Eliminação completa de cores azuis legadas, unificando botões, links ativos, badges e campos em foco na cor da publicação.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.

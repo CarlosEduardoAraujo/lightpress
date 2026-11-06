@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Padronização da Área Administrativa (/admin) e Header Unificado
+- **Cabeçalho Unificado Compartilhado (`public/admin/header.php`):**
+  - Eliminação de duplicações estruturais de HTML, metadados, scripts anti-flash de tema e folhas de estilos em todas as páginas da área administrativa.
+  - Carregamento dinâmico e centralizado das configurações da publicação via `Settings::get('site_title')` e `Settings::get('site_favicon')`.
+  - Exibição dinâmica do **Título do Site (Nome da Publicação)** no link `<a href="/admin/dashboard.php" class="brand">`, eliminando textos estáticos hardcoded.
+  - Navegação global completa com suporte ao estado ativo (`$activePage`), submenu suspenso para plugins ativos, menu de usuário logado com atalho para perfil, botão alternador de tema e link seguro de logout com token CSRF.
+- **Rodapé Compartilhado e Gerenciador de Tema (`public/admin/footer.php`):**
+  - Centralização dos scripts da interface administrativa, incluindo alternância de tema claro/escuro (`toggleTheme()`), sincronização persistente com `localStorage('lp_theme')` e atualização automática dos ícones ☀️ / 🌙.
+- **Largura Universal de 1900px (`.container`):**
+  - Padronização de todas as páginas administrativas para a largura máxima de **1900px** (`max-width: var(--admin-max-width)`), expandindo os limites anteriores fragmentados (1550px em `dashboard.php`, 1350px em `media.php`, 1200px em `pages.php`, `categories.php`, `plugins.php` e `system.php`, 1450px em `stats.php`, 1400px em `users.php`, 1100px em `editor.php`, 1000px em `plugin-settings.php` e `revisions.php`, 980px em `settings.php` e 960px em `profile.php`).
+  - Excelente aproveitamento de espaço em monitores widescreen para tabelas, grades de mídias, filtros e formulários, com total responsividade mobile preservada (`padding: 0 1.5rem`).
+- **Padronização Visual da Paleta para Vermelho Oficial (`#E10600`):**
+  - Substituição definitiva de todas as tonalidades azuis remanescentes (`#2563eb`, `#3b82f6`, `#1d4ed8`, `rgba(37,99,235,...)`) pela cor padrão oficial da publicação (`--primary-accent: #E10600;`, `--primary-hover: #b80500;`, `--primary-light: rgba(225, 6, 0, 0.08);` e `--primary-focus: rgba(225, 6, 0, 0.2);`).
+  - Aplicação unificada em botões (`.btn`, `.btn-filter`), links em destaque, anéis de foco em formulários, badges de categorias e tags, avatares de autores e telas de acesso (`login.php` e `activate.php`).
+- **Refatoração Completa das Páginas Administrativas:**
+  - Migração de 100% das páginas para a nova arquitetura: `dashboard.php`, `pages.php`, `page-edit.php`, `media.php`, `categories.php`, `stats.php`, `users.php`, `plugins.php`, `settings.php`, `system.php`, `profile.php`, `revisions.php`, `editor.php` e `plugins/webhook-sender/settings.php`.
+
 ### Documentação Técnica do Primeiro Plugin (`Plugin-Webhook.md`)
 - **Criação do Documento Arquitetural Completo (`Plugin-Webhook.md`):**
   - Registro minucioso de todo o ciclo de engenharia do plugin `webhook-sender`.

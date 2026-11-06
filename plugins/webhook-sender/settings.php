@@ -134,103 +134,32 @@ try {
 } catch (\Throwable) {
     // Tabela pode ainda estar vazia
 }
+$pageTitle = 'Configurações - Webhook Sender';
+$activePage = 'plugin-settings';
+require dirname(__DIR__, 2) . '/public/admin/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configurações - Webhook Sender</title>
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --radius: 8px;
-        }
+<style>
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 2rem; }
 
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #334155;
-            --bg: #0f172a;
-            --surface: #1e293b;
-        }
+    textarea { width: 100%; padding: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.92rem; font-family: monospace; background: var(--bg); color: var(--text); outline: none; resize: vertical; line-height: 1.5; }
+    textarea:focus { border-color: var(--primary-accent); }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
-        
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 600; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--primary-accent); }
+    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+    [data-theme="dark"] .alert-success { background: #064e3b; color: #6ee7b7; }
+    [data-theme="dark"] .alert-error { background: #7f1d1d; color: #fca5a5; }
 
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
+    .badge-status { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; font-family: monospace; }
+    .badge-2xx { background: #dcfce7; color: #166534; }
+    .badge-4xx { background: #fee2e2; color: #991b1b; }
+    [data-theme="dark"] .badge-2xx { background: #064e3b; color: #6ee7b7; }
+    [data-theme="dark"] .badge-4xx { background: #7f1d1d; color: #fca5a5; }
 
-        .container { max-width: 1000px; margin: 2.5rem auto; padding: 0 1.5rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 2rem; }
-
-        .btn { padding: 0.7rem 1.25rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; }
-        .btn:hover { background: #1d4ed8; }
-        .btn-secondary { background: #e2e8f0; color: var(--text); }
-        .btn-secondary:hover { background: #cbd5e1; }
-        [data-theme="dark"] .btn-secondary { background: #334155; color: #f1f5f9; }
-        [data-theme="dark"] .btn-secondary:hover { background: #475569; }
-
-        textarea { width: 100%; padding: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.92rem; font-family: monospace; background: var(--bg); color: var(--text); outline: none; resize: vertical; line-height: 1.5; }
-        textarea:focus { border-color: var(--primary-accent); }
-
-        .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-        .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-        [data-theme="dark"] .alert-success { background: #064e3b; color: #6ee7b7; }
-        [data-theme="dark"] .alert-error { background: #7f1d1d; color: #fca5a5; }
-
-        .badge-status { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; font-family: monospace; }
-        .badge-2xx { background: #dcfce7; color: #166534; }
-        .badge-4xx { background: #fee2e2; color: #991b1b; }
-        [data-theme="dark"] .badge-2xx { background: #064e3b; color: #6ee7b7; }
-        [data-theme="dark"] .badge-4xx { background: #7f1d1d; color: #fca5a5; }
-
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
-        th { background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; font-weight: 700; }
-        [data-theme="dark"] th { background: #1e293b; }
-        td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    </style>
-</head>
-<body>
-    <?= AdminNav::renderHeader('plugin-settings', $currentUser, $csrfToken) ?>
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+    th { background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; font-weight: 700; }
+    [data-theme="dark"] th { background: #1e293b; }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+</style>
 
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem;">
@@ -354,18 +283,4 @@ try {
         </div>
     </div>
 
-    <script>
-        function toggleTheme() {
-            const current = document.documentElement.getAttribute('data-theme');
-            const target = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', target);
-            localStorage.setItem('lp_theme', target);
-            document.getElementById('btnThemeToggle').textContent = target === 'dark' ? '☀️' : '🌙';
-        }
-
-        const savedTheme = localStorage.getItem('lp_theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        document.getElementById('btnThemeToggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-    </script>
-</body>
-</html>
+    <?php require dirname(__DIR__, 2) . '/public/admin/footer.php'; ?>

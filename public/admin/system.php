@@ -42,99 +42,28 @@ $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
 $isDefaultHmac = ($hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32);
 
 $csrfToken = Security::generateCsrfToken();
+$pageTitle = 'Diagnóstico do Sistema';
+$activePage = 'system';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saúde do Sistema - SpeedPress Admin</title>
+<style>
+    [data-theme="dark"] th { background: #0f172a; }
+    [data-theme="dark"] tr:hover td { background: #162036; }
+    [data-theme="dark"] .stat-card { background: #131b2e; border-color: #1e293b; }
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; text-align: center; }
+    .stat-num { font-size: 1.8rem; font-weight: 800; color: var(--primary-accent); margin-bottom: 0.25rem; }
+    .stat-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
-        
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
-        .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; text-align: center; transition: background 0.2s, border-color 0.2s; }
-        .stat-num { font-size: 1.8rem; font-weight: 800; color: var(--primary-accent); margin-bottom: 0.25rem; }
-        .stat-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
-        .grid-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; transition: background 0.2s, border-color 0.2s; }
-        .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
-        .info-row { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-        .info-row:last-child { border-bottom: none; }
-        .badge-ok { color: #16a34a; font-weight: 600; }
-        .badge-warn { color: #d97706; font-weight: 600; }
-        .badge-err { color: #dc2626; font-weight: 600; }
-
-        code { background: rgba(148, 163, 184, 0.15); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
-
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('system', $currentUser, $csrfToken) ?>
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 2rem; }
+    .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 1rem; }
+    
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+    th { background: #f8fafc; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+    td { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+</style>
 
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1.5rem;">Diagnóstico e Saúde da Infraestrutura</h1>
@@ -304,20 +233,4 @@ $csrfToken = Security::generateCsrfToken();
         </div>
     </div>
 
-    <script>
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
-        }
-        updateThemeIcon();
-    </script>
-</body>
-</html>
+    <?php require __DIR__ . '/footer.php'; ?>

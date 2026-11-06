@@ -275,176 +275,21 @@ $initialHtml = $post['content_html'] ?? '';
 if (empty($initialHtml) && !empty($post['content_json'])) {
     $initialHtml = BlockCompiler::compile($post['content_json']);
 }
+$pageTitle = !empty($post['id']) ? 'Editar Notícia' : 'Nova Notícia';
+$activePage = 'dashboard';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $post ? 'Editar: ' . Security::e($post['title']) : 'Nova Publicação' ?> - SpeedPress Admin</title>
-
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
-
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #cbd5e1;
-            --text: #0f172a;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        [data-theme="dark"] .editor-toolbar { background: #1a233a; border-color: #1e293b; }
-        [data-theme="dark"] .tool-btn { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .tool-btn:hover { background: #1e293b; }
-        [data-theme="dark"] .editor-canvas { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .editor-canvas h2, [data-theme="dark"] .editor-canvas h3 { color: #f1f5f9; }
-        [data-theme="dark"] .editor-canvas blockquote { background: #1a233a; color: #cbd5e1; }
-        [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] label { color: #f1f5f9; }
-        [data-theme="dark"] .btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; }
-        [data-theme="dark"] .btn-secondary:hover { background: #334155; }
-        [data-theme="dark"] .media-modal-dialog { background: #131b2e; color: #f1f5f9; }
-        [data-theme="dark"] .media-modal-header, [data-theme="dark"] .media-modal-footer { background: #090d16; border-color: #1e293b; }
-        [data-theme="dark"] .media-modal-header h2 { color: #f1f5f9; }
-        [data-theme="dark"] .modal-media-item { background: #131b2e; border-color: #1e293b; }
-        [data-theme="dark"] .modal-media-title { color: #f1f5f9; }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); padding-bottom: 5rem; transition: background 0.2s, color 0.2s; }
-        header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; transition: background 0.2s, border-color 0.2s; }
-        .brand { font-size: 1.25rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .container { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
-        .editor-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 2rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; transition: background 0.2s, border-color 0.2s; }
-        .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #334155; }
-        input[type="text"], textarea, select { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; font-family: inherit; }
-        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-        .btn { padding: 0.65rem 1.25rem; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
-        .btn-primary { background: var(--primary-accent); color: white; }
-        .btn-primary:hover { background: #1d4ed8; }
-        .btn-secondary { background: #e2e8f0; color: #334155; }
-        .btn-secondary:hover { background: #cbd5e1; }
-        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-        .alert-error { background: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-
-        /* Barra de Ferramentas Rica */
-        .editor-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-            padding: 0.5rem;
-            background: #f1f5f9;
-            border: 1px solid var(--border);
-            border-bottom: none;
-            border-radius: var(--radius) var(--radius) 0 0;
-            position: sticky;
-            top: 57px;
-            z-index: 40;
-        }
-        .tool-btn {
-            background: white;
-            border: 1px solid var(--border);
-            padding: 0.4rem 0.65rem;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #334155;
-            cursor: pointer;
-            line-height: 1;
-        }
-        .tool-btn:hover { background: #e2e8f0; color: var(--primary); }
-        .tool-separator { width: 1px; background: var(--border); margin: 0 0.2rem; }
-
-        /* Canvas de Escrita Visual */
-        .editor-canvas {
-            min-height: 480px;
-            padding: 1.5rem;
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 0 0 var(--radius) var(--radius);
-            font-family: inherit;
-            font-size: 1.05rem;
-            line-height: 1.7;
-            color: #1e293b;
-            outline: none;
-        }
-        .editor-canvas:focus {
-            border-color: var(--primary-accent);
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-        }
-        .editor-canvas p { margin-bottom: 1.25rem; }
-        .editor-canvas h2 { font-size: 1.5rem; font-weight: 800; margin: 1.75rem 0 0.75rem; color: #0f172a; }
-        .editor-canvas h3 { font-size: 1.25rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: #1e293b; }
-        .editor-canvas blockquote { border-left: 4px solid var(--primary-accent); padding: 0.5rem 0 0.5rem 1rem; margin: 1.25rem 0; color: #475569; font-style: italic; background: #f8fafc; }
-        .editor-canvas ul, .editor-canvas ol { margin: 1rem 0 1.25rem 1.75rem; }
-        .editor-canvas li { margin-bottom: 0.4rem; }
-        .editor-canvas img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 1rem 0; display: block; }
-        .editor-canvas figure { margin: 1.5rem 0; }
-        .editor-canvas figcaption { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 0.4rem; font-style: italic; }
-
-        /* Modal de Mídias (WordPress-Style) */
-        .media-modal { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; }
-        .media-modal-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(2px); }
-        .media-modal-dialog { position: relative; width: 92%; max-width: 950px; max-height: 88vh; background: white; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
-        .media-modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-        .media-modal-header h2 { font-size: 1.25rem; font-weight: 800; color: #0f172a; }
-        .media-modal-close { background: transparent; border: none; font-size: 1.5rem; font-weight: 700; color: var(--text-muted); cursor: pointer; line-height: 1; }
-        .media-modal-close:hover { color: #ef4444; }
-        .media-modal-body { padding: 1.25rem 1.5rem; overflow-y: auto; flex-grow: 1; min-height: 350px; }
-        .media-modal-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
-        .media-modal-toolbar input { width: 60%; }
-        .media-modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
-        .modal-media-item { border: 2px solid transparent; border-radius: var(--radius); overflow: hidden; cursor: pointer; background: #f8fafc; display: flex; flex-direction: column; transition: all 0.15s ease; position: relative; }
-        .modal-media-item:hover { border-color: #93c5fd; transform: translateY(-2px); }
-        .modal-media-item.selected { border-color: var(--primary-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.25); }
-        .modal-media-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e2e8f0; }
-        .modal-media-title { padding: 0.5rem; font-size: 0.72rem; font-weight: 600; line-height: 1.3; word-break: break-all; color: #334155; }
-        .media-modal-footer { padding: 0.85rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('dashboard', $currentUser, $csrfToken) ?>
+<style>
+    .editor-grid { display: grid; grid-template-columns: 2.5fr 1fr; gap: 2rem; }
+    @media (max-width: 1024px) {
+        .editor-grid { grid-template-columns: 1fr; }
+    }
+    .editor-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group:last-child { margin-bottom: 0; }
+    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
+    .title-input { font-size: 1.5rem; font-weight: 800; }
+</style>
 
     <div class="container">
         <?php if (!empty($message)): ?>
@@ -1187,19 +1032,8 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
         }
 
         // Alternância de Tema Claro / Escuro
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
+        
         }
         updateThemeIcon();
     </script>
-</body>
-</html>
+<?php require __DIR__ . '/footer.php'; ?>

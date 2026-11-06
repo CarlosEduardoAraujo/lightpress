@@ -240,179 +240,106 @@ function buildMediaUrl(array $overrides = []): string {
     $cleaned = array_filter($merged, function($v) { return $v !== '' && $v !== null && $v !== 0; });
     return '/admin/media.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
 }
+$pageTitle = 'Biblioteca de Mídias';
+$activePage = 'media';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Biblioteca de Mídias - SpeedPress Admin</title>
+<style>
+    [data-theme="dark"] .btn-copy { background: #1e293b; color: #f1f5f9; border-color: #334155; }
+    [data-theme="dark"] .btn-copy:hover { background: #334155; }
+    [data-theme="dark"] .card-upload { background: #131b2e; border-color: #1e293b; }
+    [data-theme="dark"] .card-upload p { color: #f1f5f9 !important; }
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .card-upload { background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; margin-bottom: 2rem; }
+    .filter-bar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .form-input {
+        padding: 0.6rem 0.85rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 0.9rem;
+        background: var(--surface);
+        color: var(--text);
+        outline: none;
+        transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--primary-accent); }
+    .btn-filter {
+        padding: 0.6rem 1rem;
+        background: #f1f5f9;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 0.88rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: all 0.15s;
+    }
+    .btn-filter:hover { background: #e2e8f0; }
+    .btn-filter.btn-primary { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+    .btn-filter.btn-primary:hover { background: var(--primary-hover); }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
-        
-        [data-theme="dark"] .btn-copy { background: #1e293b; color: #f1f5f9; border-color: #334155; }
-        [data-theme="dark"] .btn-copy:hover { background: #334155; }
-        [data-theme="dark"] .card-upload { background: #131b2e; border-color: #1e293b; }
-        [data-theme="dark"] .card-upload p { color: #f1f5f9 !important; }
+    .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        margin-top: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .page-links { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .page-num {
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.15s;
+    }
+    .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+    .page-num:hover:not(.active) { background: #f1f5f9; }
 
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .container { max-width: 1350px; margin: 2rem auto; padding: 0 1.5rem; }
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .card-upload { background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; margin-bottom: 2rem; }
-        .filter-bar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem 1.25rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.85rem;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .form-input {
-            padding: 0.6rem 0.85rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 0.9rem;
-            background: var(--surface);
-            color: var(--text);
-            outline: none;
-            transition: border-color 0.15s;
-        }
-        .form-input:focus { border-color: var(--primary-accent); }
-        .btn-filter {
-            padding: 0.6rem 1rem;
-            background: #f1f5f9;
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 0.88rem;
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            transition: all 0.15s;
-        }
-        .btn-filter:hover { background: #e2e8f0; }
-        .btn-filter.btn-primary { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
-        .btn-filter.btn-primary:hover { background: #1d4ed8; }
+    [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; border-color: #334155; }
+    [data-theme="dark"] .btn-filter:hover { background: #334155; }
+    [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
+    [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+    [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
 
-        .pagination {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.25rem 1.5rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            margin-top: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        .page-links { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-        .page-num {
-            padding: 0.4rem 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            text-decoration: none;
-            color: var(--text);
-            font-weight: 600;
-            font-size: 0.85rem;
-            transition: all 0.15s;
-        }
-        .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
-        .page-num:hover:not(.active) { background: #f1f5f9; }
-
-        [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; border-color: #334155; }
-        [data-theme="dark"] .btn-filter:hover { background: #334155; }
-        [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
-
-        .grid-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
-        .media-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
-        .media-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e2e8f0; }
-        .media-info { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; }
-        .media-name { font-size: 0.85rem; font-weight: 700; word-break: break-all; margin-bottom: 0.5rem; line-height: 1.3; }
-        .media-meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; }
-        .btn-copy { padding: 0.35rem 0.6rem; background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 0.35rem; color: #334155; }
-        .btn-copy:hover { background: #e2e8f0; }
-        .btn-delete { color: #dc2626; font-size: 0.75rem; text-decoration: none; font-weight: 600; margin-top: auto; padding-top: 0.5rem; }
-        .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-        .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('media', $currentUser, $csrfToken) ?>
+    .grid-media { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
+    .media-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+    .media-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e2e8f0; }
+    .media-info { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; }
+    .media-name { font-size: 0.85rem; font-weight: 700; word-break: break-all; margin-bottom: 0.5rem; line-height: 1.3; }
+    .media-meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+    .btn-copy { padding: 0.35rem 0.6rem; background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 0.35rem; color: #334155; }
+    .btn-copy:hover { background: #e2e8f0; }
+    .btn-delete { color: #dc2626; font-size: 0.75rem; text-decoration: none; font-weight: 600; margin-top: auto; padding-top: 0.5rem; }
+    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+</style>
 
     <div class="container">
         <div class="page-header">
@@ -544,12 +471,12 @@ function buildMediaUrl(array $overrides = []): string {
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($webpSize > 0): ?>
-                                    <div style="color: #1d4ed8; margin-bottom: 0.35rem;">
+                                    <div style="color: var(--primary-accent); margin-bottom: 0.35rem;">
                                         <strong><?= round($webpSize / 1024) ?> KiB</strong> &bull; <?= $origW ?>x<?= $origH ?>px - <span style="font-weight: 700;">WebP</span>
                                         <?php if ($webpReduction > 0): ?>
-                                            - <span style="font-weight: 700; color: #2563eb;"><?= $webpReduction ?>% (redução do tamanho)</span>
+                                            - <span style="font-weight: 700; color: var(--primary-accent);"><?= $webpReduction ?>% (redução do tamanho)</span>
                                         <?php else: ?>
-                                            - <span style="font-weight: 700; color: #2563eb;">Formato original otimizado</span>
+                                            - <span style="font-weight: 700; color: var(--primary-accent);">Formato original otimizado</span>
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
@@ -724,17 +651,7 @@ function buildMediaUrl(array $overrides = []): string {
         });
 
         // Alternância de Tema Claro / Escuro
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
+        
         }
         updateThemeIcon();
     
@@ -845,5 +762,4 @@ function buildMediaUrl(array $overrides = []): string {
         document.addEventListener('DOMContentLoaded', attachPaginationListeners);
 
     </script>
-</body>
-</html>
+<?php require __DIR__ . '/footer.php'; ?>

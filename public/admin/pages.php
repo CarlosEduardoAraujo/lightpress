@@ -83,215 +83,125 @@ $publishedCount = (int)Database::fetchValue("SELECT COUNT(*) FROM pages WHERE st
 $draftCount = (int)Database::fetchValue("SELECT COUNT(*) FROM pages WHERE status = 'draft'");
 
 $csrfToken = Security::generateCsrfToken();
+
+$pageTitle = 'Páginas Institucionais';
+$activePage = 'pages';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Páginas Institucionais - SpeedPress Admin</title>
-    <?php if (!empty($config['app']['favicon'])): ?>
-        <link rel="icon" href="<?= Security::e($config['app']['favicon']) ?>">
-    <?php endif; ?>
+<style>
+    body { padding-bottom: 4rem; }
 
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+    .metric-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .metric-label { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+    .metric-value { font-size: 1.85rem; font-weight: 800; color: var(--text); }
+    .metric-sub { font-size: 0.78rem; color: var(--text-muted); }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #E10600;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #E10600;
-            --bg: #090d16;
-            --surface: #111827;
-            --border: #1f2937;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); padding-bottom: 4rem; }
-        .site-header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 0.85rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .brand { font-size: 1.15rem; font-weight: 800; color: var(--text); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; font-weight: 600; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--text); }
-        .user-menu { display: flex; align-items: center; gap: 1.25rem; font-size: 0.88rem; }
-        .theme-btn {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            padding: 0.35rem 0.65rem;
-            border-radius: var(--radius);
-            cursor: pointer;
-            font-size: 0.95rem;
-        }
-        .logout { color: #ef4444; text-decoration: none; font-weight: 600; }
-        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem; }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .page-title { font-size: 1.6rem; font-weight: 800; }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.25rem;
-            margin-bottom: 2rem;
-        }
-        .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-        .metric-label { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
-        .metric-value { font-size: 1.85rem; font-weight: 800; color: var(--text); }
-        .metric-sub { font-size: 0.78rem; color: var(--text-muted); }
+    .filter-bar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
 
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-        .page-title { font-size: 1.6rem; font-weight: 800; }
-        .btn {
-            background: var(--primary-accent);
-            color: #ffffff;
-            padding: 0.65rem 1.25rem;
-            border-radius: var(--radius);
-            font-weight: 700;
-            font-size: 0.88rem;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: none;
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-        .btn:hover { opacity: 0.9; }
+    .table-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th {
+        background: var(--bg);
+        padding: 0.85rem 1.25rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border);
+    }
+    td {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(0, 0, 0, 0.015); }
+    [data-theme="dark"] tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
-        .filter-bar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem;
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-        .form-input, .form-select {
-            padding: 0.55rem 0.85rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background: var(--bg);
-            color: var(--text);
-            font-size: 0.88rem;
-        }
-        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary-accent); }
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .badge-published { background: #dcfce7; color: #15803d; }
+    .badge-draft { background: #fef3c7; color: #b45309; }
+    .badge-archived { background: #f1f5f9; color: #64748b; }
+    [data-theme="dark"] .badge-published { background: #052e16; color: #86efac; }
+    [data-theme="dark"] .badge-draft { background: #451a03; color: #fde68a; }
+    [data-theme="dark"] .badge-archived { background: #1e293b; color: #94a3b8; }
 
-        .table-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th {
-            background: var(--bg);
-            padding: 0.85rem 1.25rem;
-            font-size: 0.78rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-        }
-        td {
-            padding: 1rem 1.25rem;
-            border-bottom: 1px solid var(--border);
-            vertical-align: middle;
-        }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: rgba(0, 0, 0, 0.015); }
-        [data-theme="dark"] tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    .action-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-right: 0.85rem;
+        transition: color 0.15s;
+    }
+    .action-link:hover { color: var(--primary-accent); }
+    .action-delete:hover { color: #ef4444; }
 
-        .badge {
-            display: inline-block;
-            padding: 0.2rem 0.55rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .badge-published { background: #dcfce7; color: #15803d; }
-        .badge-draft { background: #fef3c7; color: #b45309; }
-        .badge-archived { background: #f1f5f9; color: #64748b; }
-        [data-theme="dark"] .badge-published { background: #052e16; color: #86efac; }
-        [data-theme="dark"] .badge-draft { background: #451a03; color: #fde68a; }
-        [data-theme="dark"] .badge-archived { background: #1e293b; color: #94a3b8; }
-
-        .action-link {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.85rem;
-            margin-right: 0.85rem;
-            transition: color 0.15s;
-        }
-        .action-link:hover { color: var(--primary-accent); }
-        .action-delete:hover { color: #ef4444; }
-
-        .alert-success {
-            background: #dcfce7;
-            border: 1px solid #bbf7d0;
-            color: #166534;
-            padding: 0.85rem 1.25rem;
-            border-radius: var(--radius);
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-        }
-        .alert-error {
-            background: #fee2e2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-            padding: 0.85rem 1.25rem;
-            border-radius: var(--radius);
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-        }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('pages', $currentUser, $csrfToken) ?>
+    .alert-success {
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        padding: 0.85rem 1.25rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+    }
+    .alert-error {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        padding: 0.85rem 1.25rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+    }
+</style>
 
     <div class="container">
         <!-- Métricas Rápidas -->
@@ -415,19 +325,4 @@ $csrfToken = Security::generateCsrfToken();
         </div>
     </div>
 
-    <script>
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeButton(next);
-        }
-        function updateThemeButton(theme) {
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
-        }
-        updateThemeButton(document.documentElement.getAttribute('data-theme'));
-    </script>
-</body>
-</html>
+<?php require __DIR__ . '/footer.php'; ?>

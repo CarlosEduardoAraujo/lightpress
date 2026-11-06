@@ -229,234 +229,141 @@ function buildFilterUrl(array $overrides = []): string {
     return '/admin/dashboard.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
 }
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Editorial - SpeedPress</title>
-    <?php if (!empty($config['app']['favicon'])): ?>
-        <link rel="icon" href="<?= Security::e($config['app']['favicon']) ?>">
-    <?php endif; ?>
+$pageTitle = 'Painel Editorial';
+$activePage = 'dashboard';
+require __DIR__ . '/header.php';
+?>
+<style>
+    [data-theme="dark"] th { background: #0f172a; }
+    [data-theme="dark"] tr:hover td { background: #162036; }
+    [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; }
+    [data-theme="dark"] .btn-filter:hover { background: #334155; }
+    [data-theme="dark"] .form-select, [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
+    [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
+    [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
+    [data-theme="dark"] .star-inactive { background: #1e293b; color: #64748b; border-color: #334155; }
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    /* Cards de Métricas */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+    @media (max-width: 1400px) {
+        .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 900px) {
+        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+        .metrics-grid { grid-template-columns: 1fr; }
+    }
+    .metric-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .metric-label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-value { font-size: 1.85rem; font-weight: 900; color: var(--primary); }
+    .metric-sub { font-size: 0.8rem; color: var(--text-muted); }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
-        
-        [data-theme="dark"] th { background: #0f172a; }
-        [data-theme="dark"] tr:hover td { background: #162036; }
-        [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; }
-        [data-theme="dark"] .btn-filter:hover { background: #334155; }
-        [data-theme="dark"] .form-select, [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
-        [data-theme="dark"] .star-inactive { background: #1e293b; color: #64748b; border-color: #334155; }
-        
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.35rem; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 600; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--primary-accent); }
-        
-        .user-menu { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
-        .user-menu a.logout { color: #dc2626; text-decoration: none; font-weight: 600; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
 
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-        
-        .container { max-width: 1550px; margin: 2rem auto; padding: 0 1.5rem; }
-        
-        /* Cards de Métricas */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-            margin-bottom: 2rem;
-        }
-        @media (max-width: 1024px) {
-            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 640px) {
-            .metrics-grid { grid-template-columns: 1fr; }
-        }
-        .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.25rem 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }
-        .metric-label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-        .metric-value { font-size: 1.85rem; font-weight: 900; color: var(--primary); }
-        .metric-sub { font-size: 0.8rem; color: var(--text-muted); }
+    /* Barra de Filtros */
+    .filter-bar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.85rem;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    .form-input { min-width: 220px; }
+    
+    .btn-filter {
+        padding: 0.55rem 1rem;
+        background: #e2e8f0;
+        color: var(--text);
+        border: none;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    .btn-filter:hover { background: #cbd5e1; }
+    .btn-filter.btn-primary { background: var(--primary-accent); color: white; }
+    .btn-filter.btn-primary:hover { background: var(--primary-hover); }
 
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
-        
-        .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.65rem 1.2rem; background: var(--primary-accent); color: white; text-decoration: none; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: background 0.15s; }
-        .btn:hover { background: #1d4ed8; }
-        
-        /* Barra de Filtros */
-        .filter-bar {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem 1.25rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.85rem;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .filter-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            align-items: center;
-        }
-        .form-select, .form-input {
-            padding: 0.55rem 0.85rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.88rem;
-            background: var(--bg);
-            color: var(--text);
-            outline: none;
-        }
-        .form-select:focus, .form-input:focus { border-color: var(--primary-accent); }
-        .form-input { min-width: 220px; }
-        
-        .btn-filter {
-            padding: 0.55rem 1rem;
-            background: #e2e8f0;
-            color: var(--text);
-            border: none;
-            border-radius: 6px;
-            font-size: 0.88rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .btn-filter:hover { background: #cbd5e1; }
-        .btn-filter.btn-primary { background: var(--primary-accent); color: white; }
-        .btn-filter.btn-primary:hover { background: #1d4ed8; }
+    /* Tabela */
+    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: #f8fafc; padding: 0.85rem 1.15rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    
+    .status-badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .status-published { background: #dcfce7; color: #15803d; }
+    .status-draft { background: #f1f5f9; color: #475569; }
+    .status-pending_review { background: #fef3c7; color: #b45309; }
+    .status-archived { background: #fee2e2; color: #b91c1c; }
 
-        /* Tabela */
-        .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th { background: #f8fafc; padding: 0.85rem 1.15rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
-        td { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #fafafa; }
-        
-        .status-badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-        .status-published { background: #dcfce7; color: #15803d; }
-        .status-draft { background: #f1f5f9; color: #475569; }
-        .status-pending_review { background: #fef3c7; color: #b45309; }
-        .status-archived { background: #fee2e2; color: #b91c1c; }
+    .star-featured {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-left: 0.5rem;
+    }
+    .star-active { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .star-inactive { background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; }
 
-        .star-featured {
-            font-size: 0.8rem;
-            padding: 0.2rem 0.55rem;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            margin-left: 0.5rem;
-        }
-        .star-active { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-        .star-inactive { background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; }
-
-        /* Paginação */
-        .pagination {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.25rem 1.5rem;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            font-size: 0.88rem;
-            color: var(--text-muted);
-        }
-        .page-links { display: flex; gap: 0.4rem; }
-        .page-num {
-            padding: 0.4rem 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            text-decoration: none;
-            color: var(--text);
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-        .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
-        .page-num:hover:not(.active) { background: #f1f5f9; }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('dashboard', $currentUser, $csrfToken) ?>
+    /* Paginação */
+    .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 1.5rem;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        font-size: 0.88rem;
+        color: var(--text-muted);
+    }
+    .page-links { display: flex; gap: 0.4rem; }
+    .page-num {
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        text-decoration: none;
+        color: var(--text);
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+    .page-num:hover:not(.active) { background: #f1f5f9; }
+</style>
 
     <div class="container">
         <!-- Cards de Métricas em Tempo Real -->
@@ -614,7 +521,7 @@ function buildFilterUrl(array $overrides = []): string {
                                                 <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem;">
                                                     <?php foreach (array_slice(array_map('trim', explode(',', $p['tags'])), 0, 4) as $tg): ?>
                                                         <?php if (!empty($tg)): ?>
-                                                            <span style="font-size: 0.7rem; font-weight: 600; background: rgba(37,99,235,0.08); color: var(--primary-accent); padding: 0.1rem 0.45rem; border-radius: 4px;">
+                                                            <span style="font-size: 0.7rem; font-weight: 600; background: var(--primary-light); color: var(--primary-accent); padding: 0.1rem 0.45rem; border-radius: 4px;">
                                                                 #<?= Security::e($tg) ?>
                                                             </span>
                                                         <?php endif; ?>
@@ -628,7 +535,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <span style="font-weight: 600;"><?= Security::e($p['author_name']) ?></span>
                                 </td>
                                 <td>
-                                    <span style="background: #eff6ff; color: #2563eb; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
+                                    <span style="background: var(--primary-light); color: var(--primary-accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
                                         <?= Security::e($p['category']) ?>
                                     </span>
                                 </td>
@@ -664,7 +571,7 @@ function buildFilterUrl(array $overrides = []): string {
                                     <?= $formatDisplayDate($p['published_at'] ?? $p['updated_at']) ?>
                                 </td>
                                 <td style="text-align: right; white-space: nowrap;">
-                                    <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: #eff6ff; color: #2563eb;">
+                                    <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: var(--primary-light); color: var(--primary-accent); font-weight: 700;">
                                         Editar
                                     </a>
                                     
@@ -732,22 +639,4 @@ function buildFilterUrl(array $overrides = []): string {
             <?php endif; ?>
         </div>
     </div>
-    <script>
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) {
-                btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-            }
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
-        }
-        updateThemeIcon();
-    </script>
-</body>
-</html>
+<?php require __DIR__ . '/footer.php'; ?>

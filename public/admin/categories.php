@@ -149,119 +149,35 @@ $categories = Database::fetchAll(
 );
 
 $csrfToken = Security::generateCsrfToken();
+$pageTitle = 'Gerenciador de Categorias';
+$activePage = 'categories';
+require __DIR__ . '/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Categorias - SpeedPress Admin</title>
+<style>
+    [data-theme="dark"] th { background: #0f172a; }
+    [data-theme="dark"] tr:hover td { background: #162036; }
+    [data-theme="dark"] input[type="text"] { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
 
-    <!-- Detecção Instantânea de Tema Claro/Escuro sem Flash -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('lp_theme');
-            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
-    </script>
+    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: flex-start; }
+    @media (max-width: 900px) {
+        .grid { grid-template-columns: 1fr; }
+    }
+    
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
+    input[type="text"] { width: 100%; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; background: var(--bg); color: var(--text); outline: none; }
+    input[type="text"]:focus { border-color: var(--primary-accent); }
 
-    <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #2563eb;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        [data-theme="dark"] {
-            --primary: #f8fafc;
-            --primary-accent: #3b82f6;
-            --bg: #090d16;
-            --surface: #131b2e;
-            --border: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; transition: background 0.2s, color 0.2s; }
-        
-        [data-theme="dark"] th { background: #0f172a; }
-        [data-theme="dark"] tr:hover td { background: #162036; }
-        [data-theme="dark"] input[type="text"] { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-        [data-theme="dark"] .btn-secondary { background: #1e293b; color: #f1f5f9; }
-        [data-theme="dark"] .btn-secondary:hover { background: #334155; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: #f8fafc; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
+    td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
 
-        .site-header { 
-            background: var(--surface); 
-            border-bottom: 1px solid var(--border); 
-            padding: 0.85rem 1.75rem; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .brand { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
-        .brand span { color: var(--primary-accent); }
-        .nav-links { display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center; }
-        .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 600; transition: color 0.15s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--primary-accent); }
-
-        .theme-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-        .theme-btn:hover { background: var(--border); }
-        
-        .container { max-width: 1200px; margin: 2.5rem auto; padding: 0 1.5rem; }
-        .grid { display: grid; grid-template-columns: 1fr 1.8fr; gap: 2rem; align-items: flex-start; }
-        @media (max-width: 900px) {
-            .grid { grid-template-columns: 1fr; }
-        }
-        
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-        .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
-        input[type="text"] { width: 100%; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; background: var(--bg); color: var(--text); outline: none; }
-        input[type="text"]:focus { border-color: var(--primary-accent); }
-        
-        .btn { padding: 0.7rem 1.2rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; text-decoration: none; display: inline-block; text-align: center; }
-        .btn:hover { background: #1d4ed8; }
-        .btn-secondary { background: #e2e8f0; color: var(--text); }
-        .btn-secondary:hover { background: #cbd5e1; }
-
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        th { background: #f8fafc; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
-        td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #fafafa; }
-
-        .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-        .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    </style>
-</head>
-<body>
-    <?= \LightPress\Core\AdminNav::renderHeader('categories', $currentUser, $csrfToken) ?>
+    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+</style>
 
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem;">
@@ -370,22 +286,4 @@ $csrfToken = Security::generateCsrfToken();
             </div>
         </div>
     </div>
-    <script>
-        function updateThemeIcon() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var btn = document.getElementById('btnThemeToggle');
-            if (btn) {
-                btn.innerText = (current === 'dark') ? '☀️' : '🌙';
-            }
-        }
-        function toggleTheme() {
-            var current = document.documentElement.getAttribute('data-theme') || 'light';
-            var next = (current === 'dark') ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('lp_theme', next);
-            updateThemeIcon();
-        }
-        updateThemeIcon();
-    </script>
-</body>
-</html>
+    <?php require __DIR__ . '/footer.php'; ?>
