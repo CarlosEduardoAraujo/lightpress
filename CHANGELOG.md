@@ -13,6 +13,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Disparo imediato de invalidação de cache (disco FastCGI e CDN Cloudflare) para `/`, `/{slug}/`, `/categoria/{category}/`, feeds RSS e sitemap no momento em que a data/hora é alcançada, sem depender exclusivamente de cron job externo.
 - **Correção Visual de Badges e Ações na Redação (`dashboard.php` e `editor.php`):**
   - Corrigida a lógica de exibição em que matérias cujo horário de agendamento já havia sido ultrapassado continuavam com o badge amarelo "Agendado" e sem o botão "Ver ↗" na tabela de notícias e no editor. Agora compara adequadamente o timestamp `published_at` com o horário atual, renderizando a etiqueta verde "Publicado" e o link direto para o artigo no ar.
+- **Robustez e Logs no Worker de Cron (`bin/retry-cache-purge.php` e `bin/cleanup.php`):**
+  - Substituído o bloco com `catch (\Throwable) {}` silencioso em `bin/retry-cache-purge.php` (linha 28) por `PostService::promoteScheduledPosts()`, com captura de exceções e registro explícito no `error_log`.
+  - Tratamento de erro detalhado caso a abertura do arquivo de trava (`cache_purge_worker.lock`) falhe por permissões de sistema.
+  - Sincronização da purga de cache (disco FastCGI e CDN Cloudflare) quando o worker promove artigos agendados pelo cron.
 
 ### Correção do Painel de Plugins
 - Corrigidas as chamadas de autenticação e geração de token CSRF em `public/admin/plugins.php` e `public/admin/plugin-settings.php`, eliminando os erros fatais por parâmetro nomeado desconhecido (`roles`) e método inexistente (`getCsrfToken`).

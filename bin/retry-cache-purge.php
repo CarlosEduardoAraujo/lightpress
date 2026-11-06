@@ -15,7 +15,11 @@ use LightPress\Core\Database;
 // Bloqueio contra execuções sobrepostas via flock
 $lockFile = $config['paths']['storage'] . '/cache_purge_worker.lock';
 $fp = fopen($lockFile, 'c');
-if (!$fp || !flock($fp, LOCK_EX | LOCK_NB)) {
+if (!$fp) {
+    error_log("[retry-cache-purge] Falha ao abrir lock file: {$lockFile}");
+    exit(1);
+}
+if (!flock($fp, LOCK_EX | LOCK_NB)) {
     // Outro processo worker já está em execução
     exit(0);
 }
@@ -25,8 +29,13 @@ $nowUtc = gmdate('Y-m-d H:i:s');
 
 // Promover matérias agendadas vencidas
 try {
-    Database::query("UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?", [$nowUtc]);
-} catch (\Throwable) {}
+    $promoted = \LightPress\Core\PostService::promoteScheduledPosts();
+    if ($promoted > 0) {
+        error_log("[retry-cache-purge] Sucesso: {$promoted} matéria(s) agendada(s) promovida(s) para 'published' e caches purgados.");
+    }
+} catch (\Throwable $e) {
+    error_log("[retry-cache-purge] ERRO ao promover matérias agendadas: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
+}
 
 // Buscar até 20 jobs pendentes para reprocessamento
 $jobs = Database::fetchAll(

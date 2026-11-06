@@ -57,8 +57,8 @@ echo "  - Arquivos temporários residuais de staging removidos: {$deletedFiles}\
 
 // 4. Promoção automática de artigos agendados cujo horário já foi atingido
 try {
-    $stmt = Database::query("UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?", [$nowUtc]);
-    $promoted = $stmt->rowCount();
+    $promoted = \LightPress\Core\PostService::promoteScheduledPosts();
+
     echo "  - Artigos agendados promovidos para publicação: {$promoted}\n";
 } catch (\Throwable $e) {
     echo "  [ERRO] Falha ao promover artigos agendados: " . $e->getMessage() . "\n";
