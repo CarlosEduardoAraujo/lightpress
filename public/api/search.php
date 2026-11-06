@@ -36,7 +36,7 @@ $searchTerm = "%{$query}%";
 $posts = Database::fetchAll(
     "SELECT id, slug, title, summary, category, featured_image, published_at
      FROM posts
-     WHERE status = 'published' AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
+     WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
      ORDER BY published_at DESC
      LIMIT ?",
     [$nowUtc, $searchTerm, $searchTerm, $limit]

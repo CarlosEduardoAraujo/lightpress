@@ -7,6 +7,32 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correções Críticas de Execução, Segurança & Integridade de Dados
+- **Importação de `ImageProcessor` no Painel Administrativo (`public/admin/editor.php`, `public/admin/revisions.php`):**
+  - Adicionada a declaração explícita `use LightPress\Core\ImageProcessor;`, eliminando o erro fatal `Error: Class "ImageProcessor" not found` ao salvar rascunhos de matérias existentes ou restaurar revisões históricas.
+- **Visibilidade, Contabilização e Promoção Automática de Artigos Agendados (`public/api/view.php`, `public/api/posts.php`, `public/api/search.php`, `public/api/categories.php`, `public/admin/stats.php`, `public/admin/dashboard.php`, `bin/cleanup.php`, `bin/retry-cache-purge.php`):**
+  - Unificação do predicado SQL de visibilidade para `status IN ('published', 'scheduled') AND published_at <= ?`, garantindo que artigos com data de agendamento atingida computem visualizações e sejam retornados nas APIs e estatísticas administrativas.
+  - Promoção automática periódica de posts agendados vencidos de `'scheduled'` para `'published'` em `bin/cleanup.php` e `bin/retry-cache-purge.php`.
+- **Compatibilidade Portátil Multi-SGBD (MySQL / MariaDB & SQLite) (`public/api/view.php`, `public/admin/activate.php`, `public/admin/editor.php`, `public/admin/revisions.php`, `core/PostService.php`, `bin/seed.php`, `public/admin/categories.php`, `public/admin/dashboard.php`, `public/admin/users.php`):**
+  - Cláusulas de lock pessimista `FOR UPDATE` tornadas condicionais via `Database::getDriver() === 'mysql'`, mantendo segurança concorrencial em MySQL e compatibilidade nativa com transações SQLite.
+  - Conversão de funções exclusivas do MySQL como `IF(cond, 1, 0)` para o padrão ANSI SQL `CASE WHEN cond THEN 1 ELSE 0 END`.
+  - Adaptação de upserts em lote entre `ON DUPLICATE KEY UPDATE` (MySQL) e `ON CONFLICT` (SQLite).
+- **Proteção Contra IP Spoofing em `X-Forwarded-For` (`core/Security.php`):**
+  - Inspeção da cadeia `X-Forwarded-For` avaliada rigorosamente da direita para a esquerda (`array_reverse($ips)`), descartando proxies confiáveis conhecidos e capturando o primeiro IP cliente real não confiável, bloqueando bypasses de rate limit via cabeçalhos injetados.
+- **Eliminação de DOM XSS e Sanitização Estrita de Imagens (`public/admin/page-edit.php`, `public/admin/media.php`, `public/admin/editor.php`, `public/admin/settings.php`, `public/admin/users.php`):**
+  - Substituição da injeção de HTML via `innerHTML` em `previewImage` e `showAlert` por manipulação segura de nós DOM (`createElement`, `textContent`, `.src`).
+  - Validação e higienização obrigatória de URLs para `featured_image`, `avatar` e `site_favicon` com `BlockCompiler::sanitizeUrl()`.
+- **Proteção CSRF em Ações Administrativas Destrutivas (`public/admin/dashboard.php`, `public/admin/pages.php`, `public/admin/categories.php`, `public/admin/users.php`, `public/admin/media.php`):**
+  - Conversão de todas as operações de mutação e exclusão de `GET` para requisições `POST` com validação de token CSRF (`Security::validateCsrfToken()`), atualizando a interface administrativa para formulários inline acessíveis.
+- **Preservação de Destaques Editoriais (`core/PostService.php`):**
+  - Preservação do valor original de `is_featured` caso a chave não esteja presente no payload submetido, prevenindo perda silenciosa de destaques na aprovação de revisões de autores.
+- **Resolução de Slugs Reservados e Prevenção de Conflitos (`core/PostService.php`, `public/admin/editor.php`):**
+  - Criação de catálogo de rotas reservadas do sistema (`admin`, `api`, `uploads`, `busca`, `feed`, `sitemap`, etc.) e aplicação automática de `PostService::resolveUniqueSlug()` ao salvar rascunhos ou publicar artigos.
+- **Atomicidade no Rate Limiting de Autenticação (`core/Security.php`, `bin/cleanup.php`):**
+  - Operação atômica de leitura, atualização e escrita com bloqueio exclusivo de arquivo (`flock(LOCK_EX)`), prevenindo condições de corrida sob ataques de força bruta paralelos. Limpeza programada de arquivos expirados em `bin/cleanup.php`.
+- **Backup e Restauração Abrangentes (`bin/backup.php`, `bin/restore.php`):**
+  - Inclusão das tabelas `pages` e `settings` no backup completo, escape de identificadores com backticks, whitelist estrita de tabelas na restauração e tratamento transparente de foreign keys em MySQL e SQLite.
+
 ### Correções de Bugs & Integridade Transacional
 - **P1: Proteção Transacional contra Concorrência e Sobrescrita Editorial (`public/admin/editor.php`, `public/admin/revisions.php`):**
   - Centralização da gravação de rascunhos e restauração de revisões em transações atômicas com bloqueio pessimista `SELECT ... FOR UPDATE` e atualização condicional `WHERE id = ? AND version = ?`.

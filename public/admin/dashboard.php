@@ -27,14 +27,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 $cacheMgr = new CacheManager($config);
 
-// Alternar destaque do artigo na Home
-if (isset($_GET['toggle_featured_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
+// Logout seguro (suporta POST e GET)
+$isLogout = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logout')
+    || (isset($_GET['action']) && $_GET['action'] === 'logout');
+if ($isLogout) {
+    $tokenLogout = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+    if (Security::verifyCsrfToken($tokenLogout)) {
+        Security::destroySession();
+        header('Location: /admin/login.php?logged_out=1');
+        exit;
+    }
+}
+
+// Alternar destaque do artigo na Home (POST prioritário, ANSI CASE WHEN)
+$toggleFeaturedId = (int)($_POST['toggle_featured_id'] ?? $_GET['toggle_featured_id'] ?? 0);
+$tokenToggle = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if ($toggleFeaturedId > 0 && Security::verifyCsrfToken($tokenToggle)) {
     if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)) {
-        $toggleId = (int)$_GET['toggle_featured_id'];
-        Database::query("UPDATE posts SET is_featured = IF(is_featured = 1, 0, 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleId]);
+        Database::query("UPDATE posts SET is_featured = CASE WHEN is_featured = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleFeaturedId]);
         $cacheMgr->purgeUrls(['/']);
         
-        // Redireciona mantendo os filtros
         $queryParams = $_GET;
         unset($queryParams['toggle_featured_id'], $queryParams['_csrf_token']);
         $qs = !empty($queryParams) ? '?' . http_build_query($queryParams) : '';
@@ -43,14 +55,14 @@ if (isset($_GET['toggle_featured_id']) && Security::verifyCsrfToken($_GET['_csrf
     }
 }
 
-// Excluir publicação
-if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-    $deleteId = (int)$_GET['delete_id'];
-    $targetPost = Database::fetchOne("SELECT id, slug, category, tags, user_id FROM posts WHERE id = ? LIMIT 1", [$deleteId]);
+// Excluir publicação (POST prioritário)
+$delPostId = (int)($_POST['delete_id'] ?? $_GET['delete_id'] ?? 0);
+$tokenDel = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
+    $targetPost = Database::fetchOne("SELECT id, slug, category, tags, user_id FROM posts WHERE id = ? LIMIT 1", [$delPostId]);
     
     if ($targetPost) {
         if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST)) {
-            // Montar lista completa de URLs dependentes para invalidação (LP-09)
             $affectedUrls = [
                 '/',
                 '/' . $targetPost['slug'] . '/',
@@ -63,7 +75,6 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
                 '/categoria/' . $targetPost['category'] . '/page/2/',
             ];
 
-            // Adicionar páginas de tags caso existam
             if (!empty($targetPost['tags'])) {
                 $tagItems = explode(',', (string)$targetPost['tags']);
                 foreach ($tagItems as $t) {
@@ -74,16 +85,14 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
                 }
             }
 
-            Database::transaction(function (\PDO $pdo) use ($deleteId, $affectedUrls, $cacheMgr): void {
-                Database::query("DELETE FROM post_stats WHERE post_id = ?", [$deleteId]);
-                Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$deleteId]);
-                Database::query("DELETE FROM posts WHERE id = ?", [$deleteId]);
+            Database::transaction(function (\PDO $pdo) use ($delPostId, $affectedUrls, $cacheMgr): void {
+                Database::query("DELETE FROM post_stats WHERE post_id = ?", [$delPostId]);
+                Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$delPostId]);
+                Database::query("DELETE FROM posts WHERE id = ?", [$delPostId]);
                 
-                // Registra job de purga persistente de forma atômica no banco
-                $cacheMgr->recordPurgeJob($deleteId, 'post_deletion', $affectedUrls);
+                $cacheMgr->recordPurgeJob($delPostId, 'post_deletion', $affectedUrls);
             });
 
-            // Executa a purga física do cache ESTRITAMENTE APÓS O COMMIT (LP-09)
             $cacheMgr->purgeUrls($affectedUrls);
 
             $queryParams = $_GET;
@@ -95,10 +104,11 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
     }
 }
 
-// Métricas do Topo
+// Métricas do Topo (inclui agendadas cujo horário já foi atingido como publicadas)
+$nowUtc = gmdate('Y-m-d H:i:s');
 $totalPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts");
-$scheduledPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'scheduled' OR (status = 'published' AND published_at > CURRENT_TIMESTAMP)");
-$publishedPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND (published_at IS NULL OR published_at <= CURRENT_TIMESTAMP)");
+$scheduledPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE (status = 'scheduled' AND published_at > ?) OR (status = 'published' AND published_at > ?)", [$nowUtc, $nowUtc]);
+$publishedPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE (status = 'published' AND (published_at IS NULL OR published_at <= ?)) OR (status = 'scheduled' AND published_at <= ?)", [$nowUtc, $nowUtc]);
 $draftPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status IN ('draft', 'pending_review')");
 $totalViews = (int)Database::fetchValue("SELECT COALESCE(SUM(views), 0) FROM post_stats");
 
@@ -117,9 +127,13 @@ $whereClauses = ["1=1"];
 $params = [];
 
 if ($filterStatus === 'scheduled') {
-    $whereClauses[] = "(p.status = 'scheduled' OR (p.status = 'published' AND p.published_at > CURRENT_TIMESTAMP))";
+    $whereClauses[] = "((p.status = 'scheduled' AND p.published_at > ?) OR (p.status = 'published' AND p.published_at > ?))";
+    $params[] = $nowUtc;
+    $params[] = $nowUtc;
 } elseif ($filterStatus === 'published') {
-    $whereClauses[] = "(p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= CURRENT_TIMESTAMP))";
+    $whereClauses[] = "((p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= ?)) OR (p.status = 'scheduled' AND p.published_at <= ?))";
+    $params[] = $nowUtc;
+    $params[] = $nowUtc;
 } elseif (!empty($filterStatus)) {
     $whereClauses[] = "p.status = ?";
     $params[] = $filterStatus;
@@ -460,7 +474,11 @@ function buildFilterUrl(array $overrides = []): string {
             <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong> (<?= Security::e($currentUser['role']) ?>)</span>
             <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Meu Perfil</a>
             <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" class="logout">Sair</a>
+            <form method="POST" action="/admin/dashboard.php" style="display:inline;">
+                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                <input type="hidden" name="action" value="logout">
+                <button type="submit" class="logout" style="background:none; border:none; cursor:pointer; font:inherit; color:inherit; text-decoration:underline;">Sair</button>
+            </form>
         </div>
     </header>
 
@@ -601,11 +619,13 @@ function buildFilterUrl(array $overrides = []): string {
                                                 </a>
 
                                                 <?php if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)): ?>
-                                                    <a href="<?= buildFilterUrl(['toggle_featured_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 
-                                                       class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>"
-                                                       title="Clique para alternar presença no Hero Quad Grid da Home">
-                                                        <?= !empty($p['is_featured']) ? '★ Destaque Home' : '☆ Destacar' ?>
-                                                    </a>
+                                                    <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;">
+                                                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                        <input type="hidden" name="toggle_featured_id" value="<?= (int)$p['id'] ?>">
+                                                        <button type="submit" class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>" style="border:none; cursor:pointer;" title="Clique para alternar presença no Hero Quad Grid da Home">
+                                                            <?= !empty($p['is_featured']) ? '★ Destaque Home' : '☆ Destacar' ?>
+                                                        </button>
+                                                    </form>
                                                 <?php elseif (!empty($p['is_featured'])): ?>
                                                     <span class="star-featured star-active">★ Destaque</span>
                                                 <?php endif; ?>
@@ -677,13 +697,13 @@ function buildFilterUrl(array $overrides = []): string {
                                     $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST); 
                                     if ($canDelete):
                                     ?>
-                                        <a href="<?= buildFilterUrl(['delete_id' => (int)$p['id'], '_csrf_token' => $csrfToken]) ?>" 
-                                           onclick="return confirm('Tem certeza que deseja excluir esta publicação? Essa ação removerá o artigo e seu cache no Nginx.')"
-                                           class="btn-filter" 
-                                           style="padding: 0.35rem 0.6rem; font-size: 0.8rem; color: #dc2626; background: #fee2e2;"
-                                           title="Excluir Artigo">
-                                            ✕
-                                        </a>
+                                        <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta publicação? Essa ação removerá o artigo e seu cache no Nginx.');">
+                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                            <input type="hidden" name="delete_id" value="<?= (int)$p['id'] ?>">
+                                            <button type="submit" class="btn-filter" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; color: #dc2626; background: #fee2e2; border:none; cursor:pointer;" title="Excluir Artigo">
+                                                ✕
+                                            </button>
+                                        </form>
                                     <?php endif; ?>
                                 </td>
                             </tr>

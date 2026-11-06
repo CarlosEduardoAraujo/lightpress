@@ -9,6 +9,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;
+use LightPress\Core\ImageProcessor;
 use LightPress\Core\PostService;
 use LightPress\Core\Security;
 
@@ -43,8 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                 $postId, $revId, $currentUser, &$message
             ): void {
                 // 1. Bloqueia e relê a linha atualizada da publicação
+                $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
                 $current = Database::fetchOne(
-                    "SELECT * FROM posts WHERE id = ? FOR UPDATE",
+                    "SELECT * FROM posts WHERE id = ?{$forUpdate}",
                     [$postId]
                 );
                 if (!$current) {

@@ -23,6 +23,11 @@ if (!$fp || !flock($fp, LOCK_EX | LOCK_NB)) {
 $cacheManager = new CacheManager($config);
 $nowUtc = gmdate('Y-m-d H:i:s');
 
+// Promover matérias agendadas vencidas
+try {
+    Database::query("UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?", [$nowUtc]);
+} catch (\Throwable) {}
+
 // Buscar até 20 jobs pendentes para reprocessamento
 $jobs = Database::fetchAll(
     "SELECT id, post_id, payload_json, attempts 

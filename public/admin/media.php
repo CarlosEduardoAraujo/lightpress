@@ -97,8 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 }
 
 // 2. Exclusão de Mídia Segura (Verifica permissão e se está vinculada a artigos/páginas)
-if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-    $mediaId = trim($_GET['delete_id']);
+$delMediaId = trim($_POST['delete_id'] ?? $_GET['delete_id'] ?? '');
+$csrfMed = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
+    $mediaId = $delMediaId;
     $mediaItem = Database::fetchOne("SELECT * FROM media WHERE id = ? LIMIT 1", [$mediaId]);
 
     if (!$mediaItem) {
@@ -453,11 +455,13 @@ $csrfToken = Security::generateCsrfToken();
                             $canDeleteItem = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)($item['user_id'] ?? 0) === (int)$currentUser['id']);
                             if ($canDeleteItem): 
                             ?>
-                                <a href="/admin/media.php?delete_id=<?= urlencode($item['id']) ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
-                                   class="btn-delete"
-                                   onclick="return confirm('Deseja excluir esta mídia? Esta ação removerá os arquivos em disco se a imagem não estiver vinculada a nenhum artigo.');">
-                                    Excluir Imagem
-                                </a>
+                                <form method="POST" action="/admin/media.php" style="display:inline; width:100%;" onsubmit="return confirm('Deseja excluir esta mídia? Esta ação removerá os arquivos em disco se a imagem não estiver vinculada a nenhum artigo.');">
+                                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                    <input type="hidden" name="delete_id" value="<?= Security::e($item['id']) ?>">
+                                    <button type="submit" class="btn-delete" style="width:100%; border:none; cursor:pointer;">
+                                        Excluir Imagem
+                                    </button>
+                                </form>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -489,7 +493,11 @@ $csrfToken = Security::generateCsrfToken();
         const csrfToken = document.getElementById('csrfToken').value;
 
         function showAlert(msg, isError) {
-            dynamicAlert.innerHTML = '<div class="' + (isError ? 'alert-error' : 'alert-success') + '">' + msg + '</div>';
+            dynamicAlert.replaceChildren();
+            const alertDiv = document.createElement('div');
+            alertDiv.className = isError ? 'alert-error' : 'alert-success';
+            alertDiv.textContent = msg;
+            dynamicAlert.appendChild(alertDiv);
         }
 
         fileInput.addEventListener('change', function() {

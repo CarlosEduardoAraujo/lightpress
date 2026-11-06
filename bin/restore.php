@@ -56,24 +56,37 @@ echo "Iniciando restauração transacional...\n\n";
 
 $restoredCounts = [];
 
+$allowedTables = [
+    'users', 'categories', 'posts', 'post_stats', 'post_revisions',
+    'pages', 'settings', 'media', 'media_refs', 'redirects'
+];
+
 try {
-    Database::transaction(function (\PDO $pdo) use ($data, &$restoredCounts): void {
-        // Desativar chaves estrangeiras temporariamente
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+    Database::transaction(function (\PDO $pdo) use ($data, $allowedTables, &$restoredCounts): void {
+        $driver = Database::getDriver();
+        if ($driver === 'sqlite') {
+            $pdo->exec("PRAGMA foreign_keys = OFF;");
+        } else {
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+        }
 
         foreach ($data['tables'] as $table => $rows) {
+            if (!in_array($table, $allowedTables, true)) {
+                continue;
+            }
             if (!is_array($rows) || empty($rows)) {
                 continue;
             }
 
             // Limpar tabela atual
-            $pdo->exec("DELETE FROM {$table};");
+            $pdo->exec("DELETE FROM `{$table}`;");
 
             $columns = array_keys($rows[0]);
-            $colList = implode(', ', $columns);
+            $escapedCols = array_map(function($c) { return '`' . str_replace('`', '``', $c) . '`'; }, $columns);
+            $colList = implode(', ', $escapedCols);
             $placeholders = implode(', ', array_fill(0, count($columns), '?'));
 
-            $sql = "INSERT INTO {$table} ({$colList}) VALUES ({$placeholders})";
+            $sql = "INSERT INTO `{$table}` ({$colList}) VALUES ({$placeholders})";
             $stmt = $pdo->prepare($sql);
 
             $count = 0;
@@ -86,7 +99,11 @@ try {
             echo "  [OK] Tabela '{$table}': {$count} registros restaurados.\n";
         }
 
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+        if ($driver === 'sqlite') {
+            $pdo->exec("PRAGMA foreign_keys = ON;");
+        } else {
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+        }
     });
 
     echo "\n========================================================\n";

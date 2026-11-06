@@ -63,10 +63,10 @@ $ipHash = Security::hashIp($ip, $secret);
 
 try {
     $recorded = Database::transaction(function (\PDO $pdo) use ($postId, $ipHash, $expiresAt, $nowUtc): bool {
-        // Verificar se o artigo existe e está plenamente publicado
+        // Verificar se o artigo existe e está plenamente publicado (ou agendado com horário atingido)
         $post = Database::fetchOne(
             "SELECT id FROM posts 
-             WHERE id = ? AND status = 'published' AND published_at IS NOT NULL AND published_at <= ?
+             WHERE id = ? AND status IN ('published', 'scheduled') AND published_at IS NOT NULL AND published_at <= ?
              LIMIT 1",
             [$postId, $nowUtc]
         );
@@ -75,9 +75,10 @@ try {
             return false;
         }
 
-        // Verificar janela de deduplicação ativa com lock pessimista (evita race condition sob alta concorrência)
+        // Verificar janela de deduplicação ativa com lock pessimista no MySQL (evita race condition sob concorrência)
+        $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
         $dedupe = Database::fetchOne(
-            "SELECT expires_at FROM view_dedupe WHERE post_id = ? AND ip_hash = ? FOR UPDATE",
+            "SELECT expires_at FROM view_dedupe WHERE post_id = ? AND ip_hash = ?{$forUpdate}",
             [$postId, $ipHash]
         );
 
@@ -86,13 +87,22 @@ try {
             return true;
         }
 
-        // Renovar ou inserir registro de deduplicação
-        Database::query(
-            "INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
-             VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)",
-            [$postId, $ipHash, $expiresAt]
-        );
+        // Renovar ou inserir registro de deduplicação (portável MySQL / SQLite)
+        if (Database::getDriver() === 'sqlite') {
+            Database::query(
+                "INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
+                 VALUES (?, ?, ?)
+                 ON CONFLICT(post_id, ip_hash) DO UPDATE SET expires_at = excluded.expires_at",
+                [$postId, $ipHash, $expiresAt]
+            );
+        } else {
+            Database::query(
+                "INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)",
+                [$postId, $ipHash, $expiresAt]
+            );
+        }
 
         // Incremento atômico direto em post_stats
         Database::query(

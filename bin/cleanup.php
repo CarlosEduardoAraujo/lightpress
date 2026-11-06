@@ -55,4 +55,27 @@ if (is_dir($stagingDir)) {
 }
 echo "  - Arquivos temporários residuais de staging removidos: {$deletedFiles}\n";
 
+// 4. Promoção automática de artigos agendados cujo horário já foi atingido
+try {
+    $stmt = Database::query("UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?", [$nowUtc]);
+    $promoted = $stmt->rowCount();
+    echo "  - Artigos agendados promovidos para publicação: {$promoted}\n";
+} catch (\Throwable $e) {
+    echo "  [ERRO] Falha ao promover artigos agendados: " . $e->getMessage() . "\n";
+}
+
+// 5. Limpeza de arquivos de rate limit de login expirados
+$logDir = $config['paths']['storage'] . '/logs';
+$deletedRateLimits = 0;
+if (is_dir($logDir)) {
+    foreach (glob($logDir . '/ratelimit_login_*.json') as $rlFile) {
+        if (filemtime($rlFile) < (time() - 3600)) {
+            if (@unlink($rlFile)) {
+                $deletedRateLimits++;
+            }
+        }
+    }
+}
+echo "  - Arquivos de rate-limit expirados removidos: {$deletedRateLimits}\n";
+
 echo "[LightPress Cleanup] Concluído com sucesso.\n";

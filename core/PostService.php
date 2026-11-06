@@ -14,6 +14,11 @@ use RuntimeException;
  */
 class PostService
 {
+    public const RESERVED_SLUGS = [
+        'admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed',
+        'feed.xml', 'sitemap', 'sitemap.xml', 'sitemap-main.xml', 'page', 'categoria', 'tag', 'noticia'
+    ];
+
     private CacheManager $cacheManager;
 
     public function __construct(?CacheManager $cacheManager = null)
@@ -138,7 +143,7 @@ class PostService
         $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
-                "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ? FOR UPDATE",
+                "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
                 [$postId]
             );
 
@@ -161,7 +166,7 @@ class PostService
             $category = !empty($data['category']) ? Security::slugify($data['category']) : $current['category'];
             $tags = $data['tags'] ?? null;
             $featuredImage = $data['featured_image'] ?? null;
-            $isFeatured = !empty($data['is_featured']) ? 1 : 0;
+            $isFeatured = array_key_exists('is_featured', $data) ? (!empty($data['is_featured']) ? 1 : 0) : (int)$current['is_featured'];
 
             if (!empty($data['content_html'])) {
                 $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
@@ -287,7 +292,7 @@ class PostService
     /**
      * Garante unicidade do slug adicionando sufixo numérico (-2, -3) caso já exista no banco.
      */
-    private function resolveUniqueSlug(string $baseSlug, ?int $ignorePostId = null): string
+    public function resolveUniqueSlug(string $baseSlug, ?int $ignorePostId = null): string
     {
         $baseSlug = trim($baseSlug, '-');
         if (empty($baseSlug)) {
@@ -298,13 +303,14 @@ class PostService
         $counter = 1;
 
         while (true) {
+            $isReserved = in_array(strtolower($slug), self::RESERVED_SLUGS, true) || str_starts_with($slug, 'sitemap-posts-');
             if ($ignorePostId !== null) {
                 $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? AND id != ? LIMIT 1", [$slug, $ignorePostId]);
             } else {
                 $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? LIMIT 1", [$slug]);
             }
 
-            if (!$exists) {
+            if (!$exists && !$isReserved) {
                 return $slug;
             }
 

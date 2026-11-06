@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = trim($_POST['title'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $contentHtml = trim($_POST['content_html'] ?? '');
-        $featuredImage = trim($_POST['featured_image'] ?? '');
+        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeUrl(trim($_POST['featured_image'])) : null;
         $seoTitle = trim($_POST['seo_title'] ?? '');
         $seoDesc = trim($_POST['seo_description'] ?? '');
         $status = in_array($_POST['status'] ?? '', ['published', 'draft', 'archived'], true) ? $_POST['status'] : 'published';
@@ -484,10 +484,18 @@ $csrfToken = Security::generateCsrfToken();
 
         function previewImage(url) {
             var box = document.getElementById('image_preview');
+            box.replaceChildren();
             if (url && url.trim() !== '') {
-                box.innerHTML = '<img src="' + url + '" style="width: 100%; height: 100%; object-fit: cover;">';
+                var img = document.createElement('img');
+                img.src = url;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                box.appendChild(img);
             } else {
-                box.innerHTML = '<span>Sem imagem selecionada</span>';
+                var span = document.createElement('span');
+                span.textContent = 'Sem imagem selecionada';
+                box.appendChild(span);
             }
         }
     </script>

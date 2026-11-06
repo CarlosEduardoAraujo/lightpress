@@ -9,6 +9,7 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $role = $_POST['role'] ?? 'author';
         $bio = trim($_POST['bio'] ?? '');
-        $avatar = trim($_POST['avatar'] ?? '');
+        $avatar = !empty($_POST['avatar']) ? BlockCompiler::sanitizeUrl(trim($_POST['avatar'])) : null;
         $newPassword = trim($_POST['password'] ?? '');
 
         if (!in_array($role, ['author', 'editor', 'admin'], true)) {
@@ -154,15 +155,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. Alternar Status Ativo / Bloqueado
-if (isset($_GET['toggle_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-    $targetId = (int)$_GET['toggle_id'];
-    if ($targetId === (int)$currentUser['id']) {
+// 2. Alternar Status Ativo / Bloqueado (POST prioritário, ANSI CASE WHEN)
+$toggleUserId = (int)($_POST['toggle_id'] ?? $_GET['toggle_id'] ?? 0);
+$csrfUsr = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if ($toggleUserId > 0 && Security::verifyCsrfToken($csrfUsr)) {
+    if ($toggleUserId === (int)$currentUser['id']) {
         $error = "Você não pode desativar seu próprio usuário.";
     } else {
         Database::query(
-            "UPDATE users SET is_active = IF(is_active = 1, 0, 1), session_version = session_version + 1 WHERE id = ?",
-            [$targetId]
+            "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",
+            [$toggleUserId]
         );
         header("Location: /admin/users.php");
         exit;
@@ -470,11 +472,13 @@ $csrfToken = Security::generateCsrfToken();
                                     </a>
 
                                     <?php if ((int)$u['id'] !== (int)$currentUser['id']): ?>
-                                        <a href="/admin/users.php?toggle_id=<?= (int)$u['id'] ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
-                                           onclick="return confirm('Alternar status deste usuário? Se for bloqueado, suas sessões ativas serão canceladas imediatamente.')"
-                                           style="color: <?= $u['is_active'] ? '#dc2626' : '#16a34a' ?>; text-decoration: none; font-size: 0.85rem; font-weight: 600;">
-                                            <?= $u['is_active'] ? 'Bloquear' : 'Ativar' ?>
-                                        </a>
+                                        <form method="POST" action="/admin/users.php" style="display:inline;" onsubmit="return confirm('Alternar status deste usuário? Se for bloqueado, suas sessões ativas serão canceladas imediatamente.');">
+                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                            <input type="hidden" name="toggle_id" value="<?= (int)$u['id'] ?>">
+                                            <button type="submit" style="background:none; border:none; cursor:pointer; color: <?= $u['is_active'] ? '#dc2626' : '#16a34a' ?>; font-size: 0.85rem; font-weight: 600; padding:0;">
+                                                <?= $u['is_active'] ? 'Bloquear' : 'Ativar' ?>
+                                            </button>
+                                        </form>
                                     <?php endif; ?>
                                 </td>
                             </tr>

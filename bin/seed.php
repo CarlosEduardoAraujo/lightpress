@@ -35,11 +35,19 @@ $categories = [
 // 1. Garantir que as categorias existam
 echo "[1/3] Semeando categorias de automobilismo...\n";
 foreach ($categories as $cat) {
-    Database::query(
-        "INSERT INTO categories (slug, name, is_active) VALUES (?, ?, 1)
-         ON DUPLICATE KEY UPDATE name = VALUES(name)",
-        [$cat['slug'], $cat['name']]
-    );
+    if (Database::getDriver() === 'sqlite') {
+        Database::query(
+            "INSERT INTO categories (slug, name, is_active) VALUES (?, ?, 1)
+             ON CONFLICT(slug) DO UPDATE SET name = excluded.name",
+            [$cat['slug'], $cat['name']]
+        );
+    } else {
+        Database::query(
+            "INSERT INTO categories (slug, name, is_active) VALUES (?, ?, 1)
+             ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            [$cat['slug'], $cat['name']]
+        );
+    }
 }
 
 // 2. Garantir autores de demonstração
@@ -54,12 +62,21 @@ $authorIds = [];
 $sampleHash = Security::hashPassword('speedpress123');
 
 foreach ($authors as $auth) {
-    Database::query(
-        "INSERT INTO users (name, username, email, password_hash, role, is_active, session_version)
-         VALUES (?, ?, ?, ?, ?, 1, 1)
-         ON DUPLICATE KEY UPDATE role = VALUES(role)",
-        [$auth['name'], $auth['username'], $auth['email'], $sampleHash, $auth['role']]
-    );
+    if (Database::getDriver() === 'sqlite') {
+        Database::query(
+            "INSERT INTO users (name, username, email, password_hash, role, is_active, session_version)
+             VALUES (?, ?, ?, ?, ?, 1, 1)
+             ON CONFLICT(email) DO UPDATE SET role = excluded.role",
+            [$auth['name'], $auth['username'], $auth['email'], $sampleHash, $auth['role']]
+        );
+    } else {
+        Database::query(
+            "INSERT INTO users (name, username, email, password_hash, role, is_active, session_version)
+             VALUES (?, ?, ?, ?, ?, 1, 1)
+             ON DUPLICATE KEY UPDATE role = VALUES(role)",
+            [$auth['name'], $auth['username'], $auth['email'], $sampleHash, $auth['role']]
+        );
+    }
     $u = Database::fetchOne("SELECT id FROM users WHERE username = ?", [$auth['username']]);
     if ($u) {
         $authorIds[] = (int)$u['id'];

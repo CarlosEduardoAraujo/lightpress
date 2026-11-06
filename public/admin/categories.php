@@ -108,28 +108,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. Alternar Status Ativo / Inativo
-if (isset($_GET['toggle_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-    $toggleId = (int)$_GET['toggle_id'];
-    $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleId]);
+// 2. Alternar Status Ativo / Inativo (POST prioritário, GET fallback, ANSI CASE WHEN)
+$toggleCatId = (int)($_POST['toggle_id'] ?? $_GET['toggle_id'] ?? 0);
+$csrfToggle = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
+    $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleCatId]);
     if ($cat && $cat['slug'] !== 'geral') {
-        Database::query("UPDATE categories SET is_active = IF(is_active = 1, 0, 1) WHERE id = ?", [$toggleId]);
+        Database::query("UPDATE categories SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", [$toggleCatId]);
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/']);
     }
     header("Location: /admin/categories.php");
     exit;
 }
 
-// 3. Exclusão Segura de Categoria
-if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-    $deleteId = (int)$_GET['delete_id'];
-    $cat = Database::fetchOne("SELECT slug FROM categories WHERE id = ? LIMIT 1", [$deleteId]);
+// 3. Exclusão Segura de Categoria (POST prioritário, GET fallback)
+$delCatId = (int)($_POST['delete_id'] ?? $_GET['delete_id'] ?? 0);
+$csrfDel = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
+    $cat = Database::fetchOne("SELECT slug FROM categories WHERE id = ? LIMIT 1", [$delCatId]);
     
     if ($cat && $cat['slug'] !== 'geral') {
         // Mover posts vinculados para a categoria padrão 'geral' antes de excluir
-        Database::transaction(function (\PDO $pdo) use ($deleteId, $cat): void {
+        Database::transaction(function (\PDO $pdo) use ($delCatId, $cat): void {
             Database::query("UPDATE posts SET category = 'geral' WHERE category = ?", [$cat['slug']]);
-            Database::query("DELETE FROM categories WHERE id = ?", [$deleteId]);
+            Database::query("DELETE FROM categories WHERE id = ?", [$delCatId]);
         });
         
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/', '/categoria/geral/']);
@@ -366,16 +368,21 @@ $csrfToken = Security::generateCsrfToken();
                                     </a>
 
                                     <?php if ($cat['slug'] !== 'geral'): ?>
-                                        <a href="/admin/categories.php?toggle_id=<?= (int)$cat['id'] ?>&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: var(--text-muted); text-decoration: none; font-size: 0.85rem; margin-right: 0.5rem;">
-                                            <?= $cat['is_active'] ? 'Pausar' : 'Ativar' ?>
-                                        </a>
+                                        <form method="POST" action="/admin/categories.php" style="display:inline;">
+                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                            <input type="hidden" name="toggle_id" value="<?= (int)$cat['id'] ?>">
+                                            <button type="submit" style="background:none; border:none; cursor:pointer; color: var(--text-muted); font-size: 0.85rem; margin-right: 0.5rem; padding:0;">
+                                                <?= $cat['is_active'] ? 'Pausar' : 'Ativar' ?>
+                                            </button>
+                                        </form>
 
-                                        <a href="/admin/categories.php?delete_id=<?= (int)$cat['id'] ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
-                                           onclick="return confirm('Excluir esta categoria? As matérias vinculadas a ela serão movidas com segurança para a categoria Geral.')"
-                                           style="color: #dc2626; text-decoration: none; font-weight: 700; font-size: 0.85rem;"
-                                           title="Excluir Categoria">
-                                            ✕
-                                        </a>
+                                        <form method="POST" action="/admin/categories.php" style="display:inline;" onsubmit="return confirm('Excluir esta categoria? As matérias vinculadas a ela serão movidas com segurança para a categoria Geral.');">
+                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                            <input type="hidden" name="delete_id" value="<?= (int)$cat['id'] ?>">
+                                            <button type="submit" style="background:none; border:none; cursor:pointer; color: #dc2626; font-weight: 700; font-size: 0.85rem; padding:0;" title="Excluir Categoria">
+                                                ✕
+                                            </button>
+                                        </form>
                                     <?php endif; ?>
                                 </td>
                             </tr>

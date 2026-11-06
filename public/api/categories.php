@@ -22,13 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
+$nowUtc = gmdate('Y-m-d H:i:s');
 $categories = Database::fetchAll(
     "SELECT c.id, c.slug, c.name, COUNT(p.id) as total_posts 
      FROM categories c
-     LEFT JOIN posts p ON p.category = c.slug AND p.status = 'published'
+     LEFT JOIN posts p ON p.category = c.slug AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
      WHERE c.is_active = 1
      GROUP BY c.id
-     ORDER BY c.name ASC"
+     ORDER BY c.name ASC",
+    [$nowUtc]
 );
 
 foreach ($categories as &$cat) {

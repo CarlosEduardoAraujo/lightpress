@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      FROM user_reset_tokens t
                      JOIN users u ON u.id = t.user_id
                      WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > ?
-                     LIMIT 1 FOR UPDATE",
+                     LIMIT 1" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '')",
                     [$tokenHash, $nowUtc]
                 );
 

@@ -22,10 +22,12 @@ Schema::ensurePagesTable();
 $message = '';
 $error = '';
 
-// Exclusão de Página
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
-    $deleteId = (int)$_GET['id'];
-    $csrf = $_GET['_csrf_token'] ?? '';
+// Exclusão de Página (suporta POST prioritário e GET para compatibilidade)
+$isDelPage = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete')
+    || (isset($_GET['action']) && $_GET['action'] === 'delete');
+if ($isDelPage) {
+    $deleteId = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+    $csrf = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
     
     if (!Security::verifyCsrfToken($csrf)) {
         $error = "Token de segurança CSRF inválido ou expirado.";

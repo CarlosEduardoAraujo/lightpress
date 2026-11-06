@@ -11,6 +11,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Authorization;
 use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
+use LightPress\Core\ImageProcessor;
 use LightPress\Core\PostService;
 use LightPress\Core\Security;
 
@@ -45,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category = trim($_POST['category'] ?? 'geral');
         $tags = trim($_POST['tags'] ?? '');
         $summary = trim($_POST['summary'] ?? '');
-        $featuredImage = trim($_POST['featured_image'] ?? '');
+        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeUrl(trim($_POST['featured_image'])) : '';
         $contentHtml = trim($_POST['content_html'] ?? '');
         $contentJson = $_POST['content_json'] ?? '';
         $seoTitle = trim($_POST['seo_title'] ?? '');
@@ -84,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             if ($postId === 0) {
-                // Criar novo post
+                // Criar novo post (com resolução e prevenção de colisões/palavras reservadas)
+                $payload['slug'] = $postService->resolveUniqueSlug(!empty($slug) ? Security::slugify($slug) : Security::slugify($title));
                 $newId = $postService->createPost($payload, (int)$currentUser['id']);
                 if ($action === 'publish' && Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)) {
                     $postService->publishOrUpdate($newId, $payload, (int)$currentUser['id'], 1);
@@ -126,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message
                     ): void {
                         // 1. Bloqueia e relê a linha atualizada do banco
-                        $current = Database::fetchOne("SELECT * FROM posts WHERE id = ? FOR UPDATE", [$postId]);
+                        $current = Database::fetchOne("SELECT * FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''), [$postId]);
                         if (!$current) {
                             throw new RuntimeException("Publicação não encontrada.", 404);
                         }
@@ -191,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
 
                         $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($current['slug']) ? $current['slug'] : Security::slugify($title));
+                        $cleanSlug = (new PostService())->resolveUniqueSlug($cleanSlug, $postId);
                         $publishedAtVal = $canPublish ? (!empty($publishedAt) ? $publishedAt : ($current['published_at'] ?? null)) : ($current['published_at'] ?? null);
                         $newVersion = (int)$current['version'] + 1;
 

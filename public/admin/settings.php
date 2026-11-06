@@ -16,6 +16,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\CacheManager;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Settings;
 
 $currentUser = Security::requireAuth(null, ['admin']);
@@ -34,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $siteDescription = trim($_POST['site_description'] ?? '');
-            $siteFavicon = trim($_POST['site_favicon'] ?? '');
+            $siteFavicon = !empty($_POST['site_favicon']) ? BlockCompiler::sanitizeUrl(trim($_POST['site_favicon'])) : '';
             $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
 
             // Validação estrita do Fuso Horário informado

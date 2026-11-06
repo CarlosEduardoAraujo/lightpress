@@ -189,9 +189,17 @@ class Security
             }
         }
 
-        // 3. Cabeçalho X-Forwarded-For
+        // 3. Cabeçalho X-Forwarded-For (lido da direita para a esquerda - rightmost untrusted IP)
         if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ips = array_reverse(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']));
+            foreach ($ips as $candidate) {
+                $candidate = trim($candidate);
+                if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    if (!in_array($candidate, $trusted, true)) {
+                        return $candidate;
+                    }
+                }
+            }
             foreach ($ips as $candidate) {
                 $candidate = trim($candidate);
                 if (filter_var($candidate, FILTER_VALIDATE_IP)) {
@@ -256,29 +264,42 @@ class Security
         }
         $file = $dir . '/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
 
-        $data = ['attempts' => 0, 'first_attempt' => time(), 'lockout_until' => 0];
-        if (file_exists($file)) {
-            $parsed = json_decode((string)@file_get_contents($file), true);
-            if (is_array($parsed)) {
-                $data = $parsed;
+        $fp = @fopen($file, 'c+');
+        if (!$fp) {
+            return;
+        }
+
+        try {
+            flock($fp, LOCK_EX);
+            $size = @filesize($file);
+            $raw = ($size && $size > 0) ? (string)fread($fp, $size) : '';
+            $data = json_decode($raw, true);
+            if (!is_array($data)) {
+                $data = ['attempts' => 0, 'first_attempt' => time(), 'lockout_until' => 0];
             }
+
+            $now = time();
+            if (($now - ((int)($data['first_attempt'] ?? $now))) > $lockoutSeconds) {
+                $data['attempts'] = 0;
+                $data['first_attempt'] = $now;
+                $data['lockout_until'] = 0;
+            }
+
+            $data['attempts'] = ((int)($data['attempts'] ?? 0)) + 1;
+            $data['last_attempt'] = $now;
+
+            if ($data['attempts'] >= $maxAttempts) {
+                $data['lockout_until'] = $now + $lockoutSeconds;
+            }
+
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($data, JSON_UNESCAPED_SLASHES));
+            fflush($fp);
+            flock($fp, LOCK_UN);
+        } finally {
+            fclose($fp);
         }
-
-        $now = time();
-        if (($now - ((int)($data['first_attempt'] ?? $now))) > $lockoutSeconds) {
-            $data['attempts'] = 0;
-            $data['first_attempt'] = $now;
-            $data['lockout_until'] = 0;
-        }
-
-        $data['attempts'] = ((int)($data['attempts'] ?? 0)) + 1;
-        $data['last_attempt'] = $now;
-
-        if ($data['attempts'] >= $maxAttempts) {
-            $data['lockout_until'] = $now + $lockoutSeconds;
-        }
-
-        @file_put_contents($file, json_encode($data), LOCK_EX);
     }
 
     /**

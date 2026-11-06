@@ -45,7 +45,7 @@ $posts = Database::fetchAll(
      FROM posts p
      JOIN users u ON u.id = p.user_id
      LEFT JOIN post_stats s ON s.post_id = p.id
-     WHERE p.status = 'published' AND p.published_at <= ? {$whereCategory}
+     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$whereCategory}
      ORDER BY p.published_at DESC
      LIMIT ? OFFSET ?",
     $paramsWithLimit

@@ -27,7 +27,7 @@ echo "Iniciando exportação completa das tabelas relacionais...\n";
 
 $tables = [
     'users', 'categories', 'posts', 'post_stats', 'post_revisions',
-    'media', 'media_refs', 'redirects'
+    'pages', 'settings', 'media', 'media_refs', 'redirects'
 ];
 
 $exportData = [
