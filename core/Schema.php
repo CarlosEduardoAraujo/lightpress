@@ -212,6 +212,15 @@ class Schema
         } catch (\Throwable $e) {
             // Ignora se já estiver criado ou não suportado
         }
+
+        try {
+            $hasMediaCreated = $pdo->query("SHOW INDEX FROM media WHERE Key_name = 'idx_media_created'")->fetch();
+            if (!$hasMediaCreated) {
+                $pdo->exec("ALTER TABLE media ADD INDEX idx_media_created (created_at DESC)");
+            }
+        } catch (\Throwable $e) {
+            // Ignora se já existir
+        }
     }
 
     /**
@@ -324,6 +333,7 @@ class Schema
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
             );",
             "CREATE INDEX IF NOT EXISTS idx_media_user ON media (user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_media_created ON media (created_at DESC);",
 
             // 8. media_refs
             "CREATE TABLE IF NOT EXISTS media_refs (
