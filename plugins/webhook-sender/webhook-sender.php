@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Plugin Name: Webhook Sender
  * Description: Envia automaticamente notificações para servidores e canais via Webhook ao publicar matérias.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Carlos Eduardo de Araújo / LightPress
  */
 
@@ -16,33 +16,59 @@ use LightPress\Core\Settings;
 
 // 1. Registro do Hook de Ativação (Criação de Tabela Relacional Dedicada)
 PluginManager::registerActivationHook('webhook-sender', function (): void {
-    $driver = Database::getDriver();
-    if ($driver === 'sqlite') {
-        Database::query("
-            CREATE TABLE IF NOT EXISTS plugin_webhook_sender_logs (
-                post_id INTEGER PRIMARY KEY,
-                sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                servers_count INTEGER NOT NULL DEFAULT 1,
-                last_response_codes TEXT NULL,
-                FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
-            )
-        ");
-    } else {
-        Database::query("
-            CREATE TABLE IF NOT EXISTS plugin_webhook_sender_logs (
-                post_id INT UNSIGNED PRIMARY KEY,
-                sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                servers_count INT UNSIGNED NOT NULL DEFAULT 1,
-                last_response_codes TEXT NULL,
-                CONSTRAINT fk_pws_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
-    }
+    WebhookSenderService::ensureTableSchema();
 });
 
 // Helper de envio e formatação de webhooks
 final class WebhookSenderService
 {
+    /**
+     * Garante a criação da tabela e integridade da coluna is_success de forma transparente.
+     */
+    public static function ensureTableSchema(): void
+    {
+        static $checked = false;
+        if ($checked) {
+            return;
+        }
+        $checked = true;
+
+        try {
+            $driver = Database::getDriver();
+            if ($driver === 'sqlite') {
+                Database::query("
+                    CREATE TABLE IF NOT EXISTS plugin_webhook_sender_logs (
+                        post_id INTEGER PRIMARY KEY,
+                        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        servers_count INTEGER NOT NULL DEFAULT 1,
+                        is_success INTEGER NOT NULL DEFAULT 0,
+                        last_response_codes TEXT NULL,
+                        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+                    )
+                ");
+            } else {
+                Database::query("
+                    CREATE TABLE IF NOT EXISTS plugin_webhook_sender_logs (
+                        post_id INT UNSIGNED PRIMARY KEY,
+                        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        servers_count INT UNSIGNED NOT NULL DEFAULT 1,
+                        is_success TINYINT(1) NOT NULL DEFAULT 0,
+                        last_response_codes TEXT NULL,
+                        CONSTRAINT fk_pws_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                ");
+
+                // Auto-migração caso a tabela tenha sido criada em versão anterior sem is_success
+                $cols = Database::fetchAll("SHOW COLUMNS FROM plugin_webhook_sender_logs LIKE 'is_success'");
+                if (empty($cols)) {
+                    Database::query("ALTER TABLE plugin_webhook_sender_logs ADD COLUMN is_success TINYINT(1) NOT NULL DEFAULT 0 AFTER servers_count");
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log("[WebhookSender] Erro ao verificar schema: " . $e->getMessage());
+        }
+    }
+
     /**
      * Divide a string por vírgulas e/ou quebras de linha e retorna apenas URLs válidas.
      *
@@ -74,11 +100,18 @@ final class WebhookSenderService
      */
     public static function buildPayload(int $postId, array $post, array $config): array
     {
-        $siteName = $config['app']['name'] ?? 'SpeedRacing';
-        $siteUrl = rtrim($config['app']['canonical_origin'] ?? $config['app']['url'] ?? '', '/');
-        if (empty($siteUrl) && isset($_SERVER['HTTP_HOST'])) {
+        $cfg = !empty($config) ? $config : ($GLOBALS['config'] ?? []);
+        $siteName = $cfg['app']['name'] ?? 'SpeedRacing';
+        
+        // Suporte explícito a canonical_origin (essencial em cron / terminal onde $_SERVER['HTTP_HOST'] não existe)
+        $canonicalOrigin = $cfg['app']['canonical_origin'] ?? $cfg['app']['url'] ?? '';
+        if (!empty($canonicalOrigin)) {
+            $siteUrl = rtrim($canonicalOrigin, '/');
+        } elseif (isset($_SERVER['HTTP_HOST'])) {
             $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $siteUrl = $scheme . '://' . $_SERVER['HTTP_HOST'];
+        } else {
+            $siteUrl = 'https://www.speedracing.com.br';
         }
 
         $title = (string)($post['title'] ?? 'Nova publicação');
@@ -106,8 +139,8 @@ final class WebhookSenderService
 
         // Ícone / Favicon do site
         $siteIconUrl = null;
-        if (!empty($config['app']['favicon'])) {
-            $rawFav = (string)$config['app']['favicon'];
+        if (!empty($cfg['app']['favicon'])) {
+            $rawFav = (string)$cfg['app']['favicon'];
             $siteIconUrl = (str_starts_with($rawFav, 'http://') || str_starts_with($rawFav, 'https://'))
                 ? $rawFav
                 : $siteUrl . '/' . ltrim($rawFav, '/');
@@ -208,9 +241,15 @@ final class WebhookSenderService
 
 // 2. Registro do Evento de Publicação de Notícia
 Hook::addAction('post_published', function (int $postId, array $data, ?array $current = null, bool $isFirstPublish = true): void {
-    // 1. Verifica se este post já foi enviado anteriormente (evita envios repetidos em edições subsequentes)
+    // Assegura estrutura de tabela atualizada
+    WebhookSenderService::ensureTableSchema();
+
+    // 1. Verifica se este post já foi entregue com SUCESSO anteriormente (evita envios repetidos)
     try {
-        $alreadySent = Database::fetchValue("SELECT post_id FROM plugin_webhook_sender_logs WHERE post_id = ?", [$postId]);
+        $alreadySent = Database::fetchValue(
+            "SELECT post_id FROM plugin_webhook_sender_logs WHERE post_id = ? AND is_success = 1",
+            [$postId]
+        );
         if (!empty($alreadySent)) {
             return;
         }
@@ -227,20 +266,36 @@ Hook::addAction('post_published', function (int $postId, array $data, ?array $cu
     }
 
     // 3. Monta o payload universal
-    global $config;
-    $payload = WebhookSenderService::buildPayload($postId, $data, $config ?? []);
+    $payload = WebhookSenderService::buildPayload($postId, $data, $GLOBALS['config'] ?? []);
 
     // 4. Dispara os webhooks
     $responses = WebhookSenderService::dispatch($urls, $payload);
 
-    // 5. Registra o log no banco relacional
+    // 5. Avalia se houve sucesso na entrega (ao menos um servidor com HTTP 2xx)
+    $successCount = 0;
+    foreach ($responses as $code) {
+        if ($code >= 200 && $code < 300) {
+            $successCount++;
+        }
+    }
+    $isSuccess = ($successCount > 0) ? 1 : 0;
+
+    // 6. Registra ou atualiza o log no banco relacional
+    // Se falhar (is_success = 0), fica registrado para visualização no painel,
+    // mas NÃO bloqueia retentativas futuras quando o post for reprocessado ou re-salvo!
     try {
         Database::query("
-            INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, last_response_codes)
-            VALUES (?, CURRENT_TIMESTAMP, ?, ?)
+            INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
+            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                sent_at = CURRENT_TIMESTAMP,
+                servers_count = VALUES(servers_count),
+                is_success = VALUES(is_success),
+                last_response_codes = VALUES(last_response_codes)
         ", [
             $postId,
             count($urls),
+            $isSuccess,
             json_encode($responses, JSON_UNESCAPED_SLASHES)
         ]);
     } catch (\Throwable $e) {

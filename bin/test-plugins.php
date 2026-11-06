@@ -100,6 +100,12 @@ assertTest("Embed contém URL canônica correta", str_contains($payload['embeds'
 assertTest("Embed contém cor hexadecimal padrão", isset($payload['embeds'][0]['color']));
 assertTest("Payload contém dados universais estruturados", isset($payload['post']['id']) && $payload['post']['id'] === 101);
 
+// Teste de canonical_origin em ambiente CLI / Cron (sem $_SERVER['HTTP_HOST'])
+unset($_SERVER['HTTP_HOST']);
+$cliPayload = WebhookSenderService::buildPayload(102, $mockPost, ['app' => ['canonical_origin' => 'https://www.speedracing.com.br']]);
+assertTest("CLI Cron usa canonical_origin na ausência de HTTP_HOST", str_starts_with($cliPayload['embeds'][0]['url'], 'https://www.speedracing.com.br/'));
+
+
 // -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------

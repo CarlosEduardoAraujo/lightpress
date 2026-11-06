@@ -67,25 +67,28 @@ class PostService
     {
         $nowUtc = gmdate('Y-m-d H:i:s');
         try {
-            $duePosts = Database::fetchAll(
-                "SELECT id, slug, title, summary, category, tags, featured_image, content_html, published_at
-                 FROM posts 
-                 WHERE status = 'scheduled' AND published_at <= ?",
-                [$nowUtc]
-            );
+            // Transação atômica com FOR UPDATE para bloquear e promover exclusivamente os artigos vencidos
+            // evitando qualquer duplicidade em acessos concorrentes ou crons simultâneos
+            $duePosts = Database::transaction(function (\PDO $pdo) use ($nowUtc): array {
+                $posts = Database::fetchAll(
+                    "SELECT id, slug, title, summary, category, tags, featured_image, content_html, published_at
+                     FROM posts 
+                     WHERE status = 'scheduled' AND published_at <= ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
+                    [$nowUtc]
+                );
+
+                if (empty($posts)) {
+                    return [];
+                }
+
+                $ids = array_column($posts, 'id');
+                $inClause = implode(',', array_map('intval', $ids));
+                Database::query("UPDATE posts SET status = 'published' WHERE id IN ({$inClause})");
+
+                return $posts;
+            });
 
             if (empty($duePosts)) {
-                return 0;
-            }
-
-            $dueIds = array_column($duePosts, 'id');
-            $inClause = implode(',', array_map('intval', $dueIds));
-
-            $stmt = Database::query(
-                "UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND id IN ({$inClause})"
-            );
-
-            if ($stmt->rowCount() === 0) {
                 return 0;
             }
 
