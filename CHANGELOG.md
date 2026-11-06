@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Webhooks em Matérias Agendadas (`core/PostService.php` e `plugins/webhook-sender/`)
+- **Disparo de Webhook na Auto-Promoção (`core/PostService::promoteScheduledPosts()`):**
+  - Adicionado o disparo do hook `post_published` para cada matéria agendada que atinge o horário de publicação e é promovida de `scheduled` para `published`.
+  - Inclusão dos campos editoriais completos (`title`, `summary`, `tags`, `featured_image`, `content_html`, `published_at`) na consulta de matérias vencidas, garantindo a montagem integral do payload de notificação para plugins externos.
+  - Prevenção de concorrência com verificação do `rowCount()` no `UPDATE` para garantir que apenas um processo dispare os webhooks e purgue o cache.
+  - Suporte a `$config['app']['canonical_origin']` no `WebhookSenderService` para que execuções via CLI/cron montem URLs absolutas corretas mesmo na ausência de `$_SERVER['HTTP_HOST']`.
+
 ### Agendamento e Auto-Promoção de Publicações
 - **Promoção Automática On-Request (`core/PostService::promoteScheduledPosts()`):**
   - Implementada verificação automática no carregamento das rotas públicas (`public/index.php`) e administrativas (`dashboard.php` e `editor.php`) que busca matérias com `status = 'scheduled' AND published_at <= UTC_NOW` e as promove atomicamente para `status = 'published'`.

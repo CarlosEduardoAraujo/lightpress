@@ -68,7 +68,9 @@ class PostService
         $nowUtc = gmdate('Y-m-d H:i:s');
         try {
             $duePosts = Database::fetchAll(
-                "SELECT id, slug, category FROM posts WHERE status = 'scheduled' AND published_at <= ?",
+                "SELECT id, slug, title, summary, category, tags, featured_image, content_html, published_at
+                 FROM posts 
+                 WHERE status = 'scheduled' AND published_at <= ?",
                 [$nowUtc]
             );
 
@@ -76,21 +78,38 @@ class PostService
                 return 0;
             }
 
-            Database::query(
-                "UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?",
-                [$nowUtc]
+            $dueIds = array_column($duePosts, 'id');
+            $inClause = implode(',', array_map('intval', $dueIds));
+
+            $stmt = Database::query(
+                "UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND id IN ({$inClause})"
             );
+
+            if ($stmt->rowCount() === 0) {
+                return 0;
+            }
 
             $cacheManager = new CacheManager();
             foreach ($duePosts as $p) {
-                $cacheManager->purgeUrls([
-                    '/',
-                    "/{$p['slug']}/",
-                    "/categoria/{$p['category']}/",
-                    '/feed',
-                    '/feed.xml',
-                    '/sitemap.xml',
-                ]);
+                try {
+                    $cacheManager->purgeUrls([
+                        '/',
+                        "/{$p['slug']}/",
+                        "/categoria/{$p['category']}/",
+                        '/feed',
+                        '/feed.xml',
+                        '/sitemap.xml',
+                    ]);
+                } catch (\Throwable $e) {
+                    error_log("[PostService Cache Purge Error] promoteScheduledPosts: " . $e->getMessage());
+                }
+
+                // Disparo de hook para plugins (ex: Webhook Sender) quando a matéria agendada atinge o horário e é publicada
+                try {
+                    Hook::doAction('post_published', (int)$p['id'], $p, ['status' => 'scheduled'], true);
+                } catch (\Throwable $e) {
+                    error_log("[PostService Hook Error] post_published on promote: " . $e->getMessage());
+                }
             }
 
             return count($duePosts);

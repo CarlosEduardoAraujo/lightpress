@@ -75,7 +75,7 @@ final class WebhookSenderService
     public static function buildPayload(int $postId, array $post, array $config): array
     {
         $siteName = $config['app']['name'] ?? 'SpeedRacing';
-        $siteUrl = rtrim($config['app']['url'] ?? '', '/');
+        $siteUrl = rtrim($config['app']['canonical_origin'] ?? $config['app']['url'] ?? '', '/');
         if (empty($siteUrl) && isset($_SERVER['HTTP_HOST'])) {
             $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $siteUrl = $scheme . '://' . $_SERVER['HTTP_HOST'];
