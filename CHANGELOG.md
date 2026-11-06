@@ -7,6 +7,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correções de Bugs (Bug Fixes)
+- **Correção de Retorno no Roteador em PHP 8.4 (`core/Router.php`):**
+  - Correção dos ramos de redirecionamento canônico (`/page/1/`, `/categoria/{slug}/page/1`, `/noticia/{slug}` e normalização de trailing slash) no método `Router::dispatch()`: substituição de instruções `return;` vazias por `return null;` explícito, cumprindo a assinatura estrita de tipo de retorno `mixed` do PHP 8.4 e eliminando o erro de compilação `Fatal error: A method with return type must return a value` que impedia a execução das rotas públicas.
+
 ### Otimizações de Banco de Dados & Performance (SQL)
 - **Remoção de `p.content_html` das Consultas de Listagem (`public/index.php`, `templates/home.php`):**
   - Eliminação da transferência da coluna pesada `p.content_html` (`MEDIUMTEXT`) nas consultas SQL de feed da Home, paginações (`/page/{n}/`), categorias (`/categoria/{slug}/`), tags (`/tag/{tag}/`) e busca (`/busca`).

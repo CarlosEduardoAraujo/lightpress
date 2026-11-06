@@ -96,26 +96,26 @@ class Router
         // Redirecionamento Canônico de Paginação: /page/1/ ou /page/1 -> / (301)
         if ($path === '/page/1' || $path === '/page/1/') {
             $this->redirect('/', 301);
-            return;
+            return null;
         }
 
         // Canonicalização de Categoria: /categoria/{slug}/page/1 -> /categoria/{slug}/ (301)
         if (preg_match('~^/categoria/([^/]+)/page/1/?$~', $path, $matches)) {
             $this->redirect('/categoria/' . $matches[1] . '/', 301);
-            return;
+            return null;
         }
 
         // Redirecionamento de compatibilidade: /noticia/{slug} -> /{slug}/ (301)
         if (preg_match('~^/noticia/([^/]+)/?$~', $path, $matches)) {
             $this->redirect('/' . $matches[1] . '/', 301);
-            return;
+            return null;
         }
 
         // Canonicalização de barra final para rotas públicas amigáveis (apenas requisições GET e fora de /api/)
         if ($method === 'GET' && !str_starts_with($path, '/api/') && $path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
             $queryString = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
             $this->redirect($path . '/' . $queryString, 301);
-            return;
+            return null;
         }
 
         // Busca rota correspondente
