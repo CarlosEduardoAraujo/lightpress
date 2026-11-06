@@ -228,7 +228,7 @@ function buildFilterUrl(array $overrides = []): string {
     $cleaned = array_filter($merged, fn($v) => $v !== '' && $v !== null && $v !== 0);
     return '/admin/dashboard.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
 }
-?>
+
 $pageTitle = 'Painel Editorial';
 $activePage = 'dashboard';
 require __DIR__ . '/header.php';
