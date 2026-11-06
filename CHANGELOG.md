@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Agendamento e Auto-Promoção de Publicações
+- **Promoção Automática On-Request (`core/PostService::promoteScheduledPosts()`):**
+  - Implementada verificação automática no carregamento das rotas públicas (`public/index.php`) e administrativas (`dashboard.php` e `editor.php`) que busca matérias com `status = 'scheduled' AND published_at <= UTC_NOW` e as promove atomicamente para `status = 'published'`.
+  - Disparo imediato de invalidação de cache (disco FastCGI e CDN Cloudflare) para `/`, `/{slug}/`, `/categoria/{category}/`, feeds RSS e sitemap no momento em que a data/hora é alcançada, sem depender exclusivamente de cron job externo.
+- **Correção Visual de Badges e Ações na Redação (`dashboard.php` e `editor.php`):**
+  - Corrigida a lógica de exibição em que matérias cujo horário de agendamento já havia sido ultrapassado continuavam com o badge amarelo "Agendado" e sem o botão "Ver ↗" na tabela de notícias e no editor. Agora compara adequadamente o timestamp `published_at` com o horário atual, renderizando a etiqueta verde "Publicado" e o link direto para o artigo no ar.
+
 ### Correção do Painel de Plugins
 - Corrigidas as chamadas de autenticação e geração de token CSRF em `public/admin/plugins.php` e `public/admin/plugin-settings.php`, eliminando os erros fatais por parâmetro nomeado desconhecido (`roles`) e método inexistente (`getCsrfToken`).
 

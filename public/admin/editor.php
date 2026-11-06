@@ -17,6 +17,9 @@ use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth();
 
+// Auto-promoção de matérias agendadas cujo horário já foi atingido
+PostService::promoteScheduledPosts();
+
 $postId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $post = null;
 $message = '';
@@ -524,7 +527,9 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                     <div class="card">
                         <?php if ($post): ?>
                             <?php 
-                                $isSched = ($post['status'] === 'scheduled') || ($post['status'] === 'published' && !empty($post['published_at']) && strtotime($post['published_at']) > time());
+                                $pubTime = !empty($post['published_at']) ? strtotime($post['published_at']) : 0;
+                                $isSched = ($pubTime > time()) && ($post['status'] === 'scheduled' || $post['status'] === 'published');
+                                $isPub = ($post['status'] === 'published') || ($pubTime > 0 && $pubTime <= time() && $post['status'] === 'scheduled');
                                 $displayTzName = $config['app']['display_timezone'] ?? 'America/Sao_Paulo';
                                 $postDisplayFormatted = '';
                                 if (!empty($post['published_at'])) {
@@ -541,9 +546,10 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                                 <div style="background: #fef3c7; color: #b45309; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #fde68a;">
                                     📅 Matéria Agendada para <?= $postDisplayFormatted ?>
                                 </div>
-                            <?php elseif ($post['status'] === 'published'): ?>
+                            <?php elseif ($isPub): ?>
                                 <div style="background: #dcfce7; color: #15803d; padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid #bbf7d0;">
-                                    ✓ Publicada no Ar (<?= $postDisplayFormatted ?>)
+                                    <span>✓ Publicada no Ar (<?= $postDisplayFormatted ?>)</span>
+                                    <a href="/<?= Security::e($post['slug']) ?>/" target="_blank" style="color: #15803d; font-weight: 800; text-decoration: underline; margin-left: 0.5rem;">Ver ↗</a>
                                 </div>
                             <?php else: ?>
                                 <div style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 700; font-size: 0.82rem; margin-bottom: 1rem; text-align: center; border: 1px solid var(--border);">
@@ -578,10 +584,11 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                         <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
                             <button type="submit" name="form_action" value="publish" id="btnPublishAction" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
                                 <?php
-                                    $isFutureDate = ($post && !empty($post['published_at']) && strtotime($post['published_at']) > time());
-                                    if ($isFutureDate || ($post && $post['status'] === 'scheduled')) {
+                                    $pubTime = ($post && !empty($post['published_at'])) ? strtotime($post['published_at']) : 0;
+                                    $isFutureDate = ($pubTime > time());
+                                    if ($isFutureDate) {
                                         echo '📅 Salvar Agendamento';
-                                    } elseif ($post && $post['status'] === 'published') {
+                                    } elseif ($post && ($post['status'] === 'published' || ($pubTime > 0 && $pubTime <= time()))) {
                                         echo 'Atualizar Publicação';
                                     } else {
                                         echo '🚀 Publicar Agora';

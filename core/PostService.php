@@ -59,6 +59,47 @@ class PostService
         }
     }
 
+    /**
+     * Promove automaticamente matérias agendadas cujo horário de publicação foi atingido
+     * e dispara a invalidação de cache em disco e na borda Cloudflare.
+     */
+    public static function promoteScheduledPosts(): int
+    {
+        $nowUtc = gmdate('Y-m-d H:i:s');
+        try {
+            $duePosts = Database::fetchAll(
+                "SELECT id, slug, category FROM posts WHERE status = 'scheduled' AND published_at <= ?",
+                [$nowUtc]
+            );
+
+            if (empty($duePosts)) {
+                return 0;
+            }
+
+            Database::query(
+                "UPDATE posts SET status = 'published' WHERE status = 'scheduled' AND published_at <= ?",
+                [$nowUtc]
+            );
+
+            $cacheManager = new CacheManager();
+            foreach ($duePosts as $p) {
+                $cacheManager->purgeUrls([
+                    '/',
+                    "/{$p['slug']}/",
+                    "/categoria/{$p['category']}/",
+                    '/feed',
+                    '/feed.xml',
+                    '/sitemap.xml',
+                ]);
+            }
+
+            return count($duePosts);
+        } catch (\Throwable $e) {
+            error_log("[PostService] Falha ao auto-promover agendados: " . $e->getMessage());
+            return 0;
+        }
+    }
+
 
     /**
      * Cria um novo artigo em modo rascunho (draft) com integridade transacional.

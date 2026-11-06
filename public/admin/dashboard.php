@@ -16,6 +16,9 @@ use LightPress\Core\CacheManager;
 
 $currentUser = Security::requireAuth();
 
+// Auto-promoção de matérias agendadas cujo horário já foi atingido
+\LightPress\Core\PostService::promoteScheduledPosts();
+
 // Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     if (Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
@@ -631,16 +634,21 @@ function buildFilterUrl(array $overrides = []): string {
                                 </td>
                                 <td>
                                     <?php 
-                                        $isSched = ($p['status'] === 'scheduled') || ($p['status'] === 'published' && !empty($p['published_at']) && strtotime($p['published_at']) > time());
+                                        $pubTime = !empty($p['published_at']) ? strtotime($p['published_at']) : 0;
+                                        $isSched = ($pubTime > time()) && ($p['status'] === 'scheduled' || $p['status'] === 'published');
+                                        $isPub = ($p['status'] === 'published') || ($pubTime > 0 && $pubTime <= time() && $p['status'] === 'scheduled');
                                     ?>
                                     <?php if ($isSched): ?>
                                         <span class="status-badge" style="background: #fef3c7; color: #b45309;" title="Agendado para <?= $formatDisplayDate($p['published_at']) ?>">
                                             📅 Agendado (<?= $formatDisplayDate($p['published_at'], 'd/m H:i') ?>)
                                         </span>
+                                    <?php elseif ($isPub): ?>
+                                        <span class="status-badge status-published">
+                                            Publicado
+                                        </span>
                                     <?php else: ?>
                                         <span class="status-badge status-<?= Security::e($p['status']) ?>">
                                             <?= match($p['status']) {
-                                                'published' => 'Publicado',
                                                 'draft' => 'Rascunho',
                                                 'pending_review' => 'Em Revisão',
                                                 'archived' => 'Arquivado',
@@ -660,7 +668,7 @@ function buildFilterUrl(array $overrides = []): string {
                                         Editar
                                     </a>
                                     
-                                    <?php if ($p['status'] === 'published'): ?>
+                                    <?php if ($isPub): ?>
                                         <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;">
                                             Ver ↗
                                         </a>

@@ -16,8 +16,12 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:
 $config = require dirname(__DIR__) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\PostService;
 use LightPress\Core\Router;
 use LightPress\Core\Security;
+
+// Auto-promoção de matérias agendadas cujo horário já foi atingido
+PostService::promoteScheduledPosts();
 
 $router = new Router();
 
