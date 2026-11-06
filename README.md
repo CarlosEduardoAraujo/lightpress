@@ -275,7 +275,8 @@ lightpress/
 │   ├── Router.php             # Roteador regex leve de alta velocidade
 │   ├── ImageProcessor.php     # Algoritmo GD de corte, conversão e fallback
 │   ├── BlockCompiler.php      # Compilador JSON -> HTML semântico com sanitização
-│   ├── CacheManager.php       # Invalidador nativo de cache em disco Nginx
+│   ├── CacheManager.php       # Invalidador nativo de cache em disco Nginx e orquestrador
+│   ├── CloudflareCache.php    # Invalidação seletiva de cache de borda via Cloudflare API v4
 │   ├── Authorization.php      # Perfis, ações e autorização por artigo/campo
 │   ├── PostService.php        # Revisões, conflitos e publicação transacional
 │   ├── Security.php           # Utilitários de CSRF, sanitização e rate-limiting
@@ -300,6 +301,7 @@ lightpress/
 ├── bin/                       # Ferramentas CLI
 │   ├── migrate-wp.php         # Importador em lotes, retomável e auditável
 │   ├── retry-cache-purge.php  # Retentativa de purgas persistidas
+│   ├── purge-cache.php        # Utilitário CLI para purga seletiva/total (Cloudflare e Nginx)
 │   └── cleanup.php            # Expiração de tokens, deduplicação e staging
 └── public/                    # Web Root (Nginx / Servidor Web)
     ├── index.php              # Ponto único de entrada (Front Controller)
@@ -494,6 +496,42 @@ O atraso de até 5 minutos nas listagens secundárias é uma regra explícita da
 * Provar que prévias, respostas com `Set-Cookie`, erros e conteúdo de usuários autenticados nunca são armazenados nem reaproveitados para anônimos.
 * Testar mudança de slug/categoria, publicação, atualização, arquivamento e exclusão, verificando URLs antigas e novas e TTLs das listagens.
 * Simular falha de permissão, interrupção do worker e renderização anterior ao commit terminando depois da primeira purga; verificar retentativa persistente e ausência do conteúdo antigo após a conclusão declarada.
+
+### 7.5. Invalidação Seletiva na Borda com Cloudflare (API v4)
+
+Para portais que utilizam proxy reverso e CDN da Cloudflare à frente do Nginx, o LightPress integra nativamente a purga seletiva de cache por URLs via API v4 (`core/CloudflareCache.php`).
+
+#### Funcionamento da Purga Seletiva
+- **Preservação de Assets Estáticos:** A purga invalida exclusivamente o HTML das páginas impactadas pela nova notícia (Home `/`, feeds RSS/Atom `/feed.xml` e `/feed/`, `/sitemap.xml`, a notícia recém-publicada `/{slug}/` e sua categoria `/categoria/{slug}/`). Imagens (`/uploads/`), CSS, JS e fontes continuam cacheados nos datacenters globais da Cloudflare, economizando banda e mantendo máxima performance.
+- **Orquestração Concorrente:** O `CacheManager` orquestra a limpeza do cache FastCGI em disco (`/var/cache/nginx/wordpress`) e dispara a invalidação seletiva na Cloudflare em milissegundos.
+- **Operação Não-Bloqueante (Fail-Safe):** A chamada cURL para a Cloudflare opera com timeout estrito de 5 segundos e tratamento defensivo via `error_log`. Falhas externas de conectividade nunca bloqueiam a publicação nem retornam erro 500 no painel editorial.
+- **Lotes Determinísticos:** O envio de URLs é agrupado em lotes de até 30 arquivos por requisição, respeitando os limites da API v4 da Cloudflare.
+
+#### Configuração (`config.local.php`)
+```php
+    'cloudflare' => [
+        'enabled'    => true,
+        'zone_id'    => 'SEU_ZONE_ID_DA_CLOUDFLARE',
+        'api_token'  => 'SEU_API_TOKEN_COM_PERMISSAO_DE_PURGE',
+        'timeout'    => 5,
+    ],
+```
+
+#### Utilitário CLI (`bin/purge-cache.php`)
+O LightPress disponibiliza um utilitário de linha de comando para validações e limpezas manuais:
+```bash
+# Validar credenciais e permissão real de purga na Cloudflare
+php bin/purge-cache.php --test
+
+# Purgar matéria específica (Home, Feeds, Sitemap e Notícia)
+php bin/purge-cache.php --slug="alan-permane-racing-bulls-2031"
+
+# Purgar Home, Feeds e Sitemap
+php bin/purge-cache.php --home
+
+# Purga total emergencial (Cloudflare Purge Everything + Disco FastCGI local)
+php bin/purge-cache.php --all
+```
 
 ---
 

@@ -58,6 +58,9 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Adição do índice composto `INDEX idx_media_created (created_at DESC)` na tabela `media`, garantindo que a listagem de fotos no painel administrativo ([`public/admin/media.php`](file:///c:/Web/lightpress/public/admin/media.php)) execute em < 1ms mesmo com mais de 30.000 imagens catalogadas.
 
 ### Correções Críticas de Execução, Segurança & Integridade de Dados
+- **Resolução de Erro de Truncamento ao Agendar Notícias (`core/PostService.php`, `bin/migrate-scheduled.php`):**
+  - Implementação de detecção automática com self-healing DDL em `PostService::ensureScheduledEnumSupported()`, garantindo que a coluna `status` da tabela `posts` e de `post_revisions` possua os valores `'scheduled'` e `'pending_review'`, eliminando o erro MySQL `Warning: 1265 Data truncated for column 'status' at row 1` ao agendar matérias.
+  - Atualização do utilitário `bin/migrate-scheduled.php` para sincronizar ambas as tabelas diretamente pelo terminal.
 - **Importação de `ImageProcessor` no Painel Administrativo (`public/admin/editor.php`, `public/admin/revisions.php`):**
   - Adicionada a declaração explícita `use LightPress\Core\ImageProcessor;`, eliminando o erro fatal `Error: Class "ImageProcessor" not found` ao salvar rascunhos de matérias existentes ou restaurar revisões históricas.
 - **Visibilidade, Contabilização e Promoção Automática de Artigos Agendados (`public/api/view.php`, `public/api/posts.php`, `public/api/search.php`, `public/api/categories.php`, `public/admin/stats.php`, `public/admin/dashboard.php`, `bin/cleanup.php`, `bin/retry-cache-purge.php`):**

@@ -26,6 +26,40 @@ class PostService
         $this->cacheManager = $cacheManager ?? new CacheManager();
     }
 
+    private static bool $enumChecked = false;
+
+    /**
+     * Garante que as colunas ENUM suportam 'scheduled' e 'pending_review' no MySQL.
+     * Auto-migra instantaneamente caso o banco de produção esteja com schema legado.
+     */
+    private function ensureScheduledEnumSupported(): void
+    {
+        if (self::$enumChecked || Database::getDriver() !== 'mysql') {
+            return;
+        }
+
+        try {
+            $col = Database::fetchOne("SHOW COLUMNS FROM posts LIKE 'status'");
+            if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'scheduled'")) {
+                Database::getConnection()->exec(
+                    "ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'"
+                );
+            }
+
+            $revCol = Database::fetchOne("SHOW COLUMNS FROM post_revisions LIKE 'status'");
+            if ($revCol && !empty($revCol['Type']) && !str_contains($revCol['Type'], "'pending_review'")) {
+                Database::getConnection()->exec(
+                    "ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied') NOT NULL DEFAULT 'draft'"
+                );
+            }
+
+            self::$enumChecked = true;
+        } catch (\Throwable $e) {
+            // Silencioso se não tiver permissão DDL
+        }
+    }
+
+
     /**
      * Cria um novo artigo em modo rascunho (draft) com integridade transacional.
      * Insere concorrentemente a linha correspondente em `post_stats` com zero visualizações.
@@ -47,6 +81,7 @@ class PostService
      */
     public function createPost(array $data, int $userId): int
     {
+        $this->ensureScheduledEnumSupported();
         $title = trim($data['title']);
         if (empty($title)) {
             throw new RuntimeException("O título da publicação é obrigatório.", 400);
@@ -138,6 +173,7 @@ class PostService
      */
     public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion): bool
     {
+        $this->ensureScheduledEnumSupported();
         $affectedUrls = [];
 
         $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls): bool {
