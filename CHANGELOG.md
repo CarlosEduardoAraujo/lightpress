@@ -7,6 +7,14 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Expansão Panorâmica do Layout Público (`1900px`)
+- **Aumento da Largura Máxima do Container (Home, Categorias, Tags, Posts e Navegação Geral):**
+  - Atualização do container central e dos blocos estruturais de navegação pública de `max-w-[1280px]` para `max-w-[1900px]`, ampliando substancialmente o espaço útil horizontal para notícias, mosaicos de matérias, manchetes e barras laterais em monitores Full HD, Quad HD e Ultrawide.
+  - Alinhamento de todos os componentes do cabeçalho global (`templates/header.php`): Top Strip de credibilidade/newsletter, barra de navegação principal (logo, menu de categorias e busca) e faixa de ticker "Em Alta".
+  - Expansão do invólucro principal de conteúdo (`<main>` em `templates/header.php`) para `max-w-[1900px]`, aplicando-se uniformemente a todas as páginas sem estar logado (Home, Categorias, Tags, Postagens, Páginas Institucionais, Busca e Páginas de Erro).
+  - Alinhamento do container do rodapé (`templates/footer.php`) para `max-w-[1900px]`, mantendo harmonia geométrica perfeita entre o topo, o corpo e a base do site.
+  - Recompilação dos estilos Tailwind CSS de produção (`public/assets/style.css`), gerando a nova regra utilitária `.max-w-\[1900px\] { max-width: 1900px; }`.
+
 ### Modernização e Paridade Visual da Edição de Páginas Institucionais (`public/admin/page-edit.php`)
 - **Paridade Estrutural com o Editor de Notícias:**
   - Reconstrução completa da tela de inclusão e edição de páginas institucionais para adotar layout, componentes, responsividade e experiência de uso rigorosamente idênticos ao editor de notícias (`public/admin/editor.php`).

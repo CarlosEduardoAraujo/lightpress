@@ -7,7 +7,7 @@ use LightPress\Core\Security;
     </main>
 
     <footer class="w-full bg-carbon-black text-pure-white mt-space-xl pt-space-xl pb-space-lg border-t border-track-asphalt">
-        <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex flex-col gap-space-xl">
+        <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin flex flex-col gap-space-xl">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-lg">
                 <div class="lg:col-span-2 flex flex-col gap-space-sm">
                     <div class="flex items-center gap-space-sm">

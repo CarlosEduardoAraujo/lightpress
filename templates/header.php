@@ -250,7 +250,7 @@ if (empty($trendingTags)) {
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">
         <!-- 1. Top Strip -->
         <div class="w-full bg-carbon-black text-on-tertiary">
-            <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between h-9 text-label-meta font-label-meta">
+            <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between h-9 text-label-meta font-label-meta">
                 <div class="flex items-center gap-space-md">
                     <span class="text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
                 </div>
@@ -266,7 +266,7 @@ if (empty($trendingTags)) {
         </div>
 
         <!-- 2. Main Navigation Bar -->
-        <div class="h-20 max-w-[1280px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between gap-space-md">
+        <div class="h-20 max-w-[1900px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between gap-space-md">
             <div class="flex items-center gap-space-lg">
                 <a class="flex items-center gap-space-sm shrink-0" href="/">
                     <div class="flex flex-col">
@@ -311,7 +311,7 @@ if (empty($trendingTags)) {
 
         <!-- 3. Em Alta Ticker Strip -->
         <div class="bg-surface-container-low dark:bg-[#0d121c] border-t border-subtle-border/60 dark:border-[#1e2533]">
-            <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin h-11 flex items-center gap-space-sm overflow-x-auto">
+            <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin h-11 flex items-center gap-space-sm overflow-x-auto">
                 <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red shrink-0 flex items-center gap-1.5">
                     <?= Icon::svg('trending_up', 'text-racing-red', 14) ?>Em Alta:
                 </span>
@@ -325,7 +325,7 @@ if (empty($trendingTags)) {
     </header>
 
     <main class="w-full pt-40 bg-surface dark:bg-carbon-black min-h-[calc(100vh-280px)] transition-colors duration-200">
-        <div class="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin space-y-space-xl pb-space-xl">
+        <div class="max-w-[1900px] w-full mx-auto px-margin-mobile md:px-margin space-y-space-xl pb-space-xl">
 
     <script>
         var SUN_SVG = '<?= addslashes(Icon::svg("light_mode", "w-4 h-4", 18)) ?>';

@@ -895,6 +895,9 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Modernização e Paridade do Editor de Páginas (`page-edit.php`):** Canvas visual contínuo `contenteditable` com alternância `</> HTML`, limpador inteligente de formatação para Ctrl+V (Google Docs / MS Word), modal assíncrono de biblioteca de mídias para imagem de destaque e corpo, badge dinâmico de status e botões de ação na cor oficial em largura total.
   - [x] **Refinamento de Rolagem no Editor de Notícias (`editor.php`):** Ajuste fino de fixação sticky da barra de ferramentas com `top: 0px`, garantindo visibilidade total do texto sem sobreposição.
 
+* **FASE CONCLUÍDA — Expansão Panorâmica do Frontend Público (Layout 1900px):**
+  - [x] **Aumento da Largura Máxima dos Containers para 1900px:** Ampliação das páginas públicas de navegação (Home, Categorias, Tags, Posts, Institucionais e Busca) de 1280px para 1900px (`max-w-[1900px]`), otimizando o consumo de conteúdo em monitores de alta resolução e mantendo alinhamento estético uniforme entre o cabeçalho (top strip, menu principal, em alta), o feed de notícias e o rodapé.
+
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
   - [ ] **Processamento de Mídia em Lote:** Download/leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.
