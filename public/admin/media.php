@@ -122,12 +122,15 @@ if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] 
                         if ($inPostsContent > 0) { $isInUse = true; break 2; }
                         $inPages = (int)Database::fetchValue("SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?", [$url, '%' . $url . '%']);
                         if ($inPages > 0) { $isInUse = true; break 2; }
+                        // Verificar também nas revisões históricas de matérias (post_revisions)
+                        $inRevisions = (int)Database::fetchValue("SELECT COUNT(*) FROM post_revisions WHERE content_html LIKE ? OR payload_json LIKE ?", ['%' . $url . '%', '%' . $url . '%']);
+                        if ($inRevisions > 0) { $isInUse = true; break 2; }
                     }
                 }
             }
 
             if ($isInUse) {
-                $error = "Esta imagem não pode ser excluída pois está em uso como destaque ou no conteúdo de matérias ou páginas ativas.";
+                $error = "Esta imagem não pode ser excluída pois está em uso como destaque ou no conteúdo de matérias, páginas ou revisões históricas do acervo.";
             } else {
                 $publicPath = $config['paths']['public'] ?? (dirname(__DIR__, 2) . '/public');
                 foreach ($variants as $res => $formats) {

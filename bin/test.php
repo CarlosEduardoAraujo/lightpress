@@ -116,15 +116,16 @@ assertTest("Caminho do cache Nginx levels=1:2 calculado com precisão", $path ==
 echo "\n[5] Testando Roteador Puro (core/Router.php)\n";
 
 $router = new Router();
+$router->setTestingMode(true);
 $matched = false;
 $paramSlug = '';
 
-$router->get('/noticia/{slug}/', function(array $params) use (&$matched, &$paramSlug): void {
+$router->get('/artigo/{slug}/', function(array $params) use (&$matched, &$paramSlug): void {
     $matched = true;
     $paramSlug = $params['slug'] ?? '';
 });
 
-$router->dispatch('GET', '/noticia/gp-de-monaco/');
+$router->dispatch('GET', '/artigo/gp-de-monaco/');
 
 assertTest("Roteador captura rota com parâmetro nomeado", $matched);
 assertTest("Roteador extrai parâmetro slug corretamente", $paramSlug === 'gp-de-monaco');

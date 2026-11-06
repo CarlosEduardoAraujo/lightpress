@@ -120,23 +120,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? $contentJson
                         : BlockCompiler::htmlToBlocks($cleanHtml);
 
-                    $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($post['slug']) ? $post['slug'] : Security::slugify($title));
-                    $publishedAtVal = !empty($publishedAt) ? $publishedAt : ($post['published_at'] ?? null);
+                    $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
+                    $canFeature = Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED);
 
-                    Database::query(
-                        "UPDATE posts SET 
-                            title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
-                            content_json = ?, content_html = ?, seo_title = ?, 
-                            seo_description = ?, focus_keyword = ?, is_featured = ?, published_at = ?,
-                            updated_at = CURRENT_TIMESTAMP 
-                         WHERE id = ?",
-                        [
-                            $title, $cleanSlug, $summary, $category, $tags, $featuredImage, 
-                            $cleanJson, $cleanHtml, $seoTitle, 
-                            $seoDesc, $focusKeyword, $isFeatured, $publishedAtVal, $postId
-                        ]
-                    );
-                    $message = "Rascunho salvo com sucesso!";
+                    // Autores não podem alterar destaque (is_featured) - LP-05
+                    if (!$canFeature) {
+                        $isFeatured = (int)($post['is_featured'] ?? 0);
+                    }
+
+                    // Se a matéria já estiver no ar ou agendada e o usuário não tiver permissão de publicar (ex: Autor):
+                    // Salva com segurança como uma REVISÃO PRIVADA pendente de aprovação, mantendo o post público intacto (LP-05)
+                    if (!$canPublish && in_array($post['status'], ['published', 'scheduled'], true)) {
+                        $revisionPayload = [
+                            'title' => $title,
+                            'slug' => !empty($slug) ? Security::slugify($slug) : $post['slug'],
+                            'summary' => $summary,
+                            'category' => $category,
+                            'tags' => $tags,
+                            'featured_image' => $featuredImage,
+                            'content_json' => $cleanJson,
+                            'content_html' => $cleanHtml,
+                            'seo_title' => $seoTitle,
+                            'seo_description' => $seoDesc,
+                            'focus_keyword' => $focusKeyword,
+                            'status' => 'pending_review',
+                        ];
+
+                        Database::query(
+                            "INSERT INTO post_revisions (
+                                post_id, editor_id, base_version, status, payload_json, content_html, created_at
+                             ) VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP)",
+                            [
+                                $postId,
+                                (int)$currentUser['id'],
+                                (int)$post['version'],
+                                json_encode($revisionPayload, JSON_THROW_ON_ERROR),
+                                $cleanHtml
+                            ]
+                        );
+
+                        $message = "Esta matéria já está no ar. Suas alterações foram salvas com segurança como uma REVISÃO PENDENTE de aprovação editorial. A versão pública atual permaneceu inalterada.";
+                    } else {
+                        // Edição normal de rascunho ou edição autorizada
+                        $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($post['slug']) ? $post['slug'] : Security::slugify($title));
+                        
+                        // Autores não podem agendar publicação
+                        $publishedAtVal = $canPublish ? (!empty($publishedAt) ? $publishedAt : ($post['published_at'] ?? null)) : ($post['published_at'] ?? null);
+
+                        $newVersion = (int)$post['version'] + 1;
+
+                        Database::query(
+                            "UPDATE posts SET 
+                                title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
+                                content_json = ?, content_html = ?, seo_title = ?, 
+                                seo_description = ?, focus_keyword = ?, is_featured = ?, published_at = ?,
+                                version = ?, updated_at = CURRENT_TIMESTAMP 
+                             WHERE id = ?",
+                            [
+                                $title, $cleanSlug, $summary, $category, $tags, $featuredImage, 
+                                $cleanJson, $cleanHtml, $seoTitle, 
+                                $seoDesc, $focusKeyword, $isFeatured, $publishedAtVal, $newVersion, $postId
+                            ]
+                        );
+
+                        // Gravar snapshot de histórico
+                        $snapshotPayload = [
+                            'title' => $title,
+                            'slug' => $cleanSlug,
+                            'summary' => $summary,
+                            'category' => $category,
+                            'tags' => $tags,
+                            'featured_image' => $featuredImage,
+                            'content_json' => $cleanJson,
+                            'content_html' => $cleanHtml,
+                            'seo_title' => $seoTitle,
+                            'seo_description' => $seoDesc,
+                            'focus_keyword' => $focusKeyword,
+                            'is_featured' => $isFeatured,
+                        ];
+
+                        Database::query(
+                            "INSERT INTO post_revisions (
+                                post_id, editor_id, base_version, status, payload_json, content_html, created_at
+                             ) VALUES (?, ?, ?, 'draft', ?, ?, CURRENT_TIMESTAMP)",
+                            [
+                                $postId,
+                                (int)$currentUser['id'],
+                                $newVersion,
+                                json_encode($snapshotPayload, JSON_THROW_ON_ERROR),
+                                $cleanHtml
+                            ]
+                        );
+
+                        $message = "Rascunho salvo com sucesso!";
+                    }
                 }
                 // Recarregar dados do post
                 $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
@@ -950,16 +1027,35 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
                     card.classList.add('selected');
                 }
 
-                card.innerHTML = 
-                    '<img src="' + item.thumb_url + '" class="modal-media-thumb" loading="lazy">' +
-                    '<div class="modal-media-title" title="' + item.original_name + '">' + item.original_name + '</div>';
+                var img = document.createElement('img');
+                img.className = 'modal-media-thumb';
+                img.loading = 'lazy';
+                var safeThumb = (typeof item.thumb_url === 'string' && (item.thumb_url.startsWith('/') || item.thumb_url.startsWith('http://') || item.thumb_url.startsWith('https://')))
+                    ? item.thumb_url : '';
+                img.src = safeThumb;
+                img.alt = item.original_name || 'Mídia';
+
+                var titleEl = document.createElement('div');
+                titleEl.className = 'modal-media-title';
+                titleEl.title = item.original_name || '';
+                titleEl.textContent = item.original_name || '';
+
+                card.appendChild(img);
+                card.appendChild(titleEl);
 
                 card.onclick = function() {
                     document.querySelectorAll('.modal-media-item').forEach(function(el) { el.classList.remove('selected'); });
                     card.classList.add('selected');
                     selectedMediaItem = item;
-                    document.getElementById('modalSelectionDetails').innerHTML = 
-                        '<strong>Selecionada:</strong> ' + item.original_name + ' (' + Math.round(item.file_size / 1024) + ' KiB • ' + item.width + 'x' + item.height + 'px)';
+
+                    var detailsEl = document.getElementById('modalSelectionDetails');
+                    detailsEl.textContent = '';
+                    var strong = document.createElement('strong');
+                    strong.textContent = 'Selecionada: ';
+                    detailsEl.appendChild(strong);
+                    var textNode = document.createTextNode((item.original_name || '') + ' (' + Math.round(item.file_size / 1024) + ' KiB • ' + item.width + 'x' + item.height + 'px)');
+                    detailsEl.appendChild(textNode);
+
                     document.getElementById('btnApplySelection').disabled = false;
                 };
 

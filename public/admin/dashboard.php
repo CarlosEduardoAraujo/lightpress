@@ -46,22 +46,45 @@ if (isset($_GET['toggle_featured_id']) && Security::verifyCsrfToken($_GET['_csrf
 // Excluir publicação
 if (isset($_GET['delete_id']) && Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
     $deleteId = (int)$_GET['delete_id'];
-    $targetPost = Database::fetchOne("SELECT id, slug, category, user_id FROM posts WHERE id = ? LIMIT 1", [$deleteId]);
+    $targetPost = Database::fetchOne("SELECT id, slug, category, tags, user_id FROM posts WHERE id = ? LIMIT 1", [$deleteId]);
     
     if ($targetPost) {
         if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST)) {
-            Database::transaction(function (\PDO $pdo) use ($deleteId, $targetPost, $cacheMgr): void {
+            // Montar lista completa de URLs dependentes para invalidação (LP-09)
+            $affectedUrls = [
+                '/',
+                '/' . $targetPost['slug'] . '/',
+                '/noticia/' . $targetPost['slug'] . '/',
+                '/categoria/' . $targetPost['category'] . '/',
+                '/feed.xml',
+                '/feed',
+                '/sitemap.xml',
+                '/page/2/',
+                '/categoria/' . $targetPost['category'] . '/page/2/',
+            ];
+
+            // Adicionar páginas de tags caso existam
+            if (!empty($targetPost['tags'])) {
+                $tagItems = explode(',', (string)$targetPost['tags']);
+                foreach ($tagItems as $t) {
+                    $tSlug = Security::slugify(trim($t));
+                    if (!empty($tSlug)) {
+                        $affectedUrls[] = '/tag/' . $tSlug . '/';
+                    }
+                }
+            }
+
+            Database::transaction(function (\PDO $pdo) use ($deleteId, $affectedUrls, $cacheMgr): void {
                 Database::query("DELETE FROM post_stats WHERE post_id = ?", [$deleteId]);
                 Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$deleteId]);
                 Database::query("DELETE FROM posts WHERE id = ?", [$deleteId]);
                 
-                // Expurga cache da Home, da categoria e da matéria
-                $cacheMgr->purgeUrls([
-                    '/',
-                    '/' . $targetPost['slug'] . '/',
-                    '/categoria/' . $targetPost['category'] . '/'
-                ]);
+                // Registra job de purga persistente de forma atômica no banco
+                $cacheMgr->recordPurgeJob($deleteId, 'post_deletion', $affectedUrls);
             });
+
+            // Executa a purga física do cache ESTRITAMENTE APÓS O COMMIT (LP-09)
+            $cacheMgr->purgeUrls($affectedUrls);
 
             $queryParams = $_GET;
             unset($queryParams['delete_id'], $queryParams['_csrf_token']);

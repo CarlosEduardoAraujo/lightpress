@@ -13,6 +13,27 @@ class Router
 {
     private array $routes = [];
     private $notFoundHandler = null;
+    private bool $isTesting = false;
+
+    /**
+     * Habilita ou desabilita o modo de testes (evita exit prematuro em testes unitários).
+     */
+    public function setTestingMode(bool $testing): void
+    {
+        $this->isTesting = $testing;
+    }
+
+    /**
+     * Realiza redirecionamento seguro com suporte a isolamento de testes.
+     */
+    private function redirect(string $url, int $statusCode = 301): void
+    {
+        if ($this->isTesting) {
+            return;
+        }
+        header("Location: {$url}", true, $statusCode);
+        exit;
+    }
 
     /**
      * Registra rota GET.
@@ -74,27 +95,27 @@ class Router
 
         // Redirecionamento Canônico de Paginação: /page/1/ ou /page/1 -> / (301)
         if ($path === '/page/1' || $path === '/page/1/') {
-            header('Location: /', true, 301);
-            exit;
+            $this->redirect('/', 301);
+            return;
         }
 
         // Canonicalização de Categoria: /categoria/{slug}/page/1 -> /categoria/{slug}/ (301)
         if (preg_match('~^/categoria/([^/]+)/page/1/?$~', $path, $matches)) {
-            header('Location: /categoria/' . $matches[1] . '/', true, 301);
-            exit;
+            $this->redirect('/categoria/' . $matches[1] . '/', 301);
+            return;
         }
 
         // Redirecionamento de compatibilidade: /noticia/{slug} -> /{slug}/ (301)
         if (preg_match('~^/noticia/([^/]+)/?$~', $path, $matches)) {
-            header('Location: /' . $matches[1] . '/', true, 301);
-            exit;
+            $this->redirect('/' . $matches[1] . '/', 301);
+            return;
         }
 
         // Canonicalização de barra final para rotas públicas amigáveis (apenas requisições GET e fora de /api/)
         if ($method === 'GET' && !str_starts_with($path, '/api/') && $path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
             $queryString = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
-            header('Location: ' . $path . '/' . $queryString, true, 301);
-            exit;
+            $this->redirect($path . '/' . $queryString, 301);
+            return;
         }
 
         // Busca rota correspondente

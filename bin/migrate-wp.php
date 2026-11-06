@@ -253,18 +253,10 @@ foreach ($wpUsers as $u) {
     $bioStmt->execute([$wpUid]);
     $bio = (string)($bioStmt->fetchColumn() ?: '');
 
-    // Definição de Papel (Role)
-    // carlos -> admin (DONO)
-    // robsonmiranda -> editor
-    // demais -> author
-    $loginLower = strtolower($login);
-    if ($loginLower === 'carlos') {
-        $role = 'admin';
-    } elseif ($loginLower === 'robsonmiranda' || str_contains($loginLower, 'robson')) {
-        $role = 'editor';
-    } else {
-        $role = 'author';
-    }
+    // Definição de Papel (Role) segura conforme matriz RBAC:
+    // Todos os usuários importados recebem o perfil padrão 'author' (LP-08).
+    // Promoções para Editor ou Administrador devem ser ações administrativas manuais e auditáveis.
+    $role = 'author';
 
     echo "  > WP Usuário #{$wpUid}: {$login} ({$email}) -> Role: {$role}";
 
@@ -274,31 +266,34 @@ foreach ($wpUsers as $u) {
         continue;
     }
 
-    // Verificar se já existe no LightPress (por username ou email)
-    $existing = Database::fetchOne(
-        "SELECT id, username, email FROM users WHERE username = ? OR email = ? LIMIT 1",
-        [$login, $email]
-    );
+    // Verificar se já existe no LightPress com conciliação estrita (LP-08)
+    $existingByEmail = Database::fetchOne("SELECT id, username, email, role FROM users WHERE email = ? LIMIT 1", [$email]);
+    $existingByLogin = Database::fetchOne("SELECT id, username, email, role FROM users WHERE username = ? LIMIT 1", [$login]);
 
-    if ($existing) {
-        $lpUid = (int)$existing['id'];
-        // Atualizar papel se necessário
-        Database::query("UPDATE users SET role = ?, bio = IF(bio IS NULL OR bio = '', ?, bio) WHERE id = ?", [$role, $bio, $lpUid]);
+    if ($existingByEmail) {
+        $lpUid = (int)$existingByEmail['id'];
+        // Jamais sobrescrever o perfil (role) de uma conta existente
+        Database::query("UPDATE users SET bio = IF(bio IS NULL OR bio = '', ?, bio) WHERE id = ?", [$bio, $lpUid]);
         $userMap[$wpUid] = $lpUid;
-        echo " -> Vinculado ao SpeedPress ID #{$lpUid}\n";
+        echo " -> Vinculado por E-mail ao SpeedPress ID #{$lpUid} (Role '{$existingByEmail['role']}' preservado)\n";
+    } elseif ($existingByLogin) {
+        $lpUid = (int)$existingByLogin['id'];
+        Database::query("UPDATE users SET bio = IF(bio IS NULL OR bio = '', ?, bio) WHERE id = ?", [$bio, $lpUid]);
+        $userMap[$wpUid] = $lpUid;
+        echo " -> Vinculado por Usuário ao SpeedPress ID #{$lpUid} (Role '{$existingByLogin['role']}' preservado)\n";
     } else {
-        // Inserir novo usuário
-        // Se a senha for hash MD5 ou PHPass do WordPress ($P$ ou $2y$ ou Argon2), mantemos compatível
-        $secureHash = str_starts_with($passHash, '$argon2id$') ? $passHash : Security::hashPassword(bin2hex(random_bytes(10)));
+        // Inserir novo usuário como autor inativo, com senha temporária aleatória e ativação obrigatória (LP-08)
+        $randomTempPass = bin2hex(random_bytes(32));
+        $secureHash = Security::hashPassword($randomTempPass);
         
         Database::query(
             "INSERT INTO users (name, username, email, password_hash, role, is_active, password_reset_required, session_version, bio, created_at)
-             VALUES (?, ?, ?, ?, ?, 1, 0, 1, ?, ?)",
-            [$name, $login, $email, $secureHash, $role, $bio, $registered]
+             VALUES (?, ?, ?, ?, 'author', 0, 1, 1, ?, ?)",
+            [$name, $login, $email, $secureHash, $bio, $registered]
         );
         $lpUid = (int)Database::lastInsertId();
         $userMap[$wpUid] = $lpUid;
-        echo " -> CRIADO com SpeedPress ID #{$lpUid}\n";
+        echo " -> CRIADO como Autor Inativo (SpeedPress ID #{$lpUid}, Ativação Pendente)\n";
     }
 }
 
@@ -425,7 +420,7 @@ if (!$isDryRun) {
 // 4.2 Execução em Streaming por Chunks de Memória Controlada
 if ($singlePostId) {
     $postsQuery = $wpPdo->prepare(
-        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
+        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_password
          FROM {$tblPosts}
          WHERE ID = :single_id
          LIMIT 1"
@@ -433,7 +428,7 @@ if ($singlePostId) {
     $postsQuery->bindValue(':single_id', $singlePostId, PDO::PARAM_INT);
 } else {
     $postsQuery = $wpPdo->prepare(
-        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified
+        "SELECT ID, post_author, post_date_gmt, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_password
          FROM {$tblPosts}
          WHERE post_type = 'post' AND post_status IN ('publish', 'draft', 'pending', 'future', 'trash')
          ORDER BY ID {$order}
@@ -489,14 +484,21 @@ while ($processed < $totalTarget) {
         $wpAuthorId = (int)$p['post_author'];
         $targetUserId = $userMap[$wpAuthorId] ?? (reset($userMap) ?: 1);
 
-        // Mapeamento de Status
-        $status = match ($p['post_status']) {
-            'publish' => 'published',
-            'future' => 'scheduled',
-            'pending' => 'pending_review',
-            'trash' => 'archived',
-            default => 'draft',
-        };
+        // Mapeamento de Status com proteção contra vazamento de posts com senha (LP-07)
+        $hasPassword = !empty(trim((string)($p['post_password'] ?? '')));
+        if ($hasPassword) {
+            // Se o post tiver senha no WordPress, importa obrigatoriamente como 'draft' privado
+            $status = 'draft';
+            echo "  [SEGURANÇA] Post WP #{$wpPostId} protegido por senha. Importado como rascunho privado.\n";
+        } else {
+            $status = match ($p['post_status']) {
+                'publish' => 'published',
+                'future' => 'scheduled',
+                'pending' => 'pending_review',
+                'trash' => 'archived',
+                default => 'draft',
+            };
+        }
 
         $publishedAt = ($status === 'published' || $status === 'scheduled')
             ? (!empty($p['post_date_gmt']) && $p['post_date_gmt'] !== '0000-00-00 00:00:00' ? $p['post_date_gmt'] : $p['post_date'])

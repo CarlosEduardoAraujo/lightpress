@@ -23,6 +23,7 @@ $router = new Router();
 
 // Rota 1: Home Grid (Últimas notícias e 4 destaques principais)
 $router->get('/', function () use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL reduzido de 5m no FastCGI Cache para listagens dinâmicas (LP-09)
     $query = trim($_GET['q'] ?? '');
     if (!empty($query)) {
         header('Location: /busca?q=' . urlencode($query));
@@ -84,6 +85,7 @@ $router->get('/', function () use ($config): void {
 
 // Rota 2: Home Paginada (/page/{page}/)
 $router->get('/page/{page}/', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $page = max(2, (int)($params['page'] ?? 2));
     $perPage = 12;
     $offset = ($page - 1) * $perPage;
@@ -112,6 +114,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
 
 // Rota 3: Listagem por Categoria (/categoria/{slug}/)
 $router->get('/categoria/{slug}/', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $categorySlug = $params['slug'] ?? '';
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
@@ -149,6 +152,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
 
 // Rota 4: Listagem Paginada de Categoria (/categoria/{slug}/page/{page}/)
 $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $categorySlug = $params['slug'] ?? '';
     $page = max(2, (int)($params['page'] ?? 2));
     $perPage = 12;
@@ -189,6 +193,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 
 // Rota 5: Busca Pública de Notícias (/busca)
 $router->get('/busca', function () use ($config): void {
+    header('X-Accel-Expires: 60'); // TTL 1m FastCGI Cache para buscas (LP-09)
     $query = trim($_GET['q'] ?? '');
     $nowUtc = gmdate('Y-m-d H:i:s');
     $searchTerm = "%{$query}%";
@@ -211,6 +216,7 @@ $router->get('/busca', function () use ($config): void {
 
 // Rota 5b: Listagem por Tag (/tag/{tag}/)
 $router->get('/tag/{tag}/', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $tagRaw = $params['tag'] ?? '';
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
@@ -242,6 +248,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
 
 // Rota 5c: Listagem Paginada de Tag (/tag/{tag}/page/{page}/)
 $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $tagRaw = $params['tag'] ?? '';
     $page = max(2, (int)($params['page'] ?? 2));
     $perPage = 12;
@@ -304,6 +311,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
             [$slug]
         );
         if ($page) {
+            header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
             // Contabilizar visualização da página
             Database::query("UPDATE pages SET views = views + 1 WHERE id = ?", [(int)$page['id']]);
             $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
@@ -330,12 +338,14 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $wordCount = str_word_count($cleanText);
     $readingTime = max(1, (int)ceil($wordCount / 200));
 
+    header('X-Accel-Expires: 3600'); // 60 minutos de cache para matéria publicada (LP-09)
     $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
     require $config['paths']['templates'] . '/post.php';
 });
 
 // Rota 6: RSS Feed (/feed.xml)
 $router->get('/feed.xml', function () use ($config): void {
+    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Feed RSS (LP-09)
     header('Content-Type: application/rss+xml; charset=utf-8');
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
@@ -380,6 +390,7 @@ $router->get('/feed.xml', function () use ($config): void {
 
 // Rota 6: Sitemap XML (/sitemap.xml)
 $router->get('/sitemap.xml', function () use ($config): void {
+    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Sitemap XML (LP-09)
     header('Content-Type: application/xml; charset=utf-8');
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');

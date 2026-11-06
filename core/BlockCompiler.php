@@ -254,6 +254,9 @@ class BlockCompiler
             if ($tagName === 'a') {
                 $href = $child->getAttribute('href');
                 if ($href === '') {
+                    // Higieniza recursivamente os nós descendentes ANTES de desembrulhar
+                    // para evitar que tags/atributos perigosos escapem da sanitização (LP-02)
+                    self::cleanDomNode($child, $allowedTags, $dangerousTags, $allowedAttributes);
                     while ($child->firstChild) {
                         $node->insertBefore($child->firstChild, $child);
                     }
@@ -424,8 +427,11 @@ class BlockCompiler
     {
         $mediaId = trim($block['media_id'] ?? '');
         $url = trim($block['url'] ?? '');
-        $caption = self::sanitizeInline($block['caption'] ?? '');
-        $alt = self::sanitizeInline($block['alt'] ?? $caption);
+        $captionHtml = self::sanitizeInline($block['caption'] ?? '');
+        
+        // Escape contextual estrito para atributo alt (LP-03)
+        $rawAlt = !empty($block['alt']) ? (string)$block['alt'] : strip_tags($block['caption'] ?? '');
+        $altAttr = Security::e(trim(strip_tags($rawAlt)));
         $lazyAttr = $isFirstImage ? '' : ' loading="lazy"';
 
         // 1. Tentar renderizar a partir do catálogo confiável de mídias (media_id)
@@ -463,10 +469,10 @@ class BlockCompiler
                         if (!empty($webpSrcset)) {
                             $html .= '    <source type="image/webp" srcset="' . implode(', ', $webpSrcset) . "\">\n";
                         }
-                        $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$alt}\"{$lazyAttr}>\n";
+                        $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$altAttr}\"{$lazyAttr}>\n";
                         $html .= "  </picture>";
-                        if (!empty($caption)) {
-                            $html .= "\n  <figcaption>{$caption}</figcaption>";
+                        if (!empty($captionHtml)) {
+                            $html .= "\n  <figcaption>{$captionHtml}</figcaption>";
                         }
                         $html .= "\n</figure>";
                         return $html;
@@ -489,9 +495,9 @@ class BlockCompiler
         }
 
         $html = "<figure>";
-        $html .= "<img src=\"{$url}\" alt=\"{$alt}\"{$lazyAttr}>";
-        if (!empty($caption)) {
-            $html .= "<figcaption>{$caption}</figcaption>";
+        $html .= "<img src=\"{$url}\" alt=\"{$altAttr}\"{$lazyAttr}>";
+        if (!empty($captionHtml)) {
+            $html .= "<figcaption>{$captionHtml}</figcaption>";
         }
         $html .= "</figure>";
 

@@ -157,8 +157,17 @@ class Seo
             ];
         }
 
+        $json = json_encode(
+            $schema,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        );
+
+        if ($json === false) {
+            return '';
+        }
+
         return '<script type="application/ld+json">' . "\n"
-            . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+            . $json
             . "\n" . '</script>';
     }
 }

@@ -794,16 +794,35 @@ $csrfToken = Security::generateCsrfToken();
                     card.classList.add('selected');
                 }
 
-                card.innerHTML = 
-                    '<img src="' + item.thumb_url + '" class="modal-media-thumb" loading="lazy">' +
-                    '<div class="modal-media-title" title="' + item.original_name + '">' + item.original_name + '</div>';
+                var img = document.createElement('img');
+                img.className = 'modal-media-thumb';
+                img.loading = 'lazy';
+                var safeThumb = (typeof item.thumb_url === 'string' && (item.thumb_url.startsWith('/') || item.thumb_url.startsWith('http://') || item.thumb_url.startsWith('https://')))
+                    ? item.thumb_url : '';
+                img.src = safeThumb;
+                img.alt = item.original_name || 'Mídia';
+
+                var titleEl = document.createElement('div');
+                titleEl.className = 'modal-media-title';
+                titleEl.title = item.original_name || '';
+                titleEl.textContent = item.original_name || '';
+
+                card.appendChild(img);
+                card.appendChild(titleEl);
 
                 card.onclick = function() {
                     document.querySelectorAll('.modal-media-item').forEach(function(el) { el.classList.remove('selected'); });
                     card.classList.add('selected');
                     selectedMediaItem = item;
-                    document.getElementById('modalSelectionDetails').innerHTML = 
-                        '<strong>Selecionada:</strong> ' + item.original_name + ' (' + Math.round(item.file_size / 1024) + ' KiB)';
+
+                    var detailsEl = document.getElementById('modalSelectionDetails');
+                    detailsEl.textContent = '';
+                    var strong = document.createElement('strong');
+                    strong.textContent = 'Selecionada: ';
+                    detailsEl.appendChild(strong);
+                    var textNode = document.createTextNode((item.original_name || '') + ' (' + Math.round(item.file_size / 1024) + ' KiB)');
+                    detailsEl.appendChild(textNode);
+
                     document.getElementById('btnApplySelection').disabled = false;
                 };
 

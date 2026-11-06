@@ -243,9 +243,15 @@ class ImageProcessor
 
         $canAvif = function_exists('imageavif');
 
+        // Sanitizar nome original para prevenir injeção em metadados
+        $sanitizedOriginalName = mb_substr(trim(strip_tags($originalName)), 0, 200);
+        if ($sanitizedOriginalName === '') {
+            $sanitizedOriginalName = 'imagem.jpg';
+        }
+
         $manifest = [
             'media_id' => $mediaId,
-            'original_name' => $originalName,
+            'original_name' => $sanitizedOriginalName,
             'original_width' => $origWidth,
             'original_height' => $origHeight,
             'variants' => [],
@@ -272,9 +278,9 @@ class ImageProcessor
 
                 $suffixPart = empty($spec['suffix']) ? '' : "-{$spec['suffix']}";
 
-                // Geração do WebP Obrigatório
+                // Geração do WebP Obrigatório com staging isolado por operação (evita concorrência)
                 $webpFilename = "{$fileBase}{$suffixPart}.webp";
-                $webpStaging = "{$this->stagingDir}/{$webpFilename}";
+                $webpStaging = "{$this->stagingDir}/{$mediaId}_{$webpFilename}";
                 $webpTarget = "{$targetDir}/{$webpFilename}";
 
                 imagewebp($resized, $webpStaging, $this->webpQuality);
@@ -299,10 +305,10 @@ class ImageProcessor
                     throw new RuntimeException("Falha ao gerar variante WebP ({$key}).", 500);
                 }
 
-                // Geração do AVIF Opcional (se biblioteca suportada e sem falhas)
+                // Geração do AVIF Opcional com staging isolado por operação
                 if ($canAvif) {
                     $avifFilename = "{$fileBase}{$suffixPart}.avif";
-                    $avifStaging = "{$this->stagingDir}/{$avifFilename}";
+                    $avifStaging = "{$this->stagingDir}/{$mediaId}_{$avifFilename}";
                     $avifTarget = "{$targetDir}/{$avifFilename}";
 
                     try {

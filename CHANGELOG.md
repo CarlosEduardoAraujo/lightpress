@@ -8,6 +8,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Segurança (Auditoria Completa & Hardening)
+- **Mitigação Completa dos 9 Achados da Auditoria e Observações Operacionais (LP-01 a LP-09):**
+  - **LP-01 (XSS no Modal de Mídia):** Migração da renderização de cartões e detalhes em `editor.php` e `settings.php` para construção nativa via DOM (`createElement`, `textContent`, `element.title` e validação de URL do thumbnail), eliminando injeção via `innerHTML`. Sanitização preventiva de `original_name` em `ImageProcessor.php`.
+  - **LP-02 (Filhos de Links Inválidos):** Higienização recursiva dos nós descendentes antes do desembrulho de tags `<a>` sem `href` em `BlockCompiler::cleanDomNode`, impedindo que elementos perigosos (`<script>`, `<img onerror>`) escapem da sanitização.
+  - **LP-03 (Escape Contextual de Atributo `alt`):** Tratamento rigoroso de atributo com `Security::e()` para `alt` em `BlockCompiler::compileImage`, neutralizando quebra de atributo e injeção de eventos via aspas literais.
+  - **LP-04 (Blindagem de Script JSON-LD):** Serialização de JSON-LD com `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT` em `core/Seo.php` e higienização de nome/biografia em `profile.php`, prevenindo que a sequência `</script>` encerre blocos de script prematuramente.
+  - **LP-05 (Proteção Editorial de Conteúdo Público):** Bloqueio de alterações diretas na tabela `posts` por autores em matérias já publicadas ou agendadas em `editor.php`; alterações geram obrigatoriamente uma nova revisão privada (`pending_review`) e restringem campos sensíveis (`is_featured`, data de publicação).
+  - **LP-06 (Autorização Estrita em Restauração de Revisões):** Restauração por autor em `revisions.php` preserva o status `'draft'` ou cria uma revisão privada pendente de aprovação, bloqueando promoção não autorizada para `'published'`. Validação adicional de `ACTION_PUBLISH_POST` no `PostService::publishOrUpdate`.
+  - **LP-07 (Proteção de Artigos com Senha na Migração):** Seleção de `post_password` em `bin/migrate-wp.php`, forçando a conversão de artigos protegidos por senha para `draft` privado com log explicativo, prevenindo vazamento de dados confidenciais.
+  - **LP-08 (Auditoria de Usuários e Privilégios na Migração):** Remoção de concessão de papéis baseada em nomes de login; novos usuários são criados estritamente como `author`, inativos (`is_active = 0`) e com `password_reset_required = 1`. Contas existentes nunca têm seus papéis sobrescritos.
+  - **LP-09 (Invalidação Pós-Commit e Cabeçalho `X-Accel-Expires`):** Purga física de cache executada estritamente após o commit em `dashboard.php` e `PostService.php`, cobrindo tags, sitemap, feeds e paginações. Injeção do cabeçalho `X-Accel-Expires` em `public/index.php` (300s para listagens e feeds, 3600s para artigos e páginas).
+  - **Observações Operacionais:**
+    - Normalização canônica de IPv6 sem corte de sub-redes em `Security::hashIp()` e lock pessimista (`SELECT ... FOR UPDATE`) na deduplicação de visualizações em `view.php`.
+    - Isolamento de redirecionamentos em `core/Router.php` com suporte a modo de teste (`setTestingMode`) e correção da suíte de testes em `bin/test.php` executando até o fim com relatório completo.
+    - Verificação de referências de mídias na tabela `post_revisions` em `media.php` e isolamento de arquivos de staging por `media_id` em `ImageProcessor.php`.
 - **Correção de Duplo Escape em URLs e Validação Rigorosa de `srcset` (`core/BlockCompiler.php`):**
   - Decodificação de entidades prévias (`html_entity_decode`) antes de passar valores sanitizados para `DOMElement::setAttribute`, evitando que query strings com `&` em links sofram escape duplo (`&amp;amp;`) na serialização nativa do `DOMDocument::saveHTML`.
   - Validação estrita de cada candidato de imagem em atributos `srcset` (em tags `<source>` e `<img>`), sanitizando URLs individualmente e validando descritores de largura e densidade (`w`/`x`).

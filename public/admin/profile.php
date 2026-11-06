@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['form_action'] ?? 'update_profile';
 
         if ($action === 'update_profile') {
-            $name = trim($_POST['name'] ?? '');
-            $bio = trim($_POST['bio'] ?? '');
+            $name = trim(strip_tags((string)($_POST['name'] ?? '')));
+            $bio = trim(strip_tags((string)($_POST['bio'] ?? '')));
 
             if (empty($name)) {
                 $error = "O nome não pode ficar em branco.";

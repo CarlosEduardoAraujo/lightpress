@@ -187,6 +187,14 @@ class PostService
                 $targetStatus = $data['status'];
             }
 
+            // Validação estrita de autorização no serviço editorial (LP-06)
+            $editor = Database::fetchOne("SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1", [$editorId]);
+            if (!$editor || !Authorization::can($editor, Authorization::ACTION_PUBLISH_POST)) {
+                if (in_array($targetStatus, ['published', 'scheduled'], true)) {
+                    throw new RuntimeException("Apenas Editores e Administradores possuem autorização para publicar ou agendar matérias.", 403);
+                }
+            }
+
             $newVersion = (int)$current['version'] + 1;
 
             // Atualiza o artigo
@@ -213,7 +221,7 @@ class PostService
                 [$postId, $editorId, $newVersion, $payload, $contentHtml]
             );
 
-            // Invalidação e registro de purga de cache
+            // Invalidação e registro de purga de cache (LP-09)
             $affectedUrls = [
                 '/',
                 "/{$slug}/",
@@ -224,13 +232,31 @@ class PostService
                 "/categoria/{$current['category']}/",
                 '/feed.xml',
                 '/feed',
+                '/sitemap.xml',
+                '/page/2/',
+                "/categoria/{$category}/page/2/",
             ];
 
+            if (!empty($tags)) {
+                $tagItems = explode(',', (string)$tags);
+                foreach ($tagItems as $t) {
+                    $tSlug = Security::slugify(trim($t));
+                    if (!empty($tSlug)) {
+                        $affectedUrls[] = '/tag/' . $tSlug . '/';
+                    }
+                }
+            }
+
+            // Registra job de purga atomicamente dentro da transação
             $this->cacheManager->recordPurgeJob($postId, 'publish_update', $affectedUrls);
-            $this->cacheManager->purgeUrls($affectedUrls);
 
             return true;
         });
+
+        // Executa a purga física do cache estritamente após o commit (LP-09)
+        $this->cacheManager->purgeUrls($affectedUrls);
+
+        return true;
     }
 
     /**

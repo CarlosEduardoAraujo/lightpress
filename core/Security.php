@@ -133,11 +133,25 @@ class Security
 
     /**
      * Gera hash HMAC-SHA-256 do IP do visitante para deduplicação com preservação de privacidade.
+     * Trata IPv4 e IPv6 de forma consistente sem cortes de sub-redes.
      */
     public static function hashIp(string $ip, string $secret): string
     {
-        // Normaliza o IP removendo portas e espaços
-        $normalizedIp = trim(explode(':', $ip)[0] ?? $ip);
+        $ip = trim($ip);
+
+        // Se for IPv4 com porta (ex: "192.168.1.1:8080"), remove a porta
+        if (preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/', $ip)) {
+            $ip = explode(':', $ip)[0];
+        }
+
+        // Normalização canônica via inet_pton
+        $packed = @inet_pton($ip);
+        if ($packed !== false) {
+            $normalizedIp = inet_ntop($packed);
+        } else {
+            $normalizedIp = $ip;
+        }
+
         return hash_hmac('sha256', $normalizedIp, $secret);
     }
 

@@ -75,9 +75,9 @@ try {
             return false;
         }
 
-        // Verificar janela de deduplicação ativa
+        // Verificar janela de deduplicação ativa com lock pessimista (evita race condition sob alta concorrência)
         $dedupe = Database::fetchOne(
-            "SELECT expires_at FROM view_dedupe WHERE post_id = ? AND ip_hash = ?",
+            "SELECT expires_at FROM view_dedupe WHERE post_id = ? AND ip_hash = ? FOR UPDATE",
             [$postId, $ipHash]
         );
 
