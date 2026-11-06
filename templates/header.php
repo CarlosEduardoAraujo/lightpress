@@ -286,7 +286,7 @@ if (empty($trendingTags)) {
 
             <div class="flex items-center gap-space-sm">
                 <!-- Busca Integrada -->
-                <form action="/busca" method="GET" class="relative flex items-center">
+                <form action="/busca/" method="GET" class="relative flex items-center">
                     <input type="text" name="q" placeholder="Buscar no portal..." value="<?= Security::e($_GET['q'] ?? '') ?>" class="hidden md:block w-36 focus:w-52 transition-all duration-200 text-body-sm py-1.5 px-3 rounded-lg bg-surface-container dark:bg-carbon-surface text-carbon-black dark:text-pure-white placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim focus:outline-none focus:ring-1 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c]">
                     <button type="submit" aria-label="Buscar no portal" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-carbon-surface flex items-center justify-center text-on-surface dark:text-pure-white hover:bg-surface-container-high dark:hover:bg-[#252b35] transition-colors md:absolute md:right-0">
                         <?= Icon::svg('search', 'w-4 h-4', 18) ?>

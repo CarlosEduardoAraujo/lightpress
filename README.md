@@ -874,7 +874,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Módulo de Notícias Relacionadas:** Recomendações contextuais de 4 matérias da mesma categoria em grid responsivo de tela ampla para retenção de audiência.
   - [x] **Botões Rápidos de Compartilhamento Social:** Barra leve de compartilhamento (WhatsApp, X, Facebook, Telegram e botão de 1 clique Copiar Link com feedback instantâneo) sem rastreadores ou bibliotecas pesadas.
   - [x] **Menu Superior Sticky Fixo:** Cabeçalho global fixado no topo para navegação fluida em todo o site.
-  - [x] **Sistema de Busca Integrada (`/busca?q=...`):** Pesquisa ágil de notícias publicadas com marcação visual dos termos pesquisados e compatibilidade total com o cache estático.
+  - [x] **Sistema de Busca Integrada (`/busca/?q=...`):** Pesquisa ágil de notícias publicadas com marcação visual dos termos pesquisados e compatibilidade total com o cache estático.
   - [x] **URLs Canônicas na Raiz (`/{slug}/`):** URLs permanentes de alto impacto com redirecionamento 301 automático das rotas antigas.
 
 * **FASE CONCLUÍDA — Opção 2: Recursos Administrativos da Redação (Gestão de Portal):**
@@ -897,6 +897,9 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 
 * **FASE CONCLUÍDA — Expansão Panorâmica do Frontend Público (Layout 1900px):**
   - [x] **Aumento da Largura Máxima dos Containers para 1900px:** Ampliação das páginas públicas de navegação (Home, Categorias, Tags, Posts, Institucionais e Busca) de 1280px para 1900px (`max-w-[1900px]`), otimizando o consumo de conteúdo em monitores de alta resolução e mantendo alinhamento estético uniforme entre o cabeçalho (top strip, menu principal, em alta), o feed de notícias e o rodapé.
+
+* **FASE CONCLUÍDA — Correção & Padronização de Rota da Busca Pública:**
+  - [x] **Compatibilidade com Router Canônico (`/busca/`):** Correção do registro da rota em `public/index.php` para `/busca/`, eliminando falso erro 404 decorrente do redirecionamento 301 de normalização com barra final. Padronização de formulários (`templates/header.php`), redirecionamento da raiz e metadados Schema.org (`core/Seo.php`) para `/busca/?q=...`.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.

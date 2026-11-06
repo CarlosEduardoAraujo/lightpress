@@ -7,6 +7,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Rota e Redirecionamento da Busca Pública (`/busca/`)
+- **Resolução de Erro 404 em Pesquisas (`/busca/?q=...`):**
+  - Registro da rota de busca com barra final (`/busca/` em `public/index.php`), alinhando com a canonicalização e padrão de rotas públicas do sistema (`Router.php`).
+  - Prevenção do conflito em que `/busca/` caía na rota genérica de artigos individuais `/{slug}/` e retornava erro 404 por `busca` ser uma palavra reservada.
+  - Padronização dos links e formulários geradores para evitar redirecionamentos desnecessários 301:
+    - Atualização do atributo `action="/busca/"` no formulário de pesquisa do cabeçalho global (`templates/header.php`).
+    - Atualização do redirecionamento de busca na raiz para `/busca/?q=...` (`public/index.php`).
+    - Atualização da URL de `potentialAction` (Schema.org / SearchAction) para `/busca/?q={search_term_string}` (`core/Seo.php`).
+
 ### Expansão Panorâmica do Layout Público (`1900px`)
 - **Aumento da Largura Máxima do Container (Home, Categorias, Tags, Posts e Navegação Geral):**
   - Atualização do container central e dos blocos estruturais de navegação pública de `max-w-[1280px]` para `max-w-[1900px]`, ampliando substancialmente o espaço útil horizontal para notícias, mosaicos de matérias, manchetes e barras laterais em monitores Full HD, Quad HD e Ultrawide.

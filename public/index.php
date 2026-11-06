@@ -30,7 +30,7 @@ $router->get('/', function () use ($config): void {
     header('X-Accel-Expires: 300'); // TTL reduzido de 5m no FastCGI Cache para listagens dinâmicas (LP-09)
     $query = trim($_GET['q'] ?? '');
     if (!empty($query)) {
-        header('Location: /busca?q=' . urlencode($query));
+        header('Location: /busca/?q=' . urlencode($query));
         exit;
     }
 
@@ -195,8 +195,8 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     require $config['paths']['templates'] . '/category.php';
 });
 
-// Rota 5: Busca Pública de Notícias (/busca)
-$router->get('/busca', function () use ($config): void {
+// Rota 5: Busca Pública de Notícias (/busca/)
+$router->get('/busca/', function () use ($config): void {
     header('X-Accel-Expires: 60'); // TTL 1m FastCGI Cache para buscas (LP-09)
     $query = trim($_GET['q'] ?? '');
     $nowUtc = gmdate('Y-m-d H:i:s');
