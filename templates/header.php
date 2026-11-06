@@ -244,6 +244,7 @@ if (empty($trendingTags)) {
             }
         </style>
     <?php endif; ?>
+    <?php \LightPress\Core\Hook::doAction('frontend_head'); ?>
 </head>
 <body class="bg-surface dark:bg-carbon-black font-body-md text-on-surface dark:text-pure-white antialiased transition-colors duration-200">
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">

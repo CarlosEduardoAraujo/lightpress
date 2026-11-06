@@ -1,0 +1,12 @@
+{
+  "id": "webhook-sender",
+  "name": "Webhook Sender",
+  "version": "1.0.0",
+  "description": "Envia automaticamente notificações para múltiplos servidores e canais via Webhook ao publicar matérias.",
+  "author": "Carlos Eduardo de Araújo / LightPress",
+  "author_url": "https://lightpress.org",
+  "min_lp_version": "1.0.0",
+  "admin_settings": true,
+  "admin_title": "Webhook Sender",
+  "requires_db": true
+}

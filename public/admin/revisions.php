@@ -294,15 +294,7 @@ $csrfToken = Security::generateCsrfToken();
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" style="color: inherit; text-decoration: none;">Voltar ao Editor</a></span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('dashboard', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 0.5rem;">Histórico de Revisões</h1>

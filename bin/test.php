@@ -189,6 +189,42 @@ assertTest("Expurgo recursivo de '_csrf_token' interno", $cleanContext['meta']['
 assertTest("Preservação de dados não sensíveis", $cleanContext['user'] === 'admin');
 
 // -------------------------------------------------------------
+// 7. Testes do Sistema de Plugins e Hooks (core/Hook.php, PluginManager.php)
+// -------------------------------------------------------------
+echo "\n[7] Testando Sistema de Plugins e Hooks\n";
+
+$executionTrace = [];
+\LightPress\Core\Hook::addAction('test_action', function () use (&$executionTrace) {
+    $executionTrace[] = 'second';
+}, 20);
+
+\LightPress\Core\Hook::addAction('test_action', function () use (&$executionTrace) {
+    $executionTrace[] = 'first';
+}, 10);
+
+\LightPress\Core\Hook::doAction('test_action');
+assertTest("Hook Action respeita prioridade de execução", $executionTrace === ['first', 'second']);
+
+\LightPress\Core\Hook::addFilter('test_filter', function (string $text): string {
+    return $text . ' Mundo';
+}, 10);
+
+\LightPress\Core\Hook::addFilter('test_filter', function (string $text): string {
+    return strtoupper($text);
+}, 20);
+
+assertTest("Hook Filter encadeia transformações em ordem", \LightPress\Core\Hook::applyFilters('test_filter', 'Olá') === 'OLÁ MUNDO');
+
+$available = \LightPress\Core\PluginManager::getAvailablePlugins();
+assertTest("Descoberta do plugin 'webhook-sender' em /plugins/", isset($available['webhook-sender']));
+
+if (isset($available['webhook-sender'])) {
+    require_once $available['webhook-sender']['entrypoint'];
+    $cleanUrls = WebhookSenderService::parseUrls("https://discord.com/api/webhooks/123/abc, https://meuservidor.com/webhook\nhttp://insecure.test/hook, invalido");
+    assertTest("Parsing e validação de URLs de Webhook por vírgula", count($cleanUrls) === 3);
+}
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

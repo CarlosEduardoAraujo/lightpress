@@ -453,34 +453,7 @@ function buildFilterUrl(array $overrides = []): string {
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 2.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <nav class="nav-links">
-                <a href="/admin/dashboard.php" class="active">Notícias</a>
-                <a href="/admin/pages.php">Páginas</a>
-                <a href="/admin/media.php">Mídias</a>
-                <a href="/admin/categories.php">Categorias</a>
-                <a href="/admin/stats.php">Mais Lidas 📈</a>
-                <?php if ($currentUser['role'] === 'admin'): ?>
-                    <a href="/admin/users.php">Usuários & Autores</a>
-                    <a href="/admin/settings.php">Configurações</a>
-                    <a href="/admin/system.php">Diagnóstico</a>
-                <?php endif; ?>
-                <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>
-            </nav>
-        </div>
-        <div class="user-menu">
-            <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong> (<?= Security::e($currentUser['role']) ?>)</span>
-            <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Meu Perfil</a>
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            <form method="POST" action="/admin/dashboard.php" style="display:inline;">
-                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                <input type="hidden" name="action" value="logout">
-                <button type="submit" class="logout" style="background:none; border:none; cursor:pointer; font:inherit; color:inherit; text-decoration:underline;">Sair</button>
-            </form>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('dashboard', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <!-- Cards de Métricas em Tempo Real -->

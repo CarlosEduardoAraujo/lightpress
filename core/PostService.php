@@ -175,8 +175,10 @@ class PostService
     {
         $this->ensureScheduledEnumSupported();
         $affectedUrls = [];
+        $isNowPublished = false;
+        $isFirstPublish = false;
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
@@ -247,6 +249,9 @@ class PostService
                     throw new RuntimeException("Apenas Editores e Administradores possuem autorização para publicar ou agendar matérias.", 403);
                 }
             }
+
+            $isNowPublished = ($targetStatus === 'published');
+            $isFirstPublish = ($isNowPublished && ($current['status'] ?? '') !== 'published');
 
             $newVersion = (int)$current['version'] + 1;
 
@@ -319,6 +324,14 @@ class PostService
                 $this->cacheManager->purgeUrls($affectedUrls);
             } catch (\Throwable $e) {
                 error_log("[PostService Cache Purge Error] " . $e->getMessage());
+            }
+        }
+
+        if ($success && $isNowPublished) {
+            try {
+                Hook::doAction('post_published', $postId, $data, $current, $isFirstPublish);
+            } catch (\Throwable $e) {
+                error_log("[PostService Hook Error] post_published: " . $e->getMessage());
             }
         }
 

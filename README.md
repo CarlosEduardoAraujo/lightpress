@@ -309,7 +309,12 @@ lightpress/
 │   ├── Security.php           # Utilitários de CSRF, sanitização e rate-limiting
 │   ├── Seo.php                # Metatags Open Graph, Twitter Cards e Schema.org JSON-LD
 │   ├── Settings.php           # Gerenciador central de configurações dinâmicas do portal
-│   └── Icon.php               # Biblioteca estática de ícones vetoriais SVG inline ultra-leves
+│   ├── Icon.php               # Biblioteca estática de ícones vetoriais SVG inline ultra-leves
+│   ├── Hook.php               # Sistema ultraleve de Actions e Filters (Zero Dependências)
+│   ├── PluginManager.php      # Gerenciador central de plugins e ciclo de vida
+│   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
+├── plugins/                   # Plugins isolados fora da raiz pública
+│   └── webhook-sender/        # Plugin nativo para envio de webhooks em publicações
 ├── storage/                   # Dados privados; acesso web proibido
 │   ├── staging/               # Originais temporários e conversões em andamento
 │   ├── migration/             # Backups de origem, checkpoints e relatórios
@@ -753,6 +758,22 @@ Sempre que novas classes de estilo ou modificações de layout forem feitas nos 
   npm run watch:css
   ```
   *Monitora alterações em qualquer template ou arquivo PHP e recompila o CSS instantaneamente a cada salvamento.*
+
+---
+
+### 8.13. Arquitetura de Plugins e Extensões (Zero Bloatware)
+
+Para permitir a extensão modular das capacidades do LightPress sem incorrer nos vícios estruturais do WordPress (consultas em cascata, lentidão em hooks desestruturados e tabelas EAV `postmeta`):
+
+* **Isolamento Fora da Raiz Pública:** Módulos residem em `/plugins/{plugin-slug}/` fora do web root `/public`, com bloqueio nativo de execução direta via HTTP.
+* **Sistema de Hooks Ultraleve (`core/Hook.php`):** Motor de Actions (`Hook::addAction`, `Hook::doAction`) e Filters (`Hook::addFilter`, `Hook::applyFilters`) com ordenação numérica de prioridade, sem dependências externas e com impacto inferior a 1 microssegundo.
+* **Gerenciador de Ciclo de Vida (`core/PluginManager.php`):**
+  - Descoberta declarativa através de `plugin.json` (sem execução de código PHP no momento da leitura de metadados).
+  - Ativação e desativação transacionais persistidas em `settings.active_plugins` (carregado em memória durante o bootstrap sem queries SQL adicionais).
+  - **Entrega Estática de Máxima Velocidade no Nginx:** Mapeamento de `/plugins/{slug}/assets/` para `/public/assets/plugins/{slug}/` (via link simbólico ou sincronização atômica) permitindo que arquivos CSS, JS e imagens sejam entregues diretamente pelo Nginx sem passar pelo PHP.
+* **Sem EAV / Proibição de `postmeta`:** Se um plugin necessita de persistência relacional, cria suas próprias tabelas dedicadas (`CREATE TABLE IF NOT EXISTS plugin_{slug}_...`) com chaves primárias indexadas e foreign keys com `ON DELETE CASCADE`.
+* **Disparo Pós-Commit e Fail-Safe:** Hooks de publicação (`post_published`) são disparados **estritamente após o commit da transação do banco e purga do cache FastCGI**, com timeouts curtos (3-4s via cURL nativo) para que falhas externas de rede nunca afetem a experiência da redação.
+* **Menu Superior com Submenu Dinâmico (`core/AdminNav.php`):** Inclusão no cabeçalho administrativo do dropdown **Plugins ▾**, contendo acesso rápido a **Gerenciar Plugins** (`/admin/plugins.php`) e submenus diretos para as páginas de configuração dos plugins ativos (`/admin/plugin-settings.php?plugin={slug}`).
 
 ---
 

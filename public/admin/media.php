@@ -412,29 +412,7 @@ function buildMediaUrl(array $overrides = []): string {
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 2.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <nav style="display: flex; gap: 1.25rem; font-size: 0.92rem; align-items: center;">
-                <a href="/admin/dashboard.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Notícias</a>
-                <a href="/admin/pages.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Páginas</a>
-                <a href="/admin/media.php" style="color: var(--primary-accent); font-weight: 700; text-decoration: none;">Mídias</a>
-                <a href="/admin/categories.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Categorias</a>
-                <a href="/admin/stats.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Mais Lidas 📈</a>
-                <?php if ($currentUser['role'] === 'admin'): ?>
-                    <a href="/admin/users.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Usuários & Autores</a>
-                    <a href="/admin/settings.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Configurações</a>
-                <?php endif; ?>
-                <a href="/admin/system.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">Diagnóstico</a>
-                <a href="/" target="_blank" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">Ver Site &rarr;</a>
-            </nav>
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong></span>
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: #dc2626; text-decoration: none; font-size: 0.9rem; font-weight: 600;">Sair</a>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('media', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <div class="page-header">

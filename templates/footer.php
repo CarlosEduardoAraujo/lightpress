@@ -57,5 +57,6 @@ use LightPress\Core\Security;
             </div>
         </div>
     </footer>
+    <?php \LightPress\Core\Hook::doAction('frontend_footer'); ?>
 </body>
 </html>

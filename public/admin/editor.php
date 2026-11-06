@@ -441,22 +441,7 @@ if (empty($initialHtml) && !empty($post['content_json'])) {
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <span style="font-size: 0.9rem; color: var(--text-muted);">&larr; <a href="/admin/dashboard.php" style="color: inherit; text-decoration: none;">Voltar ao Gerenciador</a></span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <?php if ($post): ?>
-                <a href="/admin/revisions.php?post_id=<?= (int)$post['id'] ?>" class="btn btn-secondary">📜 Histórico (#<?= (int)$post['version'] ?>)</a>
-                <a href="/admin/preview.php?id=<?= (int)$post['id'] ?>" target="_blank" class="btn btn-secondary">👁️ Prévia Privada</a>
-            <?php endif; ?>
-            <?php if ($post && $post['status'] === 'published'): ?>
-                <a href="/<?= Security::e($post['slug']) ?>/" target="_blank" class="btn btn-secondary">Ver Artigo no Ar &rarr;</a>
-            <?php endif; ?>
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('dashboard', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <?php if (!empty($message)): ?>

@@ -53,6 +53,9 @@ $config = require $configFile;
 // Disponibilizar globalmente para helpers de infraestrutura
 $GLOBALS['config'] = $config;
 
+// Carregar Plugins Ativos
+\LightPress\Core\PluginManager::loadActivePlugins();
+
 // Configuração de Erros
 if (!empty($config['app']['debug'])) {
     ini_set('display_errors', '1');

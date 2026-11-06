@@ -301,23 +301,7 @@ $csrfToken = Security::generateCsrfToken();
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 2.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <nav class="nav-links">
-                <a href="/admin/dashboard.php">Notícias</a>
-                <a href="/admin/pages.php" class="active">Páginas</a>
-                <a href="/admin/media.php">Mídias</a>
-                <a href="/admin/categories.php">Categorias</a>
-                <a href="/admin/stats.php">Mais Lidas 📈</a>
-                <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>
-            </nav>
-        </div>
-        <div class="user-menu">
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            <a href="/admin/pages.php" style="color: var(--text-muted); text-decoration: none; font-weight: 600;">&larr; Voltar às Páginas</a>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('pages', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <?php if (!empty($message)): ?>

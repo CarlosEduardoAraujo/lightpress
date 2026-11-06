@@ -261,29 +261,7 @@ $csrfToken = Security::generateCsrfToken();
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div style="display: flex; align-items: center; gap: 2.5rem;">
-            <a href="/admin/dashboard.php" class="brand">Speed<span>Press</span> Redação</a>
-            <nav class="nav-links">
-                <a href="/admin/dashboard.php">Notícias</a>
-                <a href="/admin/pages.php">Páginas</a>
-                <a href="/admin/media.php">Mídias</a>
-                <a href="/admin/categories.php" class="active">Categorias</a>
-                <a href="/admin/stats.php">Mais Lidas 📈</a>
-                <?php if ($currentUser['role'] === 'admin'): ?>
-                    <a href="/admin/users.php">Usuários & Autores</a>
-                    <a href="/admin/settings.php">Configurações</a>
-                    <a href="/admin/system.php">Diagnóstico</a>
-                <?php endif; ?>
-                <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>
-            </nav>
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <span>Olá, <strong><?= Security::e($currentUser['name']) ?></strong></span>
-            <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-            <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: #dc2626; text-decoration: none; font-weight: 600;">Sair</a>
-        </div>
-    </header>
+    <?= \LightPress\Core\AdminNav::renderHeader('categories', $currentUser, $csrfToken) ?>
 
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem;">
