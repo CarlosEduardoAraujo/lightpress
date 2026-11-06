@@ -7,6 +7,31 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Modernização e Paridade Visual da Edição de Páginas Institucionais (`public/admin/page-edit.php`)
+- **Paridade Estrutural com o Editor de Notícias:**
+  - Reconstrução completa da tela de inclusão e edição de páginas institucionais para adotar layout, componentes, responsividade e experiência de uso rigorosamente idênticos ao editor de notícias (`public/admin/editor.php`).
+- **Canvas Visual Direto e Limpador de Ctrl+V (Docs / Word):**
+  - Implementação de área de escrita contínua `contenteditable="true"` (`.editor-canvas`) com suporte a alternância em tempo real para código-fonte `</> HTML` via textarea de fallback.
+  - Sanitizador de colagem inteligente que intercepta o evento `paste` e remove automaticamente estilos inline poluídos, spans vazios, classes proprietárias do Word (`MsoNormal`), metadados de cabeçalho e wrappers de GUID do Google Docs, preservando apenas marcações semânticas limpas.
+- **Barra de Ferramentas Rica Sticky:**
+  - Toolbar rica contendo botões para títulos de seção (H2, H3), parágrafos (P), negrito, itálico, sublinhado, listas com marcadores e numeradas, citações em bloco, inserção segura de links, atalho para fotos da biblioteca e limpeza de formatação.
+  - Fixação refinada no topo com `top: 0px` para rolagem fluida sem cobrir o texto em edição.
+- **Integração com a Biblioteca de Mídias (WordPress-Style):**
+  - Modal assíncrono para seleção rápida de imagens da biblioteca ou upload direto com geração imediata de variantes WebP/AVIF.
+  - Suporte à seleção de **Imagem de Destaque** com card dedicado, preview visual em proporção 16:9 e botão flutuante para desvinculação em 1 clique (`✕ Remover Imagem`).
+  - Inserção de imagens no corpo institucional com formatação semântica `<figure>`, `<img>` e `<figcaption>`.
+- **Slug / Link Permanente Dinâmico:**
+  - Campo com prefixo canônico `https://dominio.com/`, link de prévia e botão gerador automático `Auto 🪄` acoplado ao título da página.
+- **Painel Lateral de Publicação e SEO Nativo:**
+  - Card de status dinâmico com badge visual (`✓ Publicada no Ar` acompanhado de atalho `Ver ↗`, `📝 Modo Rascunho` ou `📦 Arquivada`).
+  - Botão principal de ação em largura total com cor vermelha oficial (`#E10600`) alternando dinamicamente entre **"Atualizar Página"** e **"🚀 Publicar Página"**, além do botão secundário **"💾 Salvar como Rascunho"**.
+  - Metadados detalhados de ID, visualizações registradas, data de criação e data de atualização.
+  - Card dedicado de **SEO Nativo** com campos para Tag Title e Meta Description.
+
+### Refinamento de Usabilidade no Editor de Notícias (`public/admin/editor.php`)
+- **Ajuste de Rolagem da Barra de Ferramentas:**
+  - Ajuste de posição sticky da `.editor-toolbar` para `top: 0px` (substituindo o espaçamento residual de `57px`), eliminando qualquer sobreposição visual sobre o texto digitado durante a rolagem contínua.
+
 ### Padronização da Área Administrativa (/admin) e Header Unificado
 - **Cabeçalho Unificado Compartilhado (`public/admin/header.php`):**
   - Eliminação de duplicações estruturais de HTML, metadados, scripts anti-flash de tema e folhas de estilos em todas as páginas da área administrativa.

@@ -712,12 +712,18 @@ Para maximizar a compatibilidade com redes sociais (WhatsApp, X/Twitter, Faceboo
 * **Conversão Forçada para WebP:** O método `ImageProcessor::toWebpUrl()` substitui extensões `.avif`, `.png`, `.jpg` ou `.ico` pela variante correspondente `.webp`, acompanhada do domínio canônico absoluto (`https://...`).
 * **Artigos Individuais:** A imagem de destaque da matéria (`featured_image`) é convertida automaticamente para WebP de alta resolução nas metatags sociais.
 
-### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `templates/page.php`)
+### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `/admin/page-edit.php`, `templates/page.php`)
 
 Páginas estáticas corporativas (ex: *Nossa Equipe Editorial*, *Contato / Fale Conosco*, *Termos de Uso*, *Política de Privacidade*, *Código de Ética*) são gerenciadas isoladamente na tabela `pages`:
-* **URLs Amigáveis na Raiz:** Servidas diretamente em `/{slug}/` com verificação transparente de colisão com notícias.
+* **URLs Amigáveis na Raiz:** Servidas diretamente em `/{slug}/` com verificação transparente de colisão com notícias e palavras reservadas do sistema (`admin`, `api`, `uploads`, etc.).
 * **Métricas de Leitura:** Contabilização atômica de visualizações (`views`) na tabela de páginas.
 * **Auto-migração de Slugs:** O esquema migra automaticamente slugs legados (ex: `quem-somos` para `nossa-equipe`) mantendo links internos íntegros.
+* **Editor Visual Moderno em Paridade com o Editor de Notícias (`/admin/page-edit.php`):**
+  - **Canvas Visual Direto (`contenteditable`):** Escrita fluida e contínua com suporte a alternância em tempo real para código-fonte `</> HTML`.
+  - **Limpador de Ctrl+V (Docs/Word):** Interceptação do evento de colagem com sanitização e descarte automático de spans inline, estilos proprietários do Office (`MsoNormal`) e wrappers de GUID do Google Docs.
+  - **Barra de Ferramentas Rica Sticky (`top: 0px`):** Títulos de seção (H2, H3), parágrafos (P), negrito, itálico, sublinhado, listas com marcadores e numeradas, citações em destaque, links e atalho para a biblioteca de mídia.
+  - **Modal de Mídias Estilo WordPress:** Seleção e upload de imagens com geração imediata de WebP/AVIF, prévia 16:9 de imagem de destaque com botão de remoção rápida (`✕ Remover Imagem`) e inserção semântica (`<figure>`, `<figcaption>`).
+  - **Publicação Ágil e SEO Nativo:** Botão de ação vermelha oficial (`#E10600`) em largura total, atalhos de rascunho, badges de status (`✓ Publicada no Ar` com link direto `Ver ↗`) e campos dedicados de Meta Title e Meta Description.
 
 ### 8.11. Biblioteca de Ícones Vetoriais SVG Inline (`core/Icon.php`)
 
@@ -886,6 +892,8 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Identidade Dinâmica da Marca:** O nome da publicação exibido em `<a href="/admin/dashboard.php" class="brand">` reflete dinamicamente o Título do Site configurado em `Settings::get('site_title')`.
   - [x] **Largura Universal de 1900px:** Expansão de todas as telas administrativas para `max-width: 1900px` (`.container`), proporcionando máximo aproveitamento horizontal em monitores widescreen.
   - [x] **Padronização Visual da Paleta em Vermelho Oficial (`#E10600`):** Eliminação completa de cores azuis legadas, unificando botões, links ativos, badges e campos em foco na cor da publicação.
+  - [x] **Modernização e Paridade do Editor de Páginas (`page-edit.php`):** Canvas visual contínuo `contenteditable` com alternância `</> HTML`, limpador inteligente de formatação para Ctrl+V (Google Docs / MS Word), modal assíncrono de biblioteca de mídias para imagem de destaque e corpo, badge dinâmico de status e botões de ação na cor oficial em largura total.
+  - [x] **Refinamento de Rolagem no Editor de Notícias (`editor.php`):** Ajuste fino de fixação sticky da barra de ferramentas com `top: 0px`, garantindo visibilidade total do texto sem sobreposição.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
