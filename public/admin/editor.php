@@ -328,7 +328,7 @@ require __DIR__ . '/header.php';
         border-bottom: none;
         border-radius: var(--radius) var(--radius) 0 0;
         position: sticky;
-        top: 57px;
+        top: 0px;
         z-index: 40;
     }
     .tool-btn {
