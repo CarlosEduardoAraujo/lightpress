@@ -274,6 +274,27 @@ $csrfToken = Security::generateCsrfToken();
                 </div>
             </div>
 
+            <!-- Cloudflare Edge Cache Purge -->
+            <div class="card">
+                <h2 class="card-title">Cloudflare Edge Cache (API v4)</h2>
+                <div class="info-row">
+                    <span>Purga Automática</span>
+                    <span><?= !empty($config['cloudflare']['enabled']) ? '<span class="badge-ok">Habilitada</span>' : '<span class="badge-warn">Desabilitada</span>' ?></span>
+                </div>
+                <div class="info-row">
+                    <span>Zone ID</span>
+                    <span><?= !empty($config['cloudflare']['zone_id']) ? '<span class="badge-ok">' . Security::e(substr((string)$config['cloudflare']['zone_id'], 0, 6) . '...' . substr((string)$config['cloudflare']['zone_id'], -4)) . '</span>' : '<span class="badge-warn">Pendente</span>' ?></span>
+                </div>
+                <div class="info-row">
+                    <span>API Token</span>
+                    <span><?= !empty($config['cloudflare']['api_token']) ? '<span class="badge-ok">Configurado</span>' : '<span class="badge-warn">Pendente</span>' ?></span>
+                </div>
+                <div class="info-row">
+                    <span>Método de Purga</span>
+                    <span>Seletiva por URLs (Home, Feeds, Matérias)</span>
+                </div>
+            </div>
+
             <!-- Segurança Defensiva -->
             <div class="card">
                 <h2 class="card-title">Segurança Ativa</h2>

@@ -24,7 +24,13 @@ return [
     ],
     'cache' => [
         'enabled' => true,
-        'cache_path' => '/var/cache/nginx/lightpress',
+        'cache_path' => '/var/cache/nginx/wordpress', // ou /var/cache/nginx/lightpress
+    ],
+    'cloudflare' => [
+        'enabled'    => true,
+        'zone_id'    => 'COLE_AQUI_SEU_ZONE_ID',
+        'api_token'  => 'COLE_AQUI_SEU_API_TOKEN',
+        'timeout'    => 5,
     ],
     'security' => [
         'hmac_secret' => 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO',

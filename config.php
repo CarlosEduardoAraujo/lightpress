@@ -50,6 +50,14 @@ $config = [
         'key_zone' => 'LIGHTPRESS',
     ],
 
+    // Invalidação Seletiva de Cache na Cloudflare (API v4)
+    'cloudflare' => [
+        'enabled' => false,
+        'zone_id' => '',
+        'api_token' => '',
+        'timeout' => 5, // Timeout em segundos por requisição de purga
+    ],
+
     // Pipeline de Mídia (PHP GD)
     'media' => [
         'upload_dir' => __DIR__ . '/public/uploads',

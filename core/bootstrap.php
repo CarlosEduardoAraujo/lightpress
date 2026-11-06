@@ -14,15 +14,25 @@ spl_autoload_register(function (string $class): void {
     $baseDir = __DIR__ . '/';
 
     $len = strlen($prefix);
-    if (strncmp($prefix, $class, $len) !== 0) {
+    if (strncmp($prefix, $class, $len) === 0) {
+        $relativeClass = substr($class, $len);
+        $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+
+        if (file_exists($file)) {
+            require_once $file;
+        }
         return;
     }
 
-    $relativeClass = substr($class, $len);
-    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
-
-    if (file_exists($file)) {
-        require_once $file;
+    // Suporte a Core\Services\ para helpers de infraestrutura (ex: CloudflareCache)
+    $servicesPrefix = 'Core\\Services\\';
+    $sLen = strlen($servicesPrefix);
+    if (strncmp($servicesPrefix, $class, $sLen) === 0) {
+        $className = substr($class, $sLen);
+        $file = $baseDir . str_replace('\\', '/', $className) . '.php';
+        if (file_exists($file)) {
+            require_once $file;
+        }
     }
 });
 

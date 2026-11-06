@@ -110,6 +110,22 @@ $expectedFull = "/var/cache/nginx/lightpress/{$expectedLevel1}/{$expectedLevel2}
 
 assertTest("Caminho do cache Nginx levels=1:2 calculado com precisão", $path === $expectedFull, "Obtido: {$path}");
 
+// Teste com URL absoluta (ex: https://speedracing.com.br/slug/)
+$testFullUrl = 'https://speedracing.com.br/alan-permane-racing-bulls-2031/';
+$pathFull = $cacheManager->getCacheFilePath($testFullUrl);
+$expectedFullKey = "httpsGETspeedracing.com.br/alan-permane-racing-bulls-2031/";
+$expectedFullHash = md5($expectedFullKey);
+$expectedFullLevel1 = substr($expectedFullHash, -1);
+$expectedFullLevel2 = substr($expectedFullHash, -3, 2);
+$expectedFullPath = "/var/cache/nginx/lightpress/{$expectedFullLevel1}/{$expectedFullLevel2}/{$expectedFullHash}";
+
+assertTest("Caminho do cache Nginx calculado corretamente a partir de URL absoluta", $pathFull === $expectedFullPath, "Obtido: {$pathFull}");
+
+// Verificação do CloudflareCache e alias de namespace
+assertTest("Classe CloudflareCache existe e está carregada", class_exists(\LightPress\Core\CloudflareCache::class));
+assertTest("Alias de namespace Core\Services\CloudflareCache disponível", class_exists('Core\Services\CloudflareCache'));
+assertTest("Cloudflare desabilitada em dev retorna falso com segurança", \LightPress\Core\CloudflareCache::purgeUrls(['/']) === false);
+
 // -------------------------------------------------------------
 // 5. Testes do Roteador Regex (Router)
 // -------------------------------------------------------------
