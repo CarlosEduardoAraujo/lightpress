@@ -234,14 +234,14 @@ class PostService
      * @param int $knownVersion Versão conhecida pelo cliente antes da edição
      * @return bool
      */
-    public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion): bool
+    public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion, int $knownRevisionId = 0): bool
     {
         $this->ensureScheduledEnumSupported();
         $affectedUrls = [];
         $isNowPublished = false;
         $isFirstPublish = false;
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
@@ -258,6 +258,28 @@ class PostService
                     "Conflito de edição detectado! A publicação foi alterada por outro usuário (versão atual: {$current['version']}, versão base: {$knownVersion}).",
                     409
                 );
+            }
+
+            // Validação de concorrência entre rascunhos de revisão da versão atual
+            $latestRev = Database::fetchOne(
+                "SELECT id, base_version FROM post_revisions 
+                 WHERE post_id = ? AND base_version = ? AND status IN ('draft', 'pending_review') 
+                 ORDER BY id DESC LIMIT 1",
+                [$postId, $knownVersion]
+            );
+            $latestRevId = $latestRev ? (int)$latestRev['id'] : 0;
+            if ($latestRevId > 0) {
+                if ($knownRevisionId > 0 && $latestRevId !== $knownRevisionId) {
+                    throw new RuntimeException(
+                        "Conflito de rascunho detectado! Outra revisão desta matéria foi salva enquanto você editava. Recarregue a página para mesclar as alterações antes de publicar.",
+                        409
+                    );
+                } elseif ($knownRevisionId === 0) {
+                    throw new RuntimeException(
+                        "Conflito de rascunho detectado! Um rascunho não publicado foi criado recentemente para esta matéria. Recarregue a página antes de publicar.",
+                        409
+                    );
+                }
             }
 
             $title = trim($data['title'] ?? '');
@@ -354,9 +376,17 @@ class PostService
                 throw new RuntimeException("Conflito de concorrência detectado durante a gravação. Nenhuma linha foi alterada.", 409);
             }
 
-            // Gravar revisão histórica aplicada e marcar rascunhos anteriores como aplicados
+            // Se a publicação foi baseada em uma revisão específica conhecida, marca-a como aplicada
+            if ($knownRevisionId > 0) {
+                Database::query(
+                    "UPDATE post_revisions SET status = 'applied' WHERE id = ? AND post_id = ?",
+                    [$knownRevisionId, $postId]
+                );
+            }
+
+            // Quaisquer outras revisões pendentes anteriores são marcadas como 'superseded'
             Database::query(
-                "UPDATE post_revisions SET status = 'applied' WHERE post_id = ? AND status IN ('draft', 'pending_review')",
+                "UPDATE post_revisions SET status = 'superseded' WHERE post_id = ? AND status IN ('draft', 'pending_review')",
                 [$postId]
             );
 

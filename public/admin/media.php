@@ -637,11 +637,29 @@ require __DIR__ . '/header.php';
         const dynamicAlert = document.getElementById('dynamicAlert');
         const csrfToken = document.getElementById('csrfToken').value;
 
-        function showAlert(msg, isError) {
+        function showAlert(mainText, detailsArray, isError) {
             dynamicAlert.replaceChildren();
             const alertDiv = document.createElement('div');
             alertDiv.className = isError ? 'alert-error' : 'alert-success';
-            alertDiv.innerHTML = msg;
+
+            if (mainText) {
+                const titleNode = document.createElement('div');
+                titleNode.textContent = mainText;
+                alertDiv.appendChild(titleNode);
+            }
+
+            if (Array.isArray(detailsArray) && detailsArray.length > 0) {
+                const listContainer = document.createElement('div');
+                listContainer.style.fontSize = '0.85rem';
+                listContainer.style.marginTop = mainText ? '0.35rem' : '0';
+                for (let j = 0; j < detailsArray.length; j++) {
+                    const item = document.createElement('div');
+                    item.textContent = detailsArray[j];
+                    listContainer.appendChild(item);
+                }
+                alertDiv.appendChild(listContainer);
+            }
+
             dynamicAlert.appendChild(alertDiv);
         }
 
@@ -665,7 +683,7 @@ require __DIR__ . '/header.php';
                 btnSelect.style.opacity = '0.6';
             }
             if (dropZone) dropZone.style.pointerEvents = 'none';
-            dynamicAlert.innerHTML = '';
+            dynamicAlert.replaceChildren();
 
             let successCount = 0;
             let errorMessages = [];
@@ -729,11 +747,10 @@ require __DIR__ . '/header.php';
                 const msg = successCount === 1 
                     ? 'Imagem enviada e convertida com sucesso!' 
                     : successCount + ' imagens enviadas e convertidas com sucesso!';
-                const extraErr = errorMessages.length > 0 ? '<br><small>' + errorMessages.join('<br>') + '</small>' : '';
-                showAlert(msg + extraErr, false);
+                showAlert(msg, errorMessages, false);
                 triggerLiveSearch(1);
             } else if (errorMessages.length > 0) {
-                showAlert(errorMessages.join('<br>') || 'Falha ao processar arquivo(s).', true);
+                showAlert('', errorMessages, true);
             }
         }
 

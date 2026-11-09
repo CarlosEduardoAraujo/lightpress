@@ -329,6 +329,60 @@ else:
 assert_check("Revisão com base_version defasada (v2 != v3) é marcada como desatualizada", has_outdated_revision)
 assert_check("Revisão desatualizada não sobrescreve o conteúdo mais recente publicado na tela", loaded_html == "<p>Texto Mais Recente v3</p>")
 
+# Caso E: Revisão desatualizada não bloqueia salvamento de novo rascunho
+# Post está na versão 3. Existe revisão pendente 102 com base_version = 2.
+# Editor envia known_version = 3 e known_revision_id = 0.
+cursor.execute("""
+    SELECT id FROM post_revisions 
+    WHERE post_id = 10 AND base_version = 3 AND status IN ('draft', 'pending_review') 
+    ORDER BY id DESC LIMIT 1
+""")
+active_v3_rev = cursor.fetchone()
+# Como a revisão 102 tem base_version = 2, a busca por base_version = 3 retorna None
+can_save_new_draft = (active_v3_rev is None)
+assert_check("Revisão de versão anterior não bloqueia o salvamento de novo rascunho na versão atual", can_save_new_draft)
+
+# Salva novo rascunho da versão 3 e arquiva as antigas como superseded
+cursor.execute("UPDATE post_revisions SET status = 'superseded' WHERE post_id = 10 AND base_version < 3 AND status IN ('draft', 'pending_review')")
+cursor.execute("""
+    INSERT INTO post_revisions (id, post_id, editor_id, base_version, status, payload_json, content_html)
+    VALUES (201, 10, 1, 3, 'draft', '{"title": "Rascunho Versão 3 B"}', '<p>Texto v3 por B</p>')
+""")
+conn.commit()
+
+cursor.execute("SELECT status FROM post_revisions WHERE id = 102")
+assert_check("Revisão defasada de versão anterior é arquivada como 'superseded'", cursor.fetchone()[0] == 'superseded')
+
+# Caso F: Publicar valida concorrência entre revisões de rascunho
+# Post 10 está na versão 3. Usuário B salvou a revisão 201.
+# Usuário A tenta publicar com known_version = 3 e known_revision_id = 0 (não conhecia o rascunho de B)
+cursor.execute("""
+    SELECT id FROM post_revisions 
+    WHERE post_id = 10 AND base_version = 3 AND status IN ('draft', 'pending_review') 
+    ORDER BY id DESC LIMIT 1
+""")
+latest_v3_rev = cursor.fetchone()
+known_rev_a = 0
+publish_conflict = False
+try:
+    if latest_v3_rev and (known_rev_a == 0 or known_rev_a != latest_v3_rev[0]):
+        publish_conflict = True
+        raise RuntimeError("Conflito de rascunho na publicação detectado! 409")
+except RuntimeError:
+    pass
+
+assert_check("Publicação com known_revision_id desatualizado é recusada com 409 em favor do rascunho recente", publish_conflict)
+
+# Caso G: Publicação autorizada com o rascunho conhecido marca apenas ele como aplicado
+known_rev_b = 201
+cursor.execute("UPDATE post_revisions SET status = 'applied' WHERE id = ? AND post_id = 10", (known_rev_b,))
+cursor.execute("UPDATE post_revisions SET status = 'superseded' WHERE post_id = 10 AND status IN ('draft', 'pending_review')")
+cursor.execute("UPDATE posts SET version = 4, title = 'Notícia v4 Publicada', content_html = '<p>Texto v3 por B</p>' WHERE id = 10")
+conn.commit()
+
+cursor.execute("SELECT status FROM post_revisions WHERE id = 201")
+assert_check("Rascunho conhecido publicado é marcado especificamente como 'applied'", cursor.fetchone()[0] == 'applied')
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

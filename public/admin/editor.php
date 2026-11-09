@@ -36,26 +36,17 @@ $applyDraftRevision = function (array &$post, int $postId) use (
     &$hasActiveDraftRevision, &$draftRevisionDate, &$activeRevisionId,
     &$hasOutdatedRevision, &$outdatedRevisionDate, &$outdatedRevisionVersion
 ): void {
+    $currentPostVersion = (int)($post['version'] ?? 1);
+
+    // 1. Busca primeiro se há revisão ativa da versão atual
     $latestRev = Database::fetchOne(
         "SELECT * FROM post_revisions 
-         WHERE post_id = ? AND status IN ('draft', 'pending_review') 
+         WHERE post_id = ? AND base_version = ? AND status IN ('draft', 'pending_review') 
          ORDER BY id DESC LIMIT 1",
-        [$postId]
+        [$postId, $currentPostVersion]
     );
 
     if ($latestRev) {
-        $baseVersion = (int)($latestRev['base_version'] ?? 0);
-        $currentPostVersion = (int)($post['version'] ?? 1);
-
-        // Se a revisão foi baseada em uma versão anterior do post público, não podemos
-        // sobrepô-la cegamente sobre o conteúdo mais recente publicado, pois causaria perda silenciosa de dados.
-        if ($baseVersion !== $currentPostVersion) {
-            $hasOutdatedRevision = true;
-            $outdatedRevisionDate = $latestRev['created_at'];
-            $outdatedRevisionVersion = $baseVersion;
-            return;
-        }
-
         $payload = json_decode((string)$latestRev['payload_json'], true);
         if (is_array($payload)) {
             foreach (['title', 'slug', 'summary', 'category', 'tags', 'featured_image', 'content_json', 'seo_title', 'seo_description', 'focus_keyword', 'is_featured'] as $key) {
@@ -81,6 +72,21 @@ $applyDraftRevision = function (array &$post, int $postId) use (
         $activeRevisionId = (int)$latestRev['id'];
         $hasActiveDraftRevision = true;
         $draftRevisionDate = $latestRev['created_at'];
+        return;
+    }
+
+    // 2. Se não houver revisão para a versão atual, verifica se há revisão órfã de versão anterior
+    $outdatedRev = Database::fetchOne(
+        "SELECT id, base_version, created_at FROM post_revisions 
+         WHERE post_id = ? AND base_version < ? AND status IN ('draft', 'pending_review') 
+         ORDER BY id DESC LIMIT 1",
+        [$postId, $currentPostVersion]
+    );
+
+    if ($outdatedRev) {
+        $hasOutdatedRevision = true;
+        $outdatedRevisionDate = $outdatedRev['created_at'];
+        $outdatedRevisionVersion = (int)$outdatedRev['base_version'];
     }
 };
 
@@ -171,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)) {
                         throw new RuntimeException("Apenas Editores e Administradores podem publicar.");
                     }
-                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion);
+                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion, $knownRevisionId);
                     
                     $isFuture = (!empty($publishedAt) && strtotime($publishedAt) > time());
                     $schedFormatted = $publishedAt ?? '';
@@ -238,12 +244,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // 4. Se a matéria já estiver publicada ou agendada e a ação for salvar rascunho:
                         // Salva com segurança como uma REVISÃO PRIVADA, mantendo o post público intacto (SEC-04)
                         if (in_array($current['status'], ['published', 'scheduled'], true)) {
-                            // Validação de concorrência entre rascunhos de revisão
+                            // Validação de concorrência entre rascunhos de revisão da VERSÃO ATUAL
                             $latestRev = Database::fetchOne(
                                 "SELECT id, base_version FROM post_revisions 
-                                 WHERE post_id = ? AND status IN ('draft', 'pending_review') 
+                                 WHERE post_id = ? AND base_version = ? AND status IN ('draft', 'pending_review') 
                                  ORDER BY id DESC LIMIT 1",
-                                [$postId]
+                                [$postId, (int)$current['version']]
                             );
                             $latestRevId = $latestRev ? (int)$latestRev['id'] : 0;
                             if ($latestRevId > 0) {
@@ -276,6 +282,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'is_featured' => $isFeaturedVal,
                                 'status' => $revStatus,
                             ];
+
+                            // Se havia uma revisão conhecida anterior sendo continuada, marca-a como superseded
+                            if ($knownRevisionId > 0) {
+                                Database::query(
+                                    "UPDATE post_revisions SET status = 'superseded' WHERE id = ? AND post_id = ?",
+                                    [$knownRevisionId, $postId]
+                                );
+                            }
+
+                            // Marca quaisquer revisões órfãs de versões passadas como superseded
+                            Database::query(
+                                "UPDATE post_revisions SET status = 'superseded' WHERE post_id = ? AND base_version < ? AND status IN ('draft', 'pending_review')",
+                                [$postId, (int)$current['version']]
+                            );
 
                             Database::query(
                                 "INSERT INTO post_revisions (
