@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = trim($_POST['title'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $contentHtml = trim($_POST['content_html'] ?? '');
-        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeUrl(trim($_POST['featured_image'])) : null;
+        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['featured_image'])) : null;
         $seoTitle = trim($_POST['seo_title'] ?? '');
         $seoDesc = trim($_POST['seo_description'] ?? '');
         

@@ -301,11 +301,18 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
     $perPage = 12;
 
     $tagClean = trim(str_replace('-', ' ', $tagRaw));
-    $tagSearch = "%{$tagClean}%";
+    $isSqlite = Database::getDriver() === 'sqlite';
+    if ($isSqlite) {
+        $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
+        $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
+    } else {
+        $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
+        $tagCriteria = [$tagClean, $tagRaw];
+    }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)",
-        [$nowUtc, $tagSearch, "%{$tagRaw}%"]
+        "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+        array_merge([$nowUtc], $tagCriteria)
     );
 
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -315,9 +322,9 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
          ORDER BY p.published_at DESC LIMIT ?",
-        [$nowUtc, $tagSearch, "%{$tagRaw}%", (int)$perPage]
+        array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
     );
 
     $tagName = ucwords($tagClean);
@@ -335,11 +342,18 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $tagClean = trim(str_replace('-', ' ', $tagRaw));
-    $tagSearch = "%{$tagClean}%";
+    $isSqlite = Database::getDriver() === 'sqlite';
+    if ($isSqlite) {
+        $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
+        $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
+    } else {
+        $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
+        $tagCriteria = [$tagClean, $tagRaw];
+    }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (tags LIKE ? OR tags LIKE ?)",
-        [$nowUtc, $tagSearch, "%{$tagRaw}%"]
+        "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+        array_merge([$nowUtc], $tagCriteria)
     );
 
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -349,9 +363,9 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.tags LIKE ? OR p.tags LIKE ?)
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-        [$nowUtc, $tagSearch, "%{$tagRaw}%", (int)$perPage, (int)$offset]
+        array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
     );
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de destaques
@@ -392,7 +406,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         if ($page) {
             header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
             // Contabilizar visualização da página
-            Database::query("UPDATE pages SET views = views + 1 WHERE id = ?", [(int)$page['id']]);
+            // Visualizações contabilizadas assincronamente via beacon /api/view.php?type=page
             $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
             require $config['paths']['templates'] . '/page.php';
             return;

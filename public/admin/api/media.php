@@ -26,7 +26,7 @@ if (!empty($search)) {
          WHERE original_name LIKE ? OR variants_manifest LIKE ? OR id = ?
          ORDER BY created_at DESC 
          LIMIT ?",
-        ['%' . $search . '%', '%' . $search . '%', $search, $limit]
+        ['%' . Security::escapeLike($search) . '%', '%' . Security::escapeLike($search) . '%', $search, $limit]
     );
 } else {
     $items = Database::fetchAll(

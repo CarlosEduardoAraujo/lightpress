@@ -129,22 +129,24 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
                         if (!empty($url)) {
                             // Suporte a busca direta e com barras escapadas (\/uploads\/...) em serializações JSON legadas
                             $escapedUrl = str_replace('/', '\/', $url);
+                            $likeUrl = '%' . Security::escapeLike($url) . '%';
+                            $likeEscapedUrl = '%' . Security::escapeLike($escapedUrl) . '%';
 
                             $inPostsFeatured = (int)Database::fetchValue(
                                 "SELECT COUNT(*) FROM posts WHERE featured_image = ? OR content_json LIKE ? OR content_json LIKE ?",
-                                [$url, '%' . $url . '%', '%' . $escapedUrl . '%']
+                                [$url, $likeUrl, $likeEscapedUrl]
                             );
                             if ($inPostsFeatured > 0) { $isInUse = true; break 2; }
 
                             $inPostsContent = (int)Database::fetchValue(
                                 "SELECT COUNT(*) FROM posts WHERE content_html LIKE ?",
-                                ['%' . $url . '%']
+                                [$likeUrl]
                             );
                             if ($inPostsContent > 0) { $isInUse = true; break 2; }
 
                             $inPages = (int)Database::fetchValue(
                                 "SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?",
-                                [$url, '%' . $url . '%']
+                                [$url, $likeUrl]
                             );
                             if ($inPages > 0) { $isInUse = true; break 2; }
 
@@ -154,7 +156,7 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
                                  WHERE content_html LIKE ? 
                                     OR payload_json LIKE ? 
                                     OR payload_json LIKE ?",
-                                ['%' . $url . '%', '%' . $url . '%', '%' . $escapedUrl . '%']
+                                [$likeUrl, $likeUrl, $likeEscapedUrl]
                             );
                             if ($inRevisions > 0) { $isInUse = true; break 2; }
                         }
@@ -191,8 +193,9 @@ $params = [];
 
 if (!empty($filterSearch)) {
     $whereClauses[] = "(m.original_name LIKE ? OR m.variants_manifest LIKE ? OR m.id = ?)";
-    $params[] = '%' . $filterSearch . '%';
-    $params[] = '%' . $filterSearch . '%';
+    $escapedFilter = '%' . Security::escapeLike($filterSearch) . '%';
+    $params[] = $escapedFilter;
+    $params[] = $escapedFilter;
     $params[] = $filterSearch;
 }
 
@@ -649,11 +652,6 @@ require __DIR__ . '/header.php';
                 showAlert('Erro de conexão ou timeout ao enviar arquivo: ' + err.message, true);
             });
         });
-
-        // Alternância de Tema Claro / Escuro
-        
-        }
-        updateThemeIcon();
     
         // ========================================================
         // Busca em Tempo Real e Paginação Assíncrona Instantânea

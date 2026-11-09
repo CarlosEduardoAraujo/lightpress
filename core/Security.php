@@ -110,6 +110,40 @@ class Security
     }
 
     /**
+     * Encerra com segurança a sessão ativa, limpando dados na memória,
+     * invalidando o cookie no navegador e destruindo a sessão no servidor.
+     */
+    public static function destroySession(): void
+    {
+        self::ensureSession();
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params['path'] ?? '/',
+                $params['domain'] ?? '',
+                (bool)($params['secure'] ?? false),
+                (bool)($params['httponly'] ?? true)
+            );
+        }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
+    }
+
+    /**
+     * Retorna os dados do usuário autenticado na sessão atual, ou null se não logado.
+     */
+    public static function getCurrentUser(): ?array
+    {
+        self::ensureSession();
+        return (isset($_SESSION['user']) && is_array($_SESSION['user'])) ? $_SESSION['user'] : null;
+    }
+
+    /**
      * Garante que a sessão está ativa.
      */
     private static function ensureSession(): void

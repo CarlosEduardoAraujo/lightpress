@@ -451,12 +451,20 @@ class BlockCompiler
                     // Resoluções disponíveis
                     foreach (['full', 'intermediate', 'thumb'] as $resKey) {
                         if (!empty($variants[$resKey]['avif']['url'])) {
-                            $avifSrcset[] = "{$variants[$resKey]['avif']['url']} {$variants[$resKey]['avif']['width']}w";
+                            $vUrl = self::sanitizeImageUrl((string)$variants[$resKey]['avif']['url']);
+                            $vWidth = (int)($variants[$resKey]['avif']['width'] ?? 0);
+                            if (!empty($vUrl) && $vWidth > 0) {
+                                $avifSrcset[] = "{$vUrl} {$vWidth}w";
+                            }
                         }
                         if (!empty($variants[$resKey]['webp']['url'])) {
-                            $webpSrcset[] = "{$variants[$resKey]['webp']['url']} {$variants[$resKey]['webp']['width']}w";
-                            if (empty($defaultSrc) || $resKey === 'intermediate') {
-                                $defaultSrc = $variants[$resKey]['webp']['url'];
+                            $vUrl = self::sanitizeImageUrl((string)$variants[$resKey]['webp']['url']);
+                            $vWidth = (int)($variants[$resKey]['webp']['width'] ?? 0);
+                            if (!empty($vUrl) && $vWidth > 0) {
+                                $webpSrcset[] = "{$vUrl} {$vWidth}w";
+                                if (empty($defaultSrc) || $resKey === 'intermediate') {
+                                    $defaultSrc = $vUrl;
+                                }
                             }
                         }
                     }
@@ -489,7 +497,7 @@ class BlockCompiler
         }
 
         // Sanitização estrita de URL da imagem
-        $url = self::sanitizeUrl($url);
+        $url = self::sanitizeImageUrl($url);
         if (empty($url)) {
             return '';
         }
@@ -510,6 +518,45 @@ class BlockCompiler
     private static function sanitizeInline(string $text): string
     {
         return self::sanitizeHtml($text);
+    }
+
+    /**
+     * Valida e sanitiza estritamente URLs destinadas a imagens (featured_image, favicon, avatares, <img>, <source>).
+     * Aceita exclusivamente caminhos internos seguros iniciados por / (sem // ou /\)
+     * ou URLs absolutas com esquemas estritos https:// ou http://.
+     * Rejeita caracteres de controle, mailto:, tel:, javascript:, data: e esquemas perigosos.
+     */
+    public static function sanitizeImageUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        // Bloquear caracteres de controle, quebras de linha e tabulações (bypasses em parsers)
+        if (preg_match('/[\x00-\x1f\x7f]/', $url)) {
+            return '';
+        }
+
+        // Bloquear caminhos protocol-relative (//evil.com) ou barra invertida (/\evil.com)
+        if (str_starts_with($url, '//') || str_starts_with($url, '/\\')) {
+            return '';
+        }
+
+        // Caminhos internos seguros iniciando com /
+        if (str_starts_with($url, '/')) {
+            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        }
+
+        // Apenas http:// e https:// autorizados para imagens
+        if (stripos($url, 'https://') === 0 || stripos($url, 'http://') === 0) {
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                return '';
+            }
+            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        }
+
+        return '';
     }
 
     /**

@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $category = trim($_POST['category'] ?? 'geral');
         $tags = trim($_POST['tags'] ?? '');
         $summary = trim($_POST['summary'] ?? '');
-        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeUrl(trim($_POST['featured_image'])) : '';
+        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['featured_image'])) : '';
         $contentHtml = trim($_POST['content_html'] ?? '');
         $contentJson = $_POST['content_json'] ?? '';
         $seoTitle = trim($_POST['seo_title'] ?? '');

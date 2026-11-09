@@ -228,4 +228,19 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     </div>
 </div>
 
+<!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->
+<script>
+(function() {
+    var pageId = <?= (int)$page['id'] ?>;
+    var endpoint = '/api/view.php?type=page&id=' + pageId;
+    try {
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(endpoint);
+        } else {
+            fetch(endpoint, { method: 'POST', keepalive: true }).catch(function() {});
+        }
+    } catch (e) {}
+})();
+</script>
+
 <?php require __DIR__ . '/footer.php'; ?>

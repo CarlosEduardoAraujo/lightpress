@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Settings::set('plugin_webhook_sender_urls', $cleanString);
         
         if (empty($parsed) && !empty($rawInput)) {
-            $error = 'Aviso: Nenhuma URL válida iniciada com http:// ou https:// foi detectada.';
+            $error = 'Aviso: Nenhuma URL segura iniciada com http:// ou https:// foi aceita (endereços locais, privados e metadados de nuvem são bloqueados por segurança).';
         } else {
             $message = 'Configurações de servidores de Webhook salvas com sucesso!';
         }
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $parsed = WebhookSenderService::parseUrls($rawInput);
 
         if (empty($parsed)) {
-            $error = 'Por favor, insira pelo menos uma URL de webhook válida para realizar o teste.';
+            $error = 'Por favor, insira pelo menos uma URL de webhook válida e segura (endereços de rede privada/loopback são bloqueados).';
         } else {
             $siteUrl = rtrim($config['app']['canonical_origin'] ?? $config['app']['url'] ?? 'https://www.speedracing.com.br', '/');
             $testPayload = [
@@ -92,20 +92,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $isSuccess = ($successCount > 0) ? 1 : 0;
 
-                    Database::query("
-                        INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
-                        VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE
-                            sent_at = CURRENT_TIMESTAMP,
-                            servers_count = VALUES(servers_count),
-                            is_success = VALUES(is_success),
-                            last_response_codes = VALUES(last_response_codes)
-                    ", [
-                        $resendPostId,
-                        count($urls),
-                        $isSuccess,
-                        json_encode($responses, JSON_UNESCAPED_SLASHES)
-                    ]);
+                    if (Database::getDriver() === 'sqlite') {
+                        Database::query("
+                            INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
+                            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+                            ON CONFLICT(post_id) DO UPDATE SET
+                                sent_at = CURRENT_TIMESTAMP,
+                                servers_count = excluded.servers_count,
+                                is_success = excluded.is_success,
+                                last_response_codes = excluded.last_response_codes
+                        ", [
+                            $resendPostId,
+                            count($urls),
+                            $isSuccess,
+                            json_encode($responses, JSON_UNESCAPED_SLASHES)
+                        ]);
+                    } else {
+                        Database::query("
+                            INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
+                            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE
+                                sent_at = CURRENT_TIMESTAMP,
+                                servers_count = VALUES(servers_count),
+                                is_success = VALUES(is_success),
+                                last_response_codes = VALUES(last_response_codes)
+                        ", [
+                            $resendPostId,
+                            count($urls),
+                            $isSuccess,
+                            json_encode($responses, JSON_UNESCAPED_SLASHES)
+                        ]);
+                    }
 
                     if ($isSuccess) {
                         $message = "Webhook da matéria #{$resendPostId} reenviado com sucesso!";

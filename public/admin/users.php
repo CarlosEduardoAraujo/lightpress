@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $role = $_POST['role'] ?? 'author';
         $bio = trim($_POST['bio'] ?? '');
-        $avatar = !empty($_POST['avatar']) ? BlockCompiler::sanitizeUrl(trim($_POST['avatar'])) : null;
+        $avatar = !empty($_POST['avatar']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['avatar'])) : null;
         $newPassword = trim($_POST['password'] ?? '');
 
         if (!in_array($role, ['author', 'editor', 'admin'], true)) {

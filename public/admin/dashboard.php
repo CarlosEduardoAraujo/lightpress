@@ -19,15 +19,6 @@ $currentUser = Security::requireAuth();
 // Auto-promoção de matérias agendadas cujo horário já foi atingido
 \LightPress\Core\PostService::promoteScheduledPosts();
 
-// Logout
-if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    if (Security::verifyCsrfToken($_GET['_csrf_token'] ?? '')) {
-        session_destroy();
-        header('Location: /admin/login.php');
-        exit;
-    }
-}
-
 $cacheMgr = new CacheManager($config);
 
 // Logout seguro (suporta POST e GET)

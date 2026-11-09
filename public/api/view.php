@@ -3,14 +3,15 @@ declare(strict_types=1);
 
 /**
  * Micro-endpoint assíncrono para contabilização de visualizações (views)
- * Rota: POST /api/view/{id} ou /api/view.php?id={id}
+ * Rota: POST /api/view/{id} ou /api/view.php?id={id} (para posts)
+ *       POST /api/view/page/{id} ou /api/view.php?type=page&id={id} (para páginas institucionais)
  * 
  * Regras estritas:
  * 1. Não inicia sessão e não emite cookies (evita conflitos com cache do Nginx).
  * 2. Retorna sempre Cache-Control: no-store.
  * 3. Validação rigorosa de origem (Sec-Fetch-Site: same-origin, Origin / Referer).
- * 4. Deduplicação atômica transacional de 30 segundos por IP/artigo via HMAC.
- * 5. Incremento atômico exclusivo na tabela `post_stats.views`.
+ * 4. Deduplicação atômica transacional de 30 segundos por IP/item via HMAC.
+ * 5. Incremento atômico exclusivo na tabela correspondente (`post_stats.views` ou `pages.views`).
  */
 
 // Headers obrigatórios de entrega dinâmica
@@ -39,17 +40,21 @@ if (!Security::validatePublicOrigin($canonicalOrigin)) {
     exit;
 }
 
-// 2. Extração e validação do ID do Artigo
-$postId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($postId <= 0 && isset($_SERVER['REQUEST_URI'])) {
-    if (preg_match('~/api/view/([0-9]+)~', $_SERVER['REQUEST_URI'], $matches)) {
-        $postId = (int)$matches[1];
+// 2. Extração e validação do Tipo e ID
+$type = ($_GET['type'] ?? '') === 'page' ? 'page' : 'post';
+$targetId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($targetId <= 0 && isset($_SERVER['REQUEST_URI'])) {
+    if (preg_match('~/api/view/(?:(page|post)/)?([0-9]+)~', $_SERVER['REQUEST_URI'], $matches)) {
+        if (!empty($matches[1]) && $matches[1] === 'page') {
+            $type = 'page';
+        }
+        $targetId = (int)$matches[2];
     }
 }
 
-if ($postId <= 0) {
+if ($targetId <= 0) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid Post ID']);
+    echo json_encode(['error' => 'Invalid Target ID']);
     exit;
 }
 
@@ -62,24 +67,37 @@ $secret = $config['security']['hmac_secret'] ?? 'lightpress_default_secret';
 $ipHash = Security::hashIp($ip, $secret);
 
 try {
-    $recorded = Database::transaction(function (\PDO $pdo) use ($postId, $ipHash, $expiresAt, $nowUtc): bool {
-        // Verificar se o artigo existe e está plenamente publicado (ou agendado com horário atingido)
-        $post = Database::fetchOne(
-            "SELECT id FROM posts 
-             WHERE id = ? AND status IN ('published', 'scheduled') AND published_at IS NOT NULL AND published_at <= ?
-             LIMIT 1",
-            [$postId, $nowUtc]
-        );
+    $recorded = Database::transaction(function (\PDO $pdo) use ($type, $targetId, $ipHash, $expiresAt, $nowUtc): bool {
+        // IDs negativos no view_dedupe são reservados para páginas institucionais para evitar colisões com IDs de posts
+        $dedupeId = ($type === 'page') ? -$targetId : $targetId;
 
-        if (!$post) {
-            return false;
+        if ($type === 'page') {
+            $page = Database::fetchOne(
+                "SELECT id FROM pages WHERE id = ? AND status = 'published' LIMIT 1",
+                [$targetId]
+            );
+            if (!$page) {
+                return false;
+            }
+        } else {
+            // Verificar se o artigo existe e está plenamente publicado (ou agendado com horário atingido)
+            $post = Database::fetchOne(
+                "SELECT id FROM posts 
+                 WHERE id = ? AND status IN ('published', 'scheduled') AND published_at IS NOT NULL AND published_at <= ?
+                 LIMIT 1",
+                [$targetId, $nowUtc]
+            );
+
+            if (!$post) {
+                return false;
+            }
         }
 
         // Verificar janela de deduplicação ativa com lock pessimista no MySQL (evita race condition sob concorrência)
         $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
         $dedupe = Database::fetchOne(
             "SELECT expires_at FROM view_dedupe WHERE post_id = ? AND ip_hash = ?{$forUpdate}",
-            [$postId, $ipHash]
+            [$dedupeId, $ipHash]
         );
 
         if ($dedupe && $dedupe['expires_at'] > $nowUtc) {
@@ -93,29 +111,36 @@ try {
                 "INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
                  VALUES (?, ?, ?)
                  ON CONFLICT(post_id, ip_hash) DO UPDATE SET expires_at = excluded.expires_at",
-                [$postId, $ipHash, $expiresAt]
+                [$dedupeId, $ipHash, $expiresAt]
             );
         } else {
             Database::query(
                 "INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
                  VALUES (?, ?, ?)
                  ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)",
-                [$postId, $ipHash, $expiresAt]
+                [$dedupeId, $ipHash, $expiresAt]
             );
         }
 
-        // Incremento atômico direto em post_stats
-        Database::query(
-            "UPDATE post_stats SET views = views + 1 WHERE post_id = ?",
-            [$postId]
-        );
+        // Incremento atômico direto na tabela correta
+        if ($type === 'page') {
+            Database::query(
+                "UPDATE pages SET views = views + 1 WHERE id = ?",
+                [$targetId]
+            );
+        } else {
+            Database::query(
+                "UPDATE post_stats SET views = views + 1 WHERE post_id = ?",
+                [$targetId]
+            );
+        }
 
         return true;
     });
 
     if (!$recorded) {
         http_response_code(404);
-        echo json_encode(['error' => 'Post not found or not published']);
+        echo json_encode(['error' => 'Target not found or not published']);
         exit;
     }
 

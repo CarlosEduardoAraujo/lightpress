@@ -70,7 +70,63 @@ final class WebhookSenderService
     }
 
     /**
-     * Divide a string por vírgulas e/ou quebras de linha e retorna apenas URLs válidas.
+     * Valida se uma URL é segura para envio de webhooks, mitigando ataques de SSRF
+     * (bloqueia IPs de loopback, faixas privadas, link-local e metadados de nuvem).
+     */
+    public static function isSafeUrl(string $url): bool
+    {
+        $url = trim($url);
+        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            return false;
+        }
+
+        $host = (string)parse_url($url, PHP_URL_HOST);
+        if (empty($host)) {
+            return false;
+        }
+
+        // Bloqueio explícito de localhost e metadados de cloud conhecidos
+        $lowerHost = strtolower($host);
+        if ($lowerHost === 'localhost' || $lowerHost === 'metadata.google.internal') {
+            return false;
+        }
+
+        // Se for um endereço IP direto, valida faixas privadas/reservadas
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return (bool)filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+        }
+
+        // Para domínios/hostnames, resolve todos os registros de IP (IPv4)
+        $ips = @gethostbynamel($host);
+        if ($ips === false || empty($ips)) {
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            $isValidPublicIp = filter_var(
+                $ip,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+            if (!$isValidPublicIp) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Divide a string por vírgulas e/ou quebras de linha e retorna apenas URLs válidas e seguras.
      *
      * @return list<string>
      */
@@ -86,7 +142,7 @@ final class WebhookSenderService
             if (
                 !empty($url) &&
                 filter_var($url, FILTER_VALIDATE_URL) &&
-                preg_match('/^https?:\/\//i', $url)
+                self::isSafeUrl($url)
             ) {
                 $clean[] = $url;
             }
@@ -207,6 +263,12 @@ final class WebhookSenderService
         $results = [];
 
         foreach ($urls as $url) {
+            if (!self::isSafeUrl($url)) {
+                error_log("[WebhookSender] URL bloqueada por política de segurança SSRF: {$url}");
+                $results[$url] = 400;
+                continue;
+            }
+
             $ch = curl_init();
             curl_setopt_array($ch, [
                 CURLOPT_URL            => $url,
@@ -221,6 +283,9 @@ final class WebhookSenderService
                 CURLOPT_CONNECTTIMEOUT => 3,
                 CURLOPT_TIMEOUT        => 4,
                 CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_PROTOCOLS      => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_REDIR_PROTOCOLS => 0,
             ]);
 
             curl_exec($ch);
@@ -280,24 +345,41 @@ Hook::addAction('post_published', function (int $postId, array $data, ?array $cu
     }
     $isSuccess = ($successCount > 0) ? 1 : 0;
 
-    // 6. Registra ou atualiza o log no banco relacional
+    // 6. Registra ou atualiza o log no banco relacional (compatível com MySQL e SQLite)
     // Se falhar (is_success = 0), fica registrado para visualização no painel,
     // mas NÃO bloqueia retentativas futuras quando o post for reprocessado ou re-salvo!
     try {
-        Database::query("
-            INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
-            VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                sent_at = CURRENT_TIMESTAMP,
-                servers_count = VALUES(servers_count),
-                is_success = VALUES(is_success),
-                last_response_codes = VALUES(last_response_codes)
-        ", [
-            $postId,
-            count($urls),
-            $isSuccess,
-            json_encode($responses, JSON_UNESCAPED_SLASHES)
-        ]);
+        if (Database::getDriver() === 'sqlite') {
+            Database::query("
+                INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
+                VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+                ON CONFLICT(post_id) DO UPDATE SET
+                    sent_at = CURRENT_TIMESTAMP,
+                    servers_count = excluded.servers_count,
+                    is_success = excluded.is_success,
+                    last_response_codes = excluded.last_response_codes
+            ", [
+                $postId,
+                count($urls),
+                $isSuccess,
+                json_encode($responses, JSON_UNESCAPED_SLASHES)
+            ]);
+        } else {
+            Database::query("
+                INSERT INTO plugin_webhook_sender_logs (post_id, sent_at, servers_count, is_success, last_response_codes)
+                VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    sent_at = CURRENT_TIMESTAMP,
+                    servers_count = VALUES(servers_count),
+                    is_success = VALUES(is_success),
+                    last_response_codes = VALUES(last_response_codes)
+            ", [
+                $postId,
+                count($urls),
+                $isSuccess,
+                json_encode($responses, JSON_UNESCAPED_SLASHES)
+            ]);
+        }
     } catch (\Throwable $e) {
         error_log("[WebhookSender] Erro ao persistir log de webhook: " . $e->getMessage());
     }

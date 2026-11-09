@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $siteDescription = trim($_POST['site_description'] ?? '');
-            $siteFavicon = !empty($_POST['site_favicon']) ? BlockCompiler::sanitizeUrl(trim($_POST['site_favicon'])) : '';
+            $siteFavicon = !empty($_POST['site_favicon']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['site_favicon'])) : '';
             $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
 
             // Validação estrita do Fuso Horário informado

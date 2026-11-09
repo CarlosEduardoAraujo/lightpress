@@ -7,6 +7,30 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correções Críticas, Mitigação de SSRF e Paridade Multi-banco
+- **Correção de ParseError Fatal em `public/admin/activate.php`:**
+  - Remoção de aspa dupla excedente na query de bloqueio com `FOR UPDATE`, restabelecendo o carregamento e ativação de contas.
+- **Correção de SyntaxError em `public/admin/media.php`:**
+  - Remoção de chave `}` órfã e chamada duplicada de `updateThemeIcon()` dentro da tag `<script>`, restabelecendo o upload assíncrono e scripts da biblioteca de mídias.
+- **Implementação dos Métodos `Security::destroySession()` e `Security::getCurrentUser()`:**
+  - Adição em `core/Security.php` de encerramento seguro de sessão com invalidação de cookies e recuperação dos dados do usuário logado, eliminando potenciais erros fatais em `dashboard.php` e `header.php`.
+- **Proteção Contra SSRF no Plugin `webhook-sender`:**
+  - Implementação de `WebhookSenderService::isSafeUrl()` com validação de scheme (apenas HTTP/HTTPS), proibição de `localhost` e metadados de nuvem, resolução de DNS (`gethostbynamel()`) e bloqueio rigoroso de faixas de IP privadas (`FILTER_FLAG_NO_PRIV_RANGE`) e reservadas (`FILTER_FLAG_NO_RES_RANGE`).
+  - Configuração estrita de cURL com `CURLOPT_FOLLOWLOCATION => false`, `CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS` e `CURLOPT_REDIR_PROTOCOLS => 0`.
+- **Validação Específica de Imagens (`BlockCompiler::sanitizeImageUrl`) e Prevenção de Injeção de Atributos:**
+  - Criação de `BlockCompiler::sanitizeImageUrl()` que restringe URLs de imagens a caminhos locais iniciados por `/` (sem `//` ou `/\`) e `http://` / `https://`, bloqueando esquemas como `mailto:`, `tel:` e `javascript:`.
+  - Aplicação na sanitização de `featured_image`, `site_favicon` e `avatar` (`editor.php`, `page-edit.php`, `settings.php`, `users.php`).
+  - Sanitização e escape seguro de todas as variantes e dimensões extraídas do JSON `variants_manifest` em `BlockCompiler::compileImage()`.
+- **Escape de Wildcards em Proteção de Exclusão de Mídia e Busca (`media.php` e `api/media.php`):**
+  - Aplicação de `Security::escapeLike()` em todas as checagens relacionais e filtros de busca por nome e manifesto.
+- **Compatibilidade Plena com SQLite no Plugin `webhook-sender`:**
+  - Implementação condicional de `ON CONFLICT(post_id) DO UPDATE SET ...` para SQLite e `ON DUPLICATE KEY UPDATE ...` para MySQL ao registrar logs de disparo.
+- **Eliminação de Falsos Positivos na Busca por Tags e Escape de Curingas SQL:**
+  - Refatoração da listagem pública de tags (`/tag/{tag}/` e `/tag/{tag}/page/{page}/`) em `public/index.php`. Uso de `FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ','))` no MySQL e delimitadores seguros no SQLite, garantindo que buscas por termos curtos (ex: `car`) não retornem falsos positivos contendo apenas substrings (ex: `stockcar` ou `carlos`).
+- **Desacoplamento e Idempotência de Views de Páginas Institucionais:**
+  - Remoção de `UPDATE pages SET views = views + 1` no GET de `public/index.php`, prevenindo escritas em disco e garantindo cache FastCGI de 3600 segundos limpo.
+  - Implementação de rastreamento assíncrono via `navigator.sendBeacon` para `/api/view.php?type=page&id={id}`, com deduplicação atômica por IP em janela de 30 segundos.
+
 ### Upload de Mídia via Drag-and-Drop e Auto-Seleção nos Editores (Posts e Páginas)
 - **Área de Arrastar e Soltar (Drag & Drop Zone):**
   - Adição de área de soltura dedicada no modal da Biblioteca de Mídias em `public/admin/editor.php` e `public/admin/page-edit.php` com o texto *"Solte arquivos aqui para enviar ou Enviar nova foto"*.
