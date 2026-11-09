@@ -932,6 +932,11 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Ordenação Cronológica Recente Primeiro (`published_at DESC`):** Priorização de notícias recém-publicadas no topo da lista de resultados em vez de pontuação estática de relevância do FULLTEXT.
   - [x] **Paginação Completa e Totalizador Real de Resultados:** Eliminação do limite fixo de 30 itens (`LIMIT 30`), introdução de contagem atômica de matérias (`COUNT(*)`) e paginação fluida (12 notícias por página) com barra minimalista em `templates/search.php` e compatibilidade com `/busca/page/{page}/`.
 
+* **FASE CONCLUÍDA — Drag-and-Drop e Auto-Seleção de Mídias nos Editores (`editor.php` e `page-edit.php`):**
+  - [x] **Área Intuitiva de Arrastar e Soltar (Drop Zone):** Área de soltura moderna com borda tracejada e feedback visual dinâmico (*"Solte arquivos aqui para enviar ou Enviar nova foto"*), com suporte a clique e suporte a arrastar diretamente sobre o modal.
+  - [x] **Seleção Automática Pós-Upload:** Ao concluir o upload e o processamento de imagens (WebP/AVIF), a biblioteca é recarregada e a nova foto fica automaticamente selecionada com destaque visual, metadados preenchidos no rodapé e botão "Confirmar Seleção" habilitado instantaneamente.
+  - [x] **Validação no Cliente e Dark Mode:** Validação ágil de formatos aceitos (WebP, AVIF, JPEG, PNG) e suporte estético completo ao tema escuro.
+
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
   - [ ] **Processamento de Mídia em Lote:** Download/leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.

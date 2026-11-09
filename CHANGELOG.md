@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Upload de Mídia via Drag-and-Drop e Auto-Seleção nos Editores (Posts e Páginas)
+- **Área de Arrastar e Soltar (Drag & Drop Zone):**
+  - Adição de área de soltura dedicada no modal da Biblioteca de Mídias em `public/admin/editor.php` e `public/admin/page-edit.php` com o texto *"Solte arquivos aqui para enviar ou Enviar nova foto"*.
+  - Suporte completo a drag-and-drop tanto na zona visual tracejada quanto em todo o diálogo do modal, com feedback visual em tempo real (`.modal-drop-zone.dragover`).
+  - Suporte a clique direto para abrir o seletor nativo de arquivos do sistema operacional.
+- **Auto-Seleção Imediata após Upload:**
+  - Após o upload da imagem e a geração em segundo plano dos formatos modernos WebP e AVIF, a lista de mídias é recarregada e a imagem recém-enviada é **selecionada automaticamente**.
+  - O card da nova imagem recebe destaque visual imediato (`.selected`), rola suavemente para o campo de visão (`scrollIntoView`), os metadados (nome, tamanho em KiB e dimensões em pixels) são populados no rodapé do modal e o botão **"Confirmar Seleção"** é habilitado na hora, proporcionando fluxo de trabalho contínuo e ágil.
+- **Validação e Paridade em Temas:**
+  - Validação de extensões no lado do cliente (WebP, AVIF, JPEG, PNG).
+  - Estilização responsiva com suporte completo ao Dark Mode (`[data-theme="dark"] .modal-drop-zone`).
+
 ### Hardening de Segurança, Concorrência e Resiliência Arquitetural
 - **Prevenção Contra Injeção de Curingas SQL (LIKE Injection):**
   - Implementação do método utilitário centralizado `Security::escapeLike(string $value): string` (`core/Security.php`), tratando os caracteres de controle do SQL (`%`, `_` e `\`).

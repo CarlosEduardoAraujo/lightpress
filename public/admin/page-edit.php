@@ -245,6 +245,42 @@ require __DIR__ . '/header.php';
     .modal-media-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #e2e8f0; }
     .modal-media-title { padding: 0.5rem; font-size: 0.72rem; font-weight: 600; line-height: 1.3; word-break: break-all; color: #334155; }
     .media-modal-footer { padding: 0.85rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
+
+    /* Área de Drop Zone no Modal de Mídias */
+    .modal-drop-zone {
+        border: 2px dashed #cbd5e1;
+        border-radius: var(--radius);
+        padding: 1.25rem 1rem;
+        text-align: center;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+    }
+    .modal-drop-zone:hover {
+        border-color: var(--primary-accent);
+        background: rgba(225, 6, 0, 0.03);
+    }
+    .modal-drop-zone.dragover {
+        border-color: var(--primary-accent);
+        background: rgba(225, 6, 0, 0.08);
+        border-style: solid;
+        transform: scale(1.01);
+        box-shadow: 0 0 0 4px rgba(225, 6, 0, 0.15);
+    }
+    .modal-drop-icon { font-size: 1.8rem; line-height: 1; }
+    .modal-drop-text { font-size: 0.92rem; color: #334155; }
+    .modal-drop-browse { color: var(--primary-accent); font-weight: 700; text-decoration: underline; }
+    .modal-drop-hint { font-size: 0.75rem; color: var(--text-muted); }
+    [data-theme="dark"] .modal-drop-zone { background: #0b1120; border-color: #334155; }
+    [data-theme="dark"] .modal-drop-zone:hover { border-color: var(--primary-accent); background: rgba(225, 6, 0, 0.1); }
+    [data-theme="dark"] .modal-drop-zone.dragover { background: rgba(225, 6, 0, 0.2); border-color: var(--primary-accent); }
+    [data-theme="dark"] .modal-drop-text { color: #f1f5f9; }
 </style>
 
     <div class="container">
@@ -414,15 +450,25 @@ require __DIR__ . '/header.php';
             </div>
             
             <div class="media-modal-body">
+                <!-- Área de Arrastar e Soltar / Upload Rápido -->
+                <div id="modalDropZone" class="modal-drop-zone">
+                    <input type="file" id="modalUploadInput" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" style="display: none;" onchange="uploadFromModal(this)">
+                    <div class="modal-drop-icon">☁️</div>
+                    <div class="modal-drop-text">
+                        <strong>Solte arquivos aqui para enviar</strong> ou <span class="modal-drop-browse">Enviar nova foto</span>
+                    </div>
+                    <div class="modal-drop-hint">Formatos suportados: WebP, AVIF, JPEG, PNG (otimização e geração de miniaturas automática)</div>
+                </div>
+
                 <div class="media-modal-toolbar">
                     <input type="text" id="modalSearchInput" placeholder="🔍 Filtrar fotos por nome..." oninput="filterMediaItems(this.value)">
                     <label class="btn btn-secondary" style="margin: 0; cursor: pointer; white-space: nowrap;">
                         + Enviar Nova Foto
-                        <input type="file" id="modalUploadInput" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" style="display: none;" onchange="uploadFromModal(this)">
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" style="display: none;" onchange="uploadFromModal(this)">
                     </label>
                 </div>
 
-                <div id="modalLoading" style="display: none; text-align: center; padding: 3rem; color: var(--text-muted);">
+                <div id="modalLoading" style="display: none; text-align: center; padding: 2rem; color: var(--text-muted); font-weight: 600;">
                     Carregando fotos da biblioteca...
                 </div>
 
@@ -753,7 +799,32 @@ require __DIR__ . '/header.php';
             document.getElementById('mediaModal').style.display = 'none';
         }
 
-        function loadMediaCatalog(query) {
+        function selectModalItem(item) {
+            selectedMediaItem = item;
+            document.querySelectorAll('.modal-media-item').forEach(function(el) {
+                if (el.dataset.id === String(item.id)) {
+                    el.classList.add('selected');
+                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    el.classList.remove('selected');
+                }
+            });
+
+            var detailsEl = document.getElementById('modalSelectionDetails');
+            detailsEl.textContent = '';
+            var strong = document.createElement('strong');
+            strong.textContent = 'Selecionada: ';
+            detailsEl.appendChild(strong);
+            var safeName = item.original_name || 'Mídia';
+            var safeSize = Math.round((item.file_size || 0) / 1024);
+            var dims = (item.width && item.height) ? (item.width + 'x' + item.height + 'px') : '';
+            var textNode = document.createTextNode(safeName + ' (' + safeSize + ' KiB' + (dims ? ' • ' + dims : '') + ')');
+            detailsEl.appendChild(textNode);
+
+            document.getElementById('btnApplySelection').disabled = false;
+        }
+
+        function loadMediaCatalog(query, autoSelectId) {
             var grid = document.getElementById('modalMediaGrid');
             var loading = document.getElementById('modalLoading');
             grid.innerHTML = '';
@@ -767,6 +838,15 @@ require __DIR__ . '/header.php';
                     if (data.ok && Array.isArray(data.media)) {
                         modalMediaList = data.media;
                         renderModalGrid(modalMediaList);
+
+                        if (autoSelectId) {
+                            var targetItem = modalMediaList.find(function(m) {
+                                return String(m.id) === String(autoSelectId);
+                            });
+                            if (targetItem) {
+                                selectModalItem(targetItem);
+                            }
+                        }
                     } else {
                         grid.innerHTML = '<p style="padding: 2rem; color: #dc2626;">Erro ao carregar mídias.</p>';
                     }
@@ -789,7 +869,8 @@ require __DIR__ . '/header.php';
             items.forEach(function(item) {
                 var card = document.createElement('div');
                 card.className = 'modal-media-item';
-                if (selectedMediaItem && selectedMediaItem.id === item.id) {
+                card.dataset.id = item.id;
+                if (selectedMediaItem && String(selectedMediaItem.id) === String(item.id)) {
                     card.classList.add('selected');
                 }
 
@@ -810,23 +891,11 @@ require __DIR__ . '/header.php';
                 card.appendChild(titleEl);
 
                 card.onclick = function() {
-                    document.querySelectorAll('.modal-media-item').forEach(function(el) { el.classList.remove('selected'); });
-                    card.classList.add('selected');
-                    selectedMediaItem = item;
-
-                    var detailsEl = document.getElementById('modalSelectionDetails');
-                    detailsEl.textContent = '';
-                    var strong = document.createElement('strong');
-                    strong.textContent = 'Selecionada: ';
-                    detailsEl.appendChild(strong);
-                    var textNode = document.createTextNode((item.original_name || '') + ' (' + Math.round(item.file_size / 1024) + ' KiB • ' + item.width + 'x' + item.height + 'px)');
-                    detailsEl.appendChild(textNode);
-
-                    document.getElementById('btnApplySelection').disabled = false;
+                    selectModalItem(item);
                 };
 
                 card.ondblclick = function() {
-                    selectedMediaItem = item;
+                    selectModalItem(item);
                     applyMediaSelection();
                 };
 
@@ -843,17 +912,24 @@ require __DIR__ . '/header.php';
             }, 300);
         }
 
-        function uploadFromModal(input) {
-            if (!input.files || !input.files[0]) return;
-            var file = input.files[0];
-            var csrf = document.getElementById('csrfToken').value;
+        function uploadMediaFile(file) {
+            if (!file) return;
 
+            var validExts = /\.(jpe?g|png|webp|avif)$/i;
+            var isImage = (file.type && file.type.startsWith('image/')) || validExts.test(file.name);
+            if (!isImage) {
+                alert('Formato de arquivo não suportado. Por favor, envie uma imagem WebP, AVIF, JPEG ou PNG.');
+                return;
+            }
+
+            var csrf = document.getElementById('csrfToken').value;
             var formData = new FormData();
             formData.append('media_file', file);
             formData.append('_csrf_token', csrf);
 
-            document.getElementById('modalLoading').style.display = 'block';
-            document.getElementById('modalLoading').innerText = 'Enviando ' + file.name + ' e gerando WebP / AVIF...';
+            var loadingEl = document.getElementById('modalLoading');
+            loadingEl.style.display = 'block';
+            loadingEl.innerText = 'Enviando "' + file.name + '" e gerando WebP / AVIF...';
 
             fetch('/admin/media.php', {
                 method: 'POST',
@@ -862,20 +938,84 @@ require __DIR__ . '/header.php';
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
-                input.value = '';
-                document.getElementById('modalLoading').innerText = 'Carregando fotos...';
+                loadingEl.innerText = 'Carregando fotos...';
                 if (data.ok && data.media) {
-                    loadMediaCatalog();
+                    loadMediaCatalog('', data.media.id);
                 } else {
                     alert('Erro no upload: ' + (data.error || 'Falha ao processar'));
-                    document.getElementById('modalLoading').style.display = 'none';
+                    loadingEl.style.display = 'none';
                 }
             })
             .catch(function(err) {
-                input.value = '';
                 alert('Erro de conexão ao enviar foto: ' + err.message);
-                document.getElementById('modalLoading').style.display = 'none';
+                loadingEl.style.display = 'none';
             });
+        }
+
+        function uploadFromModal(input) {
+            if (!input.files || !input.files[0]) return;
+            uploadMediaFile(input.files[0]);
+            input.value = '';
+        }
+
+        // Configuração de Drag and Drop para o Modal de Mídias
+        var dropZone = document.getElementById('modalDropZone');
+        if (dropZone) {
+            dropZone.addEventListener('click', function(e) {
+                if (e.target && e.target.tagName !== 'INPUT') {
+                    document.getElementById('modalUploadInput').click();
+                }
+            });
+
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                dropZone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(function(evt) {
+                dropZone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                var dt = e.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    uploadMediaFile(dt.files[0]);
+                }
+            }, false);
+
+            var modalDialog = document.querySelector('.media-modal-dialog');
+            if (modalDialog) {
+                ['dragenter', 'dragover'].forEach(function(evt) {
+                    modalDialog.addEventListener(evt, function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZone.classList.add('dragover');
+                    }, false);
+                });
+
+                modalDialog.addEventListener('dragleave', function(e) {
+                    if (e.target === modalDialog) {
+                        dropZone.classList.remove('dragover');
+                    }
+                }, false);
+
+                modalDialog.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('dragover');
+                    var dt = e.dataTransfer;
+                    if (dt && dt.files && dt.files.length > 0) {
+                        uploadMediaFile(dt.files[0]);
+                    }
+                }, false);
+            }
         }
 
         function applyMediaSelection() {
