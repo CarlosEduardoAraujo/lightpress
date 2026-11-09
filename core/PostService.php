@@ -24,35 +24,33 @@ class PostService
     public function __construct(?CacheManager $cacheManager = null)
     {
         $this->cacheManager = $cacheManager ?? new CacheManager();
+        $this->ensureScheduledEnumSupported();
     }
 
     private static bool $enumChecked = false;
 
     /**
-     * Garante que as colunas ENUM suportam 'scheduled' e 'pending_review' no MySQL.
-     * Auto-migra instantaneamente caso o banco de produção esteja com schema legado.
+     * Garante que as colunas ENUM suportam 'scheduled', 'pending_review' e 'superseded'.
+     * Auto-migra instantaneamente caso o banco de produção (MySQL ou SQLite) esteja com schema legado.
      */
     private function ensureScheduledEnumSupported(): void
     {
-        if (self::$enumChecked || Database::getDriver() !== 'mysql') {
+        if (self::$enumChecked) {
             return;
         }
 
         try {
-            $col = Database::fetchOne("SHOW COLUMNS FROM posts LIKE 'status'");
-            if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'scheduled'")) {
-                Database::getConnection()->exec(
-                    "ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'"
-                );
+            $driver = Database::getDriver();
+            if ($driver === 'mysql') {
+                $col = Database::fetchOne("SHOW COLUMNS FROM posts LIKE 'status'");
+                if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'scheduled'")) {
+                    Database::getConnection()->exec(
+                        "ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'"
+                    );
+                }
             }
 
-            $revCol = Database::fetchOne("SHOW COLUMNS FROM post_revisions LIKE 'status'");
-            if ($revCol && !empty($revCol['Type']) && !str_contains($revCol['Type'], "'pending_review'")) {
-                Database::getConnection()->exec(
-                    "ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied') NOT NULL DEFAULT 'draft'"
-                );
-            }
-
+            Schema::ensureRevisionsSchema(Database::getConnection(), $driver);
             self::$enumChecked = true;
         } catch (\Throwable $e) {
             // Silencioso se não tiver permissão DDL

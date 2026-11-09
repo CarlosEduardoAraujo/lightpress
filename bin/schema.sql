@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS post_revisions (
     post_id INT UNSIGNED NOT NULL,
     editor_id SMALLINT UNSIGNED NOT NULL,
     base_version INT UNSIGNED NOT NULL,
-    status ENUM('draft', 'pending_review', 'applied') NOT NULL DEFAULT 'draft',
+    status ENUM('draft', 'pending_review', 'applied', 'superseded') NOT NULL DEFAULT 'draft',
     payload_json MEDIUMTEXT NOT NULL,
     content_html MEDIUMTEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

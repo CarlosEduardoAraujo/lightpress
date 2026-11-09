@@ -113,7 +113,7 @@ class Schema
                 if (!$hasNossaEquipe) {
                     Database::query("UPDATE pages SET slug = 'nossa-equipe' WHERE slug = 'quem-somos'");
                 }
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
                 // Silencioso se o banco estiver em processo de criação
             }
         }
@@ -200,6 +200,12 @@ class Schema
         // Migrações incrementais seguras e idempotentes
         try {
             $pdo->exec("ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'");
+        } catch (\Throwable $e) {
+            // Ignora se já estiver atualizado
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied', 'superseded') NOT NULL DEFAULT 'draft'");
         } catch (\Throwable $e) {
             // Ignora se já estiver atualizado
         }
@@ -297,7 +303,7 @@ class Schema
                 post_id INTEGER NOT NULL,
                 editor_id INTEGER NOT NULL,
                 base_version INTEGER NOT NULL,
-                status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'applied')),
+                status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'applied', 'superseded')),
                 payload_json TEXT NOT NULL,
                 content_html TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
@@ -399,6 +405,56 @@ class Schema
 
         foreach ($statements as $sql) {
             $pdo->exec($sql);
+        }
+
+        self::ensureRevisionsSchema($pdo, 'sqlite');
+    }
+
+    /**
+     * Garante que o status 'superseded' e demais estados de post_revisions sejam aceitos nos dois bancos.
+     * Auto-migra tabelas existentes sem perda de dados.
+     */
+    public static function ensureRevisionsSchema(PDO $pdo, string $driver = 'mysql'): void
+    {
+        try {
+            if ($driver === 'sqlite') {
+                $revTable = $pdo->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'post_revisions'")->fetch();
+                if ($revTable && !empty($revTable['sql']) && !str_contains($revTable['sql'], "'superseded'")) {
+                    $inTx = $pdo->inTransaction();
+                    $pdo->exec('PRAGMA foreign_keys = OFF;');
+                    if (!$inTx) {
+                        $pdo->beginTransaction();
+                    }
+                    $pdo->exec("CREATE TABLE post_revisions_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        editor_id INTEGER NOT NULL,
+                        base_version INTEGER NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'applied', 'superseded')),
+                        payload_json TEXT NOT NULL,
+                        content_html TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
+                        FOREIGN KEY (editor_id) REFERENCES users (id) ON DELETE RESTRICT
+                    );");
+                    $pdo->exec("INSERT INTO post_revisions_new (id, post_id, editor_id, base_version, status, payload_json, content_html, created_at)
+                                SELECT id, post_id, editor_id, base_version, status, payload_json, content_html, created_at FROM post_revisions;");
+                    $pdo->exec("DROP TABLE post_revisions;");
+                    $pdo->exec("ALTER TABLE post_revisions_new RENAME TO post_revisions;");
+                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_revision_post ON post_revisions (post_id, id);");
+                    if (!$inTx) {
+                        $pdo->commit();
+                    }
+                    $pdo->exec('PRAGMA foreign_keys = ON;');
+                }
+            } else {
+                $col = $pdo->query("SHOW COLUMNS FROM post_revisions LIKE 'status'")->fetch();
+                if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'superseded'")) {
+                    $pdo->exec("ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied', 'superseded') NOT NULL DEFAULT 'draft'");
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silencioso se não tiver permissão DDL
         }
     }
 }

@@ -437,6 +437,72 @@ assert_check("Aprovação pelo histórico marca a revisão especificada como 'ap
 cursor.execute("SELECT status FROM posts WHERE id = 20")
 assert_check("Artigo é publicado com sucesso", cursor.fetchone()[0] == 'published')
 
+# 6. P1: Validação e Migração do Estado 'superseded' no Banco de Dados
+print("\n[6] Testando P1: Suporte e Migração ao Estado 'superseded' em post_revisions")
+
+# Simula uma tabela SQLite com schema legado (sem 'superseded')
+cursor.execute("""
+    CREATE TABLE legacy_post_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        editor_id INTEGER NOT NULL,
+        base_version INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'applied')),
+        payload_json TEXT NOT NULL,
+        content_html TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+    );
+""")
+cursor.execute("INSERT INTO legacy_post_revisions (id, post_id, editor_id, base_version, status, payload_json, content_html) VALUES (1, 10, 1, 1, 'draft', '{}', '<p>Rev 1</p>')")
+conn.commit()
+
+# Tenta atualizar para 'superseded' no schema legado
+check_failed = False
+try:
+    cursor.execute("UPDATE legacy_post_revisions SET status = 'superseded' WHERE id = 1")
+    conn.commit()
+except sqlite3.IntegrityError:
+    check_failed = True
+
+assert_check("Schema legado rejeita 'superseded' com CHECK constraint failed", check_failed)
+
+# Executa o procedimento de auto-migração idêntico ao Schema::ensureRevisionsSchema
+conn.commit()
+cursor.execute("PRAGMA foreign_keys = OFF;")
+cursor.execute("""
+    CREATE TABLE legacy_post_revisions_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        editor_id INTEGER NOT NULL,
+        base_version INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'pending_review', 'applied', 'superseded')),
+        payload_json TEXT NOT NULL,
+        content_html TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+    );
+""")
+cursor.execute("""
+    INSERT INTO legacy_post_revisions_new (id, post_id, editor_id, base_version, status, payload_json, content_html, created_at)
+    SELECT id, post_id, editor_id, base_version, status, payload_json, content_html, created_at FROM legacy_post_revisions;
+""")
+cursor.execute("DROP TABLE legacy_post_revisions;")
+cursor.execute("ALTER TABLE legacy_post_revisions_new RENAME TO legacy_post_revisions;")
+cursor.execute("PRAGMA foreign_keys = ON;")
+conn.commit()
+
+# Testa novamente a atualização para 'superseded' após a migração
+migration_success = False
+try:
+    cursor.execute("UPDATE legacy_post_revisions SET status = 'superseded' WHERE id = 1")
+    conn.commit()
+    cursor.execute("SELECT status FROM legacy_post_revisions WHERE id = 1")
+    status_row = cursor.fetchone()
+    migration_success = (status_row is not None and status_row[0] == 'superseded')
+except Exception as e:
+    migration_success = False
+
+assert_check("Após migração do schema, o estado 'superseded' é aceito e gravado com sucesso", migration_success)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")
