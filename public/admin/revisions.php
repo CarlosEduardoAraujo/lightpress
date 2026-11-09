@@ -179,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                     }
 
                     $postService = new PostService();
-                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], (int)$current['version']);
+                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], (int)$current['version'], $revId);
                     $message = "Revisão #{$revId} aprovada e aplicada à versão pública com sucesso!";
                 }
             });

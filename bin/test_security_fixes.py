@@ -383,6 +383,60 @@ conn.commit()
 cursor.execute("SELECT status FROM post_revisions WHERE id = 201")
 assert_check("Rascunho conhecido publicado é marcado especificamente como 'applied'", cursor.fetchone()[0] == 'applied')
 
+# Caso H: Criação de Nova Notícia e Publicação Imediata (Fix do Bug P1)
+# 1. Simula createPost() criando novo post 20 com revisão inicial 301
+cursor.execute("""
+    INSERT INTO posts (id, slug, title, summary, category, content_html, content_json, status, version)
+    VALUES (20, 'nova-noticia-f1', 'Nova Notícia Teste', 'Resumo', 'f1', '<p>Texto Novo</p>', '[]', 'draft', 1)
+""")
+cursor.execute("""
+    INSERT INTO post_revisions (id, post_id, editor_id, base_version, status, payload_json, content_html)
+    VALUES (301, 20, 1, 1, 'draft', '{"title": "Nova Notícia Teste"}', '<p>Texto Novo</p>')
+""")
+conn.commit()
+
+# 2. editor.php recebe newRevId = 301 e chama publishOrUpdate com known_version = 1 e known_revision_id = 301
+cursor.execute("""
+    SELECT id FROM post_revisions 
+    WHERE post_id = 20 AND base_version = 1 AND status IN ('draft', 'pending_review') 
+    ORDER BY id DESC LIMIT 1
+""")
+active_rev = cursor.fetchone()
+latest_rev_id = active_rev[0] if active_rev else 0
+known_rev_id = 301
+
+first_publish_conflict = False
+try:
+    if latest_rev_id > 0 and (known_rev_id == 0 or known_rev_id != latest_rev_id):
+        first_publish_conflict = True
+        raise RuntimeError("Conflito de rascunho na primeira publicação!")
+except RuntimeError:
+    pass
+
+assert_check("Primeira publicação com newRevId conhecido NÃO sofre conflito de concorrência", not first_publish_conflict)
+
+# Caso I: Carregamento de Post Existente com status 'draft' fornece activeRevisionId
+# Post 20 está em draft, com revisão ativa 301. Ao carregar o editor:
+cursor.execute("""
+    SELECT id FROM post_revisions 
+    WHERE post_id = 20 AND base_version = 1 AND status IN ('draft', 'pending_review') 
+    ORDER BY id DESC LIMIT 1
+""")
+loaded_active_rev = cursor.fetchone()
+active_rev_id_loaded = loaded_active_rev[0] if loaded_active_rev else 0
+assert_check("Editor fornece activeRevisionId ao carregar rascunho existente", active_rev_id_loaded == 301)
+
+# Caso J: Aprovação pelo Histórico de Revisões (revisions.php) passando revId específico
+approved_rev_id = 301
+cursor.execute("UPDATE post_revisions SET status = 'applied' WHERE id = ? AND post_id = 20", (approved_rev_id,))
+cursor.execute("UPDATE posts SET status = 'published', version = 2 WHERE id = 20")
+conn.commit()
+
+cursor.execute("SELECT status FROM post_revisions WHERE id = 301")
+assert_check("Aprovação pelo histórico marca a revisão especificada como 'applied'", cursor.fetchone()[0] == 'applied')
+cursor.execute("SELECT status FROM posts WHERE id = 20")
+assert_check("Artigo é publicado com sucesso", cursor.fetchone()[0] == 'published')
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

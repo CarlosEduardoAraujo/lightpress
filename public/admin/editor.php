@@ -37,6 +37,7 @@ $applyDraftRevision = function (array &$post, int $postId) use (
     &$hasOutdatedRevision, &$outdatedRevisionDate, &$outdatedRevisionVersion
 ): void {
     $currentPostVersion = (int)($post['version'] ?? 1);
+    $isPublic = in_array($post['status'], ['published', 'scheduled'], true);
 
     // 1. Busca primeiro se há revisão ativa da versão atual
     $latestRev = Database::fetchOne(
@@ -47,46 +48,51 @@ $applyDraftRevision = function (array &$post, int $postId) use (
     );
 
     if ($latestRev) {
-        $payload = json_decode((string)$latestRev['payload_json'], true);
-        if (is_array($payload)) {
-            foreach (['title', 'slug', 'summary', 'category', 'tags', 'featured_image', 'content_json', 'seo_title', 'seo_description', 'focus_keyword', 'is_featured'] as $key) {
-                if (array_key_exists($key, $payload)) {
-                    $post[$key] = $payload[$key];
+        $activeRevisionId = (int)$latestRev['id'];
+
+        if ($isPublic) {
+            $payload = json_decode((string)$latestRev['payload_json'], true);
+            if (is_array($payload)) {
+                foreach (['title', 'slug', 'summary', 'category', 'tags', 'featured_image', 'content_json', 'seo_title', 'seo_description', 'focus_keyword', 'is_featured'] as $key) {
+                    if (array_key_exists($key, $payload)) {
+                        $post[$key] = $payload[$key];
+                    }
                 }
             }
-        }
 
-        // Diferenciar explicitamente campo ausente de conteúdo vazio (string vazia intencional)
-        if (array_key_exists('content_html', $latestRev) && $latestRev['content_html'] !== null) {
-            $post['content_html'] = (string)$latestRev['content_html'];
-            if (trim($post['content_html']) === '') {
-                $post['content_json'] = '[]';
+            // Diferenciar explicitamente campo ausente de conteúdo vazio (string vazia intencional)
+            if (array_key_exists('content_html', $latestRev) && $latestRev['content_html'] !== null) {
+                $post['content_html'] = (string)$latestRev['content_html'];
+                if (trim($post['content_html']) === '') {
+                    $post['content_json'] = '[]';
+                }
+            } elseif (is_array($payload) && array_key_exists('content_html', $payload) && $payload['content_html'] !== null) {
+                $post['content_html'] = (string)$payload['content_html'];
+                if (trim($post['content_html']) === '') {
+                    $post['content_json'] = '[]';
+                }
             }
-        } elseif (is_array($payload) && array_key_exists('content_html', $payload) && $payload['content_html'] !== null) {
-            $post['content_html'] = (string)$payload['content_html'];
-            if (trim($post['content_html']) === '') {
-                $post['content_json'] = '[]';
-            }
-        }
 
-        $activeRevisionId = (int)$latestRev['id'];
-        $hasActiveDraftRevision = true;
-        $draftRevisionDate = $latestRev['created_at'];
+            $hasActiveDraftRevision = true;
+            $draftRevisionDate = $latestRev['created_at'];
+        }
         return;
     }
 
-    // 2. Se não houver revisão para a versão atual, verifica se há revisão órfã de versão anterior
-    $outdatedRev = Database::fetchOne(
-        "SELECT id, base_version, created_at FROM post_revisions 
-         WHERE post_id = ? AND base_version < ? AND status IN ('draft', 'pending_review') 
-         ORDER BY id DESC LIMIT 1",
-        [$postId, $currentPostVersion]
-    );
+    // 2. Se for matéria pública e não houver revisão para a versão atual, verifica se há revisão órfã de versão anterior
+    if ($isPublic) {
+        $outdatedRev = Database::fetchOne(
+            "SELECT id, base_version, created_at FROM post_revisions 
+             WHERE post_id = ? AND base_version < ? AND status IN ('draft', 'pending_review') 
+             ORDER BY id DESC LIMIT 1",
+            [$postId, $currentPostVersion]
+        );
 
-    if ($outdatedRev) {
-        $hasOutdatedRevision = true;
-        $outdatedRevisionDate = $outdatedRev['created_at'];
-        $outdatedRevisionVersion = (int)$outdatedRev['base_version'];
+        if ($outdatedRev) {
+            $hasOutdatedRevision = true;
+            $outdatedRevisionDate = $outdatedRev['created_at'];
+            $outdatedRevisionVersion = (int)$outdatedRev['base_version'];
+        }
     }
 };
 
@@ -98,10 +104,8 @@ if ($postId > 0) {
     if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $post)) {
         die("Você não possui permissão para editar este artigo.");
     }
-    // Se a matéria estiver publicada ou agendada, carrega a revisão pendente mais recente
-    if (in_array($post['status'], ['published', 'scheduled'], true)) {
-        $applyDraftRevision($post, $postId);
-    }
+    // Carrega a revisão e vincula activeRevisionId para controle de concorrência
+    $applyDraftRevision($post, $postId);
 }
 
 $postService = new PostService();
@@ -165,9 +169,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($postId === 0) {
                 // Criar novo post (com resolução e prevenção de colisões/palavras reservadas)
                 $payload['slug'] = $postService->resolveUniqueSlug(!empty($slug) ? Security::slugify($slug) : Security::slugify($title));
-                $newId = $postService->createPost($payload, (int)$currentUser['id']);
+                $newRevId = 0;
+                $newId = $postService->createPost($payload, (int)$currentUser['id'], $newRevId);
                 if ($action === 'publish' && Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)) {
-                    $postService->publishOrUpdate($newId, $payload, (int)$currentUser['id'], 1);
+                    $postService->publishOrUpdate($newId, $payload, (int)$currentUser['id'], 1, $newRevId);
                 }
                 header("Location: /admin/editor.php?id={$newId}&saved=1");
                 exit;
@@ -412,7 +417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 // Recarregar dados do post e sobrepor rascunho de revisão se aplicável
                 $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
-                if ($post && in_array($post['status'], ['published', 'scheduled'], true)) {
+                if ($post) {
                     $applyDraftRevision($post, $postId);
                 }
             }

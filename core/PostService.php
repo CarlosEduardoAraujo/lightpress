@@ -142,7 +142,7 @@ class PostService
      * @param int $userId ID do autor
      * @return int ID do artigo criado
      */
-    public function createPost(array $data, int $userId): int
+    public function createPost(array $data, int $userId, &$createdRevId = null): int
     {
         $this->ensureScheduledEnumSupported();
         $title = trim($data['title']);
@@ -218,6 +218,7 @@ class PostService
             );
 
             $revId = (int)Database::getConnection()->lastInsertId();
+            $createdRevId = $revId;
             ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $contentHtml, $featuredImage);
 
             return $postId;
