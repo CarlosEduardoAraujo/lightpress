@@ -841,17 +841,40 @@ Em conformidade com a auditoria de segurança profunda de novembro de 2026, os s
 * **8.17.4. Isolamento, Concorrência Otimista e Recarregamento Editorial de Rascunhos Privados (SEC-04):**
   - **Preservação de Conteúdo Público e Recarregamento no Editor (`editor.php`):** Salvar rascunho de matérias já publicadas ou agendadas grava as alterações exclusivamente como revisões privadas em `post_revisions` (`status = 'draft'` ou `'pending_review'`), sem alterar a linha ativa da tabela `posts`. Ao reabrir ou salvar a tela, o editor recarrega e sobrepõe automaticamente a revisão privada ativa no formulário e canvas visual com aviso informativo, permitindo continuar a edição contínua do texto salvo.
   - **Validação de Concorrência em Rascunhos e Publicação:** Verificação estrita de versão do post público (`(int)$current['version'] === $knownVersion`) e conferência de `known_revision_id` executadas tanto ao salvar rascunhos quanto ao publicar via `PostService::publishOrUpdate()`. Se outro autor salvar um rascunho recente da matéria pública, publicações e rascunhos concorrentes são interceptados com HTTP 409. O bloqueio por rascunho não conhecido aplica-se estritamente a matérias no ar (`published`/`scheduled`), permitindo a publicação instantânea de novos artigos e rascunhos (`draft`) de primeira. Na publicação, apenas a revisão aplicada é marcada como `'applied'`, enquanto rascunhos órfãos anteriores são arquivados como `'superseded'`.
-  - **Suporte ao Estado `superseded` e Migração nos Bancos:** O estado `'superseded'` foi incorporado ao DDL de MySQL (`bin/schema.sql`) e SQLite (`core/Schema.php`), acompanhado de migração automática e atômica (`Schema::ensureRevisionsSchema()`) executada no bootstrap para bases já implantadas.
+  - **Suporte ao Estado `superseded` e Migração nos Bancos:** O estado `'superseded'` integra o DDL de MySQL (`bin/schema.sql`) e SQLite (`core/Schema.php`). A atualização de bases existentes ocorre em `Schema::ensureRevisionsSchema()`, chamada na inicialização do serviço editorial e na instalação do SQLite. As migrações necessárias devem terminar antes de iniciar transações editoriais; DDL necessário durante uma transação é recusado.
   - **Desbloqueio por Filtro de Versão Atual:** A busca por rascunhos concorrentes filtra estritamente por `base_version = (int)$current['version']`, garantindo que revisões defasadas de versões anteriores não impeçam o salvamento de novos rascunhos ou novas publicações.
   - **Preservação de Corpo Vazio e Prevenção de Restauração Espúria:** Diferenciação explícita entre campos ausentes e conteúdos vazios intencionais no editor e em `core/PostService.php`. Garantia de que matérias com texto intencionalmente limpo mantenham `content_json = '[]'`, evitando que fallbacks de compilação restaurem textos previamente deletados. Revisões com `base_version` defasadas não sobrepõem o conteúdo publicado mais recente.
-  - **Publicação Explícita e Purga de URLs Antigas:** A aplicação no site público exige a ação expressa de publicar, marcando as revisões anteriores como aplicadas e disparando purga atômica no FastCGI Cache e na API da Cloudflare tanto para a URL atual quanto para o slug anterior caso tenha ocorrido renomeação.
+  - **Publicação Explícita e Purga de URLs Antigas:** A aplicação no site público exige a ação expressa de publicar. A revisão escolhida é marcada como `applied`; outras revisões pendentes tornam-se `superseded`. O job de invalidação é registrado na transação editorial e a purga é tentada após o commit, incluindo a URL atual e o slug anterior quando houver renomeação.
 * **8.17.5. Prazos de Sessão no Servidor (SEC-05):**
   - **Controle no Backend (`core/Security.php` e `config.php`):** Imposição de tempo máximo absoluto de 24 horas (`session_lifetime = 86400`) e tempo limite de inatividade de 2 horas (`session_idle_timeout = 7200`) em `Security::requireAuth()`.
   - **Destruição Ativa de Sessão:** Ao expirar qualquer um dos limites, a sessão é destruída no servidor, o cookie é removido e o usuário é redirecionado para `/admin/login.php?expired=1`.
 * **8.17.6. Resolução Segura de IP Compatível com Cloudflare Tunnel (SEC-06):**
   - Em `Security::getClientIp()`, quando atrás de proxy reverso confiável local, prioriza `X-Real-IP` normalizado pelo Nginx para o cliente real, mantendo total compatibilidade e aceitação do `CF-Connecting-IP` originado de instâncias do Cloudflare Tunnel.
+  - **Pendência da auditoria:** a precedência de cabeçalhos não comprova sua procedência. Se um proxy confiável repassar `CF-Connecting-IP` enviado pelo cliente e não fornecer um `X-Real-IP` de cliente válido, o IP ainda pode ser forjado. A restrição das origens autorizadas a atestar esse cabeçalho permanece pendente; as correções de migração e restauração abaixo não alteram esse controle.
 * **8.17.7. Mutações Administrativas Exclusivamente via POST com CSRF:**
   - Todas as ações mutáveis de exclusão e alternância de estado em `pages.php`, `categories.php`, `dashboard.php`, `media.php` e `users.php` foram migradas para formulários `POST` estritos com validação de `_csrf_token`, eliminando a presença de tokens em históricos de navegação e access logs do servidor.
+
+#### 8.17.8. Recuperação de migrações e restauração histórica
+
+No SQLite, a migração de `post_revisions` preserva IDs e conteúdo, cria sua própria transação e restaura o valor original de `PRAGMA foreign_keys`, inclusive quando ele já estava desabilitado. Se qualquer etapa falhar, o método desfaz a transação que iniciou, restaura a configuração em `finally` e propaga a exceção. Não há confirmação nem rollback de uma transação pertencente ao chamador. A migração necessária é recusada se a conexão já estiver em uma transação.
+
+No MySQL, `ALTER TABLE` pode causar commit implícito. Por isso, o histórico inicializa `PostService` e conclui as migrações antes de abrir a transação de restauração e adquirir os locks editoriais. O serviço também recusa atualizações de esquema necessárias dentro de uma transação, propagando erros de DDL em vez de ignorá-los. A atualização de esquema no MySQL não é anunciada como uma operação reversível por rollback.
+
+A restauração distingue três valores: a versão pública conhecida, o identificador da revisão ativa conhecida (`knownRevisionId`) e o snapshot histórico escolhido (`appliedRevisionId`). Assim, é possível restaurar um snapshot antigo mesmo com outro rascunho ativo, desde que o estado não tenha mudado desde a abertura do formulário. A transação revalida versão e revisão ativa antes de gravar. Divergências retornam HTTP 409; a revisão escolhida recebe `applied`, e as demais revisões pendentes recebem `superseded`. Após sucesso, os identificadores do formulário são atualizados.
+
+#### 8.17.9. Verificações de regressão e limites de validação
+
+Execute, com PHP 8.4 e as extensões do projeto:
+
+```bash
+php bin/test-revision-safety.php
+php bin/test-ssrf.php
+python bin/test_security_fixes.py
+```
+
+`bin/test-revision-safety.php` não carrega o bootstrap nem `config.local.php`: usa bancos SQLite em memória e as classes reais do projeto. Cobre migração bem-sucedida, preservação de `foreign_keys` ligado/desligado, falha de DDL com rollback e propagação, rejeição de migração dentro de transação externa, publicação inicial e restauração histórica com concorrência. A CI executa esse teste em PHP 8.4.
+
+Na validação local destas correções, passaram os cinco testes reais de migração SQLite e as verificações de sintaxe disponíveis. O PHP local é 7.2: o teste informa explicitamente que a integração editorial foi pulada nessa versão. Os testes Python simulam regras e não substituem a integração PHP. A execução completa em PHP 8.4 e os fluxos HTTP/MySQL ainda precisam ser confirmados em CI ou homologação; adicionar o teste ao workflow não equivale a comprovar sua execução remota.
 
 ---
 

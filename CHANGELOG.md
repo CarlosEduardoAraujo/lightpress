@@ -7,6 +7,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Recuperação de migrações e restauração histórica — 2026-11-09
+
+- **SQLite:** rollback da transação criada pela migração em caso de falha, restauração do valor original de `PRAGMA foreign_keys` em `finally` e propagação da exceção. Migração necessária durante uma transação externa é recusada sem confirmar ou desfazer o trabalho do chamador.
+- **MySQL:** inicialização do serviço e migrações antes da transação de restauração, evitando que `ALTER TABLE` cause commit implícito durante a operação editorial. O serviço recusa DDL necessário em transações abertas e propaga erros de migração.
+- **Histórico:** separação entre revisão ativa conhecida para concorrência e snapshot histórico escolhido para aplicação. O formulário transporta versão e revisão conhecidas; a transação revalida ambas e responde HTTP 409 se o estado mudou. Após sucesso, atualiza os identificadores do formulário. Apenas o snapshot escolhido é marcado como `applied`; outros rascunhos pendentes tornam-se `superseded`.
+- **Testes:** adição de `bin/test-revision-safety.php`, com bancos SQLite em memória, classes reais e sem configuração ou dados locais da aplicação. Inclusão do teste na CI com PHP 8.4.
+- **Validação local:** cinco testes de migração passaram, além das verificações de sintaxe disponíveis. A integração editorial foi explicitamente pulada no PHP 7.2 local; execução completa em PHP 8.4 e fluxos HTTP/MySQL ainda não confirmados nesta etapa.
+- **Documentação:** atualização do README com contratos de migração, restauração, comandos de teste e limites de validação. A pendência de procedência de `CF-Connecting-IP` permanece aberta.
+
 ### Otimização e Usabilidade da Biblioteca de Mídias (`public/admin/media.php`)
 - **Área de Arrastar e Soltar (Drag & Drop Zone) e Upload em Lote:**
   - Modernização do card de envio de imagens (`#dropZone`) para suporte total a arrastar e soltar (Drag and Drop), além de clique nativo em qualquer ponto da área.
@@ -48,7 +57,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Proteção contra sobreposição por revisões antigas: verificação de paridade de versão base (`(int)$latestRev['base_version'] === (int)$post['version']`) antes de carregar revisões pendentes. Caso a matéria pública tenha avançado, a revisão obsoleta é ignorada e um aviso em destaque é apresentado ao editor.
   - Preservação de corpo intencionalmente vazio: distinção rigorosa entre campos ausentes e conteúdos vazios (`array_key_exists` / `isset`) no carregamento do editor e em `core/PostService.php`. Garantia de que artigos limpos mantenham `content_json = '[]'`, evitando que fallbacks de compilação restaurem textos previamente deletados.
   - Recarregamento automático no editor do rascunho de revisão salvo mais recente, sobrepondo os campos no formulário e no canvas visual com banner informativo, permitindo continuar a edição contínua do texto recém-salvo sem perda de conteúdo.
-  - Atualização do conteúdo público reservada estritamente à ação explícita de publicação (`publish`), marcando automaticamente todas as revisões pendentes anteriores como aplicadas.
+  - Atualização do conteúdo público reservada à ação explícita de publicação (`publish`), marcando a revisão aplicada como `applied` e as demais revisões pendentes como `superseded`.
   - Purga automática no FastCGI Cache e na API da Cloudflare para a URL atual e para o slug anterior (`$current['slug']`) em caso de renomeação de matéria.
 - **Imposição de Prazos de Sessão no Servidor (SEC-05):**
   - Implementação de verificação de prazo absoluto (24 horas / `session_lifetime`) e tempo limite de inatividade (2 horas / `session_idle_timeout`) diretamente no servidor no método `Security::requireAuth()` (`core/Security.php`).
