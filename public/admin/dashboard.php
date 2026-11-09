@@ -21,11 +21,10 @@ $currentUser = Security::requireAuth();
 
 $cacheMgr = new CacheManager($config);
 
-// Logout seguro (suporta POST e GET)
-$isLogout = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logout')
-    || (isset($_GET['action']) && $_GET['action'] === 'logout');
+// Logout seguro (estritamente via POST com CSRF)
+$isLogout = $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logout';
 if ($isLogout) {
-    $tokenLogout = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+    $tokenLogout = $_POST['_csrf_token'] ?? '';
     if (Security::verifyCsrfToken($tokenLogout)) {
         Security::destroySession();
         header('Location: /admin/login.php?logged_out=1');
@@ -33,9 +32,9 @@ if ($isLogout) {
     }
 }
 
-// Alternar destaque do artigo na Home (POST prioritário, ANSI CASE WHEN)
-$toggleFeaturedId = (int)($_POST['toggle_featured_id'] ?? $_GET['toggle_featured_id'] ?? 0);
-$tokenToggle = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// Alternar destaque do artigo na Home (estritamente via POST com CSRF)
+$toggleFeaturedId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_featured_id'] ?? 0) : 0;
+$tokenToggle = $_POST['_csrf_token'] ?? '';
 if ($toggleFeaturedId > 0 && Security::verifyCsrfToken($tokenToggle)) {
     if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)) {
         Database::query("UPDATE posts SET is_featured = CASE WHEN is_featured = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleFeaturedId]);

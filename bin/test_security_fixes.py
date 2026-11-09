@@ -523,6 +523,34 @@ except Exception as e:
 
 assert_check("Após migração do schema, o estado 'superseded' é aceito e gravado com sucesso", migration_success)
 
+# 7. Prevenção de Exposição de CSRF via GET no Logout e Destaques
+print("\n[7] Testando Prevenção de Exposição de CSRF via GET no Logout e Destaques")
+
+with open("core/AdminNav.php", "r", encoding="utf-8") as f:
+    admin_nav_content = f.read()
+
+with open("public/admin/dashboard.php", "r", encoding="utf-8") as f:
+    dashboard_content = f.read()
+
+assert_check(
+    "AdminNav não expõe token CSRF ou logout via link GET",
+    "action=logout" not in admin_nav_content and "?_csrf_token" not in admin_nav_content
+)
+assert_check(
+    "AdminNav renderiza logout estritamente como formulário POST com token CSRF",
+    '<form method="POST" action="/admin/dashboard.php"' in admin_nav_content
+    and 'name="_csrf_token"' in admin_nav_content
+    and 'name="action" value="logout"' in admin_nav_content
+)
+assert_check(
+    "dashboard.php não aceita $_GET['action'] ou $_GET['_csrf_token'] para logout",
+    "$_GET['action']" not in dashboard_content and "$_GET['_csrf_token']" not in dashboard_content
+)
+assert_check(
+    "dashboard.php não aceita $_GET['toggle_featured_id'] para alternância de destaques",
+    "$_GET['toggle_featured_id']" not in dashboard_content
+)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

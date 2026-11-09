@@ -116,7 +116,11 @@ final class AdminNav
                 <span>Olá, <strong><?= Security::e($currentUser['name'] ?? '') ?></strong></span>
                 <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600; font-size: 0.9rem;">Meu Perfil</a>
                 <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-                <a href="/admin/dashboard.php?action=logout&_csrf_token=<?= Security::e($csrfToken) ?>" style="color: #dc2626; text-decoration: none; font-weight: 600;">Sair</a>
+                <form method="POST" action="/admin/dashboard.php" style="display: inline; margin: 0; padding: 0;">
+                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                    <input type="hidden" name="action" value="logout">
+                    <button type="submit" style="background: none; border: none; padding: 0; margin: 0; font: inherit; color: #dc2626; cursor: pointer; font-weight: 600;">Sair</button>
+                </form>
             </div>
         </header>
         <?php
