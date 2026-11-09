@@ -8,6 +8,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Unreleased]
 
 ### Otimização e Usabilidade da Biblioteca de Mídias (`public/admin/media.php`)
+- **Área de Arrastar e Soltar (Drag & Drop Zone) e Upload em Lote:**
+  - Modernização do card de envio de imagens (`#dropZone`) para suporte total a arrastar e soltar (Drag and Drop), além de clique nativo em qualquer ponto da área.
+  - Feedback visual dinâmico com realce de bordas, cores da identidade oficial (`#E10600`) e tema escuro (`.card-upload.dragover`).
+  - Suporte a envio individual e em lote sequencial para múltiplos arquivos soltos de uma vez, com validação de extensões aceitas (JPG, PNG, WebP e AVIF) e do teto de 8 MiB por imagem.
+  - Atualização assíncrona imediata da galeria via AJAX (`triggerLiveSearch(1)`) após o término dos uploads, dispensando recarregamento de página.
+  - Prevenção no navegador contra abertura indesejada de imagens soltas fora da área demarcada.
 - **Ordenação Padrão por Mídias Recentes (`DESC`):**
   - Inversão da ordenação padrão na galeria de mídias do painel administrativo (`$filterOrder = 'desc'`), garantindo que uploads recentes e fotos novas apareçam no topo imediatamente (`m.created_at DESC, m.id DESC`).
   - Atualização do menu suspenso `<select name="order">` com a opção "Recentes primeiro" selecionada por padrão e mantendo a opção "Antigas primeiro" para navegação histórica do acervo.

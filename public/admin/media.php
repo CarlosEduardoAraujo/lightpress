@@ -250,11 +250,59 @@ require __DIR__ . '/header.php';
 <style>
     [data-theme="dark"] .btn-copy { background: #1e293b; color: #f1f5f9; border-color: #334155; }
     [data-theme="dark"] .btn-copy:hover { background: #334155; }
-    [data-theme="dark"] .card-upload { background: #131b2e; border-color: #1e293b; }
-    [data-theme="dark"] .card-upload p { color: #f1f5f9 !important; }
+    [data-theme="dark"] .card-upload { background: #131b2e; border-color: #334155; }
+    [data-theme="dark"] .card-upload:hover { border-color: var(--primary-accent); background: rgba(225, 6, 0, 0.05); }
+    [data-theme="dark"] .card-upload.dragover { background: rgba(225, 6, 0, 0.15); border-color: var(--primary-accent); }
+    [data-theme="dark"] .card-upload .upload-title { color: #f1f5f9 !important; }
+    [data-theme="dark"] .card-upload .upload-subtitle { color: #cbd5e1 !important; }
+    [data-theme="dark"] .card-upload .upload-hint { color: #94a3b8 !important; }
 
     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .card-upload { background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; margin-bottom: 2rem; }
+    .card-upload {
+        background: var(--surface);
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 2.25rem 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        user-select: none;
+    }
+    .card-upload:hover {
+        border-color: var(--primary-accent);
+        background: rgba(225, 6, 0, 0.02);
+    }
+    .card-upload.dragover {
+        border-color: var(--primary-accent);
+        background: rgba(225, 6, 0, 0.08);
+        border-style: solid;
+        box-shadow: 0 0 0 4px rgba(225, 6, 0, 0.15);
+        transform: scale(1.005);
+    }
+    .card-upload .upload-icon {
+        font-size: 2.5rem;
+        line-height: 1;
+        margin-bottom: 0.6rem;
+        display: inline-block;
+    }
+    .card-upload .upload-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        color: #1e293b;
+    }
+    .card-upload .upload-subtitle {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 0.4rem;
+    }
+    .card-upload .upload-hint {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-bottom: 1.25rem;
+    }
     .filter-bar {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -353,21 +401,25 @@ require __DIR__ . '/header.php';
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>
 
-        <!-- Formulário de Upload Rápido -->
-        <div class="card-upload">
-            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+        <!-- Formulário de Upload Rápido / Drag and Drop -->
+        <div class="card-upload" id="dropZone" onclick="handleDropZoneClick(event)">
+            <form method="POST" enctype="multipart/form-data" id="uploadForm" onsubmit="event.preventDefault();">
                 <input type="hidden" name="_csrf_token" id="csrfToken" value="<?= Security::e($csrfToken) ?>">
-                <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: #334155;">
+                <div class="upload-icon">📁</div>
+                <p class="upload-title">
                     Envie fotos para conversão automática em WebP / AVIF
                 </p>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <p class="upload-subtitle">
+                    <strong>Arraste e solte imagens aqui</strong> ou clique no botão abaixo
+                </p>
+                <p class="upload-hint">
                     Formatos aceitos: JPG, PNG, WebP e AVIF (até 8 MiB). Três resoluções são geradas e nomes amigáveis para SEO são aplicados.
                 </p>
-                <input type="file" name="media_file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" required style="display: none;">
-                <button type="button" id="btnSelect" onclick="document.getElementById('fileInput').click()" style="padding: 0.65rem 1.5rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer;">
+                <input type="file" name="media_file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif" multiple style="display: none;">
+                <button type="button" id="btnSelect" onclick="event.stopPropagation(); document.getElementById('fileInput').click()" style="padding: 0.65rem 1.5rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer; transition: background 0.15s;">
                     Selecionar Imagem do Computador
                 </button>
-                <div id="uploadStatus" style="display: none; margin-top: 1rem; padding: 0.75rem 1rem; background: #e0f2fe; color: #0369a1; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600;">
+                <div id="uploadStatus" style="display: none; margin-top: 1.25rem; padding: 0.75rem 1rem; background: #e0f2fe; color: #0369a1; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600;">
                     <span style="display: inline-block; animation: spin 1s linear infinite; margin-right: 0.5rem;">⏳</span>
                     <span id="uploadStatusText">Enviando e processando imagem em 3 resoluções...</span>
                 </div>
@@ -577,6 +629,7 @@ require __DIR__ . '/header.php';
             });
         }
 
+        const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const btnSelect = document.getElementById('btnSelect');
         const uploadStatus = document.getElementById('uploadStatus');
@@ -588,69 +641,142 @@ require __DIR__ . '/header.php';
             dynamicAlert.replaceChildren();
             const alertDiv = document.createElement('div');
             alertDiv.className = isError ? 'alert-error' : 'alert-success';
-            alertDiv.textContent = msg;
+            alertDiv.innerHTML = msg;
             dynamicAlert.appendChild(alertDiv);
         }
 
-        fileInput.addEventListener('change', function() {
-            if (!this.files || !this.files[0]) return;
-            const file = this.files[0];
-
-            // Validação de tamanho no cliente (8 MiB)
-            if (file.size > 8 * 1024 * 1024) {
-                showAlert('O arquivo selecionado (' + (file.size / (1024 * 1024)).toFixed(1) + ' MiB) excede o limite máximo permitido de 8 MiB.', true);
-                this.value = '';
+        function handleDropZoneClick(e) {
+            if (e.target && (e.target.id === 'fileInput' || e.target.closest('#btnSelect'))) {
                 return;
             }
+            if (btnSelect && btnSelect.disabled) return;
+            if (fileInput) fileInput.click();
+        }
+
+        const validImageRegex = /\.(jpe?g|png|webp|avif)$/i;
+
+        async function processFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            const files = Array.from(fileList);
 
             uploadStatus.style.display = 'block';
-            btnSelect.disabled = true;
-            btnSelect.style.opacity = '0.6';
-            uploadStatusText.innerText = 'Enviando ' + file.name + ' (' + Math.round(file.size / 1024) + ' KiB) e gerando variantes WebP / AVIF...';
+            if (btnSelect) {
+                btnSelect.disabled = true;
+                btnSelect.style.opacity = '0.6';
+            }
+            if (dropZone) dropZone.style.pointerEvents = 'none';
             dynamicAlert.innerHTML = '';
 
-            const formData = new FormData();
-            formData.append('media_file', file);
-            formData.append('_csrf_token', csrfToken);
+            let successCount = 0;
+            let errorMessages = [];
 
-            fetch('/admin/media.php', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            })
-            .then(function(res) {
-                return res.json().then(function(data) {
-                    return { ok: res.ok, status: res.status, data: data };
-                }).catch(function() {
-                    return { ok: res.ok, status: res.status, data: null };
-                });
-            })
-            .then(function(result) {
-                uploadStatus.style.display = 'none';
-                btnSelect.disabled = false;
-                btnSelect.style.opacity = '1';
-                fileInput.value = '';
-
-                if (result.ok && result.data && result.data.ok) {
-                    showAlert('Imagem enviada e convertida com sucesso!', false);
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 800);
-                } else {
-                    const errorMsg = (result.data && result.data.error) ? result.data.error : ('Erro durante o envio da imagem (HTTP ' + result.status + '). Verifique os limites do PHP.');
-                    showAlert(errorMsg, true);
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const isImage = (file.type && file.type.startsWith('image/')) || validImageRegex.test(file.name);
+                
+                if (!isImage) {
+                    errorMessages.push('"' + file.name + '" não é um formato suportado (JPG, PNG, WebP, AVIF).');
+                    continue;
                 }
-            })
-            .catch(function(err) {
-                uploadStatus.style.display = 'none';
+
+                if (file.size > 8 * 1024 * 1024) {
+                    errorMessages.push('"' + file.name + '" (' + (file.size / (1024 * 1024)).toFixed(1) + ' MiB) excede o limite máximo permitido de 8 MiB.');
+                    continue;
+                }
+
+                const progressPrefix = files.length > 1 ? '[' + (i + 1) + '/' + files.length + '] ' : '';
+                uploadStatusText.innerText = progressPrefix + 'Enviando ' + file.name + ' (' + Math.round(file.size / 1024) + ' KiB) e gerando WebP / AVIF...';
+
+                const formData = new FormData();
+                formData.append('media_file', file);
+                formData.append('_csrf_token', csrfToken);
+
+                try {
+                    const res = await fetch('/admin/media.php', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+
+                    let data = null;
+                    try {
+                        data = await res.json();
+                    } catch (_) {}
+
+                    if (res.ok && data && data.ok) {
+                        successCount++;
+                    } else {
+                        const errMsg = (data && data.error) ? data.error : ('HTTP ' + res.status);
+                        errorMessages.push('"' + file.name + '": ' + errMsg);
+                    }
+                } catch (err) {
+                    errorMessages.push('"' + file.name + '": Erro de rede (' + err.message + ')');
+                }
+            }
+
+            uploadStatus.style.display = 'none';
+            if (btnSelect) {
                 btnSelect.disabled = false;
                 btnSelect.style.opacity = '1';
-                fileInput.value = '';
-                showAlert('Erro de conexão ou timeout ao enviar arquivo: ' + err.message, true);
+            }
+            if (dropZone) dropZone.style.pointerEvents = 'auto';
+            if (fileInput) fileInput.value = '';
+
+            if (successCount > 0) {
+                const msg = successCount === 1 
+                    ? 'Imagem enviada e convertida com sucesso!' 
+                    : successCount + ' imagens enviadas e convertidas com sucesso!';
+                const extraErr = errorMessages.length > 0 ? '<br><small>' + errorMessages.join('<br>') + '</small>' : '';
+                showAlert(msg + extraErr, false);
+                triggerLiveSearch(1);
+            } else if (errorMessages.length > 0) {
+                showAlert(errorMessages.join('<br>') || 'Falha ao processar arquivo(s).', true);
+            }
+        }
+
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                processFiles(this.files);
             });
+        }
+
+        if (dropZone) {
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                dropZone.addEventListener(evt, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!dropZone.contains(e.relatedTarget)) {
+                    dropZone.classList.remove('dragover');
+                }
+            }, false);
+
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    processFiles(e.dataTransfer.files);
+                }
+            }, false);
+        }
+
+        // Previne comportamento padrão de abrir o arquivo se solto na janela
+        ['dragenter', 'dragover', 'drop'].forEach(function(evt) {
+            window.addEventListener(evt, function(e) {
+                if (e.target !== dropZone && !dropZone.contains(e.target)) {
+                    e.preventDefault();
+                }
+            }, false);
         });
     
         // ========================================================

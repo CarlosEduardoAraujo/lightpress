@@ -284,6 +284,7 @@ php bin/catalog-media.php --chunk=500
 A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rápida com acervos de 30.000+ fotos:
 
 * **Busca em Tempo Real com Debounce (300ms):** Conforme o usuário digita no campo de busca, o painel realiza a consulta assíncrona ao servidor e atualiza a grade de fotos, contadores e paginação sem piscar ou recarregar a página inteira.
+* **Área de Arrastar e Soltar (Drag & Drop Zone):** Envio ágil de imagens arrastando arquivos diretamente para o topo da biblioteca com feedback visual instantâneo (`.dragover`), suporte a múltiplos arquivos sequenciais e atualização dinâmica da galeria via AJAX.
 * **Paginação Fluida Assíncrona:** Grade configurada para 48 itens por página (harmônica para layouts responsivos de 2, 3, 4 e 6 colunas) com navegação numerada instantânea via AJAX.
 * **Ordenação Flexível:** Seletor de ordenação com padrão decrescente (recentes primeiro), permitindo alternar entre mídias recém-enviadas e ordem cronológica ascendente (antigas primeiro).
 * **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
