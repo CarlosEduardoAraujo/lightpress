@@ -269,14 +269,22 @@ class PostService
             $featuredImage = $data['featured_image'] ?? null;
             $isFeatured = array_key_exists('is_featured', $data) ? (!empty($data['is_featured']) ? 1 : 0) : (int)$current['is_featured'];
 
-            if (!empty($data['content_html'])) {
-                $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
-                $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
-                    ? (is_array($data['content_json']) ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $data['content_json'])
-                    : BlockCompiler::htmlToBlocks($contentHtml);
+            if (array_key_exists('content_html', $data) && $data['content_html'] !== null) {
+                $sanitized = BlockCompiler::sanitizeHtml((string)$data['content_html']);
+                if (trim($sanitized) === '') {
+                    $contentHtml = '';
+                    $contentJson = '[]';
+                } else {
+                    $contentHtml = $sanitized;
+                    $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
+                        ? (is_array($data['content_json']) ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $data['content_json'])
+                        : BlockCompiler::htmlToBlocks($contentHtml);
+                }
             } else {
-                $contentJson = is_array($data['content_json']) ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : ($data['content_json'] ?? '');
-                $contentHtml = BlockCompiler::compile($contentJson);
+                $contentJson = is_array($data['content_json'] ?? null)
+                    ? json_encode($data['content_json'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                    : ($data['content_json'] ?? '');
+                $contentHtml = (!empty($contentJson) && $contentJson !== '[]') ? BlockCompiler::compile($contentJson) : '';
             }
 
             $seoTitle = $data['seo_title'] ?? null;

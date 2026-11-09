@@ -27,8 +27,15 @@ $message = '';
 $error = '';
 $hasActiveDraftRevision = false;
 $draftRevisionDate = null;
+$activeRevisionId = 0;
+$hasOutdatedRevision = false;
+$outdatedRevisionDate = null;
+$outdatedRevisionVersion = 0;
 
-$applyDraftRevision = function (array &$post, int $postId) use (&$hasActiveDraftRevision, &$draftRevisionDate): void {
+$applyDraftRevision = function (array &$post, int $postId) use (
+    &$hasActiveDraftRevision, &$draftRevisionDate, &$activeRevisionId,
+    &$hasOutdatedRevision, &$outdatedRevisionDate, &$outdatedRevisionVersion
+): void {
     $latestRev = Database::fetchOne(
         "SELECT * FROM post_revisions 
          WHERE post_id = ? AND status IN ('draft', 'pending_review') 
@@ -37,6 +44,18 @@ $applyDraftRevision = function (array &$post, int $postId) use (&$hasActiveDraft
     );
 
     if ($latestRev) {
+        $baseVersion = (int)($latestRev['base_version'] ?? 0);
+        $currentPostVersion = (int)($post['version'] ?? 1);
+
+        // Se a revisão foi baseada em uma versão anterior do post público, não podemos
+        // sobrepô-la cegamente sobre o conteúdo mais recente publicado, pois causaria perda silenciosa de dados.
+        if ($baseVersion !== $currentPostVersion) {
+            $hasOutdatedRevision = true;
+            $outdatedRevisionDate = $latestRev['created_at'];
+            $outdatedRevisionVersion = $baseVersion;
+            return;
+        }
+
         $payload = json_decode((string)$latestRev['payload_json'], true);
         if (is_array($payload)) {
             foreach (['title', 'slug', 'summary', 'category', 'tags', 'featured_image', 'content_json', 'seo_title', 'seo_description', 'focus_keyword', 'is_featured'] as $key) {
@@ -45,11 +64,21 @@ $applyDraftRevision = function (array &$post, int $postId) use (&$hasActiveDraft
                 }
             }
         }
-        if (!empty($latestRev['content_html'])) {
-            $post['content_html'] = $latestRev['content_html'];
-        } elseif (!empty($payload['content_html'])) {
-            $post['content_html'] = $payload['content_html'];
+
+        // Diferenciar explicitamente campo ausente de conteúdo vazio (string vazia intencional)
+        if (array_key_exists('content_html', $latestRev) && $latestRev['content_html'] !== null) {
+            $post['content_html'] = (string)$latestRev['content_html'];
+            if (trim($post['content_html']) === '') {
+                $post['content_json'] = '[]';
+            }
+        } elseif (is_array($payload) && array_key_exists('content_html', $payload) && $payload['content_html'] !== null) {
+            $post['content_html'] = (string)$payload['content_html'];
+            if (trim($post['content_html']) === '') {
+                $post['content_json'] = '[]';
+            }
         }
+
+        $activeRevisionId = (int)$latestRev['id'];
         $hasActiveDraftRevision = true;
         $draftRevisionDate = $latestRev['created_at'];
     }
@@ -100,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formatted = $dt->format('Y-m-d H:i:s');
                 $ts = $dt->getTimestamp();
                 $publishedAt = ($ts > 0 && (int)gmdate('Y', $ts) > 1970) ? $formatted : null;
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
                 $timestamp = strtotime($publishedAtRaw);
                 $publishedAt = ($timestamp !== false && $timestamp > 0 && (int)gmdate('Y', $timestamp) > 1970)
                     ? gmdate('Y-m-d H:i:s', $timestamp)
@@ -108,6 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $knownVersion = (int)($_POST['version'] ?? 1);
+        $knownRevisionId = (int)($_POST['known_revision_id'] ?? 0);
 
         $payload = [
             'title' => $title,
@@ -150,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $dt = new \DateTime($publishedAt, new \DateTimeZone('UTC'));
                             $dt->setTimezone(new \DateTimeZone($displayTzName));
                             $schedFormatted = $dt->format('d/m/Y \à\s H:i');
-                        } catch (\Throwable) {
+                        } catch (\Throwable $e) {
                             $schedFormatted = date('d/m/Y \à\s H:i', strtotime($publishedAt));
                         }
                     }
@@ -160,16 +190,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     // Salvar rascunho (executado atomicamente em transação com bloqueio FOR UPDATE)
                     $cleanHtml = BlockCompiler::sanitizeHtml($contentHtml);
-                    $cleanJson = !empty($contentJson) && $contentJson !== '[]'
-                        ? $contentJson
-                        : BlockCompiler::htmlToBlocks($cleanHtml);
+                    if (trim($cleanHtml) === '') {
+                        $cleanHtml = '';
+                        $cleanJson = '[]';
+                    } else {
+                        $cleanJson = !empty($contentJson) && $contentJson !== '[]'
+                            ? $contentJson
+                            : BlockCompiler::htmlToBlocks($cleanHtml);
+                    }
 
                     $wasPublished = false;
                     $prevSlug = '';
                     $prevCat = '';
 
                     Database::transaction(function (\PDO $pdo) use (
-                        $postId, $currentUser, $knownVersion, $title, $slug, $summary,
+                        $postId, $currentUser, $knownVersion, $knownRevisionId, $title, $slug, $summary,
                         $category, $tags, $featuredImage, $cleanJson, $cleanHtml,
                         $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message,
                         &$wasPublished, &$prevSlug, &$prevCat
@@ -185,6 +220,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             throw new RuntimeException("Você não possui permissão para editar este artigo.", 403);
                         }
 
+                        // 3. Validação de concorrência otimista da publicação base ANTES de qualquer gravação
+                        if ((int)$current['version'] !== $knownVersion) {
+                            throw new RuntimeException(
+                                "Conflito de edição detectado! A matéria foi modificada por outro usuário (versão atual: {$current['version']}, versão base: {$knownVersion}). Recarregue a página para mesclar suas alterações.",
+                                409
+                            );
+                        }
+
                         $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
                         $canFeature = Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED);
 
@@ -192,9 +235,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ? (!empty($_POST['is_featured']) ? 1 : 0)
                             : (int)($current['is_featured'] ?? 0);
 
-                        // 3. Se a matéria já estiver publicada ou agendada e a ação for salvar rascunho:
+                        // 4. Se a matéria já estiver publicada ou agendada e a ação for salvar rascunho:
                         // Salva com segurança como uma REVISÃO PRIVADA, mantendo o post público intacto (SEC-04)
                         if (in_array($current['status'], ['published', 'scheduled'], true)) {
+                            // Validação de concorrência entre rascunhos de revisão
+                            $latestRev = Database::fetchOne(
+                                "SELECT id, base_version FROM post_revisions 
+                                 WHERE post_id = ? AND status IN ('draft', 'pending_review') 
+                                 ORDER BY id DESC LIMIT 1",
+                                [$postId]
+                            );
+                            $latestRevId = $latestRev ? (int)$latestRev['id'] : 0;
+                            if ($latestRevId > 0) {
+                                if ($knownRevisionId > 0 && $latestRevId !== $knownRevisionId) {
+                                    throw new RuntimeException(
+                                        "Conflito de rascunho detectado! Outra revisão deste artigo foi salva enquanto você editava. Recarregue a página para carregar as alterações mais recentes.",
+                                        409
+                                    );
+                                } elseif ($knownRevisionId === 0) {
+                                    throw new RuntimeException(
+                                        "Conflito de rascunho detectado! Uma revisão privada recente foi criada para este artigo. Recarregue a página para visualizar a versão mais recente.",
+                                        409
+                                    );
+                                }
+                            }
+
                             $revStatus = $canPublish ? 'draft' : 'pending_review';
                             $revisionPayload = [
                                 'title' => $title,
@@ -219,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 [
                                     $postId,
                                     (int)$currentUser['id'],
-                                    (int)$current['version'],
+                                    $knownVersion,
                                     $revStatus,
                                     json_encode($revisionPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                                     $cleanHtml
@@ -235,15 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             return;
                         }
 
-                        // 4. Edição normal de rascunho ou edição autorizada:
-                        // Concorrência otimista baseada na versão conhecida
-                        if ((int)$current['version'] !== $knownVersion) {
-                            throw new RuntimeException(
-                                "Conflito de edição detectado! A matéria foi modificada por outro usuário (versão atual: {$current['version']}, versão base: {$knownVersion}). Recarregue a página para mesclar suas alterações.",
-                                409
-                            );
-                        }
-
+                        // 5. Edição normal de rascunho ou edição autorizada:
                         $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($current['slug']) ? $current['slug'] : Security::slugify($title));
                         $cleanSlug = (new PostService())->resolveUniqueSlug($cleanSlug, $postId);
                         // Se o editor limpou o campo de data (published_at vazio), respeita a remoção
@@ -352,11 +409,10 @@ if (isset($_GET['saved'])) {
 $categories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_active = 1 ORDER BY name ASC");
 $csrfToken = Security::generateCsrfToken();
 
-// Conteúdo inicial para o editor
-$initialHtml = $post['content_html'] ?? '';
-if (empty($initialHtml) && !empty($post['content_json'])) {
-    $initialHtml = BlockCompiler::compile($post['content_json']);
-}
+// Conteúdo inicial para o editor: diferencia campo ausente de conteúdo vazio (string vazia intencional)
+$initialHtml = (array_key_exists('content_html', $post ?? []) && $post['content_html'] !== null)
+    ? (string)$post['content_html']
+    : (!empty($post['content_json']) && $post['content_json'] !== '[]' ? BlockCompiler::compile($post['content_json']) : '');
 $pageTitle = !empty($post['id']) ? 'Editar Notícia' : 'Nova Notícia';
 $activePage = 'dashboard';
 require __DIR__ . '/header.php';
@@ -519,6 +575,16 @@ require __DIR__ . '/header.php';
             <div class="alert-error"><?= Security::e($error) ?></div>
         <?php endif; ?>
 
+        <?php if (!empty($hasOutdatedRevision)): ?>
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.25rem;">⚠️</span>
+                <div style="font-size: 0.9rem; line-height: 1.4;">
+                    <strong style="color: #dc2626;">Atenção: Revisão desatualizada ignorada:</strong>
+                    Existe uma revisão não publicada gravada em <strong><?= !empty($outdatedRevisionDate) ? date('d/m/Y \à\s H:i', strtotime($outdatedRevisionDate)) : '' ?></strong> baseada na versão <?= (int)$outdatedRevisionVersion ?> deste artigo, mas a versão pública atual já avançou para a versão <?= (int)($post['version'] ?? 1) ?>. Para preservar as alterações públicas mais recentes, o editor exibiu a publicação atual em vez de restaurar a revisão desatualizada.
+                </div>
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($hasActiveDraftRevision)): ?>
             <div style="background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.35); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
                 <span style="font-size: 1.25rem;">📝</span>
@@ -532,6 +598,7 @@ require __DIR__ . '/header.php';
         <form method="POST" id="editorForm" onsubmit="return handleFormSubmit()">
             <input type="hidden" name="_csrf_token" id="csrfToken" value="<?= Security::e($csrfToken) ?>">
             <input type="hidden" name="version" value="<?= $post ? (int)$post['version'] : 1 ?>">
+            <input type="hidden" name="known_revision_id" value="<?= (int)($activeRevisionId ?? 0) ?>">
             <input type="hidden" name="content_html" id="contentHtmlInput" value="">
             <input type="hidden" name="content_json" id="contentJsonInput" value="<?= Security::e($post['content_json'] ?? '') ?>">
 
@@ -611,7 +678,7 @@ require __DIR__ . '/header.php';
                                         $dt = new \DateTime($post['published_at'], new \DateTimeZone('UTC'));
                                         $dt->setTimezone(new \DateTimeZone($displayTzName));
                                         $postDisplayFormatted = $dt->format('d/m/Y \à\s H:i');
-                                    } catch (\Throwable) {
+                                    } catch (\Throwable $e) {
                                         $postDisplayFormatted = date('d/m/Y \à\s H:i', strtotime($post['published_at']));
                                     }
                                 }
@@ -642,7 +709,7 @@ require __DIR__ . '/header.php';
                                         $dt = new \DateTime($post['published_at'], new \DateTimeZone('UTC'));
                                         $dt->setTimezone(new \DateTimeZone($config['app']['display_timezone'] ?? 'America/Sao_Paulo'));
                                         $postInputVal = $dt->format('Y-m-d\TH:i');
-                                    } catch (\Throwable) {
+                                    } catch (\Throwable $e) {
                                         $postInputVal = date('Y-m-d\TH:i', strtotime($post['published_at']));
                                     }
                                 }
@@ -1076,6 +1143,16 @@ require __DIR__ . '/header.php';
 
         function handleFormSubmit() {
             var html = isSourceMode ? rawHtmlArea.value : editorCanvas.innerHTML;
+            var temp = document.createElement('div');
+            temp.innerHTML = html;
+            var textOnly = (temp.textContent || temp.innerText || '').trim();
+            if (textOnly === '' && !temp.querySelector('img, iframe, video, audio, table')) {
+                html = '';
+                var jsonInput = document.getElementById('contentJsonInput');
+                if (jsonInput) {
+                    jsonInput.value = '[]';
+                }
+            }
             document.getElementById('contentHtmlInput').value = html;
             return true;
         }

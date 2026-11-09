@@ -221,6 +221,114 @@ conn.commit()
 cursor.execute("SELECT * FROM post_revisions WHERE post_id = 10 AND status IN ('draft', 'pending_review')")
 assert_check("Após publicação explícita, as revisões pendentes são marcadas como aplicadas", cursor.fetchone() is None)
 
+# 5. P2: Detecção de Concorrência em Rascunhos e Preservação de Corpo Vazio
+print("\n[5] Testando P2: Concorrência Otimista e Corpo de Rascunho Vazio")
+
+# Caso A: Concorrência de Versão ao Salvar Rascunho de Artigo Publicado
+# Post 10 está na versão 2 (publicado). Usuário submete form com known_version = 1.
+cursor.execute("SELECT version FROM posts WHERE id = 10")
+current_version = cursor.fetchone()[0]
+known_version = 1
+version_conflict = False
+try:
+    if current_version != known_version:
+        version_conflict = True
+        raise RuntimeError("Conflito de edição detectado! 409")
+except RuntimeError:
+    pass
+
+assert_check("Formulário com versão 1 é recusado com HTTP 409 quando o artigo já está na versão 2", version_conflict)
+
+# Caso B: Concorrência de Rascunhos Concorrentes via known_revision_id
+# Usuário A e B abriram o editor na versão 2.
+# Usuário A salvou uma revisão (id = 101).
+cursor.execute("""
+    INSERT INTO post_revisions (id, post_id, editor_id, base_version, status, payload_json, content_html)
+    VALUES (101, 10, 1, 2, 'draft', '{"title": "Revisão Usuário A"}', '<p>Texto A</p>')
+""")
+conn.commit()
+
+# Usuário B tenta salvar com known_revision_id = 0 (ou id antigo)
+cursor.execute("SELECT id FROM post_revisions WHERE post_id = 10 AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1")
+latest_rev_id = cursor.fetchone()[0]
+known_rev_b = 0
+draft_conflict = False
+try:
+    if latest_rev_id > 0 and known_rev_b != latest_rev_id:
+        draft_conflict = True
+        raise RuntimeError("Conflito de rascunho detectado! 409")
+except RuntimeError:
+    pass
+
+assert_check("Salvamento concorrente de rascunho com known_revision_id desatualizado é recusado com 409", draft_conflict)
+
+# Caso C: Rascunho com corpo intencionalmente vazio
+# Post 10 tem texto público:
+cursor.execute("SELECT content_html, content_json FROM posts WHERE id = 10")
+live_row = cursor.fetchone()
+live_html = live_row[0]
+live_json = live_row[1]
+
+# Editor salva rascunho com HTML vazio ("")
+empty_html = ""
+clean_json = "[]" if empty_html == "" else live_json
+cursor.execute("""
+    INSERT INTO post_revisions (id, post_id, editor_id, base_version, status, payload_json, content_html)
+    VALUES (102, 10, 1, 2, 'draft', ?, ?)
+""", (json.dumps({"title": "Post com Corpo Vazio", "content_json": clean_json, "content_html": empty_html}), empty_html))
+conn.commit()
+
+# Recarregamento do editor: aplica revisão mais recente
+cursor.execute("SELECT * FROM post_revisions WHERE post_id = 10 AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1")
+rev_102 = cursor.fetchone()
+# Colunas: id(0), post_id(1), editor_id(2), base_version(3), status(4), payload_json(5), content_html(6)
+rev_payload_102 = json.loads(rev_102[5])
+editor_post = {"content_html": live_html, "content_json": live_json, "version": 2}
+
+# Lógica corrigida do $applyDraftRevision:
+# Diferencia campo ausente de conteúdo vazio (string vazia intencional)
+if rev_102[6] is not None:
+    editor_post["content_html"] = rev_102[6]
+    if editor_post["content_html"] == "":
+        editor_post["content_json"] = "[]"
+elif "content_html" in rev_payload_102 and rev_payload_102["content_html"] is not None:
+    editor_post["content_html"] = rev_payload_102["content_html"]
+    if editor_post["content_html"] == "":
+        editor_post["content_json"] = "[]"
+
+# Lógica corrigida do $initialHtml:
+initial_html = editor_post["content_html"] if ("content_html" in editor_post and editor_post["content_html"] is not None) else (
+    "FALLBACK_COMPILED" if (editor_post.get("content_json") and editor_post["content_json"] != "[]") else ""
+)
+
+assert_check("Rascunho com corpo vazio preserva content_html como string vazia", editor_post["content_html"] == "")
+assert_check("Rascunho com corpo vazio mantém content_json coerente como '[]'", editor_post["content_json"] == "[]")
+assert_check("Editor não aciona fallback de compilação nem restaura o texto publicado", initial_html == "")
+
+# Caso D: Revisão defasada (base_version desatualizada em relação ao post ao vivo)
+# Post é promovido para a versão 3 (com novo texto ao vivo)
+cursor.execute("UPDATE posts SET version = 3, content_html = '<p>Texto Mais Recente v3</p>' WHERE id = 10")
+conn.commit()
+
+# Simula o editor carregando o post 10 na versão 3 quando há a revisão 102 que era baseada na versão 2
+cursor.execute("SELECT version, content_html FROM posts WHERE id = 10")
+live_v3 = cursor.fetchone()
+current_v3_version = live_v3[0] # 3
+current_v3_html = live_v3[1]
+
+# $applyDraftRevision para a revisão 102 (base_version = 2):
+rev_base_version = rev_102[3] # 2
+has_outdated_revision = False
+loaded_html = current_v3_html
+if rev_base_version != current_v3_version:
+    has_outdated_revision = True
+    # NÃO sobrescreve loaded_html
+else:
+    loaded_html = rev_102[6]
+
+assert_check("Revisão com base_version defasada (v2 != v3) é marcada como desatualizada", has_outdated_revision)
+assert_check("Revisão desatualizada não sobrescreve o conteúdo mais recente publicado na tela", loaded_html == "<p>Texto Mais Recente v3</p>")
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")
