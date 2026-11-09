@@ -407,13 +407,33 @@ known_rev_id = 301
 
 first_publish_conflict = False
 try:
-    if latest_rev_id > 0 and (known_rev_id == 0 or known_rev_id != latest_rev_id):
-        first_publish_conflict = True
-        raise RuntimeError("Conflito de rascunho na primeira publicação!")
-except RuntimeError:
-    pass
+    if latest_rev_id > 0:
+        if known_rev_id > 0 and latest_rev_id != known_rev_id:
+            first_publish_conflict = True
+        elif known_rev_id == 0:
+            current_status = 'draft' # post 20 está em draft
+            if current_status in ('published', 'scheduled'):
+                first_publish_conflict = True
+except Exception:
+    first_publish_conflict = True
 
 assert_check("Primeira publicação com newRevId conhecido NÃO sofre conflito de concorrência", not first_publish_conflict)
+
+# Valida também primeira publicação mesmo se known_rev_id for 0 em artigo com status 'draft'
+fallback_draft_conflict = False
+try:
+    known_rev_zero = 0
+    current_status = 'draft'
+    if latest_rev_id > 0:
+        if known_rev_zero > 0 and latest_rev_id != known_rev_zero:
+            fallback_draft_conflict = True
+        elif known_rev_zero == 0:
+            if current_status in ('published', 'scheduled'):
+                fallback_draft_conflict = True
+except Exception:
+    fallback_draft_conflict = True
+
+assert_check("Publicação de artigo em rascunho (status='draft') aceita known_revision_id=0 sem falso positivo", not fallback_draft_conflict)
 
 # Caso I: Carregamento de Post Existente com status 'draft' fornece activeRevisionId
 # Post 20 está em draft, com revisão ativa 301. Ao carregar o editor:

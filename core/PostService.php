@@ -171,7 +171,7 @@ class PostService
 
         return Database::transaction(function (\PDO $pdo) use (
             $userId, $slug, $title, $summary, $category, $tags, $featuredImage,
-            $contentJson, $contentHtml, $seoTitle, $seoDesc, $focusKw
+            $contentJson, $contentHtml, $seoTitle, $seoDesc, $focusKw, &$createdRevId
         ): int {
             // 1. Inserir artigo em posts
             Database::query(
@@ -274,10 +274,15 @@ class PostService
                         409
                     );
                 } elseif ($knownRevisionId === 0) {
-                    throw new RuntimeException(
-                        "Conflito de rascunho detectado! Um rascunho não publicado foi criado recentemente para esta matéria. Recarregue a página antes de publicar.",
-                        409
-                    );
+                    // Se a matéria já estiver publicada ou agendada, um rascunho desconhecido representa trabalho não publicado de outro autor
+                    if (in_array($current['status'], ['published', 'scheduled'], true)) {
+                        throw new RuntimeException(
+                            "Conflito de rascunho detectado! Um rascunho não publicado foi criado recentemente para esta matéria. Recarregue a página antes de publicar.",
+                            409
+                        );
+                    }
+                    // Para artigos em rascunho ('draft'), adota a revisão existente como a revisão que está sendo publicada
+                    $knownRevisionId = $latestRevId;
                 }
             }
 

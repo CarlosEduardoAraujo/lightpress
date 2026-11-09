@@ -172,6 +172,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newRevId = 0;
                 $newId = $postService->createPost($payload, (int)$currentUser['id'], $newRevId);
                 if ($action === 'publish' && Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)) {
+                    if ($newRevId === 0) {
+                        $latest = Database::fetchOne("SELECT id FROM post_revisions WHERE post_id = ? ORDER BY id DESC LIMIT 1", [$newId]);
+                        $newRevId = $latest ? (int)$latest['id'] : 0;
+                    }
                     $postService->publishOrUpdate($newId, $payload, (int)$currentUser['id'], 1, $newRevId);
                 }
                 header("Location: /admin/editor.php?id={$newId}&saved=1");
