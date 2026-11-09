@@ -199,10 +199,15 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 $router->get('/busca/', function () use ($config): void {
     header('X-Accel-Expires: 60'); // TTL 1m FastCGI Cache para buscas (LP-09)
     $query = trim($_GET['q'] ?? '');
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = 12;
+    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
     $searchTerm = "%{$query}%";
 
     $posts = [];
+    $totalPosts = 0;
+
     if (strlen($query) >= 2) {
         // 1. Tenta busca FULLTEXT booleana de alta performance (InnoDB MySQL/MariaDB)
         $driver = $config['database']['driver'] ?? 'mysql';
@@ -219,37 +224,71 @@ $router->get('/busca/', function () use ($config): void {
                 $boolQuery = trim($boolQuery);
 
                 if (!empty($boolQuery)) {
-                    $posts = Database::fetchAll(
-                        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name,
-                                MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE) AS score
+                    $totalPosts = (int)Database::fetchValue(
+                        "SELECT COUNT(*)
                          FROM posts p
-                         LEFT JOIN users u ON u.id = p.user_id
                          WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
-                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-                         ORDER BY score DESC, p.published_at DESC LIMIT 30",
-                        [$boolQuery, $nowUtc, $boolQuery]
+                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)",
+                        [$nowUtc, $boolQuery]
                     );
+
+                    if ($totalPosts > 0) {
+                        $posts = Database::fetchAll(
+                            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+                             FROM posts p
+                             LEFT JOIN users u ON u.id = p.user_id
+                             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                               AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                            [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
+                        );
+                    }
                 }
             } catch (\Throwable) {
                 $posts = [];
+                $totalPosts = 0;
             }
         }
 
         // 2. Fallback via LIKE caso o FULLTEXT não retorne resultados ou o driver seja SQLite
-        if (empty($posts)) {
-            $posts = Database::fetchAll(
-                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+        if (empty($posts) && $totalPosts === 0) {
+            $totalPosts = (int)Database::fetchValue(
+                "SELECT COUNT(*)
                  FROM posts p
-                 LEFT JOIN users u ON u.id = p.user_id
-                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
-                 ORDER BY p.published_at DESC LIMIT 30",
+                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                   AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)",
                 [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
             );
+
+            if ($totalPosts > 0) {
+                $posts = Database::fetchAll(
+                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+                     FROM posts p
+                     LEFT JOIN users u ON u.id = p.user_id
+                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                       AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
+                     ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                    [$nowUtc, $searchTerm, $searchTerm, $searchTerm, (int)$perPage, (int)$offset]
+                );
+            }
         }
     }
 
-    $pageTitle = "Busca: {$query} - " . $config['app']['name'];
+    $totalPages = (int)ceil($totalPosts / $perPage);
+    $currentPage = $page;
+    $pageTitle = $page > 1
+        ? "Busca: {$query} - Página {$page} - " . $config['app']['name']
+        : "Busca: {$query} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/search.php';
+});
+
+// Rota 5-Paginada: Redirecionamento canônico de compatibilidade para /busca/page/{page}/
+$router->get('/busca/page/{page}/', function (array $params) use ($config): void {
+    $page = max(1, (int)($params['page'] ?? 1));
+    $query = trim($_GET['q'] ?? '');
+    $target = '/busca/?q=' . urlencode($query) . ($page > 1 ? '&page=' . $page : '');
+    header('Location: ' . $target, true, 301);
+    exit;
 });
 
 // Rota 5b: Listagem por Tag (/tag/{tag}/)

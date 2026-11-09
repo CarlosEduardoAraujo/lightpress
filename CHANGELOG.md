@@ -7,6 +7,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Ordenação Cronológica e Paginação Completa da Busca Pública (`/busca/`)
+- **Ordenação por Recência (`published_at DESC`):**
+  - Substituição da ordenação prioritária por pontuação estática de relevância (`ORDER BY score DESC`) pela ordenação cronológica decrescente (`ORDER BY p.published_at DESC`), garantindo que as notícias mais recentes sempre apareçam no topo dos resultados da pesquisa.
+- **Paginação Completa e Totalizador Real de Resultados:**
+  - Remoção do teto rígido de 30 resultados (`LIMIT 30`), implementando paginação fluida de 12 itens por página com `LIMIT ? OFFSET ?`.
+  - Implementação de contagem atômica de matérias (`COUNT(*)`) para exibição precisa do volume total de notícias encontradas no badge de status do cabeçalho de busca (ex: *"540 resultados encontrados"*).
+  - Adição de barra de paginação minimalista responsiva em `templates/search.php`, em total harmonia estética com as listagens de categorias e tags, mantendo o termo consultado na URL (`/busca/?q=...&page=...`).
+  - Criação de rota de compatibilidade `/busca/page/{page}/` com redirecionamento canônico 301 para a busca paginada.
+
 ### Correção de Rota e Redirecionamento da Busca Pública (`/busca/`)
 - **Resolução de Erro 404 em Pesquisas (`/busca/?q=...`):**
   - Registro da rota de busca com barra final (`/busca/` em `public/index.php`), alinhando com a canonicalização e padrão de rotas públicas do sistema (`Router.php`).

@@ -76,7 +76,7 @@ $searchQuery = Security::e($query ?? '');
             <div class="flex items-center gap-2 shrink-0 pl-5 md:pl-0">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container dark:bg-carbon-surface rounded-full text-label-category font-label-category text-carbon-black dark:text-pure-white uppercase border border-subtle-border dark:border-[#2a303c]">
                     <span class="w-2 h-2 rounded-full bg-racing-red animate-pulse"></span>
-                    <span><?= count($posts) ?> <?= count($posts) === 1 ? 'resultado encontrado' : 'resultados encontrados' ?></span>
+                    <span><?= number_format($totalPosts ?? count($posts), 0, ',', '.') ?> <?= ($totalPosts ?? count($posts)) === 1 ? 'resultado encontrado' : 'resultados encontrados' ?></span>
                 </span>
             </div>
         </div>
@@ -140,6 +140,55 @@ $searchQuery = Security::e($query ?? '');
                         </article>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- REFINED MINIMAL PAGINATION -->
+                <?php if (!empty($totalPages) && $totalPages > 1): ?>
+                    <nav aria-label="Navegação de páginas da busca" class="w-full bg-pure-white dark:bg-carbon-surface rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] p-space-md flex flex-wrap items-center justify-between gap-space-sm mt-space-sm">
+                        <div class="flex items-center gap-1.5 font-headline-sm text-data-telemetry">
+                            <?php if ($currentPage > 1): ?>
+                                <a href="<?= $currentPage === 2 ? '/busca/?q=' . urlencode($query ?? '') : '/busca/?q=' . urlencode($query ?? '') . '&page=' . ($currentPage - 1) ?>" class="px-space-sm h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center gap-1 text-label-category font-label-category uppercase tracking-wider transition-colors mr-1" title="Página Anterior">
+                                    <?= Icon::svg('chevron_right', 'rotate-180', 14) ?> <span class="hidden sm:inline">Anterior</span>
+                                </a>
+                            <?php endif; ?>
+
+                            <?php if ($currentPage === 1): ?>
+                                <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold">1</span>
+                            <?php else: ?>
+                                <a href="/busca/?q=<?= urlencode($query ?? '') ?>" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors">1</a>
+                            <?php endif; ?>
+
+                            <?php if ($currentPage > 3): ?>
+                                <span class="w-8 h-9 flex items-center justify-center text-secondary dark:text-secondary-fixed-dim">…</span>
+                            <?php endif; ?>
+
+                            <?php for ($p = max(2, $currentPage - 1); $p <= min($totalPages - 1, $currentPage + 1); $p++): ?>
+                                <?php if ($p === $currentPage): ?>
+                                    <span class="w-9 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= $p ?></span>
+                                <?php else: ?>
+                                    <a href="/busca/?q=<?= urlencode($query ?? '') ?>&page=<?= $p ?>" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors"><?= $p ?></a>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+
+                            <?php if ($currentPage < $totalPages - 2): ?>
+                                <span class="w-8 h-9 flex items-center justify-center text-secondary dark:text-secondary-fixed-dim">…</span>
+                            <?php endif; ?>
+
+                            <?php if ($totalPages > 1): ?>
+                                <?php if ($currentPage === $totalPages): ?>
+                                    <span class="px-2.5 h-9 rounded-lg bg-racing-red text-pure-white flex items-center justify-center font-bold"><?= number_format($totalPages, 0, ',', '.') ?></span>
+                                <?php else: ?>
+                                    <a href="/busca/?q=<?= urlencode($query ?? '') ?>&page=<?= $totalPages ?>" class="px-2.5 h-9 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors"><?= number_format($totalPages, 0, ',', '.') ?></a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($currentPage < $totalPages): ?>
+                            <a class="px-space-md py-2 rounded-lg bg-carbon-black hover:bg-racing-red text-pure-white font-label-category text-label-category uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-xs border border-transparent dark:border-[#2a303c] dark:bg-[#252b36] dark:hover:bg-racing-red" href="/busca/?q=<?= urlencode($query ?? '') ?>&page=<?= $currentPage + 1 ?>">
+                                Próxima Página <?= Icon::svg('arrow_forward', 'text-pure-white', 16) ?>
+                            </a>
+                        <?php endif; ?>
+                    </nav>
+                <?php endif; ?>
             <?php endif; ?>
         </section>
 

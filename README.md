@@ -898,8 +898,10 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 * **FASE CONCLUÍDA — Expansão Panorâmica do Frontend Público (Layout 1900px):**
   - [x] **Aumento da Largura Máxima dos Containers para 1900px:** Ampliação das páginas públicas de navegação (Home, Categorias, Tags, Posts, Institucionais e Busca) de 1280px para 1900px (`max-w-[1900px]`), otimizando o consumo de conteúdo em monitores de alta resolução e mantendo alinhamento estético uniforme entre o cabeçalho (top strip, menu principal, em alta), o feed de notícias e o rodapé.
 
-* **FASE CONCLUÍDA — Correção & Padronização de Rota da Busca Pública:**
+* **FASE CONCLUÍDA — Otimização, Paginação e Padronização da Busca Pública:**
   - [x] **Compatibilidade com Router Canônico (`/busca/`):** Correção do registro da rota em `public/index.php` para `/busca/`, eliminando falso erro 404 decorrente do redirecionamento 301 de normalização com barra final. Padronização de formulários (`templates/header.php`), redirecionamento da raiz e metadados Schema.org (`core/Seo.php`) para `/busca/?q=...`.
+  - [x] **Ordenação Cronológica Recente Primeiro (`published_at DESC`):** Priorização de notícias recém-publicadas no topo da lista de resultados em vez de pontuação estática de relevância do FULLTEXT.
+  - [x] **Paginação Completa e Totalizador Real de Resultados:** Eliminação do limite fixo de 30 itens (`LIMIT 30`), introdução de contagem atômica de matérias (`COUNT(*)`) e paginação fluida (12 notícias por página) com barra minimalista em `templates/search.php` e compatibilidade com `/busca/page/{page}/`.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
