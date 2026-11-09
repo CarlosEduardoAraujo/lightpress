@@ -7,6 +7,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização e Usabilidade da Biblioteca de Mídias (`public/admin/media.php`)
+- **Ordenação Padrão por Mídias Recentes (`DESC`):**
+  - Inversão da ordenação padrão na galeria de mídias do painel administrativo (`$filterOrder = 'desc'`), garantindo que uploads recentes e fotos novas apareçam no topo imediatamente (`m.created_at DESC, m.id DESC`).
+  - Atualização do menu suspenso `<select name="order">` com a opção "Recentes primeiro" selecionada por padrão e mantendo a opção "Antigas primeiro" para navegação histórica do acervo.
+  - Sincronização do script JavaScript de busca em tempo real (`triggerLiveSearch`) e paginação assíncrona, tratando `'desc'` como estado padrão e omitindo o parâmetro redundante na URL para manter links limpos.
+
 ### Correções de Segurança e Hardening Arquitetural (Auditoria SEC-01 a SEC-06)
 - **Revogação de Tokens de Redefinição e Ciclo de Ativação Segura (SEC-01):**
   - Validação estrita de `purpose = 'activation'` em `public/admin/activate.php` tanto no lookup quanto na transação com bloqueio `FOR UPDATE`.

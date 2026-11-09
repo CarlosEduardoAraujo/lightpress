@@ -285,7 +285,7 @@ A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rá
 
 * **Busca em Tempo Real com Debounce (300ms):** Conforme o usuário digita no campo de busca, o painel realiza a consulta assíncrona ao servidor e atualiza a grade de fotos, contadores e paginação sem piscar ou recarregar a página inteira.
 * **Paginação Fluida Assíncrona:** Grade configurada para 48 itens por página (harmônica para layouts responsivos de 2, 3, 4 e 6 colunas) com navegação numerada instantânea via AJAX.
-* **Ordenação Flexível:** Seletor de ordenação permitindo alternar entre ordem cronológica original (antigas primeiro - padrão) e ordem decrescente (recentes primeiro).
+* **Ordenação Flexível:** Seletor de ordenação com padrão decrescente (recentes primeiro), permitindo alternar entre mídias recém-enviadas e ordem cronológica ascendente (antigas primeiro).
 * **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
 
 ---

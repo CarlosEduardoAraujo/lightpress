@@ -216,12 +216,12 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
-// Ordenação (padrão 'asc' - ordem cronológica inversa da anterior)
-$filterOrder = strtolower($_GET['order'] ?? 'asc');
+// Ordenação (padrão 'desc' - recentes primeiro)
+$filterOrder = strtolower($_GET['order'] ?? 'desc');
 if (!in_array($filterOrder, ['asc', 'desc'], true)) {
-    $filterOrder = 'asc';
+    $filterOrder = 'desc';
 }
-$orderSql = ($filterOrder === 'desc') ? 'm.created_at DESC, m.id DESC' : 'm.created_at ASC, m.id ASC';
+$orderSql = ($filterOrder === 'asc') ? 'm.created_at ASC, m.id ASC' : 'm.created_at DESC, m.id DESC';
 
 $querySql = "SELECT m.*, u.name as uploader_name 
              FROM media m
@@ -379,8 +379,8 @@ require __DIR__ . '/header.php';
             <form id="mediaSearchForm" method="GET" action="/admin/media.php" style="display: flex; gap: 0.75rem; align-items: center; flex: 1; min-width: 320px; max-width: 750px;" onsubmit="event.preventDefault(); triggerLiveSearch(1);">
                 <input type="text" id="searchInput" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="🔍 Digite para buscar fotos em tempo real..." class="form-input" style="flex: 1;" autocomplete="off">
                 <select name="order" id="orderSelect" class="form-input" style="cursor: pointer; padding-right: 1.25rem;" onchange="triggerLiveSearch(1)">
-                    <option value="asc" <?= $filterOrder === 'asc' ? 'selected' : '' ?>>Antigas primeiro (Ordem Inversa)</option>
                     <option value="desc" <?= $filterOrder === 'desc' ? 'selected' : '' ?>>Recentes primeiro</option>
+                    <option value="asc" <?= $filterOrder === 'asc' ? 'selected' : '' ?>>Antigas primeiro</option>
                 </select>
                 <button type="submit" class="btn-filter btn-primary">Buscar</button>
                 <a href="/admin/media.php" id="btnClearSearch" class="btn-filter" style="<?= empty($filterSearch) ? 'display: none;' : '' ?>" onclick="clearSearch(event)">Limpar</a>
@@ -684,12 +684,12 @@ require __DIR__ . '/header.php';
 
         function triggerLiveSearch(page) {
             const query = searchInput ? searchInput.value.trim() : '';
-            const order = orderSelect ? orderSelect.value : 'asc';
+            const order = orderSelect ? orderSelect.value : 'desc';
             const pageNum = page || 1;
 
             const params = new URLSearchParams();
             if (query) params.set('q', query);
-            if (order && order !== 'asc') params.set('order', order);
+            if (order && order !== 'desc') params.set('order', order);
             if (pageNum > 1) params.set('page', pageNum);
 
             const targetUrl = '/admin/media.php' + (params.toString() ? '?' + params.toString() : '');
