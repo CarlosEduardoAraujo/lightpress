@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Proteção do Último Administrador e Defesa contra Path Traversal na Mídia — 2026-11-09
+
+- **Gestão de Usuários (`public/admin/users.php`):**
+  - Implementada trava estrita contra rebaixamento do último administrador ativo: ao editar qualquer usuário (`action === 'edit'`), se o papel for alterado de `admin` para outro (`author` ou `editor`), o sistema verifica previamente `COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?`. Caso não haja outro administrador ativo, a operação é rejeitada com mensagem de erro clara.
+  - Implementada trava estrita contra desativação/bloqueio do último administrador ativo: no fluxo de alternância de status (`toggle_id`), verifica-se se o usuário alvo ativo é administrador e se há outros administradores ativos antes de executar a transação.
+- **Biblioteca de Mídias (`public/admin/media.php`):**
+  - Implementada validação defensiva contra Path Traversal (`/../`) na exclusão física de arquivos de mídia: resolução canônica de caminho via `realpath()` tanto para o diretório configurado de uploads (`$config['media']['upload_dir']`) quanto para os caminhos de variantes (`$localPath`).
+  - Chamadas a `@unlink()` agora ocorrem exclusivamente se o caminho canônico do arquivo pertencer comprovadamente à raiz do diretório de uploads.
+- **Testes de Regressão de Segurança (`bin/test_security_fixes.py`):**
+  - Adicionadas suítes `[8] Testando Trava contra Desativação ou Rebaixamento do Último Administrador` e `[9] Testando Validação de Caminho Seguro na Exclusão de Mídia`, expandindo a suíte para 43 verificações automatizadas com 100% de aprovação.
+
+
 ### Blindagem contra Exposição de Token CSRF no Logout e Destaques — 2026-11-09
 
 - **Navegação Administrativa (`core/AdminNav.php`):**
