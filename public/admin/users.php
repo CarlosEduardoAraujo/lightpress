@@ -68,12 +68,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     throw new \InvalidArgumentException("A nova senha deve ter no mínimo 8 caracteres.");
                                 }
                                 $hash = Security::hashPassword($newPassword);
-                                Database::query(
-                                    "UPDATE users 
-                                     SET name = ?, username = ?, email = ?, role = ?, bio = ?, avatar = ?, password_hash = ?, session_version = session_version + 1 
-                                     WHERE id = ?",
-                                    [$name, $username, $email, $role, $bio, $avatar, $hash, $targetId]
-                                );
+                                Database::transaction(function () use ($name, $username, $email, $role, $bio, $avatar, $hash, $targetId): void {
+                                    Database::query(
+                                        "UPDATE users 
+                                         SET name = ?, username = ?, email = ?, role = ?, bio = ?, avatar = ?, password_hash = ?, session_version = session_version + 1 
+                                         WHERE id = ?",
+                                        [$name, $username, $email, $role, $bio, $avatar, $hash, $targetId]
+                                    );
+                                    Database::query(
+                                        "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+                                        [$targetId]
+                                    );
+                                });
                             } else {
                                 Database::query(
                                     "UPDATE users 
@@ -155,17 +161,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. Alternar Status Ativo / Bloqueado (POST prioritário, ANSI CASE WHEN)
-$toggleUserId = (int)($_POST['toggle_id'] ?? $_GET['toggle_id'] ?? 0);
-$csrfUsr = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// 2. Alternar Status Ativo / Bloqueado (Estritamente via POST com CSRF)
+$toggleUserId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
+$csrfUsr = $_POST['_csrf_token'] ?? '';
 if ($toggleUserId > 0 && Security::verifyCsrfToken($csrfUsr)) {
     if ($toggleUserId === (int)$currentUser['id']) {
         $error = "Você não pode desativar seu próprio usuário.";
     } else {
-        Database::query(
-            "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",
-            [$toggleUserId]
-        );
+        Database::transaction(function () use ($toggleUserId): void {
+            Database::query(
+                "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",
+                [$toggleUserId]
+            );
+            Database::query(
+                "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+                [$toggleUserId]
+            );
+        });
         header("Location: /admin/users.php");
         exit;
     }

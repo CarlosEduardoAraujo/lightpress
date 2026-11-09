@@ -15,7 +15,6 @@ config.local.php
 
 # Dependências Node / Tailwind
 node_modules/
-package-lock.json
 
 # Logs e arquivos do sistema
 *.log

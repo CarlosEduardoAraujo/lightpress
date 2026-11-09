@@ -19,6 +19,11 @@ if (!empty($_SESSION['user_id'])) {
 }
 
 $error = '';
+if (isset($_GET['expired'])) {
+    $error = 'Sua sessão expirou por inatividade ou tempo limite. Faça login novamente.';
+} elseif (isset($_GET['revoked'])) {
+    $error = 'Sessão revogada ou conta inativa. Faça login novamente.';
+}
 $trustedProxies = $config['security']['trusted_proxies'] ?? ['127.0.0.1', '::1'];
 $clientIp = Security::getClientIp($trustedProxies);
 $maxAttempts = (int)($config['security']['rate_limit']['login_max_attempts'] ?? 5);
@@ -58,6 +63,8 @@ if ($lockRemaining !== null) {
                 $_SESSION['user_name'] = $user['name'];
                 $_SESSION['user_role'] = $user['role'];
                 $_SESSION['session_version'] = (int)$user['session_version'];
+                $_SESSION['auth_created_at'] = time();
+                $_SESSION['last_activity_at'] = time();
 
                 header('Location: /admin/dashboard.php');
                 exit;

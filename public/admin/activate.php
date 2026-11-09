@@ -25,16 +25,20 @@ $nowUtc = gmdate('Y-m-d H:i:s');
 
 // Buscar e validar token
 $tokenRecord = Database::fetchOne(
-    "SELECT t.*, u.name, u.username, u.email 
+    "SELECT t.*, u.name, u.username, u.email, u.is_active, u.password_reset_required 
      FROM user_reset_tokens t
      JOIN users u ON u.id = t.user_id
-     WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > ?
+     WHERE t.token_hash = ? AND t.purpose = 'activation' AND t.used_at IS NULL AND t.expires_at > ?
      LIMIT 1",
     [$tokenHash, $nowUtc]
 );
 
 if (!$tokenRecord) {
-    die("Este link de ativação expirou ou já foi utilizado.");
+    die("Este link de ativação expirou, já foi utilizado ou é inválido.");
+}
+
+if ((int)$tokenRecord['password_reset_required'] !== 1) {
+    die("Esta conta já foi ativada ou não permite ativação por este token.");
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -53,32 +57,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             Database::transaction(function (\PDO $pdo) use ($tokenHash, $password, $nowUtc): void {
                 $lockedToken = Database::fetchOne(
-                    "SELECT t.*, u.id as user_id 
+                    "SELECT t.*, u.id as user_id, u.is_active, u.password_reset_required 
                      FROM user_reset_tokens t
                      JOIN users u ON u.id = t.user_id
-                     WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > ?
+                     WHERE t.token_hash = ? AND t.purpose = 'activation' AND t.used_at IS NULL AND t.expires_at > ?
                      LIMIT 1" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
                     [$tokenHash, $nowUtc]
                 );
 
                 if (!$lockedToken) {
-                    throw new RuntimeException("Este link de ativação expirou ou já foi utilizado.");
+                    throw new RuntimeException("Este link de ativação expirou, já foi utilizado ou é inválido.");
+                }
+
+                if ((int)$lockedToken['password_reset_required'] !== 1) {
+                    throw new RuntimeException("Esta conta já foi ativada ou não permite ativação por este token.");
                 }
 
                 $newHash = Security::hashPassword($password);
+                $userId = (int)$lockedToken['user_id'];
 
                 // 1. Atualizar senha do usuário, ativar conta e limpar flag de reset obrigatório
                 Database::query(
                     "UPDATE users 
                      SET password_hash = ?, is_active = 1, password_reset_required = 0, session_version = session_version + 1
                      WHERE id = ?",
-                    [$newHash, (int)$lockedToken['user_id']]
+                    [$newHash, $userId]
                 );
 
-                // 2. Marcar token como consumido
+                // 2. Marcar todos os tokens pendentes deste usuário como consumidos
                 Database::query(
-                    "UPDATE user_reset_tokens SET used_at = ? WHERE token_hash = ?",
-                    [$nowUtc, $tokenHash]
+                    "UPDATE user_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+                    [$nowUtc, $userId]
                 );
             });
 

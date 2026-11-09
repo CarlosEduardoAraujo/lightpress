@@ -49,9 +49,9 @@ if ($toggleFeaturedId > 0 && Security::verifyCsrfToken($tokenToggle)) {
     }
 }
 
-// Excluir publicação (POST prioritário)
-$delPostId = (int)($_POST['delete_id'] ?? $_GET['delete_id'] ?? 0);
-$tokenDel = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// Excluir publicação (Estritamente via POST com CSRF)
+$delPostId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['delete_id'] ?? 0) : 0;
+$tokenDel = $_POST['_csrf_token'] ?? '';
 if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
     $targetPost = Database::fetchOne("SELECT id, slug, category, tags, user_id FROM posts WHERE id = ? LIMIT 1", [$delPostId]);
     

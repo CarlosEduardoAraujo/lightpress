@@ -52,11 +52,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $newHash = Security::hashPassword($newPass);
                 $newVersion = (int)$currentUser['session_version'] + 1;
+                $userId = (int)$currentUser['id'];
 
-                Database::query(
-                    "UPDATE users SET password_hash = ?, session_version = ? WHERE id = ?",
-                    [$newHash, $newVersion, (int)$currentUser['id']]
-                );
+                Database::transaction(function () use ($newHash, $newVersion, $userId): void {
+                    Database::query(
+                        "UPDATE users SET password_hash = ?, session_version = ? WHERE id = ?",
+                        [$newHash, $newVersion, $userId]
+                    );
+                    Database::query(
+                        "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+                        [$userId]
+                    );
+                });
 
                 $_SESSION['session_version'] = $newVersion;
                 $message = "Senha alterada com sucesso! Suas outras sessões ativas foram desconectadas por segurança.";

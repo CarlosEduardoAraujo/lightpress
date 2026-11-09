@@ -96,9 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
     }
 }
 
-// 2. Exclusão de Mídia Segura (Verifica permissão e se está vinculada a artigos/páginas)
-$delMediaId = trim($_POST['delete_id'] ?? $_GET['delete_id'] ?? '');
-$csrfMed = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// 2. Exclusão de Mídia Segura (Estritamente via POST com CSRF)
+$delMediaId = $_SERVER['REQUEST_METHOD'] === 'POST' ? trim((string)($_POST['delete_id'] ?? '')) : '';
+$csrfMed = $_POST['_csrf_token'] ?? '';
 if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
     $mediaId = $delMediaId;
     $mediaItem = Database::fetchOne("SELECT * FROM media WHERE id = ? LIMIT 1", [$mediaId]);

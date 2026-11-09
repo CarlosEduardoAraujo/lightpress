@@ -75,12 +75,29 @@ echo "\n[3] Testando Plugin Webhook Sender\n";
 
 require_once $available['webhook-sender']['entrypoint'];
 
-$inputUrls = "https://discord.com/api/webhooks/123/abc, https://meuservidor.com/webhook\nhttp://insecure.test/hook, invalido, ftp://teste.com";
+WebhookSenderService::setDnsMock([
+    'discord.com' => ['162.159.135.232'],
+    'meuservidor.com' => ['93.184.216.34'],
+    'insecure.test' => ['93.184.216.35'],
+    'malicious-rebinding.com' => ['162.159.135.232', '169.254.169.254'],
+    'ipv6-loopback.com' => ['::1'],
+]);
+
+$inputUrls = "https://discord.com/api/webhooks/123/abc, https://meuservidor.com/webhook\nhttp://insecure.test/hook, invalido, ftp://teste.com, http://192.168.3.165:5678/webhook";
 $cleanUrls = WebhookSenderService::parseUrls($inputUrls);
 
-assertTest("Separador por vírgula e quebra de linha", count($cleanUrls) === 3);
+assertTest("Separador por vírgula e quebra de linha", count($cleanUrls) === 4);
 assertTest("Filtra protocolos inválidos e strings corrompidas", !in_array('invalido', $cleanUrls, true) && !in_array('ftp://teste.com', $cleanUrls, true));
 assertTest("Aceita HTTP e HTTPS válidos", in_array('https://discord.com/api/webhooks/123/abc', $cleanUrls, true) && in_array('http://insecure.test/hook', $cleanUrls, true));
+assertTest("Suporta portas customizadas e rede local (192.168.3.165:5678)", in_array('http://192.168.3.165:5678/webhook', $cleanUrls, true));
+
+// Testes defensivos contra SSRF
+assertTest("Bloqueia loopback IPv4 (127.0.0.1)", !WebhookSenderService::isSafeUrl('http://127.0.0.1:8080/webhook'));
+assertTest("Bloqueia loopback IPv6 ([::1])", !WebhookSenderService::isSafeUrl('http://[::1]:8080/webhook'));
+assertTest("Bloqueia metadados de nuvem (169.254.169.254)", !WebhookSenderService::isSafeUrl('http://169.254.169.254/latest/meta-data'));
+assertTest("Bloqueia metadados GCP (metadata.google.internal)", !WebhookSenderService::isSafeUrl('http://metadata.google.internal/computeMetadata/v1'));
+assertTest("Bloqueia tentativa de DNS rebinding com metadata", !WebhookSenderService::isSafeUrl('http://malicious-rebinding.com/hook'));
+assertTest("Bloqueia domínio que resolve para IPv6 loopback", !WebhookSenderService::isSafeUrl('http://ipv6-loopback.com/hook'));
 
 // Teste de montagem do payload
 $mockPost = [

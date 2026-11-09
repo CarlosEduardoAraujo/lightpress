@@ -108,9 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 2. Alternar Status Ativo / Inativo (POST prioritário, GET fallback, ANSI CASE WHEN)
-$toggleCatId = (int)($_POST['toggle_id'] ?? $_GET['toggle_id'] ?? 0);
-$csrfToggle = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// 2. Alternar Status Ativo / Inativo (Estritamente via POST com CSRF)
+$toggleCatId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
+$csrfToggle = $_POST['_csrf_token'] ?? '';
 if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
     $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleCatId]);
     if ($cat && $cat['slug'] !== 'geral') {
@@ -121,9 +121,9 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
     exit;
 }
 
-// 3. Exclusão Segura de Categoria (POST prioritário, GET fallback)
-$delCatId = (int)($_POST['delete_id'] ?? $_GET['delete_id'] ?? 0);
-$csrfDel = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+// 3. Exclusão Segura de Categoria (Estritamente via POST com CSRF)
+$delCatId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['delete_id'] ?? 0) : 0;
+$csrfDel = $_POST['_csrf_token'] ?? '';
 if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
     $cat = Database::fetchOne("SELECT slug FROM categories WHERE id = ? LIMIT 1", [$delCatId]);
     

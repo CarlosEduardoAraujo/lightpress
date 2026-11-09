@@ -823,6 +823,30 @@ Para impedir o uso indevido do sistema como vetor em ataques de engenharia socia
 * **Prevenção de Publicação Acidental por Data Inválida:** Validação rigorosa em `editor.php` e `core/PostService.php` para garantir que erros de formatação em datas de agendamento não caiam em timestamp zero (`01/01/1970`), impedindo que matérias com datas corrompidas sejam publicadas inadvertidamente no passado.
 * **Prevenção de Matérias Fantasmas (Status e Data Sincronizados):** Ao salvar rascunho com o campo de data esvaziado, o sistema sincroniza atomicamente o `status = 'draft'` e purga o cache das URLs afetadas, garantindo que a matéria não fique como `published` sem data válida (`published_at IS NULL`).
 
+### 8.17. Hardening de Segurança e Integridade Arquitetural (Auditoria SEC-01 a SEC-06)
+
+Em conformidade com a auditoria de segurança profunda de novembro de 2026, os seguintes controles defensivos foram incorporados:
+
+* **8.17.1. Ciclo de Vida e Invalidação Atômica de Tokens (SEC-01):**
+  - **Validação de Finalidade e Estado (`activate.php`):** O lookup e a transação `FOR UPDATE` de ativação validam estritamente `purpose = 'activation'`, além de verificar se a conta está de fato pendente de ativação (`is_active = 0` e `password_reset_required = 1`). Contas bloqueadas ou já ativadas são recusadas imediatamente.
+  - **Invalidação Transacional em Cascata:** Qualquer alteração administrativa de senha ou alternância de bloqueio (`users.php`), alteração de senha pelo próprio usuário (`profile.php`) ou conclusão de ativação invalida na mesma transação todos os tokens pendentes em `user_reset_tokens` (`used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL`).
+* **8.17.2. Blindagem SSRF em Webhooks com Suporte a Rede Local e DNS Pinning (SEC-02):**
+  - **Prevenção de DNS Rebinding e TOCTOU (`webhook-sender.php`):** Resolução dual-stack (registros A e AAAA) com vinculação direta da conexão no cURL via `CURLOPT_RESOLVE => ["$host:$port:$approvedIp"]`, garantindo que o cURL conecte exatamente ao endereço validado previamente.
+  - **Bloqueio Rigoroso de Ameaças:** Rejeição de loopback (`127.0.0.0/8`, `::1`), metadados de nuvem (`169.254.169.254`, `metadata.google.internal`), link-local (`fe80::/10`) e normalização de IPv4-mapped IPv6.
+  - **Suporte a Portas Customizadas e LAN:** Aceita portas personalizadas (ex: `5678`) e tráfego em rede local privada (RFC1918 como `http://192.168.3.165:5678`), atendendo a servidores internos de automação (n8n/Zapier local) com total segurança.
+* **8.17.3. Blindagem de Rate Limiting no Nginx para Métricas (SEC-03):**
+  - **Bloqueio Direto de Scripts (`nginx/lightpress.conf`):** O script `/api/view.php` tem acesso direto negado via Nginx (`return 404;`), forçando todo o tráfego de visualizações a transitar pela rota canônica `^~ /api/view/`, sujeita ao limitador `limit_req zone=lp_views burst=10 nodelay`.
+* **8.17.4. Isolamento Editorial de Rascunhos de Matérias Públicas (SEC-04):**
+  - **Preservação de Conteúdo Público (`editor.php`):** Salvar rascunho de matérias já publicadas ou agendadas grava as alterações exclusivamente como revisões privadas em `post_revisions` (`status = 'draft'` ou `'pending_review'`), sem alterar a linha ativa da tabela `posts`.
+  - **Publicação Explícita e Purga de URLs Antigas:** A aplicação no site público exige a ação expressa de publicar, disparando purga atômica no FastCGI Cache e na API da Cloudflare tanto para a URL atual quanto para o slug anterior caso tenha ocorrido renomeação.
+* **8.17.5. Prazos de Sessão no Servidor (SEC-05):**
+  - **Controle no Backend (`core/Security.php` e `config.php`):** Imposição de tempo máximo absoluto de 24 horas (`session_lifetime = 86400`) e tempo limite de inatividade de 2 horas (`session_idle_timeout = 7200`) em `Security::requireAuth()`.
+  - **Destruição Ativa de Sessão:** Ao expirar qualquer um dos limites, a sessão é destruída no servidor, o cookie é removido e o usuário é redirecionado para `/admin/login.php?expired=1`.
+* **8.17.6. Resolução Segura de IP Compatível com Cloudflare Tunnel (SEC-06):**
+  - Em `Security::getClientIp()`, quando atrás de proxy reverso confiável local, prioriza `X-Real-IP` normalizado pelo Nginx para o cliente real, mantendo total compatibilidade e aceitação do `CF-Connecting-IP` originado de instâncias do Cloudflare Tunnel.
+* **8.17.7. Mutações Administrativas Exclusivamente via POST com CSRF:**
+  - Todas as ações mutáveis de exclusão e alternância de estado em `pages.php`, `categories.php`, `dashboard.php`, `media.php` e `users.php` foram migradas para formulários `POST` estritos com validação de `_csrf_token`, eliminando a presença de tokens em históricos de navegação e access logs do servidor.
+
 ---
 
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)
@@ -936,6 +960,15 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Área Intuitiva de Arrastar e Soltar (Drop Zone):** Área de soltura moderna com borda tracejada e feedback visual dinâmico (*"Solte arquivos aqui para enviar ou Enviar nova foto"*), com suporte a clique e suporte a arrastar diretamente sobre o modal.
   - [x] **Seleção Automática Pós-Upload:** Ao concluir o upload e o processamento de imagens (WebP/AVIF), a biblioteca é recarregada e a nova foto fica automaticamente selecionada com destaque visual, metadados preenchidos no rodapé e botão "Confirmar Seleção" habilitado instantaneamente.
   - [x] **Validação no Cliente e Dark Mode:** Validação ágil de formatos aceitos (WebP, AVIF, JPEG, PNG) e suporte estético completo ao tema escuro.
+
+* **FASE CONCLUÍDA — Hardening de Segurança e Integridade Arquitetural (Auditoria 2026-11-09 — SEC-01 a SEC-06):**
+  - [x] **Invalidação Atômica de Tokens (SEC-01):** Validação de `purpose = 'activation'` em `activate.php` e invalidação em cascata de tokens pendentes ao alterar senha ou bloquear contas em `users.php` e `profile.php`.
+  - [x] **Blindagem SSRF em Webhooks com Suporte a LAN (SEC-02):** Resolução dual-stack A/AAAA, DNS pinning com `CURLOPT_RESOLVE`, bloqueio de cloud metadata e loopback, com suporte total a portas como 5678 e IPs locais como `192.168.3.165:5678`.
+  - [x] **Proteção de Rate Limiting no Nginx (SEC-03):** Bloqueio de acesso direto a `/api/view.php` via Nginx (404), garantindo enforcement da zona `lp_views` na rota canônica.
+  - [x] **Isolamento de Rascunhos em Artigos Publicados (SEC-04):** Gravação de rascunhos em `post_revisions` sem alterar o conteúdo público da tabela `posts`, com purga de cache Nginx e Cloudflare na publicação (incluindo slugs antigos).
+  - [x] **Controle de Prazos de Sessão no Servidor (SEC-05):** Expiração absoluta (24h) e por inatividade (2h) diretamente no backend em `Security::requireAuth()`.
+  - [x] **Precedência de IP Compatível com Cloudflare Tunnel (SEC-06):** Priorização segura de `X-Real-IP` com preservação transparente de `CF-Connecting-IP` originado de Cloudflare Tunnel.
+  - [x] **Mutações Administrativas via POST:** Migração de exclusões e alternâncias para formulários `POST` estritos com CSRF em `pages.php`, `categories.php`, `dashboard.php`, `media.php` e `users.php`.
 
 * **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
   - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.

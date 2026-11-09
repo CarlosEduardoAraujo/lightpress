@@ -22,12 +22,11 @@ Schema::ensurePagesTable();
 $message = '';
 $error = '';
 
-// Exclusão de Página (suporta POST prioritário e GET para compatibilidade)
-$isDelPage = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete')
-    || (isset($_GET['action']) && $_GET['action'] === 'delete');
+// Exclusão de Página (estritamente via POST com CSRF)
+$isDelPage = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete');
 if ($isDelPage) {
-    $deleteId = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
-    $csrf = $_POST['_csrf_token'] ?? $_GET['_csrf_token'] ?? '';
+    $deleteId = (int)($_POST['id'] ?? 0);
+    $csrf = $_POST['_csrf_token'] ?? '';
     
     if (!Security::verifyCsrfToken($csrf)) {
         $error = "Token de segurança CSRF inválido ou expirado.";
@@ -314,9 +313,12 @@ require __DIR__ . '/header.php';
                                 <td style="text-align: right; white-space: nowrap;">
                                     <a href="/admin/page-edit.php?id=<?= (int)$p['id'] ?>" class="action-link">Editar</a>
                                     <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="action-link">Visualizar &rarr;</a>
-                                    <a href="/admin/pages.php?action=delete&id=<?= (int)$p['id'] ?>&_csrf_token=<?= Security::e($csrfToken) ?>" 
-                                       onclick="return confirm('Tem certeza que deseja excluir a página \'<?= Security::e(addslashes($p['title'])) ?>\'? Esta ação não pode ser desfeita.');" 
-                                       class="action-link action-delete">Excluir</a>
+                                    <form method="POST" action="/admin/pages.php" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir a página \'<?= Security::e(addslashes($p['title'])) ?>\'? Esta ação não pode ser desfeita.');">
+                                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                        <input type="hidden" name="action" value="delete">
+                                        <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                                        <button type="submit" class="action-link action-delete" style="background:none; border:none; padding:0; cursor:pointer; font:inherit;">Excluir</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

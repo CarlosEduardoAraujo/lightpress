@@ -159,9 +159,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ? (!empty($_POST['is_featured']) ? 1 : 0)
                             : (int)($current['is_featured'] ?? 0);
 
-                        // 3. Se a matéria já estiver publicada ou agendada e o usuário não tiver permissão de publicar (ex: Autor):
-                        // Salva com segurança como uma REVISÃO PRIVADA pendente de aprovação, mantendo o post público intacto (LP-05 / P1)
-                        if (!$canPublish && in_array($current['status'], ['published', 'scheduled'], true)) {
+                        // 3. Se a matéria já estiver publicada ou agendada e a ação for salvar rascunho:
+                        // Salva com segurança como uma REVISÃO PRIVADA, mantendo o post público intacto (SEC-04)
+                        if (in_array($current['status'], ['published', 'scheduled'], true)) {
+                            $revStatus = $canPublish ? 'draft' : 'pending_review';
                             $revisionPayload = [
                                 'title' => $title,
                                 'slug' => !empty($slug) ? Security::slugify($slug) : $current['slug'],
@@ -174,17 +175,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'seo_title' => $seoTitle,
                                 'seo_description' => $seoDesc,
                                 'focus_keyword' => $focusKeyword,
-                                'status' => 'pending_review',
+                                'is_featured' => $isFeaturedVal,
+                                'status' => $revStatus,
                             ];
 
                             Database::query(
                                 "INSERT INTO post_revisions (
                                     post_id, editor_id, base_version, status, payload_json, content_html, created_at
-                                 ) VALUES (?, ?, ?, 'pending_review', ?, ?, CURRENT_TIMESTAMP)",
+                                 ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
                                 [
                                     $postId,
                                     (int)$currentUser['id'],
                                     (int)$current['version'],
+                                    $revStatus,
                                     json_encode($revisionPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                                     $cleanHtml
                                 ]
@@ -193,7 +196,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $revId = (int)Database::getConnection()->lastInsertId();
                             ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $cleanHtml, $featuredImage);
 
-                            $message = "Esta matéria está publicada ou agendada. Suas alterações foram salvas com segurança como uma REVISÃO PENDENTE de aprovação editorial. A versão pública atual permaneceu inalterada.";
+                            $message = $canPublish
+                                ? "Esta matéria está publicada ou agendada. Suas alterações foram salvas como um RASCUNHO DE REVISÃO privada. A versão pública atual permaneceu inalterada. Clique em 'Publicar Alterações' quando desejar aplicar as mudanças no site."
+                                : "Esta matéria está publicada ou agendada. Suas alterações foram salvas com segurança como uma REVISÃO PENDENTE de aprovação editorial. A versão pública atual permaneceu inalterada.";
                             return;
                         }
 

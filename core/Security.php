@@ -223,7 +223,17 @@ class Security
             return filter_var($remoteAddr, FILTER_VALIDATE_IP) ?: '127.0.0.1';
         }
 
-        // 1. Cabeçalho Cloudflare (quando aplicável)
+        // 1. Cabeçalho X-Real-IP configurado pelo Nginx (precedência quando aponta para IP do cliente)
+        if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+            $realIp = trim($_SERVER['HTTP_X_REAL_IP']);
+            if (filter_var($realIp, FILTER_VALIDATE_IP)) {
+                if (!in_array($realIp, $trusted, true)) {
+                    return $realIp;
+                }
+            }
+        }
+
+        // 2. Cabeçalho Cloudflare (suporte compatível com Cloudflare Tunnel / CDN)
         if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $cfIp = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
             if (filter_var($cfIp, FILTER_VALIDATE_IP)) {
@@ -231,7 +241,7 @@ class Security
             }
         }
 
-        // 2. Cabeçalho X-Real-IP configurado pelo Nginx
+        // 3. Fallback para X-Real-IP mesmo se estiver em faixa local
         if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
             $realIp = trim($_SERVER['HTTP_X_REAL_IP']);
             if (filter_var($realIp, FILTER_VALIDATE_IP)) {
@@ -421,6 +431,47 @@ class Security
             exit;
         }
 
+        // Validação defensiva de prazos no servidor (SEC-05)
+        $appConfig = $config ?? ($GLOBALS['config'] ?? []);
+        $maxLifetime = (int)($appConfig['security']['session_lifetime'] ?? 86400);
+        $idleTimeout = (int)($appConfig['security']['session_idle_timeout'] ?? 7200);
+
+        $now = time();
+        $authCreatedAt = (int)($_SESSION['auth_created_at'] ?? 0);
+        $lastActivityAt = (int)($_SESSION['last_activity_at'] ?? 0);
+
+        $isExpired = false;
+        $expireMsg = '';
+
+        if ($authCreatedAt > 0 && ($now - $authCreatedAt > $maxLifetime)) {
+            $isExpired = true;
+            $expireMsg = 'Sessão expirada por limite de tempo máximo. Faça login novamente.';
+        } elseif ($lastActivityAt > 0 && ($now - $lastActivityAt > $idleTimeout)) {
+            $isExpired = true;
+            $expireMsg = 'Sessão expirada por inatividade. Faça login novamente.';
+        }
+
+        if ($isExpired) {
+            $_SESSION = [];
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                setcookie(session_name(), '', time() - 42000,
+                    $params["path"], $params["domain"],
+                    $params["secure"], $params["httponly"]
+                );
+            }
+            @session_destroy();
+
+            if ($isAjax) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => $expireMsg]);
+                exit;
+            }
+            header('Location: /admin/login.php?expired=1');
+            exit;
+        }
+
         $user = Database::fetchOne(
             "SELECT id, name, username, email, role, bio, password_hash, is_active, session_version 
              FROM users WHERE id = ? LIMIT 1",
@@ -447,6 +498,12 @@ class Security
             header('Location: /admin/login.php?revoked=1');
             exit;
         }
+
+        // Atualizar marcadores temporais na sessão ativa
+        if ($authCreatedAt === 0) {
+            $_SESSION['auth_created_at'] = $now;
+        }
+        $_SESSION['last_activity_at'] = $now;
 
         if ($requiredRoles !== null && !in_array($user['role'], $requiredRoles, true)) {
             if ($isAjax) {
