@@ -147,6 +147,80 @@ assert_check("Cloudflare Tunnel preserva CF-Connecting-IP do visitante quando X-
 ip_c = resolve_client_ip("192.0.2.1", "203.0.113.20", "198.51.100.10", trusted)
 assert_check("Conexão direta não confiável ignora qualquer cabeçalho de proxy", ip_c == "192.0.2.1")
 
+# 4. SEC-04 / P2: Recarregamento de Rascunho de Revisão no Editor
+print("\n[4] Testando SEC-04 / P2: Recarregamento de Rascunho Privado no Editor")
+
+cursor.executescript("""
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT,
+        title TEXT,
+        summary TEXT,
+        category TEXT,
+        content_html TEXT,
+        content_json TEXT,
+        status TEXT,
+        version INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE post_revisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER,
+        editor_id INTEGER,
+        base_version INTEGER,
+        status TEXT,
+        payload_json TEXT,
+        content_html TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+""")
+
+# Matéria publicada no ar
+cursor.execute("""
+    INSERT INTO posts (id, slug, title, summary, category, content_html, content_json, status, version)
+    VALUES (10, 'gp-brasil-f1', 'Notícia Original Pública', 'Resumo Antigo', 'f1', '<p>Texto Público Original</p>', '[]', 'published', 1)
+""")
+conn.commit()
+
+# Simula "Salvar Rascunho" pelo editor: grava em post_revisions sem alterar posts
+cursor.execute("""
+    INSERT INTO post_revisions (post_id, editor_id, base_version, status, payload_json, content_html)
+    VALUES (10, 1, 1, 'draft', '{"title": "Título em Rascunho Salvo", "summary": "Novo Resumo Rascunho"}', '<p>Texto Novo em Rascunho</p>')
+""")
+conn.commit()
+
+# Verifica que o post público permanece intacto no banco
+cursor.execute("SELECT title, content_html, status FROM posts WHERE id = 10")
+live_post = cursor.fetchone()
+assert_check("Artigo público na tabela posts permanece com conteúdo original inalterado", live_post[0] == "Notícia Original Pública" and live_post[1] == "<p>Texto Público Original</p>")
+
+# Lógica do editor.php ao recarregar a tela:
+cursor.execute("SELECT * FROM posts WHERE id = 10")
+cols = [col[0] for col in cursor.description]
+post_data = dict(zip(cols, cursor.fetchone()))
+
+# Busca rascunho mais recente
+cursor.execute("SELECT * FROM post_revisions WHERE post_id = 10 AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1")
+rev_row = cursor.fetchone()
+import json
+if rev_row:
+    rev_payload = json.loads(rev_row[5])
+    for k, v in rev_payload.items():
+        post_data[k] = v
+    if rev_row[6]:
+        post_data['content_html'] = rev_row[6]
+
+assert_check("Editor recarrega o formulário com o título do rascunho salvo", post_data['title'] == "Título em Rascunho Salvo")
+assert_check("Editor recarrega o canvas com o HTML do rascunho salvo", post_data['content_html'] == "<p>Texto Novo em Rascunho</p>")
+
+# Simula ação de Publicar Alterações
+cursor.execute("UPDATE posts SET title = ?, content_html = ?, version = 2, status = 'published' WHERE id = 10", (post_data['title'], post_data['content_html']))
+cursor.execute("UPDATE post_revisions SET status = 'applied' WHERE post_id = 10 AND status IN ('draft', 'pending_review')")
+conn.commit()
+
+cursor.execute("SELECT * FROM post_revisions WHERE post_id = 10 AND status IN ('draft', 'pending_review')")
+assert_check("Após publicação explícita, as revisões pendentes são marcadas como aplicadas", cursor.fetchone() is None)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

@@ -346,7 +346,12 @@ class PostService
                 throw new RuntimeException("Conflito de concorrência detectado durante a gravação. Nenhuma linha foi alterada.", 409);
             }
 
-            // Gravar revisão histórica aplicada
+            // Gravar revisão histórica aplicada e marcar rascunhos anteriores como aplicados
+            Database::query(
+                "UPDATE post_revisions SET status = 'applied' WHERE post_id = ? AND status IN ('draft', 'pending_review')",
+                [$postId]
+            );
+
             $payload = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             Database::query(
                 "INSERT INTO post_revisions (

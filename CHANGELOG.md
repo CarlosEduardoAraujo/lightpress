@@ -18,16 +18,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Validação estrita de `purpose = 'activation'` em `public/admin/activate.php` tanto no lookup quanto na transação com bloqueio `FOR UPDATE`.
   - Verificação de elegibilidade da conta (`is_active = 0` e `password_reset_required = 1`), impedindo reativação indevida de contas bloqueadas administrativamente.
   - Invalidação atômica de todos os tokens pendentes em `user_reset_tokens` na alteração administrativa de senhas e bloqueio de usuários (`public/admin/users.php`), na alteração de senha no perfil (`public/admin/profile.php`) e na conclusão da ativação da conta.
-- **Defesa Contra SSRF em Webhooks com Suporte a Rede Local e DNS Pinning (SEC-02):**
-  - Implementação de resolução de DNS dual-stack (registros A e AAAA via `dns_get_record`) e DNS pinning no cURL via `CURLOPT_RESOLVE => ["$host:$port:$approvedIp"]` em `plugins/webhook-sender/webhook-sender.php`, neutralizando vulnerabilidades de DNS Rebinding e TOCTOU.
+- **Defesa Contra SSRF em Webhooks com Resolução Atômica e Normalização Binária (SEC-02):**
+  - Implementação de `WebhookSenderService::resolveSafeTarget()`, que unifica a validação de URLs e a resolução DNS em uma única etapa atômica, rejeitando resoluções vazias e eliminando consultas DNS secundárias que possibilitavam ataques de DNS Rebinding / TOCTOU. O endereço validado é fixado de forma estrita no cURL via `CURLOPT_RESOLVE => ["$host:$port:$approvedIp"]`.
+  - Normalização binária de IPv6 (`inet_pton` de 16 bytes), decodificando e bloqueando representações hexadecimais de loopback e metadados de nuvem via IPv4-mapped (`::ffff:7f00:1`, `::ffff:a9fe:a9fe`), IPv4-compatible e NAT64 (`64:ff9b::/96`).
   - Suporte completo a portas customizadas (ex: 5678) e destinos em rede local (RFC1918 como `http://192.168.3.165:5678`), viabilizando integrações internas de automação (n8n/Zapier local) com segurança.
   - Bloqueio rígido de endereços de metadados de nuvem (`169.254.169.254`, `metadata.google.internal`), faixas link-local (`169.254.0.0/16`, `fe80::/10`), loopback (`127.0.0.0/8`, `::1`) e validação defensiva do IP de destino conectado (`CURLINFO_PRIMARY_IP`).
   - Adição de tabela de mock DNS (`WebhookSenderService::setDnsMock()`) para execução determinística e reproduzível da suíte de testes.
 - **Blindagem do Contador de Visualizações e Rate Limiting no Nginx (SEC-03):**
   - Bloqueio do acesso direto ao script `location = /api/view.php` via Nginx com retorno HTTP 404, forçando o tráfego exclusivamente através da rota canônica `^~ /api/view/`, sujeita ao limitador defensivo de requisições `limit_req zone=lp_views burst=10 nodelay`.
-- **Isolamento de Rascunhos de Matérias Públicas e Invalidação de URLs Antigas (SEC-04):**
+- **Isolamento e Recarregamento de Rascunhos Privados no Editor (SEC-04):**
   - Reformulação do fluxo editorial em `public/admin/editor.php`: ao acionar "Salvar Rascunho" em artigos com status `published` ou `scheduled`, as alterações são salvas como revisões privadas em `post_revisions` (`draft` ou `pending_review`), preservando a linha pública da tabela `posts` e prevenindo vazamentos de conteúdo inacabado e divergências com o FastCGI Cache.
-  - Atualização do conteúdo público reservada estritamente à ação explícita de publicação (`publish`).
+  - Recarregamento automático no editor do rascunho de revisão salvo mais recente, sobrepondo os campos no formulário e no canvas visual com banner informativo, permitindo continuar a edição contínua do texto recém-salvo sem perda de conteúdo.
+  - Atualização do conteúdo público reservada estritamente à ação explícita de publicação (`publish`), marcando automaticamente todas as revisões pendentes anteriores como aplicadas.
   - Purga automática no FastCGI Cache e na API da Cloudflare para a URL atual e para o slug anterior (`$current['slug']`) em caso de renomeação de matéria.
 - **Imposição de Prazos de Sessão no Servidor (SEC-05):**
   - Implementação de verificação de prazo absoluto (24 horas / `session_lifetime`) e tempo limite de inatividade (2 horas / `session_idle_timeout`) diretamente no servidor no método `Security::requireAuth()` (`core/Security.php`).

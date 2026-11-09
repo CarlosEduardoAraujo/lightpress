@@ -25,6 +25,35 @@ $postId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $post = null;
 $message = '';
 $error = '';
+$hasActiveDraftRevision = false;
+$draftRevisionDate = null;
+
+$applyDraftRevision = function (array &$post, int $postId) use (&$hasActiveDraftRevision, &$draftRevisionDate): void {
+    $latestRev = Database::fetchOne(
+        "SELECT * FROM post_revisions 
+         WHERE post_id = ? AND status IN ('draft', 'pending_review') 
+         ORDER BY id DESC LIMIT 1",
+        [$postId]
+    );
+
+    if ($latestRev) {
+        $payload = json_decode((string)$latestRev['payload_json'], true);
+        if (is_array($payload)) {
+            foreach (['title', 'slug', 'summary', 'category', 'tags', 'featured_image', 'content_json', 'seo_title', 'seo_description', 'focus_keyword', 'is_featured'] as $key) {
+                if (array_key_exists($key, $payload)) {
+                    $post[$key] = $payload[$key];
+                }
+            }
+        }
+        if (!empty($latestRev['content_html'])) {
+            $post['content_html'] = $latestRev['content_html'];
+        } elseif (!empty($payload['content_html'])) {
+            $post['content_html'] = $payload['content_html'];
+        }
+        $hasActiveDraftRevision = true;
+        $draftRevisionDate = $latestRev['created_at'];
+    }
+};
 
 if ($postId > 0) {
     $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
@@ -33,6 +62,10 @@ if ($postId > 0) {
     }
     if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $post)) {
         die("Você não possui permissão para editar este artigo.");
+    }
+    // Se a matéria estiver publicada ou agendada, carrega a revisão pendente mais recente
+    if (in_array($post['status'], ['published', 'scheduled'], true)) {
+        $applyDraftRevision($post, $postId);
     }
 }
 
@@ -300,8 +333,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     }
                 }
-                // Recarregar dados do post
+                // Recarregar dados do post e sobrepor rascunho de revisão se aplicável
                 $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
+                if ($post && in_array($post['status'], ['published', 'scheduled'], true)) {
+                    $applyDraftRevision($post, $postId);
+                }
             }
         } catch (\Throwable $e) {
             $error = $e->getMessage();
@@ -481,6 +517,16 @@ require __DIR__ . '/header.php';
 
         <?php if (!empty($error)): ?>
             <div class="alert-error"><?= Security::e($error) ?></div>
+        <?php endif; ?>
+
+        <?php if (!empty($hasActiveDraftRevision)): ?>
+            <div style="background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.35); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.25rem;">📝</span>
+                <div style="font-size: 0.9rem; line-height: 1.4;">
+                    <strong style="color: #ca8a04;">Rascunho de revisão carregado:</strong>
+                    Você está editando a revisão privada salva em <strong><?= !empty($draftRevisionDate) ? date('d/m/Y \à\s H:i', strtotime($draftRevisionDate)) : 'revisão recente' ?></strong>. A versão pública atualmente no ar permanece inalterada até que você clique em <strong>Publicar Alterações</strong>.
+                </div>
+            </div>
         <?php endif; ?>
 
         <form method="POST" id="editorForm" onsubmit="return handleFormSubmit()">

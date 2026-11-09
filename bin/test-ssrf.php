@@ -14,8 +14,10 @@ namespace {
         'insecure.test' => ['93.184.216.35'],
         'malicious-rebinding.com' => ['162.159.135.232', '169.254.169.254'],
         'ipv6-loopback.com' => ['::1'],
+        'empty-dns.com' => [],
     ]);
 
+    $resolvedDiscord = WebhookSenderService::resolveSafeTarget('https://discord.com/api/webhooks/123/abc');
     $tests = [
         '192.168.3.165:5678 should be allowed' => WebhookSenderService::isSafeUrl('http://192.168.3.165:5678/webhook') === true,
         '127.0.0.1 should be blocked' => WebhookSenderService::isSafeUrl('http://127.0.0.1:8080/webhook') === false,
@@ -25,6 +27,13 @@ namespace {
         'malicious rebinding should be blocked' => WebhookSenderService::isSafeUrl('http://malicious-rebinding.com/hook') === false,
         'ipv6 loopback should be blocked' => WebhookSenderService::isSafeUrl('http://ipv6-loopback.com/hook') === false,
         'discord.com should be allowed' => WebhookSenderService::isSafeUrl('https://discord.com/api/webhooks/123/abc') === true,
+        // Novos testes P2
+        '::ffff:7f00:1 (IPv6 hex loopback) should be blocked' => WebhookSenderService::isSafeUrl('http://[::ffff:7f00:1]/hook') === false,
+        '::ffff:a9fe:a9fe (IPv6 hex metadata) should be blocked' => WebhookSenderService::isSafeUrl('http://[::ffff:a9fe:a9fe]/hook') === false,
+        '::ffff:c0a8:3a5:5678 (IPv6 hex LAN) allowed with allowPrivate=true' => WebhookSenderService::isSafeUrl('http://[::ffff:c0a8:3a5]:5678/webhook', true) === true,
+        '::ffff:c0a8:3a5:5678 (IPv6 hex LAN) blocked with allowPrivate=false' => WebhookSenderService::isSafeUrl('http://[::ffff:c0a8:3a5]:5678/webhook', false) === false,
+        'empty DNS resolution should be blocked' => WebhookSenderService::isSafeUrl('http://empty-dns.com/hook') === false,
+        'resolveSafeTarget fixes DNS pinning to the validated IP' => $resolvedDiscord !== null && $resolvedDiscord['pinned_ip'] === '162.159.135.232',
     ];
 
     $failed = 0;

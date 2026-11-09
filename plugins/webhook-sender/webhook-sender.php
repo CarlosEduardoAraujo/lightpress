@@ -88,6 +88,7 @@ final class WebhookSenderService
      * Valida se um IP é seguro.
      * Permite redes locais (RFC1918) por padrão para suportar servidores de automação/n8n locais (ex: 192.168.3.165:5678).
      * Bloqueia estritamente loopback (127.0.0.0/8, ::1) e link-local/cloud metadata (169.254.0.0/16, fe80::/10).
+     * Normaliza formatos binários de IPv6 (incluindo notações hexadecimais de IPv4-mapped, IPv4-compatible e NAT64).
      */
     public static function isSafeIp(string $ip, bool $allowPrivate = true): bool
     {
@@ -95,20 +96,47 @@ final class WebhookSenderService
             return false;
         }
 
-        // Normalizar IPv4-mapped IPv6 (ex: ::ffff:192.168.1.1)
+        // 1. Validação em formato binário para IPv6
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            if (stripos($ip, '::ffff:') === 0 || stripos($ip, ':ffff:') !== false) {
-                $lastColon = strrpos($ip, ':');
-                if ($lastColon !== false) {
-                    $possibleV4 = substr($ip, $lastColon + 1);
-                    if (filter_var($possibleV4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                        $ip = $possibleV4;
-                    }
-                }
+            $binary = @inet_pton($ip);
+            if ($binary === false || strlen($binary) !== 16) {
+                return false;
             }
+            $hex = bin2hex($binary);
+
+            // Loopback ::1 e Unspecified ::
+            if ($hex === '00000000000000000000000000000001' || $hex === '00000000000000000000000000000000') {
+                return false;
+            }
+
+            // Normalização binária de IPv4-mapped (::ffff:0:0/96), IPv4-compatible (::/96) e NAT64 (64:ff9b::/96)
+            // Cobre tanto notação decimal (::ffff:127.0.0.1) quanto hexadecimal pura (::ffff:7f00:1, ::ffff:a9fe:a9fe)
+            $isV4Mapped = (substr($hex, 0, 20) === '00000000000000000000' && (substr($hex, 20, 4) === 'ffff' || substr($hex, 20, 4) === '0000'));
+            $isNat64    = (substr($hex, 0, 24) === '0064ff9b0000000000000000');
+
+            if ($isV4Mapped || $isNat64) {
+                $v4Binary = substr($binary, 12, 4);
+                $extractedV4 = @inet_ntop($v4Binary);
+                if ($extractedV4 !== false) {
+                    return self::isSafeIp($extractedV4, $allowPrivate);
+                }
+                return false;
+            }
+
+            // Link-local: fe80::/10 (fe80 a febf)
+            if (preg_match('/^fe[89ab]/i', $hex)) {
+                return false;
+            }
+
+            // Unique local: fc00::/7 (fc00 a fdff)
+            if (!$allowPrivate && preg_match('/^f[cd]/i', $hex)) {
+                return false;
+            }
+
+            return true;
         }
 
-        // Validação IPv4
+        // 2. Validação para IPv4
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             $long = ip2long($ip);
             if ($long === false) {
@@ -142,32 +170,6 @@ final class WebhookSenderService
                     FILTER_VALIDATE_IP,
                     FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
                 );
-            }
-
-            return true;
-        }
-
-        // Validação IPv6
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $binary = @inet_pton($ip);
-            if ($binary === false) {
-                return false;
-            }
-            $hex = bin2hex($binary);
-
-            // Loopback ::1 e Unspecified ::
-            if ($hex === '00000000000000000000000000000001' || $hex === '00000000000000000000000000000000') {
-                return false;
-            }
-
-            // Link-local: fe80::/10 (fe80 a febf)
-            if (preg_match('/^fe[89ab]/i', $hex)) {
-                return false;
-            }
-
-            // Unique local: fc00::/7 (fc00 a fdff)
-            if (!$allowPrivate && preg_match('/^f[cd]/i', $hex)) {
-                return false;
             }
 
             return true;
@@ -212,58 +214,91 @@ final class WebhookSenderService
     }
 
     /**
+     * Valida a URL e resolve os IPs de destino de forma estritamente atômica (única resolução).
+     * Retorna array com os dados e o IP validado para fixação (pinning), ou null se inválida/insegura/vazia.
+     *
+     * @param string $url
+     * @param bool $allowPrivate
+     * @return array{url: string, host: string, scheme: string, port: int, pinned_ip: ?string}|null
+     */
+    public static function resolveSafeTarget(string $url, bool $allowPrivate = true): ?array
+    {
+        $url = trim($url);
+        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            return null;
+        }
+
+        $host = (string)parse_url($url, PHP_URL_HOST);
+        if (empty($host)) {
+            return null;
+        }
+
+        // Portas válidas: 1 a 65535 (não bloquear portas customizadas como 5678)
+        $parsedPort = parse_url($url, PHP_URL_PORT);
+        if ($parsedPort !== null && ($parsedPort < 1 || $parsedPort > 65535)) {
+            return null;
+        }
+        $port = (int)($parsedPort ?? ($scheme === 'https' ? 443 : 80));
+
+        // Bloqueio explícito de localhost e metadados de cloud conhecidos
+        $lowerHost = strtolower($host);
+        if ($lowerHost === 'localhost' || $lowerHost === 'metadata.google.internal') {
+            return null;
+        }
+
+        // Se for um endereço IP direto (IPv4 ou IPv6 com ou sem colchetes)
+        $cleanIp = trim($host, '[]');
+        if (filter_var($cleanIp, FILTER_VALIDATE_IP)) {
+            if (!self::isSafeIp($cleanIp, $allowPrivate)) {
+                return null;
+            }
+            return [
+                'url'       => $url,
+                'host'      => $host,
+                'scheme'    => $scheme,
+                'port'      => $port,
+                'pinned_ip' => null,
+            ];
+        }
+
+        // Para domínios/hostnames: executa a resolução DNS UMA ÚNICA VEZ
+        $ips = self::resolveHostIps($host);
+
+        // Rejeita explicitamente resolução vazia ou ausente
+        if (empty($ips)) {
+            return null;
+        }
+
+        // Valida TODOS os endereços retornados na resolução
+        foreach ($ips as $ip) {
+            if (!self::isSafeIp($ip, $allowPrivate)) {
+                return null;
+            }
+        }
+
+        // Fixa a conexão exatamente no primeiro endereço resolvido e validado
+        return [
+            'url'       => $url,
+            'host'      => $host,
+            'scheme'    => $scheme,
+            'port'      => $port,
+            'pinned_ip' => $ips[0],
+        ];
+    }
+
+    /**
      * Valida se uma URL é segura para envio de webhooks, mitigando ataques de SSRF.
      * Permite portas personalizadas (ex: 5678) e redes locais (ex: 192.168.3.165:5678).
      * Bloqueia rigorosamente loopback, link-local e metadados de nuvem.
      */
     public static function isSafeUrl(string $url, bool $allowPrivate = true): bool
     {
-        $url = trim($url);
-        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-            return false;
-        }
-
-        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            return false;
-        }
-
-        $host = (string)parse_url($url, PHP_URL_HOST);
-        if (empty($host)) {
-            return false;
-        }
-
-        // Portas válidas: 1 a 65535 (não bloquear portas customizadas como 5678)
-        $port = parse_url($url, PHP_URL_PORT);
-        if ($port !== null && ($port < 1 || $port > 65535)) {
-            return false;
-        }
-
-        // Bloqueio explícito de localhost e metadados de cloud conhecidos
-        $lowerHost = strtolower($host);
-        if ($lowerHost === 'localhost' || $lowerHost === 'metadata.google.internal') {
-            return false;
-        }
-
-        // Se for um endereço IP direto (IPv4 ou IPv6 com ou sem colchetes)
-        $cleanIp = trim($host, '[]');
-        if (filter_var($cleanIp, FILTER_VALIDATE_IP)) {
-            return self::isSafeIp($cleanIp, $allowPrivate);
-        }
-
-        // Para domínios/hostnames, resolve todos os registros de IP (A e AAAA)
-        $ips = self::resolveHostIps($host);
-        if (empty($ips)) {
-            return false;
-        }
-
-        foreach ($ips as $ip) {
-            if (!self::isSafeIp($ip, $allowPrivate)) {
-                return false;
-            }
-        }
-
-        return true;
+        return self::resolveSafeTarget($url, $allowPrivate) !== null;
     }
 
     /**
@@ -405,19 +440,16 @@ final class WebhookSenderService
         $results = [];
 
         foreach ($urls as $url) {
-            if (!self::isSafeUrl($url, $allowPrivate)) {
-                error_log("[WebhookSender] URL bloqueada por política de segurança SSRF: {$url}");
+            // Valida e resolve DNS atomicamente uma única vez
+            $target = self::resolveSafeTarget($url, $allowPrivate);
+            if ($target === null) {
+                error_log("[WebhookSender] URL bloqueada por política de segurança SSRF ou resolução DNS inválida: {$url}");
                 $results[$url] = 400;
                 continue;
             }
 
-            $host = (string)parse_url($url, PHP_URL_HOST);
-            $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
-            $port = (int)(parse_url($url, PHP_URL_PORT) ?? ($scheme === 'https' ? 443 : 80));
-            $cleanIp = trim($host, '[]');
-
             $curlOptions = [
-                CURLOPT_URL            => $url,
+                CURLOPT_URL            => $target['url'],
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $jsonPayload,
                 CURLOPT_HTTPHEADER     => [
@@ -434,13 +466,10 @@ final class WebhookSenderService
                 CURLOPT_REDIR_PROTOCOLS => 0,
             ];
 
-            // Para hostnames, fixa a resolução previamente aprovada no cURL para mitigar DNS Rebinding / TOCTOU
-            if (!filter_var($cleanIp, FILTER_VALIDATE_IP)) {
-                $ips = self::resolveHostIps($host);
-                if (!empty($ips[0])) {
-                    $pinnedIp = $ips[0];
-                    $curlOptions[CURLOPT_RESOLVE] = ["{$host}:{$port}:{$pinnedIp}"];
-                }
+            // Para hostnames, fixa exatamente o mesmo endereço IP previamente validado (DNS Pinning rigoroso)
+            // sem executar uma segunda consulta DNS
+            if (!empty($target['pinned_ip'])) {
+                $curlOptions[CURLOPT_RESOLVE] = ["{$target['host']}:{$target['port']}:{$target['pinned_ip']}"];
             }
 
             $ch = curl_init();
@@ -454,7 +483,7 @@ final class WebhookSenderService
 
             // Validação em profundidade do IP de destino conectado
             if (!empty($primaryIp) && !self::isSafeIp($primaryIp, $allowPrivate)) {
-                error_log("[WebhookSender] Conexão bloqueada: IP conectado inseguro ({$primaryIp}) para {$url}");
+                error_log("[WebhookSender] Conexão abortada: IP conectado inseguro ({$primaryIp}) para {$url}");
                 $results[$url] = 403;
                 continue;
             }
