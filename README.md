@@ -650,7 +650,7 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
 * Centralizar as decisões em `Authorization.php`, por exemplo `can($user, $action, $post)`, com negação por padrão. Verificar todas as requisições e operações de serviço, incluindo AJAX, prévias, upload e aplicação de revisões.
 * IDs recebidos nunca provam propriedade. Conferir `posts.user_id` e validar campos permitidos por perfil; um autor não pode forjar `user_id`, `status`, destaque ou privilégios no JSON. O vínculo de uma imagem a um artigo também exige autorização sobre ambos.
 * Contas novas e importadas recebem `author` por padrão. Promoções são explícitas e administrativas. Impedir remoção, desativação ou rebaixamento do último administrador ativo.
-* **Proteção do Último Administrador:** O sistema valida ativamente `COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?` tanto na alteração de perfil/papel (`action=edit`) quanto na alternância de estado de bloqueio (`toggle_id`), impedindo terminantemente que o último administrador ativo seja desativado ou rebaixado para `editor` ou `author`.
+* **Proteção Atômica do Último Administrador:** O sistema valida ativamente `COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?` atomicamente dentro de `Database::transaction()` com bloqueio pessimista `FOR UPDATE` (no MySQL), tanto na alteração de perfil/papel (`action=edit`) quanto na alternância de bloqueio (`toggle_id`), prevenindo condições de corrida onde dois administradores tentem rebaixar ou desativar um ao outro concorrentemente.
 * Testar acesso horizontal (autor tentando editar outro autor), acesso vertical (autor tentando publicar/administrar), mudança de perfil com sessão aberta e bloqueio de conta. Ocultar botões na interface não substitui essas verificações.
 
 ### 8.5. Blindagem do Diretório de Uploads e Execução de Arquivos
@@ -667,7 +667,7 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
   }
   ```
 * Arquivos são armazenados com extensões padronizadas restritas (`.webp`, `.avif`) e nomes pseudorrandômicos gerados no servidor.
-* **Exclusão Segura contra Path Traversal:** Ao excluir imagens e variantes na biblioteca de mídia (`public/admin/media.php`), a aplicação resolve o caminho canônico do arquivo com `realpath()` e valida se ele se inicia estritamente dentro de `realpath($config['media']['upload_dir'])` antes de invocar `unlink()`, neutralizando qualquer tentativa de exclusão arbitrária de arquivos do sistema via manipulação de manifests ou sequências `/../`.
+* **Exclusão Segura contra Path Traversal:** Ao excluir imagens e variantes na biblioteca de mídia (`public/admin/media.php`), a aplicação resolve o caminho canônico com `realpath()` e garante a terminação com barra separadora (`/`) no diretório base (`$baseUploadDir = rtrim(..., '/') . '/'`), além de exigir `is_file()` antes de invocar `unlink()`. Isso impede que diretórios irmãos de mesmo prefixo (ex: `/public/uploads_backup/`) ou tentativas de navegação arbitrária via `/../` contornem a proteção.
 
 ### 8.6. Cabeçalhos HTTP de Segurança Defensivos
 

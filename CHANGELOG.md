@@ -9,14 +9,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Proteção do Último Administrador e Defesa contra Path Traversal na Mídia — 2026-11-09
 
-- **Gestão de Usuários (`public/admin/users.php`):**
-  - Implementada trava estrita contra rebaixamento do último administrador ativo: ao editar qualquer usuário (`action === 'edit'`), se o papel for alterado de `admin` para outro (`author` ou `editor`), o sistema verifica previamente `COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?`. Caso não haja outro administrador ativo, a operação é rejeitada com mensagem de erro clara.
-  - Implementada trava estrita contra desativação/bloqueio do último administrador ativo: no fluxo de alternância de status (`toggle_id`), verifica-se se o usuário alvo ativo é administrador e se há outros administradores ativos antes de executar a transação.
-- **Biblioteca de Mídias (`public/admin/media.php`):**
+- **Gestão de Usuários e Concorrência Atômica (`public/admin/users.php`):**
+  - Implementada trava atômica contra rebaixamento do último administrador ativo: ao editar qualquer usuário (`action === 'edit'`), a verificação de outros administradores ativos (`COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?`) é executada dentro de `Database::transaction()`, acompanhada de bloqueio pessimista `FOR UPDATE` no MySQL. Caso não haja outro administrador ativo, a transação sofre rollback imediato com mensagem de erro, neutralizando condições de corrida onde administradores concorrentes tentem rebaixar um ao outro.
+  - Implementada trava atômica contra desativação/bloqueio do último administrador ativo: no fluxo de alternância de status (`toggle_id`), a inspeção do usuário alvo e a contagem de administradores ativos são executadas dentro de `Database::transaction()` com bloqueio pessimista `FOR UPDATE` no MySQL antes de aplicar qualquer alteração.
+- **Biblioteca de Mídias e Prevenção de Path Traversal (`public/admin/media.php`):**
   - Implementada validação defensiva contra Path Traversal (`/../`) na exclusão física de arquivos de mídia: resolução canônica de caminho via `realpath()` tanto para o diretório configurado de uploads (`$config['media']['upload_dir']`) quanto para os caminhos de variantes (`$localPath`).
-  - Chamadas a `@unlink()` agora ocorrem exclusivamente se o caminho canônico do arquivo pertencer comprovadamente à raiz do diretório de uploads.
+  - Adição mandatória da barra delimitadora ao final do diretório base (`$baseUploadDir = rtrim(..., '/') . '/'`), prevenindo falsos positivos por prefixo parcial em diretórios irmãos (ex: `/public/uploads_backup/arquivo.webp`).
+  - Validação explícita com `is_file($resolvedLocalPath)` assegurando que apenas arquivos regulares sejam removidos via `@unlink()`.
 - **Testes de Regressão de Segurança (`bin/test_security_fixes.py`):**
-  - Adicionadas suítes `[8] Testando Trava contra Desativação ou Rebaixamento do Último Administrador` e `[9] Testando Validação de Caminho Seguro na Exclusão de Mídia`, expandindo a suíte para 43 verificações automatizadas com 100% de aprovação.
+  - Adicionadas suítes `[8] Testando Trava contra Desativação ou Rebaixamento do Último Administrador` e `[9] Testando Validação de Caminho Seguro na Exclusão de Mídia`, cobrindo atomicidade com `FOR UPDATE`, trailing slash em diretórios irmãos (`uploads_backup`) e integridade estrutural, totalizando 45 verificações com 100% de aprovação.
 
 
 ### Blindagem contra Exposição de Token CSRF no Logout e Destaques — 2026-11-09
