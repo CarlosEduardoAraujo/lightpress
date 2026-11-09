@@ -416,15 +416,19 @@ class Schema
      */
     public static function ensureRevisionsSchema(PDO $pdo, string $driver = 'mysql'): void
     {
+        $ownsTransaction = false;
+        $foreignKeys = null;
         try {
             if ($driver === 'sqlite') {
                 $revTable = $pdo->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'post_revisions'")->fetch();
                 if ($revTable && !empty($revTable['sql']) && !str_contains($revTable['sql'], "'superseded'")) {
-                    $inTx = $pdo->inTransaction();
-                    $pdo->exec('PRAGMA foreign_keys = OFF;');
-                    if (!$inTx) {
-                        $pdo->beginTransaction();
+                    if ($pdo->inTransaction()) {
+                        throw new RuntimeException('Migre post_revisions antes de iniciar a transação editorial.');
                     }
+                    $foreignKeys = (int)$pdo->query('PRAGMA foreign_keys')->fetchColumn();
+                    $pdo->exec('PRAGMA foreign_keys = OFF;');
+                    $pdo->beginTransaction();
+                    $ownsTransaction = true;
                     $pdo->exec("CREATE TABLE post_revisions_new (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         post_id INTEGER NOT NULL,
@@ -442,19 +446,27 @@ class Schema
                     $pdo->exec("DROP TABLE post_revisions;");
                     $pdo->exec("ALTER TABLE post_revisions_new RENAME TO post_revisions;");
                     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_revision_post ON post_revisions (post_id, id);");
-                    if (!$inTx) {
-                        $pdo->commit();
-                    }
-                    $pdo->exec('PRAGMA foreign_keys = ON;');
+                    $pdo->commit();
+                    $ownsTransaction = false;
                 }
             } else {
                 $col = $pdo->query("SHOW COLUMNS FROM post_revisions LIKE 'status'")->fetch();
                 if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'superseded'")) {
+                    if ($pdo->inTransaction()) {
+                        throw new RuntimeException('Migre post_revisions antes de iniciar a transação editorial.');
+                    }
                     $pdo->exec("ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied', 'superseded') NOT NULL DEFAULT 'draft'");
                 }
             }
         } catch (\Throwable $e) {
-            // Silencioso se não tiver permissão DDL
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        } finally {
+            if ($foreignKeys !== null) {
+                $pdo->exec('PRAGMA foreign_keys = ' . $foreignKeys);
+            }
         }
     }
 }

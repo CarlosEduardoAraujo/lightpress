@@ -32,6 +32,9 @@ jobs:
     - name: Executar Suíte de Testes Automatizados
       run: php bin/test.php
 
+    - name: Testar migrações e restauração de revisões em bancos isolados
+      run: php bin/test-revision-safety.php
+
     - name: Testar Setup de Banco de Dados (SQLite)
       run: |
         cat << 'EOF' > config.local.php

@@ -31,6 +31,11 @@ if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $post)) {
 
 $message = '';
 $error = '';
+$latestRevisionId = (int)(Database::fetchValue(
+    "SELECT id FROM post_revisions WHERE post_id = ? AND base_version = ?
+     AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1",
+    [$postId, (int)$post['version']]
+) ?? 0);
 
 // Restaurar uma revisão histórica (executado atomicamente em transação com bloqueio FOR UPDATE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id'])) {
@@ -38,10 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
         $error = "Token CSRF inválido ou expirado.";
     } else {
         $revId = (int)$_POST['restore_revision_id'];
+        $knownVersion = (int)($_POST['version'] ?? 0);
+        $knownRevisionId = (int)($_POST['known_revision_id'] ?? 0);
 
         try {
+            // Migrações podem executar DDL: concluir antes de adquirir os locks editoriais.
+            $postService = new PostService();
             Database::transaction(function (\PDO $pdo) use (
-                $postId, $revId, $currentUser, &$message
+                $postId, $revId, $currentUser, $postService, $knownVersion, $knownRevisionId, &$message
             ): void {
                 // 1. Bloqueia e relê a linha atualizada da publicação
                 $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
@@ -51,6 +60,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                 );
                 if (!$current) {
                     throw new RuntimeException("Artigo não encontrado.", 404);
+                }
+                if ((int)$current['version'] !== $knownVersion) {
+                    throw new RuntimeException('A publicação mudou. Recarregue o histórico antes de restaurar.', 409);
+                }
+                $latest = Database::fetchOne(
+                    "SELECT id FROM post_revisions WHERE post_id = ? AND base_version = ?
+                     AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1",
+                    [$postId, $knownVersion]
+                );
+                if ((int)($latest['id'] ?? 0) !== $knownRevisionId) {
+                    throw new RuntimeException('O rascunho mudou. Recarregue o histórico antes de restaurar.', 409);
                 }
 
                 // 2. Reavalia autorização com o estado real do banco
@@ -178,14 +198,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                         $payload['published_at'] = $targetPubAt;
                     }
 
-                    $postService = new PostService();
-                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], (int)$current['version'], $revId);
+                    $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion, $knownRevisionId, $revId);
                     $message = "Revisão #{$revId} aprovada e aplicada à versão pública com sucesso!";
                 }
             });
 
             $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);
+            $latestRevisionId = (int)(Database::fetchValue(
+                "SELECT id FROM post_revisions WHERE post_id = ? AND base_version = ?
+                 AND status IN ('draft', 'pending_review') ORDER BY id DESC LIMIT 1",
+                [$postId, (int)$post['version']]
+            ) ?? 0);
         } catch (\Throwable $e) {
+            if ($e->getCode() === 409) {
+                http_response_code(409);
+            }
             $error = "Erro ao restaurar: " . $e->getMessage();
         }
     }
@@ -254,6 +281,8 @@ require __DIR__ . '/header.php';
                                         <form method="POST" style="display: inline;" onsubmit="return confirm('Deseja realmente restaurar este snapshot? A alteração criará uma nova revisão aplicada.');">
                                             <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
                                             <input type="hidden" name="restore_revision_id" value="<?= (int)$r['id'] ?>">
+                                            <input type="hidden" name="version" value="<?= (int)$post['version'] ?>">
+                                            <input type="hidden" name="known_revision_id" value="<?= $latestRevisionId ?>">
                                             <button type="submit" class="btn btn-restore">Restaurar Versão</button>
                                         </form>
                                     <?php else: ?>

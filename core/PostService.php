@@ -44,6 +44,9 @@ class PostService
             if ($driver === 'mysql') {
                 $col = Database::fetchOne("SHOW COLUMNS FROM posts LIKE 'status'");
                 if ($col && !empty($col['Type']) && !str_contains($col['Type'], "'scheduled'")) {
+                    if (Database::getConnection()->inTransaction()) {
+                        throw new RuntimeException('Migre posts antes de iniciar a transação editorial.');
+                    }
                     Database::getConnection()->exec(
                         "ALTER TABLE posts MODIFY COLUMN status ENUM('draft', 'pending_review', 'scheduled', 'published', 'archived') NOT NULL DEFAULT 'draft'"
                     );
@@ -53,7 +56,7 @@ class PostService
             Schema::ensureRevisionsSchema(Database::getConnection(), $driver);
             self::$enumChecked = true;
         } catch (\Throwable $e) {
-            // Silencioso se não tiver permissão DDL
+            throw $e;
         }
     }
 
@@ -231,16 +234,18 @@ class PostService
      * @param array $data Dados a serem atualizados
      * @param int $editorId ID do usuário que está aplicando
      * @param int $knownVersion Versão conhecida pelo cliente antes da edição
+     * @param int $knownRevisionId Revisão ativa conhecida pelo cliente (controle de concorrência)
+     * @param int|null $appliedRevisionId Snapshot histórico escolhido para restauração, se houver
      * @return bool
      */
-    public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion, int $knownRevisionId = 0): bool
+    public function publishOrUpdate(int $postId, array $data, int $editorId, int $knownVersion, int $knownRevisionId = 0, ?int $appliedRevisionId = null): bool
     {
         $this->ensureScheduledEnumSupported();
         $affectedUrls = [];
         $isNowPublished = false;
         $isFirstPublish = false;
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
@@ -381,10 +386,11 @@ class PostService
             }
 
             // Se a publicação foi baseada em uma revisão específica conhecida, marca-a como aplicada
-            if ($knownRevisionId > 0) {
+            $revisionToApply = $appliedRevisionId ?? $knownRevisionId;
+            if ($revisionToApply > 0) {
                 Database::query(
                     "UPDATE post_revisions SET status = 'applied' WHERE id = ? AND post_id = ?",
-                    [$knownRevisionId, $postId]
+                    [$revisionToApply, $postId]
                 );
             }
 
