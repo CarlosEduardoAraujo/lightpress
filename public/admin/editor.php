@@ -10,6 +10,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
 use LightPress\Core\BlockCompiler;
+use LightPress\Core\CacheManager;
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\PostService;
@@ -63,9 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $dt = new \DateTime($publishedAtRaw, new \DateTimeZone($displayTzName));
                 $dt->setTimezone(new \DateTimeZone('UTC'));
-                $publishedAt = $dt->format('Y-m-d H:i:s');
+                $formatted = $dt->format('Y-m-d H:i:s');
+                $ts = $dt->getTimestamp();
+                $publishedAt = ($ts > 0 && (int)gmdate('Y', $ts) > 1970) ? $formatted : null;
             } catch (\Throwable) {
-                $publishedAt = gmdate('Y-m-d H:i:s', strtotime($publishedAtRaw));
+                $timestamp = strtotime($publishedAtRaw);
+                $publishedAt = ($timestamp !== false && $timestamp > 0 && (int)gmdate('Y', $timestamp) > 1970)
+                    ? gmdate('Y-m-d H:i:s', $timestamp)
+                    : null;
             }
         }
         $knownVersion = (int)($_POST['version'] ?? 1);
@@ -125,10 +131,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ? $contentJson
                         : BlockCompiler::htmlToBlocks($cleanHtml);
 
+                    $wasPublished = false;
+                    $prevSlug = '';
+                    $prevCat = '';
+
                     Database::transaction(function (\PDO $pdo) use (
                         $postId, $currentUser, $knownVersion, $title, $slug, $summary,
                         $category, $tags, $featuredImage, $cleanJson, $cleanHtml,
-                        $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message
+                        $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message,
+                        &$wasPublished, &$prevSlug, &$prevCat
                     ): void {
                         // 1. Bloqueia e relê a linha atualizada do banco
                         $current = Database::fetchOne("SELECT * FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''), [$postId]);
@@ -197,19 +208,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         $cleanSlug = !empty($slug) ? Security::slugify($slug) : (!empty($current['slug']) ? $current['slug'] : Security::slugify($title));
                         $cleanSlug = (new PostService())->resolveUniqueSlug($cleanSlug, $postId);
-                        $publishedAtVal = $canPublish ? (!empty($publishedAt) ? $publishedAt : ($current['published_at'] ?? null)) : ($current['published_at'] ?? null);
+                        // Se o editor limpou o campo de data (published_at vazio), respeita a remoção
+                        $publishedAtVal = $canPublish
+                            ? (!empty($publishedAt) ? $publishedAt : (empty($publishedAtRaw) ? null : ($current['published_at'] ?? null)))
+                            : ($current['published_at'] ?? null);
+
+                        $statusVal = $current['status'];
+                        $previousStatus = $statusVal;
+
+                        // Se a data de publicação for removida e a matéria estiver publicada ou agendada, reverte status para draft
+                        if (empty($publishedAtVal) && in_array($statusVal, ['published', 'scheduled'], true)) {
+                            $statusVal = 'draft';
+                            $wasPublished = true;
+                            $prevSlug = $current['slug'];
+                            $prevCat = $current['category'];
+                        }
+
                         $newVersion = (int)$current['version'] + 1;
 
                         $stmt = Database::query(
                             "UPDATE posts SET 
                                 title = ?, slug = ?, summary = ?, category = ?, tags = ?, featured_image = ?, 
-                                content_json = ?, content_html = ?, seo_title = ?, 
+                                content_json = ?, content_html = ?, status = ?, seo_title = ?, 
                                 seo_description = ?, focus_keyword = ?, is_featured = ?, published_at = ?,
                                 version = ?, updated_at = CURRENT_TIMESTAMP 
                              WHERE id = ? AND version = ?",
                             [
                                 $title, $cleanSlug, $summary, $category, $tags, $featuredImage, 
-                                $cleanJson, $cleanHtml, $seoTitle, 
+                                $cleanJson, $cleanHtml, $statusVal, $seoTitle, 
                                 $seoDesc, $focusKeyword, $isFeaturedVal, $publishedAtVal, $newVersion, $postId, $knownVersion
                             ]
                         );
@@ -232,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'seo_description' => $seoDesc,
                             'focus_keyword' => $focusKeyword,
                             'is_featured' => $isFeaturedVal,
-                            'status' => $current['status'],
+                            'status' => $statusVal,
                         ];
 
                         Database::query(
@@ -253,6 +279,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         $message = "Rascunho salvo com sucesso!";
                     });
+
+                    if ($wasPublished) {
+                        try {
+                            $cacheManager = new CacheManager();
+                            $cacheManager->purgeUrls([
+                                '/',
+                                "/{$prevSlug}/",
+                                "/categoria/{$prevCat}/",
+                                '/feed',
+                                '/feed.xml'
+                            ]);
+                        } catch (\Throwable $e) {
+                            error_log("[Cache Purge Error] Unpublishing draft {$postId}: " . $e->getMessage());
+                        }
+                    }
                 }
                 // Recarregar dados do post
                 $post = Database::fetchOne("SELECT * FROM posts WHERE id = ? LIMIT 1", [$postId]);

@@ -15,6 +15,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Refatoração dos métodos `Security::checkLoginRateLimit()` e `Security::recordLoginFailure()` (`core/Security.php`) para operar com sincronização rigorosa de arquivos via `flock()`.
   - A leitura agora adquire trava compartilhada (`LOCK_SH`), aguardando conclusões de escrita antes da desserialização do JSON e prevenindo leituras de arquivos truncados a 0 bytes.
   - Eliminação da exclusão acidental do arquivo de log (`unlink`) em casos de leitura de conteúdo vazio sob alta concorrência paralela.
+- **Prevenção de Publicação Acidental e Fallback 1970 em Datas Inválidas:**
+  - Correção em `public/admin/editor.php` e `core/PostService.php` para validar se o parsing de data de agendamento não resulta em `false` ou timestamp com ano 1970 (`01/01/1970 00:00:00`).
+  - Prevenção do erro de lógica em que strings de data corrompidas eram formatadas como timestamp 0, fazendo o `PostService` considerar a data menor que `NOW()` e publicar a matéria instantaneamente em vez de retê-la.
+- **Sincronização de Status ao Salvar Rascunho com Data Limpa:**
+  - Correção no fluxo de atualização manual de rascunhos em `public/admin/editor.php`: se um editor limpar o campo `published_at` e salvar a matéria como rascunho, o `status` é explicitamente revertido para `'draft'`.
+  - Eliminação de registros "fantasmas" (`status = 'published'` com `published_at IS NULL`) que ficavam invisíveis para leitores e APIs públicas.
+  - Invalidação automática e imediata de cache (`CacheManager::purgeUrls`) para a matéria, home e categoria caso uma notícia pública seja despublicada para rascunho.
+- **Blindagem Contra Edge-Case de Open Redirect via Backslash no Roteador:**
+  - Normalização no método `Router::dispatch()` e na canonicalização de barra final para neutralizar caminhos maliciosos iniciados com `\`, `/\` ou `//`.
+  - Tratamento em profundidade em `Router::redirect()` e `Router::isValidRedirectTarget()`, rejeitando destinos que utilizem barras invertidas para enganar clientes HTTP e navegadores legados.
 - **Defesa Contra Redirecionamentos Abertos (Open Redirect / CWE-601):**
   - Implementação do validador estrito `Router::isValidRedirectTarget(string $target): bool` (`core/Router.php`).
   - Bloqueio de ataques via evasão de protocolo relativo (`//site-malicioso.com`), barras invertidas (`/\site-malicioso.com`), esquemas não permitidos (`javascript:`, `data:`) e redirecionamentos para hosts externos não autorizados.

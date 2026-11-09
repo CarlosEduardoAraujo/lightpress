@@ -285,10 +285,19 @@ class PostService
 
             // Tratamento de Data de Publicação e Agendamento (em UTC estrito)
             $nowUtc = gmdate('Y-m-d H:i:s');
+            $currentPub = (!empty($current['published_at']) && !str_starts_with($current['published_at'], '1970'))
+                ? $current['published_at']
+                : $nowUtc;
+
             if (!empty($data['published_at'])) {
-                $publishedAt = gmdate('Y-m-d H:i:s', strtotime($data['published_at']));
+                $parsedTs = strtotime($data['published_at']);
+                if ($parsedTs !== false && $parsedTs > 0 && (int)gmdate('Y', $parsedTs) > 1970) {
+                    $publishedAt = gmdate('Y-m-d H:i:s', $parsedTs);
+                } else {
+                    $publishedAt = $currentPub;
+                }
             } else {
-                $publishedAt = $current['published_at'] ?: $nowUtc;
+                $publishedAt = $currentPub;
             }
 
             // Se a data de publicação for no futuro, o status é 'scheduled'. Se for agora/passado, 'published'.

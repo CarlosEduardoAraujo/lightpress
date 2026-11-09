@@ -804,8 +804,9 @@ O primeiro módulo construído sobre a nova arquitetura é o **Webhook Sender** 
 Para impedir o uso indevido do sistema como vetor em ataques de engenharia social, phishing e redirecionamento para URLs externas fraudulentas:
 
 * **Validação Estrita de Destinos (`Router::isValidRedirectTarget`):**
-  - **Caminhos Relativos:** Permitidos se iniciarem estritamente com `/`, barrando tentativas de bypass com protocolo relativo (`//site-malicioso.com`) ou sintaxe de barra invertida (`/\site-malicioso.com`).
+  - **Caminhos Relativos:** Permitidos se iniciarem estritamente com `/`, barrando tentativas de bypass com protocolo relativo (`//site-malicioso.com`) ou sintaxe de barra invertida (`/\site-malicioso.com`, `\evil.com` ou caminhos contendo backslashes).
   - **URLs Absolutas:** Esquemas restritos a `http` e `https` (eliminando `javascript:` e `data:`). O domínio deve corresponder estritamente ao host canônico autorizado do portal (`canonical_origin` ou `$_SERVER['HTTP_HOST']`).
+  - **Normalização Preventiva no Despacho:** O roteador intercepta caminhos iniciados com `\`, `/\` ou `//` logo no início de `Router::dispatch()` e antes da canonicalização de barra final, neutralizando redirecionamentos maliciosos gerados por barras invertidas interpretadas por navegadores legados.
   - **Redirecionamentos Legados:** Todos os registros da tabela `redirects` são verificados em `Router::dispatch()` antes do envio do cabeçalho `Location`, passando pela mesma validação de segurança.
 
 ### 8.15. Otimização Algorítmica de Slugs e Roteamento Flexível
@@ -816,6 +817,11 @@ Para impedir o uso indevido do sistema como vetor em ataques de engenharia socia
   - Detecção do maior índice em memória com fallback criptograficamente seguro (`bin2hex(random_bytes(3))`) para máxima resiliência e prevenção de DoS por esgotamento de conexões em importações massivas ou matérias com títulos idênticos.
 * **Suporte Completo a Subdiretórios (`base_path`):**
   - O motor de roteamento (`core/Router.php`) abstrai o prefixo de subpasta (ex: `/blog`), garantindo que tanto o despacho de rotas públicas quanto as regras de canonicalização 301 mantenham a navegação na subpasta sem expulsar o visitante para a raiz do domínio. Suporte integrado via `config.php` (`app.base_path`) ou dedução inteligente a partir de `canonical_origin`.
+
+### 8.16. Integridade de Agendamentos e Estados Editoriais
+
+* **Prevenção de Publicação Acidental por Data Inválida:** Validação rigorosa em `editor.php` e `core/PostService.php` para garantir que erros de formatação em datas de agendamento não caiam em timestamp zero (`01/01/1970`), impedindo que matérias com datas corrompidas sejam publicadas inadvertidamente no passado.
+* **Prevenção de Matérias Fantasmas (Status e Data Sincronizados):** Ao salvar rascunho com o campo de data esvaziado, o sistema sincroniza atomicamente o `status = 'draft'` e purga o cache das URLs afetadas, garantindo que a matéria não fique como `published` sem data válida (`published_at IS NULL`).
 
 ---
 

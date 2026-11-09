@@ -163,6 +163,8 @@ assertTest("Roteador despacha corretamente em subdiretório (/blog)", $subMatche
 assertTest("Validação de destino relativo seguro (/artigo-novo/)", $router->isValidRedirectTarget('/artigo-novo/'));
 assertTest("Bloqueio de Open Redirect com protocolo relativo (//evil.com)", !$router->isValidRedirectTarget('//evil.com'));
 assertTest("Bloqueio de Open Redirect com barra invertida (/\\evil.com)", !$router->isValidRedirectTarget('/\\evil.com'));
+assertTest("Bloqueio de Open Redirect com backslash simples (\\\\evil.com)", !$router->isValidRedirectTarget('\\\\evil.com'));
+assertTest("Bloqueio de Open Redirect contendo backslash (/foo\\evil)", !$router->isValidRedirectTarget('/foo\\evil'));
 assertTest("Bloqueio de Open Redirect com esquema javascript:", !$router->isValidRedirectTarget('javascript:alert(1)'));
 assertTest("Bloqueio de Open Redirect para host externo (https://site-malicioso.com)", !$router->isValidRedirectTarget('https://site-malicioso.com'));
 

@@ -57,8 +57,13 @@ class Router
         }
 
         $target = $url;
+        // Prevenir bypasses de Open Redirect via backslash (\), protocolo relativo (//) ou misto (/\)
+        if (str_starts_with($target, '//') || str_starts_with($target, '/\\') || str_starts_with($target, '\\')) {
+            $target = '/';
+        }
+
         // Se for caminho relativo interno e houver basePath configurado, prefixa automaticamente
-        if ($this->basePath !== '' && str_starts_with($target, '/') && !str_starts_with($target, '//') && !str_starts_with($target, '/\\')) {
+        if ($this->basePath !== '' && str_starts_with($target, '/') && !str_starts_with($target, '//') && !str_starts_with($target, '/\\') && !str_starts_with($target, '\\')) {
             if ($target === '/') {
                 $target = $this->basePath . '/';
             } elseif (!str_starts_with($target, $this->basePath . '/') && $target !== $this->basePath) {
@@ -80,9 +85,14 @@ class Router
             return false;
         }
 
-        // Caminhos relativos válidos: devem começar com "/" e não podem conter "//" ou "/\" (mitigação de bypass de esquema)
+        // Rejeita tentativas de bypass via backslash ou protocolo relativo (//, /\, \)
+        if (str_starts_with($target, '//') || str_starts_with($target, '/\\') || str_starts_with($target, '\\') || str_contains($target, '\\')) {
+            return false;
+        }
+
+        // Caminhos relativos válidos: devem começar com "/"
         if (str_starts_with($target, '/')) {
-            return !str_starts_with($target, '//') && !str_starts_with($target, '/\\');
+            return true;
         }
 
         // URLs absolutas: valida esquema seguro (apenas http/https) e restringe ao mesmo host
@@ -160,6 +170,11 @@ class Router
         // Isola o caminho da Query String
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
 
+        // Prevenir bypasses de Open Redirect via backslash (\), protocolo relativo (//) ou misto (/\)
+        if (str_starts_with($path, '//') || str_starts_with($path, '/\\') || str_starts_with($path, '\\')) {
+            $path = '/';
+        }
+
         // Remove prefixo de subdiretório (basePath), se configurado
         if ($this->basePath !== '') {
             if (str_starts_with($path, $this->basePath . '/')) {
@@ -189,6 +204,10 @@ class Router
 
         // Canonicalização de barra final para rotas públicas amigáveis (apenas requisições GET e fora de /api/)
         if ($method === 'GET' && !str_starts_with($path, '/api/') && $path !== '/' && !str_ends_with($path, '/') && !preg_match('~\.[a-zA-Z0-9]+$~', $path)) {
+            // Prevenir bypasses de Open Redirect via backslash ou barras duplas antes da canonicalização
+            if (str_starts_with($path, '//') || str_starts_with($path, '/\\') || str_starts_with($path, '\\')) {
+                $path = '/';
+            }
             $queryString = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
             $this->redirect($path . '/' . $queryString, 301);
             return null;
