@@ -13,6 +13,7 @@ header('Cache-Control: public, max-age=60');
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\Security;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -31,7 +32,8 @@ if (strlen($query) < 2) {
 $nowUtc = gmdate('Y-m-d H:i:s');
 $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-$searchTerm = "%{$query}%";
+$safeQuery = Security::escapeLike($query);
+$searchTerm = "%{$safeQuery}%";
 
 $posts = Database::fetchAll(
     "SELECT id, slug, title, summary, category, featured_image, published_at

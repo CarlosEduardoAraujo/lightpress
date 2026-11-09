@@ -23,15 +23,16 @@ use LightPress\Core\Security;
 // Auto-promoção de matérias agendadas cujo horário já foi atingido
 PostService::promoteScheduledPosts();
 
-$router = new Router();
+$basePath = $config['app']['base_path'] ?? (parse_url($config['app']['canonical_origin'] ?? '', PHP_URL_PATH) ?: '');
+$router = new Router($basePath);
 
 // Rota 1: Home Grid (Últimas notícias e 4 destaques principais)
-$router->get('/', function () use ($config): void {
+$router->get('/', function () use ($config, $router): void {
     header('X-Accel-Expires: 300'); // TTL reduzido de 5m no FastCGI Cache para listagens dinâmicas (LP-09)
     $query = trim($_GET['q'] ?? '');
     if (!empty($query)) {
-        header('Location: /busca/?q=' . urlencode($query));
-        exit;
+        $router->redirect('/busca/?q=' . urlencode($query), 302);
+        return;
     }
 
     $nowUtc = gmdate('Y-m-d H:i:s');
@@ -203,7 +204,8 @@ $router->get('/busca/', function () use ($config): void {
     $perPage = 12;
     $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
-    $searchTerm = "%{$query}%";
+    $safeQuery = Security::escapeLike($query);
+    $searchTerm = "%{$safeQuery}%";
 
     $posts = [];
     $totalPosts = 0;
@@ -283,12 +285,12 @@ $router->get('/busca/', function () use ($config): void {
 });
 
 // Rota 5-Paginada: Redirecionamento canônico de compatibilidade para /busca/page/{page}/
-$router->get('/busca/page/{page}/', function (array $params) use ($config): void {
+$router->get('/busca/page/{page}/', function (array $params) use ($config, $router): void {
     $page = max(1, (int)($params['page'] ?? 1));
     $query = trim($_GET['q'] ?? '');
     $target = '/busca/?q=' . urlencode($query) . ($page > 1 ? '&page=' . $page : '');
-    header('Location: ' . $target, true, 301);
-    exit;
+    $router->redirect($target, 301);
+    return;
 });
 
 // Rota 5b: Listagem por Tag (/tag/{tag}/)
@@ -586,13 +588,13 @@ $router->post('/api/view/{id}', $viewHandler);
 $router->post('/api/view/{id}/', $viewHandler);
 
 // Rota 8: Redirecionamento conveniente para o painel administrativo
-$router->get('/admin', function (): void {
-    header('Location: /admin/login.php');
-    exit;
+$router->get('/admin', function () use ($router): void {
+    $router->redirect('/admin/login.php', 302);
+    return;
 });
-$router->get('/admin/', function (): void {
-    header('Location: /admin/login.php');
-    exit;
+$router->get('/admin/', function () use ($router): void {
+    $router->redirect('/admin/login.php', 302);
+    return;
 });
 
 // Configurar manipulador 404

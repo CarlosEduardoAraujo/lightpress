@@ -20,6 +20,14 @@ class Security
     }
 
     /**
+     * Escapa caracteres curinga SQL (LIKE injection: %, _ e \) para consultas seguras.
+     */
+    public static function escapeLike(string $value): string
+    {
+        return addcslashes($value, '%_\\');
+    }
+
+    /**
      * Gera ou recupera o token CSRF da sessão ativa.
      */
     public static function generateCsrfToken(): string
@@ -233,9 +241,28 @@ class Security
             return null;
         }
 
-        $data = json_decode((string)@file_get_contents($file), true);
+        $fp = @fopen($file, 'rb');
+        if (!$fp) {
+            return null;
+        }
+
+        $raw = '';
+        try {
+            if (flock($fp, LOCK_SH)) {
+                $raw = (string)stream_get_contents($fp);
+                flock($fp, LOCK_UN);
+            }
+        } finally {
+            fclose($fp);
+        }
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $data = json_decode($raw, true);
         if (!is_array($data)) {
-            @unlink($file);
+            // Em caso de inconsistência temporária durante concorrência, não deleta o arquivo
             return null;
         }
 
@@ -279,8 +306,8 @@ class Security
 
         try {
             flock($fp, LOCK_EX);
-            $size = @filesize($file);
-            $raw = ($size && $size > 0) ? (string)fread($fp, $size) : '';
+            rewind($fp);
+            $raw = (string)stream_get_contents($fp);
             $data = json_decode($raw, true);
             if (!is_array($data)) {
                 $data = ['attempts' => 0, 'first_attempt' => time(), 'lockout_until' => 0];

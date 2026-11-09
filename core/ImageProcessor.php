@@ -455,7 +455,7 @@ class ImageProcessor
                 try {
                     $mediaId = Database::fetchValue(
                         "SELECT id FROM media WHERE variants_manifest LIKE ? LIMIT 1",
-                        ['%' . $url . '%']
+                        ['%' . Security::escapeLike($url) . '%']
                     );
                     if ($mediaId) {
                         Database::query(

@@ -169,10 +169,11 @@ if (!empty($filterSearch)) {
         $whereClauses[] = "MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)";
         $params[] = $boolQuery;
     } else {
+        $safeSearch = Security::escapeLike($filterSearch);
         $whereClauses[] = "(p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)";
-        $params[] = '%' . $filterSearch . '%';
-        $params[] = '%' . $filterSearch . '%';
-        $params[] = '%' . $filterSearch . '%';
+        $params[] = '%' . $safeSearch . '%';
+        $params[] = '%' . $safeSearch . '%';
+        $params[] = '%' . $safeSearch . '%';
     }
 }
 

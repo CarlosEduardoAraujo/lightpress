@@ -7,6 +7,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Hardening de Segurança, Concorrência e Resiliência Arquitetural
+- **Prevenção Contra Injeção de Curingas SQL (LIKE Injection):**
+  - Implementação do método utilitário centralizado `Security::escapeLike(string $value): string` (`core/Security.php`), tratando os caracteres de controle do SQL (`%`, `_` e `\`).
+  - Aplicação obrigatória em `public/api/search.php`, na busca pública de fallback em `public/index.php`, na sincronização de mídias em `core/ImageProcessor.php` (`syncRefs`), e nos filtros do painel administrativo (`public/admin/dashboard.php` e `public/admin/pages.php`), mitigando riscos de Full Table Scan não intencional (DoS) e falso matching de arquivos com underline.
+- **Resolução de Race Condition no Rate-Limiting de Login (Brute Force):**
+  - Refatoração dos métodos `Security::checkLoginRateLimit()` e `Security::recordLoginFailure()` (`core/Security.php`) para operar com sincronização rigorosa de arquivos via `flock()`.
+  - A leitura agora adquire trava compartilhada (`LOCK_SH`), aguardando conclusões de escrita antes da desserialização do JSON e prevenindo leituras de arquivos truncados a 0 bytes.
+  - Eliminação da exclusão acidental do arquivo de log (`unlink`) em casos de leitura de conteúdo vazio sob alta concorrência paralela.
+- **Defesa Contra Redirecionamentos Abertos (Open Redirect / CWE-601):**
+  - Implementação do validador estrito `Router::isValidRedirectTarget(string $target): bool` (`core/Router.php`).
+  - Bloqueio de ataques via evasão de protocolo relativo (`//site-malicioso.com`), barras invertidas (`/\site-malicioso.com`), esquemas não permitidos (`javascript:`, `data:`) e redirecionamentos para hosts externos não autorizados.
+  - Despacho da tabela de redirecionamentos (`redirects`) integrado a `$this->redirect()`, garantindo conformidade com o ambiente de testes e com as diretrizes de segurança defensiva.
+- **Otimização Algorítmica e Prevenção de DoS na Geração de Slugs (`resolveUniqueSlug`):**
+  - Eliminação do loop sequencial `while (true)` em `core/PostService.php`, que executava centenas de queries individuais em cascata ($O(N)$) na existência de publicações homônimas.
+  - Implementação de algoritmo em dois passos com resolução em lote: checagem rápida em 1 query para slugs livres e, em caso de colisão, leitura agrupada de todos os prefixos correspondentes em uma única query (`slug = ? OR slug LIKE ?`).
+  - Cálculo do maior sufixo numérico em memória (ex: `artigo-150` -> `artigo-151`), com teto de até 10 tentativas e fallback pseudoaleatório seguro (`bin2hex(random_bytes(3))`).
+- **Suporte Nativo a Subdiretórios (`base_path`) no Roteador:**
+  - Adição de propriedade e configuração de `$basePath` em `core/Router.php`, permitindo hospedar o CMS em subpastas (ex: `https://dominio.com/blog/`).
+  - Suporte nos arquivos de configuração (`config.php` e `config.local.php.example`) e autodetecção inteligente em `public/index.php` baseada em `canonical_origin`.
+  - Normalização automática de caminhos no método `dispatch()` e prefixação dinâmica de URLs internas em `Router::redirect()`, impedindo que canonicalizações e redirecionamentos 301 expulsem o usuário para fora do subdiretório.
+- **Normalização de Parâmetros Nomeados no Wrapper de Banco de Dados (`Database::query`):**
+  - Atualização em `core/Database.php` para prefixar automaticamente os dois pontos (`:`) em chaves de arrays associativos (`['id' => 1]` -> `:id`), resolvendo incompatibilidade estrita do método `PDO::bindValue()` com parâmetros nomeados sem prefixo.
+- **Saneamento e Escape HTML no Editor JavaScript (XSS Contextual):**
+  - Aprimoramento da função JavaScript `escapeHtml()` em `public/admin/editor.php` e `public/admin/page-edit.php`, cobrindo obrigatoriamente aspas duplas (`&quot;`) e aspas simples (`&#039;`).
+  - Sanitização obrigatória da propriedade `selectedMediaItem.full_url` antes de concatená-la ao atributo `src` na inserção de imagens via `applyMediaSelection()`.
+- **Expansão da Suíte de Testes Automatizados (`bin/test.php`):**
+  - Inclusão de testes unitários para escape de wildcards SQL (`Security::escapeLike`), validação de rotas em subdiretórios com `Router` e verificação de regras de segurança contra Open Redirect.
+
 ### Ordenação Cronológica e Paginação Completa da Busca Pública (`/busca/`)
 - **Ordenação por Recência (`published_at DESC`):**
   - Substituição da ordenação prioritária por pontuação estática de relevância (`ORDER BY score DESC`) pela ordenação cronológica decrescente (`ORDER BY p.published_at DESC`), garantindo que as notícias mais recentes sempre apareçam no topo dos resultados da pesquisa.

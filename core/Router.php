@@ -11,9 +11,33 @@ namespace LightPress\Core;
  */
 class Router
 {
+    private string $basePath = '';
     private array $routes = [];
     private $notFoundHandler = null;
     private bool $isTesting = false;
+
+    public function __construct(string $basePath = '')
+    {
+        $this->setBasePath($basePath);
+    }
+
+    /**
+     * Define o caminho base (subdiretório) onde a aplicação está hospedada.
+     */
+    public function setBasePath(string $basePath): self
+    {
+        $trimmed = trim($basePath, '/');
+        $this->basePath = $trimmed !== '' ? '/' . $trimmed : '';
+        return $this;
+    }
+
+    /**
+     * Retorna o caminho base atual.
+     */
+    public function getBasePath(): string
+    {
+        return $this->basePath;
+    }
 
     /**
      * Habilita ou desabilita o modo de testes (evita exit prematuro em testes unitários).
@@ -24,15 +48,58 @@ class Router
     }
 
     /**
-     * Realiza redirecionamento seguro com suporte a isolamento de testes.
+     * Realiza redirecionamento seguro com suporte a subdiretório e isolamento de testes.
      */
-    private function redirect(string $url, int $statusCode = 301): void
+    public function redirect(string $url, int $statusCode = 301): void
     {
         if ($this->isTesting) {
             return;
         }
-        header("Location: {$url}", true, $statusCode);
+
+        $target = $url;
+        // Se for caminho relativo interno e houver basePath configurado, prefixa automaticamente
+        if ($this->basePath !== '' && str_starts_with($target, '/') && !str_starts_with($target, '//') && !str_starts_with($target, '/\\')) {
+            if ($target === '/') {
+                $target = $this->basePath . '/';
+            } elseif (!str_starts_with($target, $this->basePath . '/') && $target !== $this->basePath) {
+                $target = $this->basePath . $target;
+            }
+        }
+
+        header("Location: {$target}", true, $statusCode);
         exit;
+    }
+
+    /**
+     * Valida se um destino de redirecionamento é seguro contra Open Redirect.
+     */
+    public function isValidRedirectTarget(string $target): bool
+    {
+        $target = trim($target);
+        if ($target === '') {
+            return false;
+        }
+
+        // Caminhos relativos válidos: devem começar com "/" e não podem conter "//" ou "/\" (mitigação de bypass de esquema)
+        if (str_starts_with($target, '/')) {
+            return !str_starts_with($target, '//') && !str_starts_with($target, '/\\');
+        }
+
+        // URLs absolutas: valida esquema seguro (apenas http/https) e restringe ao mesmo host
+        $scheme = parse_url($target, PHP_URL_SCHEME);
+        if ($scheme !== null && !in_array(strtolower($scheme), ['http', 'https'], true)) {
+            return false;
+        }
+
+        $targetHost = parse_url($target, PHP_URL_HOST);
+        $currentHost = $_SERVER['HTTP_HOST'] ?? '';
+        if (!empty($targetHost) && !empty($currentHost)) {
+            $cleanCurrentHost = explode(':', $currentHost)[0];
+            $cleanTargetHost = explode(':', $targetHost)[0];
+            return strcasecmp($cleanTargetHost, $cleanCurrentHost) === 0;
+        }
+
+        return false;
     }
 
     /**
@@ -93,6 +160,15 @@ class Router
         // Isola o caminho da Query String
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
 
+        // Remove prefixo de subdiretório (basePath), se configurado
+        if ($this->basePath !== '') {
+            if (str_starts_with($path, $this->basePath . '/')) {
+                $path = substr($path, strlen($this->basePath));
+            } elseif ($path === $this->basePath) {
+                $path = '/';
+            }
+        }
+
         // Redirecionamento Canônico de Paginação: /page/1/ ou /page/1 -> / (301)
         if ($path === '/page/1' || $path === '/page/1/') {
             $this->redirect('/', 301);
@@ -144,9 +220,14 @@ class Router
             );
 
             if ($redirect) {
+                $target = (string)($redirect['target_path'] ?? '');
                 $code = (int)($redirect['status_code'] ?? 301);
-                header('Location: ' . $redirect['target_path'], true, $code);
-                exit;
+
+                // Mitigação de Open Redirect: só redireciona se for caminho interno seguro ou mesmo host
+                if ($this->isValidRedirectTarget($target)) {
+                    $this->redirect($target, $code);
+                    return null;
+                }
             }
         } catch (\Throwable $e) {
             // Caso ocorra falha de conexão, prossegue para o manipulador 404

@@ -585,6 +585,8 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
   $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
   ```
 * Tipagem rigorosa em parâmetros de consulta (ex: casting explícito de IDs para `int`).
+* **Mitigação de LIKE Injection (Wildcard Escaping):** Todas as consultas dinâmicas que utilizam o operador `LIKE` realizam o escape prévio de caracteres curinga (`%`, `_` e `\`) através de `Security::escapeLike()` (`core/Security.php`), prevenindo varreduras completas no banco (Full Table Scan / DoS) ou cruzamento indevido de mídias com caracteres especiais.
+* **Normalização de Parâmetros no PDO Wrapper (`Database::query`):** Suporte nativo tanto a parâmetros posicionais (`?`) quanto nomeados associativos (`['id' => 1]`), prefixando automaticamente os dois pontos (`:`) exigidos pelo `PDO::bindValue()`.
 
 ### 8.2. Prevenção Contra Cross-Site Scripting (XSS)
 
@@ -597,6 +599,7 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
   }
   ```
   Páginas institucionais (`templates/page.php`) executam sanitização defensiva em profundidade via `BlockCompiler::sanitizeHtml()` antes da exibição para neutralizar qualquer possibilidade de XSS armazenado.
+* **Escape Seguro em Interfaces JavaScript e Editores:** A função `escapeHtml()` utilizada nos editores administrativos (`editor.php` e `page-edit.php`) realiza o escape de todos os caracteres críticos (`&`, `<`, `>`, `"`, `'`). A inserção assíncrona de tags `<img>` via modal de mídia aplica `escapeHtml()` obrigatoriamente tanto no `src` quanto no `alt`/`figcaption`, garantindo integridade contra injeção contextual em atributos.
 * **HTML compilado:** Somente `content_html` produzido pelo compilador e armazenado pelo fluxo autorizado pode ser renderizado como HTML sem passar por `e()` novamente. JSON-LD e dados inseridos em scripts usam serialização JSON apropriada ao contexto, não apenas escape HTML. A migração obedece à mesma fronteira de confiança.
 
 ### 8.3. Proteção Contra Cross-Site Request Forgery (CSRF)
@@ -625,7 +628,7 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
   ]);
   ```
 * **Regeneração de Sessão:** Chamada obrigatória a `session_regenerate_id(true)` após login com sucesso para prevenir ataques de fixação de sessão.
-* **Proteção contra Força Bruta e Spoofing de IP:** Validação de proxies reversos confiáveis (Cloudflare, localhost) em `Security::getClientIp()` antes de confiar em cabeçalhos como `X-Forwarded-For` ou `CF-Connecting-IP`. Limitação estrita de tentativas de login baseada no IP real do cliente (`Security::checkLoginRateLimit()`), bloqueando ataques distribuídos e de dicionário mesmo que o cliente descarte o cookie de sessão.
+* **Proteção contra Força Bruta com Locks Concorrentes:** Validação de proxies reversos confiáveis (Cloudflare, localhost) em `Security::getClientIp()` antes de confiar em cabeçalhos como `X-Forwarded-For` ou `CF-Connecting-IP`. Limitação estrita de tentativas de login baseada no IP real do cliente (`Security::checkLoginRateLimit()` e `Security::recordLoginFailure()`), sincronizada com travas de arquivo `flock()` (`LOCK_SH` para leituras seguras e `LOCK_EX` para escrita atômica), neutralizando race conditions de ataques concorrentes paralelos que tentem corromper ou resetar o arquivo de rate limit.
 * **Sessões Revogáveis e Centralização de Autenticação (`Security::requireAuth`):** Todas as rotas administrativas e APIs internas validam o acesso através de `Security::requireAuth(?string $action, ?array $roles, ?array $config)`, que consulta em tempo real o estado da conta e a versão da sessão (`session_version`). Caso a conta seja desativada (`is_active = 0`), a senha redefinida ou o usuário deslogado remotamente, qualquer requisição (página HTML ou chamada assíncrona AJAX/JSON) é imediatamente rejeitada e a sessão invalidada.
 * **Tokens e Bloqueio Concorrente:** Ativação expira em até 24 horas; redefinição, em até 1 hora. Tokens são de uso único, validados com CSRF obrigatório e protegidos contra race conditions através de lock pessimista (`SELECT ... FOR UPDATE`) dentro de transações de banco de dados. Limitar solicitação e validação por IP e conta, usar mensagens que não revelem a existência do e-mail e não registrar tokens/URLs completas em logs.
 * **Conclusão segura:** Ao definir senha Argon2id, consumir o token, remover `password_reset_required` e revogar os demais tokens e sessões em uma transação. Somente na ativação válida de conta pendente, liberar também `is_active`; um bloqueio administrativo revoga tokens de ativação e não pode ser desfeito por simples redefinição de senha. Não autenticar automaticamente após redefinição.
@@ -793,6 +796,26 @@ O primeiro módulo construído sobre a nova arquitetura é o **Webhook Sender** 
 * **Detecção Automática de Origem Canônica em CLI/Cron:** Em execuções de terminal ou cron onde `$_SERVER['HTTP_HOST']` não existe, utiliza `$config['app']['canonical_origin']` para gerar permalinks absolutos precisos.
 * **Tolerância a Falhas de Rede (`is_success`):** Falhas transitórias externas (timeout ou HTTP 4xx/5xx) são sinalizadas como erro nos logs, permitindo retentativas manuais pelo painel ou nova execução, sem bloquear o sistema.
 * **Interface Administrativa:** Painel integrado em `/admin/plugin-settings.php?plugin=webhook-sender` com teste de ping imediato e tabela de auditoria dos últimos envios com status de entrega e botão de reenvio em 1 clique.
+
+---
+
+### 8.14. Prevenção Contra Redirecionamentos Abertos (Open Redirect / CWE-601)
+
+Para impedir o uso indevido do sistema como vetor em ataques de engenharia social, phishing e redirecionamento para URLs externas fraudulentas:
+
+* **Validação Estrita de Destinos (`Router::isValidRedirectTarget`):**
+  - **Caminhos Relativos:** Permitidos se iniciarem estritamente com `/`, barrando tentativas de bypass com protocolo relativo (`//site-malicioso.com`) ou sintaxe de barra invertida (`/\site-malicioso.com`).
+  - **URLs Absolutas:** Esquemas restritos a `http` e `https` (eliminando `javascript:` e `data:`). O domínio deve corresponder estritamente ao host canônico autorizado do portal (`canonical_origin` ou `$_SERVER['HTTP_HOST']`).
+  - **Redirecionamentos Legados:** Todos os registros da tabela `redirects` são verificados em `Router::dispatch()` antes do envio do cabeçalho `Location`, passando pela mesma validação de segurança.
+
+### 8.15. Otimização Algorítmica de Slugs e Roteamento Flexível
+
+* **Resolução Otimizada de Slugs Únicos (`PostService::resolveUniqueSlug`):**
+  - Eliminação de consultas sequenciais $O(N)$ em loop infinito `while`.
+  - Checagem em 1 query para casos comuns e consulta agrupada em lote com busca por prefixo em colisões (`slug = ? OR slug LIKE ?`).
+  - Detecção do maior índice em memória com fallback criptograficamente seguro (`bin2hex(random_bytes(3))`) para máxima resiliência e prevenção de DoS por esgotamento de conexões em importações massivas ou matérias com títulos idênticos.
+* **Suporte Completo a Subdiretórios (`base_path`):**
+  - O motor de roteamento (`core/Router.php`) abstrai o prefixo de subpasta (ex: `/blog`), garantindo que tanto o despacho de rotas públicas quanto as regras de canonicalização 301 mantenham a navegação na subpasta sem expulsar o visitante para a raiz do domínio. Suporte integrado via `config.php` (`app.base_path`) ou dedução inteligente a partir de `canonical_origin`.
 
 ---
 

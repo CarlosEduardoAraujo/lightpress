@@ -18,6 +18,7 @@ $config = [
         'env' => 'production', // 'development' ou 'production'
         'debug' => false,
         'canonical_origin' => 'http://localhost:8080', // Ex: https://seudominio.com.br (sem barra final)
+        'base_path' => '', // Ex: '/blog' caso instalado em subdiretório (deixe vazio se instalado na raiz do domínio)
         'display_timezone' => 'America/Sao_Paulo',
     ],
 

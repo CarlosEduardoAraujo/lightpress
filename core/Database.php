@@ -148,7 +148,11 @@ class Database
                     is_null($val) => PDO::PARAM_NULL,
                     default => PDO::PARAM_STR,
                 };
-                $paramKey = is_int($key) ? $key + 1 : $key;
+                if (is_int($key)) {
+                    $paramKey = $key + 1;
+                } else {
+                    $paramKey = str_starts_with($key, ':') ? $key : ':' . $key;
+                }
                 $stmt->bindValue($paramKey, $val, $paramType);
             }
             $stmt->execute();

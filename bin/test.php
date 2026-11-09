@@ -39,6 +39,7 @@ echo "[1] Testando Segurança e Escape (core/Security.php)\n";
 
 assertTest("Escape HTML básico", Security::e("<h1>Título & 'teste'</h1>") === "&lt;h1&gt;T&iacute;tulo &amp; &#039;teste&#039;&lt;/h1&gt;" || Security::e("<h1>Título & 'teste'</h1>") === "&lt;h1&gt;Título &amp; &#039;teste&#039;&lt;/h1&gt;");
 assertTest("Escape de valor nulo", Security::e(null) === "");
+assertTest("Escape de curingas SQL (LIKE Injection)", Security::escapeLike("100%_desconto\\promo") === "100\\%\\_desconto\\\\promo");
 assertTest("Geração de Slug limpo", Security::slugify("Notícia Incrível de Fórmula 1!") === "noticia-incrivel-de-formula-1");
 assertTest("HMAC IP Hash não vazio e 64 caracteres hexadecimais", strlen(Security::hashIp("192.168.1.100", "segredo")) === 64);
 assertTest("HMAC IP Hash determinístico", Security::hashIp("192.168.1.100", "segredo") === Security::hashIp("192.168.1.100", "segredo"));
@@ -145,6 +146,25 @@ $router->dispatch('GET', '/artigo/gp-de-monaco/');
 
 assertTest("Roteador captura rota com parâmetro nomeado", $matched);
 assertTest("Roteador extrai parâmetro slug corretamente", $paramSlug === 'gp-de-monaco');
+
+// Testes de Roteamento em Subdiretório (basePath)
+$subRouter = new Router('/blog');
+$subRouter->setTestingMode(true);
+$subMatched = false;
+$subSlug = '';
+$subRouter->get('/artigo/{slug}/', function(array $params) use (&$subMatched, &$subSlug): void {
+    $subMatched = true;
+    $subSlug = $params['slug'] ?? '';
+});
+$subRouter->dispatch('GET', '/blog/artigo/gp-do-brasil/');
+assertTest("Roteador despacha corretamente em subdiretório (/blog)", $subMatched && $subSlug === 'gp-do-brasil');
+
+// Testes de Mitigação de Open Redirect
+assertTest("Validação de destino relativo seguro (/artigo-novo/)", $router->isValidRedirectTarget('/artigo-novo/'));
+assertTest("Bloqueio de Open Redirect com protocolo relativo (//evil.com)", !$router->isValidRedirectTarget('//evil.com'));
+assertTest("Bloqueio de Open Redirect com barra invertida (/\\evil.com)", !$router->isValidRedirectTarget('/\\evil.com'));
+assertTest("Bloqueio de Open Redirect com esquema javascript:", !$router->isValidRedirectTarget('javascript:alert(1)'));
+assertTest("Bloqueio de Open Redirect para host externo (https://site-malicioso.com)", !$router->isValidRedirectTarget('https://site-malicioso.com'));
 
 // -------------------------------------------------------------
 // 6. Testes do Módulo de SEO e JSON-LD (core/Seo.php)

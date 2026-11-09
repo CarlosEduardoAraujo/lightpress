@@ -402,7 +402,8 @@ class PostService
     }
 
     /**
-     * Garante unicidade do slug adicionando sufixo numérico (-2, -3) caso já exista no banco.
+     * Garante unicidade do slug de forma eficiente, evitando loops de queries O(N).
+     * Adiciona sufixo numérico incremental (-2, -3) ou sufixo aleatório seguro em caso de alta colisão.
      */
     public function resolveUniqueSlug(string $baseSlug, ?int $ignorePostId = null): string
     {
@@ -411,23 +412,58 @@ class PostService
             $baseSlug = 'artigo';
         }
 
-        $slug = $baseSlug;
-        $counter = 1;
-
-        while (true) {
-            $isReserved = in_array(strtolower($slug), self::RESERVED_SLUGS, true) || str_starts_with($slug, 'sitemap-posts-');
-            if ($ignorePostId !== null) {
-                $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? AND id != ? LIMIT 1", [$slug, $ignorePostId]);
-            } else {
-                $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? LIMIT 1", [$slug]);
-            }
-
-            if (!$exists && !$isReserved) {
-                return $slug;
-            }
-
-            $counter++;
-            $slug = "{$baseSlug}-{$counter}";
+        // 1. Caminho Rápido: verifica se o slug base está livre e não é reservado
+        $isReserved = in_array(strtolower($baseSlug), self::RESERVED_SLUGS, true) || str_starts_with($baseSlug, 'sitemap-posts-');
+        if ($ignorePostId !== null) {
+            $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? AND id != ? LIMIT 1", [$baseSlug, $ignorePostId]);
+        } else {
+            $exists = Database::fetchOne("SELECT id FROM posts WHERE slug = ? LIMIT 1", [$baseSlug]);
         }
+
+        if (!$exists && !$isReserved) {
+            return $baseSlug;
+        }
+
+        // 2. Se houver colisão, busca de uma só vez todos os slugs existentes com o mesmo prefixo
+        $likePattern = Security::escapeLike($baseSlug) . '-%';
+        if ($ignorePostId !== null) {
+            $similarSlugs = Database::fetchAll(
+                "SELECT slug FROM posts WHERE (slug = ? OR slug LIKE ?) AND id != ?",
+                [$baseSlug, $likePattern, $ignorePostId]
+            );
+        } else {
+            $similarSlugs = Database::fetchAll(
+                "SELECT slug FROM posts WHERE slug = ? OR slug LIKE ?",
+                [$baseSlug, $likePattern]
+            );
+        }
+
+        $existingMap = [];
+        $maxSuffix = 1;
+        $regex = '/^' . preg_quote($baseSlug, '/') . '-(\d+)$/';
+
+        foreach ($similarSlugs as $row) {
+            $s = (string)($row['slug'] ?? '');
+            $existingMap[$s] = true;
+            if (preg_match($regex, $s, $m)) {
+                $num = (int)$m[1];
+                if ($num > $maxSuffix) {
+                    $maxSuffix = $num;
+                }
+            }
+        }
+
+        // 3. Testa sequencialmente até 10 candidatos a partir de maxSuffix + 1
+        $candidateCounter = $maxSuffix + 1;
+        for ($i = 0; $i < 10; $i++, $candidateCounter++) {
+            $candidateSlug = "{$baseSlug}-{$candidateCounter}";
+            $reserved = in_array(strtolower($candidateSlug), self::RESERVED_SLUGS, true) || str_starts_with($candidateSlug, 'sitemap-posts-');
+            if (!isset($existingMap[$candidateSlug]) && !$reserved) {
+                return $candidateSlug;
+            }
+        }
+
+        // 4. Fallback de alta concorrência/colisão: gera sufixo pseudoaleatório curto
+        return "{$baseSlug}-" . bin2hex(random_bytes(3));
     }
 }

@@ -871,7 +871,13 @@ require __DIR__ . '/header.php';
         }
 
         function escapeHtml(text) {
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            if (text === null || text === undefined) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         // -------------------------------------------------------------
@@ -1096,7 +1102,9 @@ require __DIR__ . '/header.php';
                 document.getElementById('featuredPreviewImg').src = url;
                 document.getElementById('featuredPreviewBox').style.display = 'block';
             } else if (currentModalTarget === 'content') {
-                var imgHtml = '<figure><img src="' + selectedMediaItem.full_url + '" alt="' + escapeHtml(selectedMediaItem.original_name) + '"><figcaption>' + escapeHtml(selectedMediaItem.original_name) + '</figcaption></figure><p></p>';
+                var safeUrl = escapeHtml(selectedMediaItem.full_url);
+                var safeName = escapeHtml(selectedMediaItem.original_name);
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeName + '"><figcaption>' + safeName + '</figcaption></figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {

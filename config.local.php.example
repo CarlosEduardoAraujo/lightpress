@@ -13,6 +13,7 @@ return [
         'env' => 'production',
         'debug' => false,
         'canonical_origin' => 'https://seudominio.com.br',
+        'base_path' => '', // Ex: '/blog' caso instalado em subpasta
     ],
     'database' => [
         'driver' => 'mysql', // 'mysql' ou 'sqlite'

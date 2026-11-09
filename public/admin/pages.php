@@ -63,7 +63,8 @@ $params = [];
 
 if ($filterSearch !== '') {
     $sql .= " AND (p.title LIKE ? OR p.slug LIKE ? OR p.content_html LIKE ?)";
-    $term = "%{$filterSearch}%";
+    $safeSearch = Security::escapeLike($filterSearch);
+    $term = "%{$safeSearch}%";
     $params[] = $term;
     $params[] = $term;
     $params[] = $term;
