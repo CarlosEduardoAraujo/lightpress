@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$existing) {
                     $error = "Usuário não encontrado.";
                 } else {
+                    $editUser = $existing;
                     // Validar se username ou email já existem em outro usuário
                     $duplicate = Database::fetchOne(
                         "SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ? LIMIT 1",
@@ -61,7 +62,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($duplicate) {
                         $error = "Nome de usuário ou e-mail já está em uso por outra conta.";
-                    } else {
+                    } elseif ($existing['role'] === 'admin' && (int)$existing['is_active'] === 1 && $role !== 'admin') {
+                        $otherAdmins = (int)Database::fetchValue(
+                            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?",
+                            [$targetId]
+                        );
+                        if ($otherAdmins === 0) {
+                            $error = "Não é permitido rebaixar o único administrador ativo do sistema.";
+                        }
+                    }
+
+                    if (empty($error)) {
                         try {
                             if (!empty($newPassword)) {
                                 if (strlen($newPassword) < 8) {
@@ -165,9 +176,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $toggleUserId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
 $csrfUsr = $_POST['_csrf_token'] ?? '';
 if ($toggleUserId > 0 && Security::verifyCsrfToken($csrfUsr)) {
-    if ($toggleUserId === (int)$currentUser['id']) {
+    $targetToggle = Database::fetchOne("SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1", [$toggleUserId]);
+    if (!$targetToggle) {
+        $error = "Usuário não encontrado.";
+    } elseif ($toggleUserId === (int)$currentUser['id']) {
         $error = "Você não pode desativar seu próprio usuário.";
-    } else {
+    } elseif ($targetToggle['role'] === 'admin' && (int)$targetToggle['is_active'] === 1) {
+        $otherAdmins = (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?",
+            [$toggleUserId]
+        );
+        if ($otherAdmins === 0) {
+            $error = "Não é permitido desativar o único administrador ativo do sistema.";
+        }
+    }
+
+    if (empty($error)) {
         Database::transaction(function () use ($toggleUserId): void {
             Database::query(
                 "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",

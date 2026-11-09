@@ -551,6 +551,91 @@ assert_check(
     "$_GET['toggle_featured_id']" not in dashboard_content
 )
 
+# 8. Trava contra Desativação ou Rebaixamento do Último Administrador
+print("\n[8] Testando Trava contra Desativação ou Rebaixamento do Último Administrador")
+
+with open("public/admin/users.php", "r", encoding="utf-8") as f:
+    users_content = f.read()
+
+assert_check(
+    "users.php verifica outros administradores antes de permitir rebaixamento no edit",
+    "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?" in users_content
+    and "Não é permitido rebaixar o único administrador ativo do sistema." in users_content
+)
+
+assert_check(
+    "users.php verifica outros administradores antes de permitir desativação no toggle",
+    "Não é permitido desativar o único administrador ativo do sistema." in users_content
+)
+
+# Teste com banco SQLite simulando a lógica de negócio
+cursor.execute("DELETE FROM users")
+cursor.execute("INSERT INTO users (id, name, username, email, role, is_active) VALUES (1, 'Admin 1', 'admin1', 'admin1@teste.com', 'admin', 1)")
+cursor.execute("INSERT INTO users (id, name, username, email, role, is_active) VALUES (2, 'Autor 1', 'autor1', 'autor1@teste.com', 'author', 1)")
+conn.commit()
+
+# Tentativa de rebaixar Admin 1 (único ativo)
+cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != 1")
+other_admins = cursor.fetchone()[0]
+assert_check("Único administrador ativo não possui outros administradores ativos (other_admins == 0)", other_admins == 0)
+
+# Adiciona um segundo admin ativo
+cursor.execute("INSERT INTO users (id, name, username, email, role, is_active) VALUES (3, 'Admin 2', 'admin2', 'admin2@teste.com', 'admin', 1)")
+conn.commit()
+cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != 1")
+other_admins_after = cursor.fetchone()[0]
+assert_check("Com dois administradores ativos, a contagem de outros admins é 1", other_admins_after == 1)
+
+# Se Admin 2 for desativado
+cursor.execute("UPDATE users SET is_active = 0 WHERE id = 3")
+conn.commit()
+cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != 1")
+other_active_admins = cursor.fetchone()[0]
+assert_check("Admin inativo não conta como administrador ativo disponível", other_active_admins == 0)
+
+# 9. Validação de Caminho na Exclusão de Arquivos de Mídia (Anti-Path-Traversal)
+print("\n[9] Testando Validação de Caminho Seguro na Exclusão de Mídia")
+
+with open("public/admin/media.php", "r", encoding="utf-8") as f:
+    media_content = f.read()
+
+assert_check(
+    "media.php resolve realpath do diretório de upload e do arquivo antes de unlink",
+    "realpath($uploadDir)" in media_content
+    and "realpath($localPath)" in media_content
+    and "str_starts_with" in media_content
+    and "@unlink($realLocalPath)" in media_content
+)
+
+# Teste de validação de path traversal
+import tempfile
+import os
+
+with tempfile.TemporaryDirectory() as base_temp:
+    upload_root = os.path.join(base_temp, "public", "uploads")
+    os.makedirs(upload_root, exist_ok=True)
+    
+    secret_file = os.path.join(base_temp, "config.php")
+    with open(secret_file, "w") as sf:
+        sf.write("<?php // secret")
+        
+    safe_file = os.path.join(upload_root, "foto.webp")
+    with open(safe_file, "w") as sf:
+        sf.write("fake image")
+        
+    real_upload = os.path.realpath(upload_root).replace(os.sep, '/').rstrip('/') + '/'
+    
+    # Traversal tentativa
+    traversal_path = os.path.join(upload_root, "..", "..", "config.php")
+    real_traversal = os.path.realpath(traversal_path).replace(os.sep, '/')
+    is_traversal_safe = real_traversal.lower().startswith(real_upload.lower())
+    assert_check("Arquivo fora do diretório de uploads via traversal é rejeitado", not is_traversal_safe)
+    
+    # Arquivo legítimo dentro de uploads
+    real_safe = os.path.realpath(safe_file).replace(os.sep, '/')
+    is_legit_safe = real_safe.lower().startswith(real_upload.lower())
+    assert_check("Arquivo legítimo dentro do diretório de uploads é aceito", is_legit_safe)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

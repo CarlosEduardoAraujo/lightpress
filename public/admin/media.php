@@ -168,12 +168,24 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
                 $error = "Esta imagem não pode ser excluída pois está em uso como destaque ou no conteúdo de matérias, páginas ou revisões históricas do acervo.";
             } else {
                 $publicPath = $config['paths']['public'] ?? (dirname(__DIR__, 2) . '/public');
+                $uploadDir = $config['media']['upload_dir'] ?? ($publicPath . '/uploads');
+                $realUploadDir = realpath($uploadDir);
+
                 foreach ($variants as $res => $formats) {
                     if (!is_array($formats)) continue;
                     foreach ($formats as $fmt => $info) {
                         $localPath = $publicPath . ($info['url'] ?? '');
                         if (file_exists($localPath)) {
-                            @unlink($localPath);
+                            $realLocalPath = realpath($localPath);
+                            if ($realLocalPath !== false && $realUploadDir !== false) {
+                                $normUpload = rtrim(str_replace('\\', '/', $realUploadDir), '/') . '/';
+                                $normFile = str_replace('\\', '/', $realLocalPath);
+                                $cmpUpload = DIRECTORY_SEPARATOR === '\\' ? strtolower($normUpload) : $normUpload;
+                                $cmpFile = DIRECTORY_SEPARATOR === '\\' ? strtolower($normFile) : $normFile;
+                                if (str_starts_with($cmpFile, $cmpUpload)) {
+                                    @unlink($realLocalPath);
+                                }
+                            }
                         }
                     }
                 }
