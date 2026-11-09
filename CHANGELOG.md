@@ -7,6 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Blindagem contra Exposição de Token CSRF no Logout e Destaques — 2026-11-09
+
+- **Navegação Administrativa (`core/AdminNav.php`):**
+  - Migração do botão "Sair" de um link `<a href="...">` para um formulário HTML dedicado `<form method="POST" action="/admin/dashboard.php">` com token CSRF e parâmetro de ação enviados como campos ocultos (`<input type="hidden">`).
+  - Preservação da estética visual do botão de logout sem bordas ou fundo, garantindo ergonomia sem expor credenciais temporárias ou tokens na URL.
+- **Dashboard Administrativo (`public/admin/dashboard.php`):**
+  - Remoção completa da aceitação de parâmetros via `$_GET` para encerramento de sessão (`action=logout`) e alternância de artigos em destaque (`toggle_featured_id`).
+  - Ambas as operações agora exigem estritamente `$_SERVER['REQUEST_METHOD'] === 'POST'` e validação obrigatória do token CSRF via `$_POST['_csrf_token']`.
+  - Eliminação do risco de vazamento de tokens de sessão ativa em históricos de navegadores, logs de acesso HTTP (`access.log` do Nginx) e cabeçalhos `Referer`.
+- **Testes de Regressão de Segurança (`bin/test_security_fixes.py`):**
+  - Inclusão da suíte de verificação automatizada `[7] Testando Prevenção de Exposição de CSRF via GET no Logout e Destaques`, cobrindo integridade do formulário em `AdminNav.php` e recusa de mutações via GET em `dashboard.php`.
+
+
 ### Recuperação de migrações e restauração histórica — 2026-11-09
 
 - **SQLite:** rollback da transação criada pela migração em caso de falha, restauração do valor original de `PRAGMA foreign_keys` em `finally` e propagação da exceção. Migração necessária durante uma transação externa é recusada sem confirmar ou desfazer o trabalho do chamador.
