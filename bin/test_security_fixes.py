@@ -564,6 +564,12 @@ assert_check(
 )
 
 assert_check(
+    "users.php executa verificação de rebaixamento e bloqueio com atomicidade dentro de transaction com FOR UPDATE",
+    "Database::transaction(" in users_content
+    and "Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''" in users_content
+)
+
+assert_check(
     "users.php verifica outros administradores antes de permitir desativação no toggle",
     "Não é permitido desativar o único administrador ativo do sistema." in users_content
 )
@@ -604,16 +610,24 @@ assert_check(
     "realpath($uploadDir)" in media_content
     and "realpath($localPath)" in media_content
     and "str_starts_with" in media_content
-    and "@unlink($realLocalPath)" in media_content
+    and "is_file($resolvedLocalPath)" in media_content
+    and "@unlink($resolvedLocalPath)" in media_content
 )
 
-# Teste de validação de path traversal
+# Teste de validação de path traversal e diretório irmão (sibling directory)
 import tempfile
 import os
 
 with tempfile.TemporaryDirectory() as base_temp:
     upload_root = os.path.join(base_temp, "public", "uploads")
     os.makedirs(upload_root, exist_ok=True)
+    
+    # Diretório irmão com mesmo prefixo
+    sibling_root = os.path.join(base_temp, "public", "uploads_backup")
+    os.makedirs(sibling_root, exist_ok=True)
+    sibling_file = os.path.join(sibling_root, "backup.webp")
+    with open(sibling_file, "w") as bf:
+        bf.write("backup")
     
     secret_file = os.path.join(base_temp, "config.php")
     with open(secret_file, "w") as sf:
@@ -631,9 +645,14 @@ with tempfile.TemporaryDirectory() as base_temp:
     is_traversal_safe = real_traversal.lower().startswith(real_upload.lower())
     assert_check("Arquivo fora do diretório de uploads via traversal é rejeitado", not is_traversal_safe)
     
+    # Teste de diretório irmão com mesmo prefixo (uploads_backup vs uploads/)
+    real_sibling = os.path.realpath(sibling_file).replace(os.sep, '/')
+    is_sibling_safe = real_sibling.lower().startswith(real_upload.lower())
+    assert_check("Arquivo em diretório irmão com mesmo prefixo (uploads_backup) é rejeitado graças à barra final", not is_sibling_safe)
+    
     # Arquivo legítimo dentro de uploads
     real_safe = os.path.realpath(safe_file).replace(os.sep, '/')
-    is_legit_safe = real_safe.lower().startswith(real_upload.lower())
+    is_legit_safe = real_safe.lower().startswith(real_upload.lower()) and os.path.isfile(safe_file)
     assert_check("Arquivo legítimo dentro do diretório de uploads é aceito", is_legit_safe)
 
 print("\n========================================================")

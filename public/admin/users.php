@@ -62,24 +62,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($duplicate) {
                         $error = "Nome de usuário ou e-mail já está em uso por outra conta.";
-                    } elseif ($existing['role'] === 'admin' && (int)$existing['is_active'] === 1 && $role !== 'admin') {
-                        $otherAdmins = (int)Database::fetchValue(
-                            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?",
-                            [$targetId]
-                        );
-                        if ($otherAdmins === 0) {
-                            $error = "Não é permitido rebaixar o único administrador ativo do sistema.";
-                        }
-                    }
-
-                    if (empty($error)) {
+                    } else {
                         try {
-                            if (!empty($newPassword)) {
-                                if (strlen($newPassword) < 8) {
-                                    throw new \InvalidArgumentException("A nova senha deve ter no mínimo 8 caracteres.");
+                            if (!empty($newPassword) && strlen($newPassword) < 8) {
+                                throw new \InvalidArgumentException("A nova senha deve ter no mínimo 8 caracteres.");
+                            }
+                            $hash = !empty($newPassword) ? Security::hashPassword($newPassword) : null;
+
+                            Database::transaction(function () use ($name, $username, $email, $role, $bio, $avatar, $hash, $targetId): void {
+                                $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
+                                $targetRow = Database::fetchOne(
+                                    "SELECT role, is_active FROM users WHERE id = ?" . $forUpdate,
+                                    [$targetId]
+                                );
+
+                                if (!$targetRow) {
+                                    throw new \RuntimeException("Usuário não encontrado.");
                                 }
-                                $hash = Security::hashPassword($newPassword);
-                                Database::transaction(function () use ($name, $username, $email, $role, $bio, $avatar, $hash, $targetId): void {
+
+                                if ($targetRow['role'] === 'admin' && (int)$targetRow['is_active'] === 1 && $role !== 'admin') {
+                                    $otherAdmins = (int)Database::fetchValue(
+                                        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?" . $forUpdate,
+                                        [$targetId]
+                                    );
+                                    if ($otherAdmins === 0) {
+                                        throw new \RuntimeException("Não é permitido rebaixar o único administrador ativo do sistema.");
+                                    }
+                                }
+
+                                if ($hash !== null) {
                                     Database::query(
                                         "UPDATE users 
                                          SET name = ?, username = ?, email = ?, role = ?, bio = ?, avatar = ?, password_hash = ?, session_version = session_version + 1 
@@ -90,20 +101,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
                                         [$targetId]
                                     );
-                                });
-                            } else {
-                                Database::query(
-                                    "UPDATE users 
-                                     SET name = ?, username = ?, email = ?, role = ?, bio = ?, avatar = ?, session_version = session_version + 1 
-                                     WHERE id = ?",
-                                    [$name, $username, $email, $role, $bio, $avatar, $targetId]
-                                );
-                            }
+                                } else {
+                                    Database::query(
+                                        "UPDATE users 
+                                         SET name = ?, username = ?, email = ?, role = ?, bio = ?, avatar = ?, session_version = session_version + 1 
+                                         WHERE id = ?",
+                                        [$name, $username, $email, $role, $bio, $avatar, $targetId]
+                                    );
+                                }
+                            });
 
                             $message = "Perfil de '{$name}' atualizado com sucesso!";
                             $editUser = Database::fetchOne("SELECT * FROM users WHERE id = ? LIMIT 1", [$targetId]);
                         } catch (\Throwable $e) {
-                            $error = "Erro ao atualizar usuário: " . $e->getMessage();
+                            $error = $e->getMessage();
                         }
                     }
                 }
@@ -176,34 +187,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $toggleUserId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
 $csrfUsr = $_POST['_csrf_token'] ?? '';
 if ($toggleUserId > 0 && Security::verifyCsrfToken($csrfUsr)) {
-    $targetToggle = Database::fetchOne("SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1", [$toggleUserId]);
-    if (!$targetToggle) {
-        $error = "Usuário não encontrado.";
-    } elseif ($toggleUserId === (int)$currentUser['id']) {
+    if ($toggleUserId === (int)$currentUser['id']) {
         $error = "Você não pode desativar seu próprio usuário.";
-    } elseif ($targetToggle['role'] === 'admin' && (int)$targetToggle['is_active'] === 1) {
-        $otherAdmins = (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?",
-            [$toggleUserId]
-        );
-        if ($otherAdmins === 0) {
-            $error = "Não é permitido desativar o único administrador ativo do sistema.";
-        }
-    }
+    } else {
+        try {
+            Database::transaction(function () use ($toggleUserId): void {
+                $forUpdate = Database::getDriver() === 'mysql' ? ' FOR UPDATE' : '';
+                $targetToggle = Database::fetchOne(
+                    "SELECT id, role, is_active FROM users WHERE id = ?" . $forUpdate,
+                    [$toggleUserId]
+                );
 
-    if (empty($error)) {
-        Database::transaction(function () use ($toggleUserId): void {
-            Database::query(
-                "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",
-                [$toggleUserId]
-            );
-            Database::query(
-                "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
-                [$toggleUserId]
-            );
-        });
-        header("Location: /admin/users.php");
-        exit;
+                if (!$targetToggle) {
+                    throw new \RuntimeException("Usuário não encontrado.");
+                }
+
+                if ($targetToggle['role'] === 'admin' && (int)$targetToggle['is_active'] === 1) {
+                    $otherAdmins = (int)Database::fetchValue(
+                        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?" . $forUpdate,
+                        [$toggleUserId]
+                    );
+                    if ($otherAdmins === 0) {
+                        throw new \RuntimeException("Não é permitido desativar o único administrador ativo do sistema.");
+                    }
+                }
+
+                Database::query(
+                    "UPDATE users SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, session_version = session_version + 1 WHERE id = ?",
+                    [$toggleUserId]
+                );
+                Database::query(
+                    "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+                    [$toggleUserId]
+                );
+            });
+
+            header("Location: /admin/users.php");
+            exit;
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+        }
     }
 }
 

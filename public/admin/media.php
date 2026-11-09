@@ -169,21 +169,24 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
             } else {
                 $publicPath = $config['paths']['public'] ?? (dirname(__DIR__, 2) . '/public');
                 $uploadDir = $config['media']['upload_dir'] ?? ($publicPath . '/uploads');
-                $realUploadDir = realpath($uploadDir);
+                $resolvedUploadDir = realpath($uploadDir);
 
-                foreach ($variants as $res => $formats) {
-                    if (!is_array($formats)) continue;
-                    foreach ($formats as $fmt => $info) {
-                        $localPath = $publicPath . ($info['url'] ?? '');
-                        if (file_exists($localPath)) {
-                            $realLocalPath = realpath($localPath);
-                            if ($realLocalPath !== false && $realUploadDir !== false) {
-                                $normUpload = rtrim(str_replace('\\', '/', $realUploadDir), '/') . '/';
-                                $normFile = str_replace('\\', '/', $realLocalPath);
-                                $cmpUpload = DIRECTORY_SEPARATOR === '\\' ? strtolower($normUpload) : $normUpload;
-                                $cmpFile = DIRECTORY_SEPARATOR === '\\' ? strtolower($normFile) : $normFile;
-                                if (str_starts_with($cmpFile, $cmpUpload)) {
-                                    @unlink($realLocalPath);
+                if ($resolvedUploadDir !== false) {
+                    $baseUploadDir = rtrim(str_replace('\\', '/', $resolvedUploadDir), '/') . '/';
+
+                    foreach ($variants as $res => $formats) {
+                        if (!is_array($formats)) continue;
+                        foreach ($formats as $fmt => $info) {
+                            $localPath = $publicPath . ($info['url'] ?? '');
+                            if (file_exists($localPath)) {
+                                $resolvedLocalPath = realpath($localPath);
+                                if ($resolvedLocalPath !== false) {
+                                    $targetFile = str_replace('\\', '/', $resolvedLocalPath);
+                                    $cmpBase = DIRECTORY_SEPARATOR === '\\' ? strtolower($baseUploadDir) : $baseUploadDir;
+                                    $cmpTarget = DIRECTORY_SEPARATOR === '\\' ? strtolower($targetFile) : $targetFile;
+                                    if (str_starts_with($cmpTarget, $cmpBase) && is_file($resolvedLocalPath)) {
+                                        @unlink($resolvedLocalPath);
+                                    }
                                 }
                             }
                         }
