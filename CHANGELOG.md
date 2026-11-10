@@ -16,6 +16,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Precedência de credenciais: prioridade para constantes em `config.local.php` (`AI_COPILOT_GEMINI_API_KEY`, etc.), mantendo as chaves fora do banco de dados, com fallback mascarado para a tabela `settings`.
   - Blindagem estrita contra SSRF com bloqueio explícito de metadados em nuvem (`169.254.169.254`), faixas de loopback e protocolos inseguros.
   - Parser tolerante a markdown com limpeza de delimitadores ````json```` e extração robusta de JSON.
+  - Correção de tipagem estrita em `Settings::get()`: envio de `'8'` (string) no fallback de timeout em `AiClient::getTimeout()`, prevenindo `TypeError` sob `declare(strict_types=1);` ao carregar a tela de configurações.
 - **Módulo 1: Linkagem Interna Inteligente (SEO Interno) (`src/InternalLinker.php`):**
   - Pré-filtragem determinística ultrarrápida (<5 ms) no MySQL via índice FULLTEXT `idx_fulltext_search (title, summary, tags)` com seleção de 10 a 15 artigos candidatos reais já publicados.
   - Filtros estritos: exclusão de matérias em rascunho (`status = 'published'`) e exclusão da própria matéria em edição (`id != currentPostId`).

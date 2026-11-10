@@ -109,11 +109,13 @@ $visionEnabled = Settings::get('ai_copilot_vision_enabled', '1') === '1';
 $visionMode = Settings::get('ai_copilot_vision_mode', 'auto');
 $currentTimeout = AiClient::getTimeout();
 
-function maskKey(string $key): string {
-    if (empty($key)) return '';
-    $len = strlen($key);
-    if ($len <= 8) return str_repeat('•', $len);
-    return substr($key, 0, 6) . '••••••••' . substr($key, -4);
+if (!function_exists('maskKey')) {
+    function maskKey(string $key): string {
+        if (empty($key)) return '';
+        $len = strlen($key);
+        if ($len <= 8) return str_repeat('•', $len);
+        return substr($key, 0, 6) . '••••••••' . substr($key, -4);
+    }
 }
 
 $pageTitle = 'Configurações - AI Copilot';

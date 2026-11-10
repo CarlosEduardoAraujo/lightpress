@@ -135,7 +135,7 @@ final class AiClient
      */
     public static function getTimeout(): int
     {
-        $t = (int)Settings::get('ai_copilot_timeout', 8);
+        $t = (int)Settings::get('ai_copilot_timeout', '8');
         return max(3, min(30, $t));
     }
 

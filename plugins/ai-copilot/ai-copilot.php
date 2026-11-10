@@ -27,6 +27,11 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
+// Carregamento determinístico das classes do plugin
+require_once __DIR__ . '/src/AiClient.php';
+require_once __DIR__ . '/src/InternalLinker.php';
+require_once __DIR__ . '/src/MediaVision.php';
+
 // 2. Hook de Ativação do Plugin (Garante migração idempotente de schema)
 PluginManager::registerActivationHook('ai-copilot', function (): void {
     try {
