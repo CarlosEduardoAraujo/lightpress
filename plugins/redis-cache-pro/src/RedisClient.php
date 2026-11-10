@@ -601,7 +601,7 @@ class RedisClient
     }
 
     /**
-     * Registra métricas de telemetria em bucket de 1 hora no Redis com TTL de 48h.
+     * Registra métricas de telemetria em bucket de 1 hora e no acumulador agregado persistente.
      */
     private function recordTelemetry(int $hits = 0, int $misses = 0, float $latencyMs = 0.0, int $commands = 0): void
     {
@@ -611,15 +611,32 @@ class RedisClient
 
         $hourBucket = date('Y-m-d-H');
         $telemetryKey = "{$this->config['prefix']}telemetry:{$hourBucket}";
+        $aggregateKey = "{$this->config['prefix']}telemetry:aggregate";
 
         try {
-            if ($hits > 0) $this->redis->hIncrBy($telemetryKey, 'hits', $hits);
-            if ($misses > 0) $this->redis->hIncrBy($telemetryKey, 'misses', $misses);
-            if ($commands > 0) $this->redis->hIncrBy($telemetryKey, 'commands', $commands);
-            if ($latencyMs > 0) $this->redis->hIncrBy($telemetryKey, 'latency_ms_total', (int)($latencyMs * 100));
+            if ($hits > 0) {
+                $this->redis->hIncrBy($telemetryKey, 'hits', $hits);
+                $this->redis->hIncrBy($aggregateKey, 'hits', $hits);
+            }
+            if ($misses > 0) {
+                $this->redis->hIncrBy($telemetryKey, 'misses', $misses);
+                $this->redis->hIncrBy($aggregateKey, 'misses', $misses);
+            }
+            if ($commands > 0) {
+                $this->redis->hIncrBy($telemetryKey, 'commands', $commands);
+                $this->redis->hIncrBy($aggregateKey, 'commands', $commands);
+            }
+            if ($latencyMs > 0) {
+                $scaled = (int)($latencyMs * 100);
+                $this->redis->hIncrBy($telemetryKey, 'latency_ms_total', $scaled);
+                $this->redis->hIncrBy($aggregateKey, 'latency_ms_total', $scaled);
+                $this->redis->hIncrBy($aggregateKey, 'latency_count', 1);
+            }
 
-            // Garante TTL de 48h no bucket
-            $this->redis->expire($telemetryKey, 172800);
+            // Garante TTL de 48h no bucket horário
+            if (method_exists($this->redis, 'expire')) {
+                $this->redis->expire($telemetryKey, 172800);
+            }
         } catch (Throwable) {}
     }
 
@@ -655,8 +672,8 @@ class RedisClient
             }
 
             $totalOps = $hits + $misses;
-            $hitRatio = $totalOps > 0 ? round(($hits / $totalOps) * 100, 1) : 100.0;
-            $avgLatency = $totalOps > 0 ? round($latencyTotalMs / $totalOps, 2) : 0.45;
+            $hitRatio = $totalOps > 0 ? round(($hits / $totalOps) * 100, 1) : 0.0;
+            $avgLatency = $totalOps > 0 ? round($latencyTotalMs / $totalOps, 2) : 0.0;
 
             $data[] = [
                 'hour'           => $bucket,
@@ -673,16 +690,58 @@ class RedisClient
     }
 
     /**
-     * Retorna diagnóstico geral de status, métricas e memória do Redis.
+     * Retorna diagnóstico geral de status, métricas persistentes, RTT real e memória do Redis.
      *
      * @return array<string, mixed>
      */
     public function getDiagnosticInfo(): array
     {
         $connected = $this->isConnected();
-        $total = $this->runtimeStats['hits'] + $this->runtimeStats['misses'];
-        $hitRatio = $total > 0 ? round(($this->runtimeStats['hits'] / $total) * 100, 1) : 100.0;
-        $avgLatency = $total > 0 ? round($this->runtimeStats['latency_sum_ms'] / $total, 2) : 0.35;
+
+        // 1. Ler agregador persistente de telemetria no Redis
+        $aggHits = 0;
+        $aggMisses = 0;
+        $aggCommands = 0;
+        $aggLatencyMs = 0.0;
+        $aggLatencyCount = 0;
+
+        if ($connected) {
+            try {
+                $agg = $this->redis->hGetAll("{$this->config['prefix']}telemetry:aggregate");
+                if (is_array($agg) && !empty($agg)) {
+                    $aggHits = (int)($agg['hits'] ?? 0);
+                    $aggMisses = (int)($agg['misses'] ?? 0);
+                    $aggCommands = (int)($agg['commands'] ?? 0);
+                    $aggLatencyMs = ((int)($agg['latency_ms_total'] ?? 0)) / 100;
+                    $aggLatencyCount = (int)($agg['latency_count'] ?? 0);
+                }
+            } catch (Throwable) {}
+        }
+
+        // 2. Medição Real de RTT através de PING direto ao daemon
+        $realRtt = 0.0;
+        if ($connected) {
+            try {
+                $pingStart = microtime(true);
+                $this->redis->ping();
+                $realRtt = round((microtime(true) - $pingStart) * 1000, 2);
+            } catch (Throwable) {
+                $realRtt = 0.0;
+            }
+        }
+
+        // 3. Consolidar métricas persistentes + requisição corrente
+        $totalHits = $aggHits + $this->runtimeStats['hits'];
+        $totalMisses = $aggMisses + $this->runtimeStats['misses'];
+        $totalCommands = $aggCommands + $this->runtimeStats['commands'];
+        $totalOps = $totalHits + $totalMisses;
+        $hitRatio = $totalOps > 0 ? round(($totalHits / $totalOps) * 100, 1) : 0.0;
+
+        $totalLatencySamples = $aggLatencyCount + ($this->runtimeStats['hits'] + $this->runtimeStats['misses']);
+        $totalLatencyMs = $aggLatencyMs + $this->runtimeStats['latency_sum_ms'];
+        $avgLatency = $totalLatencySamples > 0
+            ? round($totalLatencyMs / $totalLatencySamples, 2)
+            : $realRtt;
 
         $usedMemory = '0 MB';
         $peakMemory = '0 MB';
@@ -708,10 +767,12 @@ class RedisClient
             'status'            => $connected ? 'connected' : ($this->breakerState === 'OPEN' ? 'degraded' : 'disconnected'),
             'circuit_breaker'   => $this->breakerState,
             'hit_ratio'         => $hitRatio,
-            'hits'              => $this->runtimeStats['hits'],
-            'misses'            => $this->runtimeStats['misses'],
-            'commands_count'    => $this->runtimeStats['commands'],
+            'hits'              => $totalHits,
+            'misses'            => $totalMisses,
+            'commands_count'    => $totalCommands,
+            'runtime_commands'  => $this->runtimeStats['commands'],
             'avg_latency_ms'    => $avgLatency,
+            'ping_rtt_ms'       => $realRtt,
             'used_memory'       => $usedMemory,
             'peak_memory'       => $peakMemory,
             'max_memory'        => $maxMemory,

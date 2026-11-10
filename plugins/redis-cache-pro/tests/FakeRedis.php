@@ -157,6 +157,32 @@ class FakeRedis
         ];
     }
 
+    public function lPush(string $key, mixed $value): int
+    {
+        $val = $this->get($key);
+        $list = is_array($val) ? $val : [];
+        array_unshift($list, $value);
+        $this->set($key, $list);
+        return count($list);
+    }
+
+    public function lTrim(string $key, int $start, int $stop): bool
+    {
+        $val = $this->get($key);
+        if (!is_array($val)) return true;
+        $length = ($stop - $start) + 1;
+        $this->set($key, array_slice($val, $start, $length));
+        return true;
+    }
+
+    public function lRange(string $key, int $start, int $stop): array
+    {
+        $val = $this->get($key);
+        if (!is_array($val)) return [];
+        $length = $stop < 0 ? count($val) : (($stop - $start) + 1);
+        return array_slice($val, $start, $length);
+    }
+
     public function rawCommand(string $command, ...$args): mixed
     {
         switch (strtoupper($command)) {

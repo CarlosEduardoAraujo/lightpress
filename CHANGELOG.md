@@ -9,6 +9,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ### Plugin redis-cache-pro: Motor Corporativo de Cache Persistente em Memória RAM com PhpRedis — 2026-11-10
 
+- **Correção da Inicialização do Cache & Ciclo de Vida do ObjectCache:**
+  - Correção de congelamento falso-positivo de disponibilidade em `ObjectCache::isAvailable()` causado por variável estática `$checked` que avaliava `false` na leitura inicial de `Settings::applyToConfig()` antes do carregamento dos plugins.
+  - Adição do método pontual `PluginManager::loadPlugin('redis-cache-pro')` com guarda de recursão `$bootstrapping` para inicialização segura e sem ciclo fechado entre configurações, lista de plugins ativos e cache.
+  - Com a correção, todas as consultas do front-end (`home_featured_posts`, `home_feed_posts_p1`, `post_slug:{slug}`, etc.) e `all_settings` passam a ser cacheadas imediatamente no Redis.
+- **Telemetria Persistente & RTT Real:**
+  - Métricas agregadas persistentes em hash `telemetry:aggregate` no Redis, eliminando exibição de 0 hits / 0 misses na abertura da página administrativa e calculando Taxa de Acerto e Comandos globais do site.
+  - Medição de latência real de ida e volta (RTT) via `ping()` direto ao daemon Redis, substituindo o fallback estático de 0.35ms.
+- **Query Profiler com Buffer Circular no Redis:**
+  - Persistência das últimas 30 operações globais do site em lista circular capped (`lPush` + `lTrim 0 29`) em `profiler:recent_logs`, permitindo visualizar no painel administrativo as consultas executadas por visitantes do front-end em tempo real.
 - **Terceiro Plugin Oficial (`plugins/redis-cache-pro/`):**
   - Implementação completa do plugin **Redis Cache Pro** (`redis-cache-pro`), fornecendo um motor de cache de objetos persistente em memória RAM com comunicação nativa de altíssima performance via extensão C `phpredis`, compatível com TCP, Unix Domain Socket, Sentinel e Cluster.
 - **Invalidação Atômica em $O(1)$ (Eliminação de `FLUSHDB` e `KEYS *`):**

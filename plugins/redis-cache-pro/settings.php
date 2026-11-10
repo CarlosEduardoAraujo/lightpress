@@ -241,7 +241,8 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                 </div>
                 <p class="rcp-card-desc">Tempo de resposta entre o motor PHP e o daemon Redis.</p>
                 <div class="rcp-card-footer">
-                    <span>Comandos nesta requisição: <strong><?= (int)$diagnostics['commands_count'] ?></strong></span>
+                    <span>Comandos no site: <strong><?= number_format((int)$diagnostics['commands_count']) ?></strong></span>
+                    <span>Nesta requisição: <strong><?= (int)($diagnostics['runtime_commands'] ?? 0) ?></strong></span>
                 </div>
             </div>
 

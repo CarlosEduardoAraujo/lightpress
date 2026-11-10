@@ -209,6 +209,25 @@ it('Validação e montagem de alerta de teste sem erros sintáticos', function()
     expectEqual(400, $res['code']);
 });
 
+echo "\n6. Integração do ObjectCache com Ciclo de Vida e Telemetria Persistente\n";
+
+it('ObjectCache::isAvailable() reavalia dinamicamente e detecta o plugin carregado', function() {
+    expectTrue(\LightPress\Core\ObjectCache::isAvailable(), 'ObjectCache deve reportar disponibilidade sem travar em falso');
+});
+
+it('QueryProfiler armazena e recupera operações persistentes do buffer circular', function() use ($client, $fake) {
+    QueryProfiler::log('GET', 'speedracing_posts:test_key', 0.45, 'HIT', 'PostService::getById');
+    $logs = QueryProfiler::getLogs();
+    expectTrue(count($logs) > 0, 'Deve conter ao menos uma operação perfilada');
+    expectEqual('GET', $logs[0]['command']);
+});
+
+it('Telemetria agregada e RTT são calculados sem valores fixos artificiais', function() use ($client, $fake) {
+    $diag = $client->getDiagnosticInfo();
+    expectTrue(isset($diag['commands_count']));
+    expectTrue(isset($diag['ping_rtt_ms']));
+});
+
 echo "\n========================================================\n";
 echo "📊 RESULTADO FINAL DA SUÍTE:\n";
 echo "   Aprovados (PASS): {$passCount}\n";

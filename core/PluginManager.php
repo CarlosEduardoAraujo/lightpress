@@ -123,6 +123,39 @@ final class PluginManager
     }
 
     /**
+     * Carrega pontualmente um plugin ativo caso ainda não tenha sido inicializado.
+     */
+    public static function loadPlugin(string $slug): bool
+    {
+        if (!empty(self::$loadedPlugins[$slug])) {
+            return true;
+        }
+
+        if (!self::isActive($slug)) {
+            return false;
+        }
+
+        $available = self::getAvailablePlugins();
+        if (!isset($available[$slug])) {
+            return false;
+        }
+
+        $entrypoint = $available[$slug]['entrypoint'];
+        if (file_exists($entrypoint)) {
+            try {
+                require_once $entrypoint;
+                self::$loadedPlugins[$slug] = true;
+                return true;
+            } catch (\Throwable $e) {
+                error_log(sprintf('[PluginManager] Falha ao carregar plugin "%s": %s', $slug, $e->getMessage()));
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Carrega de forma segura os arquivos principais de todos os plugins ativos.
      */
     public static function loadActivePlugins(): void

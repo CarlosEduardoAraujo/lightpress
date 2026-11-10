@@ -17,22 +17,35 @@ final class ObjectCache
 {
     /**
      * Verifica se o motor Redis Cache Pro está carregado e habilitado.
+     * Reavalia dinamicamente sem congelar falso positivo durante o ciclo de inicialização (bootstrap).
      */
     public static function isAvailable(): bool
     {
-        static $checked = null;
-        if ($checked !== null) {
-            return $checked;
+        // 1. Se a classe Facade já está disponível na memória, o plugin está ativo e operacional
+        if (class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false)) {
+            return true;
         }
 
+        // 2. Proteção contra recursão circular durante o bootstrap de configurações
+        static $bootstrapping = false;
+        if ($bootstrapping) {
+            return false;
+        }
+
+        $bootstrapping = true;
         try {
-            $checked = class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false)
-                && PluginManager::isActive('redis-cache-pro');
+            // Tenta carregar o plugin Redis antecipadamente se ele estiver marcado como ativo
+            if (PluginManager::isActive('redis-cache-pro')) {
+                PluginManager::loadPlugin('redis-cache-pro');
+                return class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false);
+            }
         } catch (Throwable) {
-            $checked = false;
+            return false;
+        } finally {
+            $bootstrapping = false;
         }
 
-        return $checked;
+        return false;
     }
 
     /**
