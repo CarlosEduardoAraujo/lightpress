@@ -688,9 +688,18 @@ assert_check(
 with open("core/Schema.php", "r", encoding="utf-8") as f:
     schema_php_content = f.read()
 
+with open("public/api/view.php", "r", encoding="utf-8") as f:
+    view_php_content = f.read()
+
 assert_check(
     "core/Schema.php implementa e executa ensureViewDedupeSchema",
     "ensureViewDedupeSchema" in schema_php_content
+)
+
+assert_check(
+    "public/api/view.php executa ensureViewDedupeSchema antes da transação para páginas",
+    "Schema::ensureViewDedupeSchema(" in view_php_content
+    and view_php_content.find("Schema::ensureViewDedupeSchema") < view_php_content.find("Database::transaction")
 )
 
 # Teste em SQLite simulando deduplicação com ID negativo de página

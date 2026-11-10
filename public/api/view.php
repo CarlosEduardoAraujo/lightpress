@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\Schema;
 use LightPress\Core\Security;
 
 // 1. Validação de Origem (Prevenção contra requisições cross-site)
@@ -65,6 +66,11 @@ $expiresAt = gmdate('Y-m-d H:i:s', time() + $throttleSeconds);
 $ip = Security::getClientIp($config['security']['trusted_proxies'] ?? null);
 $secret = $config['security']['hmac_secret'] ?? 'lightpress_default_secret';
 $ipHash = Security::hashIp($ip, $secret);
+
+// Para páginas institucionais, garantir o esquema de view_dedupe antes de iniciar a transação (evita commit implícito no MySQL)
+if ($type === 'page') {
+    Schema::ensureViewDedupeSchema(Database::getConnection(), Database::getDriver());
+}
 
 try {
     $recorded = Database::transaction(function (\PDO $pdo) use ($type, $targetId, $ipHash, $expiresAt, $nowUtc): bool {
