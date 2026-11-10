@@ -482,6 +482,8 @@ class BlockCompiler
                         $html .= "  </picture>";
                         if (!empty($captionHtml)) {
                             $html .= "\n  <figcaption>{$captionHtml}</figcaption>";
+                        } elseif (!empty($altAttr)) {
+                            $html .= "\n  <figcaption class=\"sr-only\">{$altAttr}</figcaption>";
                         }
                         $html .= "\n</figure>";
                         return $html;
@@ -507,6 +509,8 @@ class BlockCompiler
         $html .= "<img src=\"{$url}\" alt=\"{$altAttr}\"{$lazyAttr}>";
         if (!empty($captionHtml)) {
             $html .= "<figcaption>{$captionHtml}</figcaption>";
+        } elseif (!empty($altAttr)) {
+            $html .= "<figcaption class=\"sr-only\">{$altAttr}</figcaption>";
         }
         $html .= "</figure>";
 

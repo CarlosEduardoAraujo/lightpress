@@ -292,16 +292,26 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
 
             <!-- 2. Feature Hero Image Block -->
             <?php if (!empty($post['featured_image'])): ?>
-                <figure class="-mx-margin-mobile sm:mx-0">
+                <figure class="-mx-margin-mobile sm:mx-0 my-space-xs">
                     <div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group bg-carbon-black border border-subtle-border dark:border-[#2a303c]">
-                        <img alt="<?= Security::e($post['title']) ?>" 
+                        <img alt="<?= Security::e(!empty($post['image_alt']) ? $post['image_alt'] : $post['title']) ?>" 
                              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" 
-                             src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>">
+                             src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>"
+                             loading="eager"
+                             fetchpriority="high"
+                             decoding="async">
                         <div class="absolute top-space-sm left-space-sm bg-carbon-black/85 backdrop-blur-md px-2.5 py-1 rounded text-label-category font-data-telemetry text-pure-white flex items-center gap-1.5 shadow-sm">
                             <span class="w-2 h-2 rounded-full bg-flag-green"></span>
                             <span>SPEEDRACING • <?= Security::e(strtoupper($post['category'])) ?></span>
                         </div>
                     </div>
+                    <?php if (!empty($post['image_caption'])): ?>
+                        <figcaption class="text-xs text-text-muted dark:text-[#94a3b8] mt-2 italic flex items-center gap-1.5 px-1 sm:px-0">
+                            <span>📷</span> <?= Security::e($post['image_caption']) ?>
+                        </figcaption>
+                    <?php else: ?>
+                        <figcaption class="sr-only"><?= Security::e(!empty($post['image_alt']) ? $post['image_alt'] : $post['title']) ?></figcaption>
+                    <?php endif; ?>
                 </figure>
             <?php endif; ?>
 
@@ -398,7 +408,10 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                             <a class="group flex gap-space-sm items-start p-space-xs rounded-lg hover:bg-canvas-cream dark:hover:bg-[#252b36] transition-colors border border-transparent hover:border-subtle-border dark:hover:border-[#2a303c]" href="/<?= Security::e($rel['slug']) ?>/">
                                 <div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-xs relative bg-surface-container dark:bg-[#151920]">
                                     <?php if (!empty($rel['featured_image'])): ?>
-                                        <img alt="<?= Security::e($rel['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="<?= Security::e(ImageProcessor::toThumbUrl($rel['featured_image'], 'avif')) ?>" loading="lazy">
+                                        <figure class="w-full h-full m-0 p-0 overflow-hidden">
+                                            <img alt="<?= Security::e($rel['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="<?= Security::e(ImageProcessor::toThumbUrl($rel['featured_image'], 'avif')) ?>" loading="lazy">
+                                            <figcaption class="sr-only"><?= Security::e($rel['title']) ?></figcaption>
+                                        </figure>
                                     <?php else: ?>
                                         <div class="w-full h-full flex items-center justify-center text-[10px] text-secondary">Sem foto</div>
                                     <?php endif; ?>

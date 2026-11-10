@@ -156,6 +156,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
                     <img src="<?= Security::e(ImageProcessor::toAvifUrl($page['featured_image'])) ?>" 
                          alt="<?= Security::e($page['title']) ?>" 
                          class="w-full max-h-[420px] object-cover">
+                    <figcaption class="sr-only"><?= Security::e($page['title']) ?></figcaption>
                 </figure>
             <?php endif; ?>
 

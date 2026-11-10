@@ -140,6 +140,43 @@ class ImageProcessor
     }
 
     /**
+     * Obtém a URL da variante Intermediária / 1024px (-1024.avif ou -1024.webp) para destaques e hero.
+     *
+     * @param string $url URL de qualquer variante da imagem
+     * @param string $format 'avif' (padrão) ou 'webp'
+     * @return string URL apontando para a versão intermediária (1024px) ou fallback
+     */
+    public static function toIntermediateUrl(string $url, string $format = 'avif'): string
+    {
+        if (empty($url)) {
+            return '';
+        }
+
+        $targetExt = ($format === 'webp') ? 'webp' : 'avif';
+
+        if (str_contains($url, '-1024.')) {
+            return ($targetExt === 'webp') ? self::toWebpUrl($url) : self::toAvifUrl($url);
+        }
+
+        $replaced = preg_replace('~-(thumb|1920)\.(webp|avif|jpe?g|png)$~i', "-1024.{$targetExt}", $url);
+        if ($replaced === null || $replaced === $url) {
+            $replaced = preg_replace('~\.(webp|avif|jpe?g|png)$~i', "-1024.{$targetExt}", $url);
+        }
+
+        $candidate = $replaced ?? $url;
+
+        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
+
+        if (file_exists($candidatePath)) {
+            return $candidate;
+        }
+
+        // Fallback para a imagem completa em AVIF
+        return self::toAvifUrl($url);
+    }
+
+    /**
      * Processa um arquivo enviado via upload ($_FILES).
      *
      * @param string $tmpFilePath Caminho temporário do arquivo
