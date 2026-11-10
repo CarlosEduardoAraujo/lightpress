@@ -7,6 +7,17 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Feed de Notícias Unificado e Thumbnails nos Destaques Secundários da Home — 2026-11-10
+
+- **Feed de Notícias Unificado na Home (`public/index.php`):**
+  - Removida a cláusula de exclusão (`$excludeSql` com `NOT IN`) na consulta do feed principal de "Últimas Notícias". Todas as matérias publicadas passam a ser listadas em ordem cronológica decrescente, incluindo os artigos que também ocupam o mosaico de destaques do Hero.
+  - Alinhamento de paginação: eliminação do descasamento de contagem e offsets entre a Home (`/`) e as páginas subsequentes (`/page/{page}/`), assegurando consistência na navegação.
+- **Thumbnails nos Destaques Secundários (`templates/home.php`):**
+  - Implementação de miniaturas compactas (`w-24 h-24 sm:w-28 sm:h-24 shrink-0 rounded-lg`) à direita em cada um dos 3 cards secundários da coluna lateral (4 colunas) do Hero da Home.
+  - Reorganização do layout interno em modelo horizontal (`flex-row`), reservando a coluna esquerda para metadados (categoria, horário e títulos com `line-clamp-2 sm:line-clamp-3`).
+  - Preservação estrita do alinhamento vertical e nivelamento com a coluna de 8 colunas do Destaque Master (`items-stretch` nos ~540px), sem risco de estouro de altura ou deslocamento do feed inferior.
+  - Renderização de imagens de alta performance com `ImageProcessor::toThumbUrl()` em formato AVIF com fallback para WebP, efeito de zoom suave ao passar o cursor e estado de contingência ("Sem foto") para publicações sem imagem cadastrada.
+
 ### Hardening de SSRF, Defesa de Roteamento, Metadados em Revisões e Multi-Banco — 2026-11-09
 
 - **Blindagem de SSRF no WebhookSender (`plugins/webhook-sender/webhook-sender.php`):**

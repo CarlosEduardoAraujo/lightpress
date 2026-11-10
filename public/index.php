@@ -73,13 +73,12 @@ $router->get('/', function () use ($config, $router): void {
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Buscar publicações para o feed principal excluindo os 4 destaques do topo (sem MEDIUMTEXT content_html)
-    $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
+    // Buscar publicações para o feed principal (sem MEDIUMTEXT content_html)
     $posts = Database::fetchAll(
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ?",
         [$nowUtc, $perPage]
     );

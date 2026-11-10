@@ -974,7 +974,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 ### 10.2. Próximas Frentes Priorizadas de Trabalho
 
 * **FASE CONCLUÍDA — Opção 1: Experiência Visual do Portal (Frontend Público de Notícias):**
-  - [x] **Design de Portal de Alta Velocidade:** Layout panorâmico Full HD (`1900px`), Home com Hero Quad Grid de 4 destaques com backfill automático, página de leitura de artigos widescreen (`1750px`), capa com visual cinematográfico, tempo estimado de leitura (*ex: 3 min de leitura*), bloco de autor com bio/avatar e modo escuro nativo sem flash.
+  - [x] **Design de Portal de Alta Velocidade:** Layout panorâmico Full HD (`1900px`), Home com Hero Quad Grid de 4 destaques com backfill automático e miniaturas compactas horizontais nos cards secundários mantendo alinhamento estrito (`items-stretch`), feed de Últimas Notícias unificado (listando todas as notícias sem exclusão arbitrária dos destaques), página de leitura de artigos widescreen (`1750px`), capa com visual cinematográfico, tempo estimado de leitura (*ex: 3 min de leitura*), bloco de autor com bio/avatar e modo escuro nativo sem flash.
   - [x] **Módulo de Notícias Relacionadas:** Recomendações contextuais de 4 matérias da mesma categoria em grid responsivo de tela ampla para retenção de audiência.
   - [x] **Botões Rápidos de Compartilhamento Social:** Barra leve de compartilhamento (WhatsApp, X, Facebook, Telegram e botão de 1 clique Copiar Link com feedback instantâneo) sem rastreadores ou bibliotecas pesadas.
   - [x] **Menu Superior Sticky Fixo:** Cabeçalho global fixado no topo para navegação fluida em todo o site.

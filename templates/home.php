@@ -117,26 +117,43 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
     <!-- Secondary Trio Column (4 Cols) -->
     <div class="lg:col-span-4 flex flex-col gap-space-md justify-between">
         <?php foreach ($secondaryLeads as $sec): ?>
-            <article class="group flex-1 flex flex-col justify-between p-space-md rounded-xl bg-pure-white dark:bg-carbon-surface shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all">
-                <div class="flex items-center justify-between gap-2 mb-space-xs">
-                    <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] font-label-category text-label-category text-carbon-black dark:text-pure-white uppercase rounded">
-                        <?= Security::e($sec['category']) ?>
-                    </span>
-                    <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-                        <?= $formatTime($sec['published_at']) ?>
-                    </span>
+            <article class="group flex-1 flex flex-row items-center justify-between gap-space-sm p-space-md rounded-xl bg-pure-white dark:bg-carbon-surface shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all">
+                <!-- Coluna de Informações e Texto -->
+                <div class="flex-1 min-w-0 flex flex-col justify-between h-full">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-space-xs">
+                            <span class="px-2 py-0.5 bg-surface-container dark:bg-[#252b36] font-label-category text-label-category text-carbon-black dark:text-pure-white uppercase rounded">
+                                <?= Security::e($sec['category']) ?>
+                            </span>
+                            <span class="font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
+                                <?= $formatTime($sec['published_at']) ?>
+                            </span>
+                        </div>
+                        <h2 class="font-headline-sm text-body-sm sm:text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors line-clamp-2 sm:line-clamp-3 font-bold leading-snug">
+                            <a href="/<?= Security::e($sec['slug']) ?>/">
+                                <?= Security::e($sec['title']) ?>
+                            </a>
+                        </h2>
+                    </div>
+                    <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-xs pt-space-xs">
+                        <span class="text-tertiary dark:text-racing-red font-medium"></span>
+                        <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
+                            <?= Icon::svg('arrow_forward', '', 18) ?>
+                        </a>
+                    </div>
                 </div>
-                <h2 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors line-clamp-3 font-bold">
-                    <a href="/<?= Security::e($sec['slug']) ?>/">
-                        <?= Security::e($sec['title']) ?>
-                    </a>
-                </h2>
-                <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-sm pt-space-xs">
-                    <span class="text-tertiary dark:text-racing-red font-medium"></span>
-                    <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
-                        <?= Icon::svg('arrow_forward', '', 18) ?>
-                    </a>
-                </div>
+
+                <!-- Thumbnail Compacta à Direita -->
+                <a href="/<?= Security::e($sec['slug']) ?>/" class="w-24 h-24 sm:w-28 sm:h-24 shrink-0 rounded-lg overflow-hidden relative bg-surface-container dark:bg-[#151920] block group-hover:opacity-95 transition-opacity" title="<?= Security::e($sec['title']) ?>">
+                    <?php if (!empty($sec['featured_image'])): ?>
+                        <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                             src="<?= Security::e(ImageProcessor::toThumbUrl($sec['featured_image'], 'avif')) ?>" 
+                             alt="<?= Security::e($sec['title']) ?>" 
+                             loading="lazy">
+                    <?php else: ?>
+                        <div class="w-full h-full flex items-center justify-center text-secondary text-xs">Sem foto</div>
+                    <?php endif; ?>
+                </a>
             </article>
         <?php endforeach; ?>
     </div>
