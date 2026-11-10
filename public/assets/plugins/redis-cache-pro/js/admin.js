@@ -266,7 +266,7 @@
 
         const width = 1100;
         const height = 240;
-        const padding = { top: 25, right: 30, bottom: 35, left: 50 };
+        const padding = { top: 25, right: 40, bottom: 35, left: 55 };
         const chartW = width - padding.left - padding.right;
         const chartH = height - padding.top - padding.bottom;
 
@@ -320,37 +320,41 @@
 
         // SVG Interativo
         container.innerHTML = `
-            <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;overflow:visible;">
-                <defs>
-                    <linearGradient id="rcpAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
-                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.02"/>
-                    </linearGradient>
-                </defs>
-                
-                ${gridLines}
-                ${xLabels}
+            <div style="width:100%;display:block;overflow-x:auto;">
+                <svg viewBox="0 0 ${width} ${height}" style="display:block;width:100%;height:auto;min-width:700px;overflow:visible;">
+                    <defs>
+                        <linearGradient id="rcpAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.02"/>
+                        </linearGradient>
+                    </defs>
+                    
+                    ${gridLines}
+                    ${xLabels}
 
-                <!-- Área e Linha Hit Ratio -->
-                <path d="${areaRatioStr}" fill="url(#rcpAreaGrad)"/>
-                <path d="${pathRatioStr}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Área e Linha Hit Ratio -->
+                    <path d="${areaRatioStr}" fill="url(#rcpAreaGrad)"/>
+                    <path d="${pathRatioStr}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-                <!-- Linha de Comandos -->
-                <path d="${pathCmdStr}" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-dasharray="4,3" stroke-linecap="round"/>
+                    <!-- Linha de Comandos -->
+                    <path d="${pathCmdStr}" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-dasharray="4,3" stroke-linecap="round"/>
 
-                <!-- Pontos Interativos com Tooltip -->
-                ${pointsRatio.map(p => `
-                    <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#ffffff" stroke="#10b981" stroke-width="2" style="cursor:pointer;">
-                        <title>${escapeHtml(p.data.label)}: Hit Ratio ${p.data.hit_ratio}% (${p.data.hits} hits / ${p.data.misses} misses, ${p.data.commands} cmds, ${p.data.avg_latency_ms}ms)</title>
-                    </circle>
-                `).join('')}
-            </svg>
-            <div style="display:flex;justify-content:center;gap:2rem;margin-top:0.75rem;font-size:0.8rem;color:var(--rcp-text-muted);">
-                <span style="display:inline-flex;align-items:center;gap:0.4rem;">
-                    <span style="display:inline-block;width:12px;height:3px;background:#10b981;border-radius:2px;"></span> Taxa de Acerto (Hit Ratio %)
+                    <!-- Pontos Interativos com Tooltip -->
+                    ${pointsRatio.map(p => `
+                        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#ffffff" stroke="#10b981" stroke-width="2" style="cursor:pointer;">
+                            <title>${escapeHtml(p.data.label)}: Hit Ratio ${p.data.hit_ratio}% (${p.data.hits} hits / ${p.data.misses} misses, ${p.data.commands} cmds, ${p.data.avg_latency_ms}ms)</title>
+                        </circle>
+                    `).join('')}
+                </svg>
+            </div>
+            <div class="rcp-chart-legend" style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2rem;width:100%;margin-top:1.25rem;padding-top:0.85rem;border-top:1px solid var(--rcp-border);font-size:0.85rem;color:var(--rcp-text-muted);">
+                <span style="display:inline-flex;align-items:center;gap:0.5rem;">
+                    <span style="display:inline-block;width:14px;height:4px;background:#10b981;border-radius:2px;"></span> 
+                    <strong>Taxa de Acerto (Hit Ratio %)</strong>
                 </span>
-                <span style="display:inline-flex;align-items:center;gap:0.4rem;">
-                    <span style="display:inline-block;width:12px;height:2px;background:#6366f1;border-radius:2px;border-top:1px dashed #6366f1;"></span> Volume de Comandos Executados
+                <span style="display:inline-flex;align-items:center;gap:0.5rem;">
+                    <span style="display:inline-block;width:14px;height:3px;background:#6366f1;border-radius:2px;border-top:1px dashed #6366f1;"></span> 
+                    <strong>Volume de Comandos Executados</strong>
                 </span>
             </div>
         `;

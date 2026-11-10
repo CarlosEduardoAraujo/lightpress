@@ -271,9 +271,9 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                 </div>
                 <span class="rcp-badge rcp-badge-success">Métricas em Tempo Real</span>
             </div>
-            <div class="rcp-chart-container">
-                <div id="rcp-history-chart" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-                    <div style="color:var(--rcp-text-muted);">Carregando métricas temporais...</div>
+            <div class="rcp-chart-container" style="width: 100%; overflow: hidden;">
+                <div id="rcp-history-chart" class="rcp-chart-wrapper" style="min-height: 200px; width: 100%; display: flex; flex-direction: column;">
+                    <div style="color:var(--rcp-text-muted); padding: 40px; text-align: center;">Carregando métricas temporais...</div>
                 </div>
             </div>
         </div>

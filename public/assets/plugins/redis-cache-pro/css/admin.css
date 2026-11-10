@@ -256,6 +256,30 @@
     margin: 0 0 1rem;
 }
 
+.rcp-chart-container {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.rcp-chart-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.rcp-chart-legend {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    margin-top: 1.25rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--rcp-border);
+}
+
 .rcp-card-footer {
     display: flex;
     justify-content: space-between;
