@@ -232,7 +232,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
 <script>
 (function() {
     var pageId = <?= (int)$page['id'] ?>;
-    var endpoint = '/api/view.php?type=page&id=' + pageId;
+    var endpoint = '/api/view/page/' + pageId;
     try {
         if (navigator.sendBeacon) {
             navigator.sendBeacon(endpoint);

@@ -52,6 +52,8 @@ class Schema
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         }
 
+        self::ensureViewDedupeSchema(Database::getConnection(), $driver);
+
         // Se a tabela estiver vazia, cria as páginas institucionais padrão
         $count = (int)Database::fetchValue("SELECT COUNT(*) FROM pages");
         if ($count === 0) {
@@ -227,6 +229,8 @@ class Schema
         } catch (\Throwable $e) {
             // Ignora se já existir
         }
+
+        self::ensureViewDedupeSchema($pdo, 'mysql');
     }
 
     /**
@@ -359,8 +363,7 @@ class Schema
                 post_id INTEGER NOT NULL,
                 ip_hash TEXT NOT NULL,
                 expires_at TEXT NOT NULL,
-                PRIMARY KEY (post_id, ip_hash),
-                FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+                PRIMARY KEY (post_id, ip_hash)
             );",
             "CREATE INDEX IF NOT EXISTS idx_view_expiry ON view_dedupe (expires_at);",
 
@@ -408,6 +411,7 @@ class Schema
         }
 
         self::ensureRevisionsSchema($pdo, 'sqlite');
+        self::ensureViewDedupeSchema($pdo, 'sqlite');
     }
 
     /**
@@ -456,6 +460,81 @@ class Schema
                         throw new RuntimeException('Migre post_revisions antes de iniciar a transação editorial.');
                     }
                     $pdo->exec("ALTER TABLE post_revisions MODIFY COLUMN status ENUM('draft', 'pending_review', 'applied', 'superseded') NOT NULL DEFAULT 'draft'");
+                }
+            }
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        } finally {
+            if ($foreignKeys !== null) {
+                $pdo->exec('PRAGMA foreign_keys = ' . $foreignKeys);
+            }
+        }
+    }
+
+    /**
+     * Garante que a tabela view_dedupe suporte IDs de páginas e posts (post_id assinado e sem FK para posts).
+     * Auto-migra tabelas existentes sem perda de dados.
+     */
+    public static function ensureViewDedupeSchema(PDO $pdo, string $driver = 'mysql'): void
+    {
+        $ownsTransaction = false;
+        $foreignKeys = null;
+        try {
+            if ($driver === 'sqlite') {
+                $dedupeTable = $pdo->query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'view_dedupe'")->fetch();
+                if ($dedupeTable && !empty($dedupeTable['sql']) && str_contains($dedupeTable['sql'], 'FOREIGN KEY')) {
+                    if ($pdo->inTransaction()) {
+                        throw new RuntimeException('Migre view_dedupe antes de iniciar a transação.');
+                    }
+                    $foreignKeys = (int)$pdo->query('PRAGMA foreign_keys')->fetchColumn();
+                    $pdo->exec('PRAGMA foreign_keys = OFF;');
+                    $pdo->beginTransaction();
+                    $ownsTransaction = true;
+                    $pdo->exec("CREATE TABLE view_dedupe_new (
+                        post_id INTEGER NOT NULL,
+                        ip_hash TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        PRIMARY KEY (post_id, ip_hash)
+                    );");
+                    $pdo->exec("INSERT INTO view_dedupe_new (post_id, ip_hash, expires_at)
+                                SELECT post_id, ip_hash, expires_at FROM view_dedupe;");
+                    $pdo->exec("DROP TABLE view_dedupe;");
+                    $pdo->exec("ALTER TABLE view_dedupe_new RENAME TO view_dedupe;");
+                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_view_expiry ON view_dedupe (expires_at);");
+                    $pdo->commit();
+                    $ownsTransaction = false;
+                }
+            } else {
+                // MySQL / MariaDB
+                $tableExists = $pdo->query("SHOW TABLES LIKE 'view_dedupe'")->fetch();
+                if ($tableExists) {
+                    try {
+                        $fk = $pdo->query(
+                            "SELECT CONSTRAINT_NAME 
+                             FROM information_schema.TABLE_CONSTRAINTS 
+                             WHERE TABLE_SCHEMA = DATABASE() 
+                               AND TABLE_NAME = 'view_dedupe' 
+                               AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                             LIMIT 1"
+                        )->fetchColumn();
+                        if ($fk) {
+                            $pdo->exec("ALTER TABLE view_dedupe DROP FOREIGN KEY `{$fk}`");
+                        }
+                    } catch (\Throwable) {
+                        // Ignora se não existir
+                    }
+
+                    try {
+                        $col = $pdo->query("SHOW COLUMNS FROM view_dedupe LIKE 'post_id'")->fetch();
+                        if ($col && (str_contains(strtolower($col['Type']), 'unsigned') || !str_contains(strtolower($col['Type']), 'bigint'))) {
+                            $pdo->exec("ALTER TABLE view_dedupe MODIFY COLUMN post_id BIGINT NOT NULL");
+                        }
+                    } catch (\Throwable) {
+                        // Ignora se já estiver modificado
+                    }
                 }
             }
         } catch (\Throwable $e) {

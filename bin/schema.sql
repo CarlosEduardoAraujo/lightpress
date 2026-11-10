@@ -138,12 +138,11 @@ CREATE TABLE IF NOT EXISTS media_refs (
 
 -- 9. Deduplicação Atômica de Visualizações (Privacidade com HMAC)
 CREATE TABLE IF NOT EXISTS view_dedupe (
-    post_id INT UNSIGNED NOT NULL,
+    post_id BIGINT NOT NULL,
     ip_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     expires_at DATETIME NOT NULL,
     PRIMARY KEY (post_id, ip_hash),
-    INDEX idx_view_expiry (expires_at),
-    CONSTRAINT fk_view_dedupe_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+    INDEX idx_view_expiry (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 10. Fila Persistente de Purga de Cache Nginx FastCGI

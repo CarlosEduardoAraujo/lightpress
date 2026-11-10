@@ -593,7 +593,16 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
     <?php
 });
 
-// Rota 7: Contador de Visualizações (POST /api/view/{id} com ou sem barra final)
+// Rota 7: Contador de Visualizações de Páginas Institucionais (POST /api/view/page/{id} com ou sem barra final)
+$pageViewHandler = function (array $params): void {
+    $_GET['type'] = 'page';
+    $_GET['id'] = $params['id'] ?? 0;
+    require __DIR__ . '/api/view.php';
+};
+$router->post('/api/view/page/{id}', $pageViewHandler);
+$router->post('/api/view/page/{id}/', $pageViewHandler);
+
+// Rota 7b: Contador de Visualizações de Notícias e Artigos (POST /api/view/{id} com ou sem barra final)
 $viewHandler = function (array $params): void {
     $_GET['id'] = $params['id'] ?? 0;
     require __DIR__ . '/api/view.php';

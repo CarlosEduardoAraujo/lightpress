@@ -655,6 +655,95 @@ with tempfile.TemporaryDirectory() as base_temp:
     is_legit_safe = real_safe.lower().startswith(real_upload.lower()) and os.path.isfile(safe_file)
     assert_check("Arquivo legítimo dentro do diretório de uploads é aceito", is_legit_safe)
 
+# 10. Contador de Views de Páginas Institucionais e Schema view_dedupe
+print("\n[10] Testando Contador de Views de Páginas Institucionais e Schema view_dedupe")
+
+with open("templates/page.php", "r", encoding="utf-8") as f:
+    page_template_content = f.read()
+
+assert_check(
+    "templates/page.php dispara para endpoint canônico /api/view/page/ e não usa rota bloqueada",
+    "var endpoint = '/api/view/page/' + pageId;" in page_template_content
+    and "/api/view.php?type=page" not in page_template_content
+)
+
+with open("public/index.php", "r", encoding="utf-8") as f:
+    index_content = f.read()
+
+assert_check(
+    "public/index.php registra rota POST para /api/view/page/{id}",
+    "$router->post('/api/view/page/{id}'" in index_content
+    and "$_GET['type'] = 'page'" in index_content
+)
+
+with open("bin/schema.sql", "r", encoding="utf-8") as f:
+    schema_sql_content = f.read()
+
+assert_check(
+    "bin/schema.sql define view_dedupe com post_id BIGINT e sem FK restrita",
+    "post_id BIGINT NOT NULL" in schema_sql_content
+    and "fk_view_dedupe_post" not in schema_sql_content
+)
+
+with open("core/Schema.php", "r", encoding="utf-8") as f:
+    schema_php_content = f.read()
+
+assert_check(
+    "core/Schema.php implementa e executa ensureViewDedupeSchema",
+    "ensureViewDedupeSchema" in schema_php_content
+)
+
+# Teste em SQLite simulando deduplicação com ID negativo de página
+cursor.execute("PRAGMA foreign_keys = ON;")
+cursor.execute("""
+    CREATE TABLE legacy_view_dedupe (
+        post_id INTEGER NOT NULL,
+        ip_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        PRIMARY KEY (post_id, ip_hash),
+        FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+    );
+""")
+
+# Tentativa de inserir ID negativo no schema legado falha com FK constraint
+legacy_fk_failed = False
+try:
+    cursor.execute("INSERT INTO legacy_view_dedupe (post_id, ip_hash, expires_at) VALUES (-1, 'ip_hash_teste', '2026-11-10 00:00:00')")
+except sqlite3.IntegrityError:
+    legacy_fk_failed = True
+assert_check("Schema legado de view_dedupe com FK rejeita ID negativo de páginas", legacy_fk_failed)
+
+# Criação da tabela atualizada sem FK
+cursor.execute("""
+    CREATE TABLE view_dedupe (
+        post_id INTEGER NOT NULL,
+        ip_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        PRIMARY KEY (post_id, ip_hash)
+    );
+""")
+
+# Inserção de página com ID negativo (-10) e post normal (+10)
+cursor.execute("INSERT INTO view_dedupe (post_id, ip_hash, expires_at) VALUES (-10, 'hash_ip_page', '2026-11-10 00:00:00')")
+cursor.execute("INSERT INTO view_dedupe (post_id, ip_hash, expires_at) VALUES (10, 'hash_ip_post', '2026-11-10 00:00:00')")
+conn.commit()
+
+cursor.execute("SELECT COUNT(*) FROM view_dedupe WHERE post_id < 0")
+negative_count = cursor.fetchone()[0]
+assert_check("view_dedupe sem FK aceita IDs negativos de páginas e positivos de posts concorrentemente", negative_count == 1)
+
+# Teste de renovação com ON CONFLICT
+cursor.execute("""
+    INSERT INTO view_dedupe (post_id, ip_hash, expires_at)
+    VALUES (-10, 'hash_ip_page', '2026-11-10 01:00:00')
+    ON CONFLICT(post_id, ip_hash) DO UPDATE SET expires_at = excluded.expires_at
+""")
+conn.commit()
+
+cursor.execute("SELECT expires_at FROM view_dedupe WHERE post_id = -10")
+updated_expires = cursor.fetchone()[0]
+assert_check("Renovação da janela de deduplicação para páginas atualiza expires_at com sucesso", updated_expires == '2026-11-10 01:00:00')
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")
