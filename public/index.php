@@ -16,6 +16,7 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:
 $config = require dirname(__DIR__) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\ImageProcessor;
 use LightPress\Core\PostService;
 use LightPress\Core\Router;
 use LightPress\Core\Security;
@@ -396,7 +397,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     );
 
     if ($post && !empty($post['featured_image'])) {
-        $post['image_alt'] = ImageProcessor::getImageDescription($post['featured_image']);
+        $post['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($post['featured_image']);
         $post['image_caption'] = '';
     }
 

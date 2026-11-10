@@ -15,6 +15,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Implementação de resolvedor de metadados visuais em `ImageProcessor::getImageDescription($imageUrl)` com busca normalizada na tabela `media` por caminhos unescaped e escaped no JSON `variants_manifest` e nome base do arquivo.
   - Ordem estrita de precedência: `alt_text` (IA/Editor) -> `caption` (IA/Editor) -> `original_name` formatado -> nome de arquivo limpo formatado (ignorando prefixos genéricos como `img`, `dsc`, `whatsapp` e números).
   - **Eliminação Total de Alucinação do Título da Notícia:** Nenhuma imagem do portal mais recebe o título da matéria (`$post['title']`) em seus atributos `alt` ou `title`. Ao passar o mouse sobre a imagem (hover tooltip), o texto exibido descreve rigorosamente o conteúdo da foto.
+- **Correção de Importação de `ImageProcessor` em `public/index.php` (Erro 500 ao Abrir Notícia):**
+  - Adicionada a declaração explícita `use LightPress\Core\ImageProcessor;` e chamada totalmente qualificada `\LightPress\Core\ImageProcessor::getImageDescription()` no Front Controller (`public/index.php`), solucionando a exceção fatal `Error: Class "ImageProcessor" not found` capturada pelo tratador global de erros (500 Instabilidade Temporária) ao acessar páginas de notícias.
 - **Páginas e Templates Atualizados:**
   - `templates/post.php`: Destaque Hero e Notícias Relacionadas utilizam descrição da foto nos atributos `alt` e `title`, sem `<figcaption>`.
   - `templates/home.php`: Destaque Principal (Main Lead), Notícias Secundárias e Feed de Notícias exibem descrição real da imagem em `alt` e `title`.
