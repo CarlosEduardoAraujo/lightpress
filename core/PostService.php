@@ -93,6 +93,8 @@ class PostService
                 return 0;
             }
 
+            ObjectCache::flushGroup('posts');
+
             $cacheManager = new CacheManager();
             foreach ($duePosts as $p) {
                 try {
@@ -450,11 +452,14 @@ class PostService
         });
 
         // Executa a purga física do cache estritamente após o commit (LP-09 / P2)
-        if ($success && !empty($affectedUrls)) {
-            try {
-                $this->cacheManager->purgeUrls($affectedUrls);
-            } catch (\Throwable $e) {
-                error_log("[PostService Cache Purge Error] " . $e->getMessage());
+        if ($success) {
+            ObjectCache::flushGroup('posts');
+            if (!empty($affectedUrls)) {
+                try {
+                    $this->cacheManager->purgeUrls($affectedUrls);
+                } catch (\Throwable $e) {
+                    error_log("[PostService Cache Purge Error] " . $e->getMessage());
+                }
             }
         }
 

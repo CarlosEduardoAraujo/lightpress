@@ -66,16 +66,19 @@ class Settings
             return self::$cache;
         }
 
-        self::$cache = [];
-        try {
-            self::ensureTable();
-            $rows = Database::fetchAll("SELECT `key`, `value` FROM settings");
-            foreach ($rows as $row) {
-                self::$cache[$row['key']] = $row['value'] ?? '';
+        self::$cache = ObjectCache::remember('all_settings', 86400, function (): array {
+            $data = [];
+            try {
+                self::ensureTable();
+                $rows = Database::fetchAll("SELECT `key`, `value` FROM settings");
+                foreach ($rows as $row) {
+                    $data[$row['key']] = $row['value'] ?? '';
+                }
+            } catch (Throwable) {
+                // Fallback caso o banco não esteja acessível
             }
-        } catch (Throwable) {
-            // Fallback caso o banco não esteja acessível
-        }
+            return $data;
+        }, 'settings');
 
         return self::$cache;
     }
@@ -117,6 +120,8 @@ class Settings
         if (self::$cache !== null) {
             self::$cache[$key] = $val ?? '';
         }
+
+        ObjectCache::flushGroup('settings');
     }
 
     /**

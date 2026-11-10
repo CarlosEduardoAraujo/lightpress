@@ -41,6 +41,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Invalidação automática via listeners de eventos do CMS (`post_saved`, `post_deleted`, `settings_updated`).
 - **Suíte de Testes Automatizados:**
   - Criação de dublê determinístico do PhpRedis em memória (`plugins/redis-cache-pro/tests/FakeRedis.php`) e script de validação de regressão (`plugins/redis-cache-pro/tests/test-redis-cache-pro.php`).
+- **Camada de Abstração Defensiva no Core (`core/ObjectCache.php`):**
+  - Implementação do adapter seguro `ObjectCache` com detecção de disponibilidade (`ObjectCache::isAvailable()`), verificando dinamicamente se o plugin `redis-cache-pro` está ativo via `PluginManager::isActive('redis-cache-pro')`.
+  - **Zero Dependência & 100% Desacoplado:** Se o plugin estiver inativo ou o Redis indisponível, todas as chamadas (`remember`, `get`, `set`, `flushGroup`) executam diretamente o callback do banco sem erros ou exceções em produção.
+  - **Integração em `core/Settings.php`:** Cache automático de todas as configurações do sistema no grupo `settings` por 24h em `Settings::getAll()` com purga em $O(1)$ ao salvar em `Settings::set()`, eliminando 100% das consultas repetitivas ao banco.
+  - **Integração em `public/index.php`:** Cache seguro de matérias individuais (`post_slug:{slug}`), notícias relacionadas (`related:{category}:{id}`), destaques da Home e categorias com expurgo atômico instantâneo.
+  - **Integração em `core/PostService.php` e `public/admin/categories.php`:** Invalidação em $O(1)$ dos grupos `posts` e `categories` imediatamente após a publicação, agendamento, atualização ou exclusão de conteúdos.
 - **Sincronização de Assets Públicos:**
   - Arquivos CSS e JS sincronizados para entrega estática direta pelo Nginx em `/public/assets/plugins/redis-cache-pro/`.
 

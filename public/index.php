@@ -17,6 +17,7 @@ $config = require dirname(__DIR__) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\PostService;
 use LightPress\Core\Router;
 use LightPress\Core\Security;
@@ -39,50 +40,56 @@ $router->get('/', function () use ($config, $router): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
     
-    // Buscar até 4 artigos em destaque principal (traz apenas content_len para estimativa de leitura, sem carregar MEDIUMTEXT)
-    $featuredPosts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT 4",
-        [$nowUtc]
-    );
-
-    // Se houver menos de 4 marcados com is_featured, completa com as matérias publicadas mais recentes
-    $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
-    if (count($featuredPosts) < 4) {
-        $needed = 4 - count($featuredPosts);
-        $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
-        $extraPosts = Database::fetchAll(
+    // Buscar até 4 artigos em destaque principal com cache seguro em memória (Redis/ObjectCache)
+    $featuredPosts = ObjectCache::remember('home_featured_posts', 300, function () use ($nowUtc): array {
+        $featured = Database::fetchAll(
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
-             ORDER BY p.published_at DESC LIMIT {$needed}",
+             WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT 4",
             [$nowUtc]
         );
-        $featuredPosts = array_merge($featuredPosts, $extraPosts);
-        $featuredIds = array_map('intval', array_column($featuredPosts, 'id'));
-    }
+
+        // Se houver menos de 4 marcados com is_featured, completa com as matérias publicadas mais recentes
+        $featuredIds = array_map('intval', array_column($featured, 'id'));
+        if (count($featured) < 4) {
+            $needed = 4 - count($featured);
+            $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
+            $extraPosts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
+                 ORDER BY p.published_at DESC LIMIT {$needed}",
+                [$nowUtc]
+            );
+            $featured = array_merge($featured, $extraPosts);
+        }
+        return $featured;
+    }, 'posts');
 
     // Total de posts para cálculo de paginação
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
-        [$nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+            [$nowUtc]
+        );
+    }, 'posts');
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    // Buscar publicações para o feed principal (sem MEDIUMTEXT content_html)
-    $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT ?",
-        [$nowUtc, $perPage]
-    );
+    // Buscar publicações para o feed principal da página 1 (sem MEDIUMTEXT content_html)
+    $posts = ObjectCache::remember('home_feed_posts_p1', 300, function () use ($nowUtc, $perPage): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ?",
+            [$nowUtc, $perPage]
+        );
+    }, 'posts');
 
     $pageTitle = $config['app']['name'] . ' - ' . (!empty($config['app']['description']) ? $config['app']['description'] : 'Portal de Notícias');
     require $config['paths']['templates'] . '/home.php';
@@ -124,10 +131,13 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
 
-    $category = Database::fetchOne(
-        "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
-        [$categorySlug]
-    );
+    $category = ObjectCache::remember("category:{$categorySlug}", 86400, function () use ($categorySlug): ?array {
+        $cat = Database::fetchOne(
+            "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
+            [$categorySlug]
+        );
+        return $cat ?: null;
+    }, 'categories');
 
     if (!$category) {
         http_response_code(404);
@@ -164,10 +174,13 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
-    $category = Database::fetchOne(
-        "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
-        [$categorySlug]
-    );
+    $category = ObjectCache::remember("category:{$categorySlug}", 86400, function () use ($categorySlug): ?array {
+        $cat = Database::fetchOne(
+            "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
+            [$categorySlug]
+        );
+        return $cat ?: null;
+    }, 'categories');
 
     if (!$category) {
         http_response_code(404);
@@ -387,31 +400,37 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         return;
     }
 
-    $post = Database::fetchOne(
-        "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
-         FROM posts p
-         JOIN users u ON u.id = p.user_id
-         WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
-         LIMIT 1",
-        [$slug, $nowUtc]
-    );
+    // Consulta atômica do artigo com cache em memória RAM (Redis/ObjectCache)
+    $post = ObjectCache::remember("post_slug:{$slug}", 3600, function () use ($slug, $nowUtc): ?array {
+        $p = Database::fetchOne(
+            "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
+             FROM posts p
+             JOIN users u ON u.id = p.user_id
+             WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             LIMIT 1",
+            [$slug, $nowUtc]
+        );
 
-    if ($post && !empty($post['featured_image'])) {
-        $post['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($post['featured_image']);
-        $post['image_caption'] = '';
-    }
+        if ($p && !empty($p['featured_image'])) {
+            $p['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($p['featured_image']);
+            $p['image_caption'] = '';
+        }
+        return $p ?: null;
+    }, 'posts');
 
     if (!$post) {
         // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
         \LightPress\Core\Schema::ensurePagesTable();
-        $page = Database::fetchOne(
-            "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
-            [$slug]
-        );
+        $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
+            $pg = Database::fetchOne(
+                "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
+                [$slug]
+            );
+            return $pg ?: null;
+        }, 'pages');
+
         if ($page) {
             header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
-            // Contabilizar visualização da página
-            // Visualizações contabilizadas assincronamente via beacon /api/view.php?type=page
             $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
             require $config['paths']['templates'] . '/page.php';
             return;
@@ -422,14 +441,16 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         return;
     }
 
-    // Buscar até 4 notícias relacionadas da mesma categoria para retenção de audiência
-    $relatedPosts = Database::fetchAll(
-        "SELECT id, slug, title, summary, category, featured_image, published_at 
-         FROM posts 
-         WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
-         ORDER BY published_at DESC LIMIT 4",
-        [$post['category'], (int)$post['id'], $nowUtc]
-    );
+    // Buscar até 4 notícias relacionadas da mesma categoria para retenção de audiência (com cache de 30m)
+    $relatedPosts = ObjectCache::remember("related:{$post['category']}:{$post['id']}", 1800, function () use ($post, $nowUtc): array {
+        return Database::fetchAll(
+            "SELECT id, slug, title, summary, category, featured_image, published_at 
+             FROM posts 
+             WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
+             ORDER BY published_at DESC LIMIT 4",
+            [$post['category'], (int)$post['id'], $nowUtc]
+        );
+    }, 'posts');
 
     // Calcular tempo estimado de leitura (média de 200 palavras/minuto)
     $cleanText = strip_tags($post['content_html']);

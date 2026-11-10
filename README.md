@@ -312,6 +312,7 @@ lightpress/
 │   ├── Settings.php           # Gerenciador central de configurações dinâmicas do portal
 │   ├── Icon.php               # Biblioteca estática de ícones vetoriais SVG inline ultra-leves
 │   ├── Hook.php               # Sistema ultraleve de Actions e Filters (Zero Dependências)
+│   ├── ObjectCache.php        # Camada defensiva de cache de objetos em memória com fallback transparente
 │   ├── PluginManager.php      # Gerenciador central de plugins e ciclo de vida
 │   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
 ├── plugins/                   # Plugins isolados fora da raiz pública

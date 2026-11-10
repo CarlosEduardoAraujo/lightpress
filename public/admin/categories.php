@@ -12,6 +12,7 @@ use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\CacheManager;
+use LightPress\Core\ObjectCache;
 
 $currentUser = Security::requireAuth(Authorization::ACTION_MANAGE_CATEGORIES);
 
@@ -73,6 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             });
 
                             // Expurga cache da Home e das categorias antiga e nova
+                            ObjectCache::flushGroup('categories');
                             $cacheMgr->purgeUrls([
                                 '/',
                                 '/categoria/' . $oldSlug . '/',
@@ -97,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             "INSERT INTO categories (name, slug, is_active) VALUES (?, ?, 1)",
                             [$name, $slug]
                         );
+                        ObjectCache::flushGroup('categories');
                         $cacheMgr->purgeUrls(['/']);
                         $message = "Categoria '{$name}' cadastrada com sucesso!";
                     } catch (\Throwable $e) {
@@ -115,6 +118,7 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
     $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleCatId]);
     if ($cat && $cat['slug'] !== 'geral') {
         Database::query("UPDATE categories SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", [$toggleCatId]);
+        ObjectCache::flushGroup('categories');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/']);
     }
     header("Location: /admin/categories.php");
@@ -134,6 +138,7 @@ if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
             Database::query("DELETE FROM categories WHERE id = ?", [$delCatId]);
         });
         
+        ObjectCache::flushGroup('categories');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/', '/categoria/geral/']);
         header("Location: /admin/categories.php");
         exit;
