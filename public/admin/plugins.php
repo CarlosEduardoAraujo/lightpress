@@ -75,6 +75,14 @@ require __DIR__ . '/header.php';
     .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
     [data-theme="dark"] .alert-success { background: #064e3b; color: #6ee7b7; }
     [data-theme="dark"] .alert-error { background: #7f1d1d; color: #fca5a5; }
+    .badge-active { background: #dcfce7; color: #166534; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .badge-inactive { background: #f1f5f9; color: #64748b; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    [data-theme="dark"] .badge-active { background: #064e3b; color: #6ee7b7; }
+    [data-theme="dark"] .badge-inactive { background: #334155; color: #94a3b8; }
+    .btn-danger { background: #fee2e2; color: #dc2626; }
+    .btn-danger:hover { background: #fecaca; }
+    [data-theme="dark"] .btn-danger { background: #7f1d1d; color: #fca5a5; }
+    [data-theme="dark"] .btn-danger:hover { background: #991b1b; }
 </style>
 
     <div class="container">

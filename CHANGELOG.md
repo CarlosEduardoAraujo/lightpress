@@ -7,6 +7,21 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Fluxo Editorial para Autores (pending_review) e Sincronização de CSS do Admin — 2026-11-09
+
+- **Fluxo de Submissão Editorial para Autores (`public/admin/editor.php`):**
+  - Implementado o ciclo de vida e estado `pending_review` para colaboradores com perfil de autor (`author`): ao submeterem novos artigos ou salvarem rascunhos com `action === 'submit_review'` (ou quando desprovidos da permissão `Authorization::ACTION_PUBLISH_POST`), o artigo transita de `draft` para `pending_review`.
+  - O snapshot gravado em `post_revisions` registra fidedignamente o status da submissão com `$revInsertStatus = ($statusVal === 'pending_review') ? 'pending_review' : 'draft'`, mantendo a rastreabilidade do histórico editorial.
+  - Atualização ergonômica das mensagens de retorno para *"Artigo enviado para revisão editorial com sucesso!"* e tratamento do feedback visual via parâmetro de URL `submitted=1`.
+  - Renderização condicional do botão principal no editor: editores e administradores visualizam *"Publicar Agora"*, *"Atualizar Publicação"* ou *"Salvar Agendamento"*, enquanto autores visualizam o botão primário *"📤 Enviar para Revisão Editorial"*.
+- **Sincronização e Padronização de Classes CSS no Painel Administrativo:**
+  - `public/admin/system.php`: Adição das classes estruturais e semânticas `.grid-details`, `.card-title`, `.info-row`, `.badge-ok`, `.badge-warn`, `.badge-err` e variantes completas para modo escuro (`[data-theme="dark"]`).
+  - `public/admin/plugins.php`: Adição das classes `.badge-active`, `.badge-inactive`, `.btn-danger` e variantes completas para tema escuro.
+  - `public/admin/users.php`: Adição das classes `.token-box` e `.token-input` (com suporte dark theme) para renderização consistente e estilizada de caixas de links de ativação com validade de 24h.
+  - `public/admin/settings.php`: Adição de classes utilitárias e de layout de componentes (`.page-header`, `.page-title`, `.page-desc`, `.card`, `.section-title`, `.section-desc`, `.browser-tab-mockup`, `.tab-bar`, `.tab-icon`, `.tab-title`, `.tab-close`, `.icon-sizes`, `.icon-box`, `.modal-content`, `.modal-grid`), assegurando uniformidade visual e interoperabilidade de nomenclatura.
+- **Suíte de Testes Automatizados (`bin/test_security_fixes.py`):**
+  - Adição da seção `[13] Testando Fluxo de Revisão Editorial (pending_review) e CSS do Painel Administrativo`, validando a máquina de estados de rascunhos, a gravação de revisões, o condicionamento de botões por permissão e a presença de todas as classes CSS, elevando a cobertura para 60 testes automatizados com 100% de sucesso.
+
 ### Roteamento Canônico e Contabilização de Views em Páginas Institucionais — 2026-11-09
 
 - **Template de Páginas Institucionais (`templates/page.php`):**

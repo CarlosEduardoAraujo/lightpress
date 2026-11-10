@@ -270,6 +270,10 @@ require __DIR__ . '/header.php';
 
     .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
     .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+    .token-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .token-input { font-family: monospace; font-size: 0.85rem; background: #ffffff; margin-top: 0.25rem; cursor: pointer; }
+    [data-theme="dark"] .token-box { background: #1e293b; border-color: #334155; }
+    [data-theme="dark"] .token-input { background: #090d16; color: #f1f5f9; }
 </style>
 
     <div class="container">

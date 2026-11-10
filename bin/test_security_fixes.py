@@ -753,6 +753,75 @@ cursor.execute("SELECT expires_at FROM view_dedupe WHERE post_id = -10")
 updated_expires = cursor.fetchone()[0]
 assert_check("Renovação da janela de deduplicação para páginas atualiza expires_at com sucesso", updated_expires == '2026-11-10 01:00:00')
 
+# 13. Testes do Fluxo Editorial (pending_review) e Sincronização de CSS do Admin
+print("[13] Testando Fluxo de Revisão Editorial (pending_review) e CSS do Painel Administrativo")
+
+with open("public/admin/editor.php", "r", encoding="utf-8") as f:
+    editor_content = f.read()
+
+assert_check(
+    "public/admin/editor.php transita rascunhos para pending_review na submissão por autores",
+    "!$canPublish && $action === 'submit_review' && $statusVal === 'draft'" in editor_content
+    and "$statusVal = 'pending_review';" in editor_content
+)
+
+assert_check(
+    "public/admin/editor.php registra status correto na revisão (revInsertStatus)",
+    "$revInsertStatus = ($statusVal === 'pending_review') ? 'pending_review' : 'draft';" in editor_content
+    and "status, payload_json, content_html" in editor_content
+)
+
+assert_check(
+    "public/admin/editor.php condiciona botão de publicação com base em ACTION_PUBLISH_POST",
+    "Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)" in editor_content
+    and "name=\"form_action\" value=\"submit_review\"" in editor_content
+    and "Enviar para Revisão Editorial" in editor_content
+)
+
+with open("public/admin/system.php", "r", encoding="utf-8") as f:
+    system_content = f.read()
+
+assert_check(
+    "public/admin/system.php define classes .grid-details, .card-title, .info-row e .badge-ok",
+    ".grid-details" in system_content
+    and ".card-title" in system_content
+    and ".info-row" in system_content
+    and ".badge-ok" in system_content
+    and ".badge-warn" in system_content
+    and ".badge-err" in system_content
+)
+
+with open("public/admin/plugins.php", "r", encoding="utf-8") as f:
+    plugins_content = f.read()
+
+assert_check(
+    "public/admin/plugins.php define classes .badge-active, .badge-inactive e .btn-danger",
+    ".badge-active" in plugins_content
+    and ".badge-inactive" in plugins_content
+    and ".btn-danger" in plugins_content
+)
+
+with open("public/admin/users.php", "r", encoding="utf-8") as f:
+    users_content = f.read()
+
+assert_check(
+    "public/admin/users.php define classes .token-box e .token-input",
+    ".token-box" in users_content and ".token-input" in users_content
+)
+
+with open("public/admin/settings.php", "r", encoding="utf-8") as f:
+    settings_content = f.read()
+
+assert_check(
+    "public/admin/settings.php define classes genéricas de layout do painel (.page-header, .card, etc.)",
+    ".page-header" in settings_content
+    and ".page-title" in settings_content
+    and ".section-title" in settings_content
+    and ".browser-tab-mockup" in settings_content
+    and ".modal-content" in settings_content
+    and ".modal-grid" in settings_content
+)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

@@ -177,6 +177,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $newRevId = $latest ? (int)$latest['id'] : 0;
                     }
                     $postService->publishOrUpdate($newId, $payload, (int)$currentUser['id'], 1, $newRevId);
+                } elseif ($action === 'submit_review' && !Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)) {
+                    Database::query("UPDATE posts SET status = 'pending_review' WHERE id = ?", [$newId]);
+                    Database::query("UPDATE post_revisions SET status = 'pending_review' WHERE post_id = ?", [$newId]);
+                    header("Location: /admin/editor.php?id={$newId}&saved=1&submitted=1");
+                    exit;
                 }
                 header("Location: /admin/editor.php?id={$newId}&saved=1");
                 exit;
@@ -340,6 +345,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $statusVal = $current['status'];
                         $previousStatus = $statusVal;
 
+                        if (!$canPublish && $action === 'submit_review' && $statusVal === 'draft') {
+                            $statusVal = 'pending_review';
+                        }
+
                         // Se a data de publicação for removida e a matéria estiver publicada ou agendada, reverte status para draft
                         if (empty($publishedAtVal) && in_array($statusVal, ['published', 'scheduled'], true)) {
                             $statusVal = 'draft';
@@ -385,14 +394,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'status' => $statusVal,
                         ];
 
+                        $revInsertStatus = ($statusVal === 'pending_review') ? 'pending_review' : 'draft';
+
                         Database::query(
                             "INSERT INTO post_revisions (
                                 post_id, editor_id, base_version, status, payload_json, content_html, created_at
-                             ) VALUES (?, ?, ?, 'draft', ?, ?, CURRENT_TIMESTAMP)",
+                             ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
                             [
                                 $postId,
                                 (int)$currentUser['id'],
                                 $newVersion,
+                                $revInsertStatus,
                                 json_encode($snapshotPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                                 $cleanHtml
                             ]
@@ -401,7 +413,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $revId = (int)Database::getConnection()->lastInsertId();
                         ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $cleanHtml, $featuredImage);
 
-                        $message = "Rascunho salvo com sucesso!";
+                        $message = ($statusVal === 'pending_review')
+                            ? "Artigo enviado para revisão editorial com sucesso!"
+                            : "Rascunho salvo com sucesso!";
                     });
 
                     if ($wasPublished) {
@@ -431,7 +445,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if (isset($_GET['saved'])) {
+if (isset($_GET['submitted'])) {
+    $message = "Artigo criado e enviado para revisão editorial com sucesso!";
+} elseif (isset($_GET['saved'])) {
     $message = "Publicação criada com sucesso!";
 }
 
@@ -752,19 +768,25 @@ require __DIR__ . '/header.php';
                         </div>
 
                         <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                            <button type="submit" name="form_action" value="publish" id="btnPublishAction" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
-                                <?php
-                                    $pubTime = ($post && !empty($post['published_at'])) ? strtotime($post['published_at']) : 0;
-                                    $isFutureDate = ($pubTime > time());
-                                    if ($isFutureDate) {
-                                        echo '📅 Salvar Agendamento';
-                                    } elseif ($post && ($post['status'] === 'published' || ($pubTime > 0 && $pubTime <= time()))) {
-                                        echo 'Atualizar Publicação';
-                                    } else {
-                                        echo '🚀 Publicar Agora';
-                                    }
-                                ?>
-                            </button>
+                            <?php if (Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)): ?>
+                                <button type="submit" name="form_action" value="publish" id="btnPublishAction" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
+                                    <?php
+                                        $pubTime = ($post && !empty($post['published_at'])) ? strtotime($post['published_at']) : 0;
+                                        $isFutureDate = ($pubTime > time());
+                                        if ($isFutureDate) {
+                                            echo '📅 Salvar Agendamento';
+                                        } elseif ($post && ($post['status'] === 'published' || ($pubTime > 0 && $pubTime <= time()))) {
+                                            echo 'Atualizar Publicação';
+                                        } else {
+                                            echo '🚀 Publicar Agora';
+                                        }
+                                    ?>
+                                </button>
+                            <?php else: ?>
+                                <button type="submit" name="form_action" value="submit_review" class="btn btn-primary" style="width: 100%; font-size: 1rem; padding: 0.85rem;">
+                                    📤 Enviar para Revisão Editorial
+                                </button>
+                            <?php endif; ?>
                             <button type="submit" name="form_action" value="save_draft" class="btn btn-secondary" style="width: 100%;">
                                 💾 Salvar como Rascunho
                             </button>

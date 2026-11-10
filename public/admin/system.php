@@ -63,6 +63,17 @@ require __DIR__ . '/header.php';
     th { background: #f8fafc; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
     td { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); }
     tr:last-child td { border-bottom: none; }
+    .grid-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; }
+    .card { padding: 1.5rem; }
+    .card-title { font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0; border-bottom: 1px dashed var(--border); font-size: 0.88rem; gap: 1rem; }
+    .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .badge-ok { background: #dcfce7; color: #166534; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .badge-warn { background: #fef3c7; color: #b45309; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .badge-err { background: #fee2e2; color: #991b1b; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    [data-theme="dark"] .badge-ok { background: #064e3b; color: #6ee7b7; }
+    [data-theme="dark"] .badge-warn { background: #451a03; color: #fde68a; }
+    [data-theme="dark"] .badge-err { background: #7f1d1d; color: #fca5a5; }
 </style>
 
     <div class="container">

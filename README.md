@@ -866,7 +866,18 @@ No MySQL, `ALTER TABLE` pode causar commit implícito. Por isso, o histórico in
 
 A restauração distingue três valores: a versão pública conhecida, o identificador da revisão ativa conhecida (`knownRevisionId`) e o snapshot histórico escolhido (`appliedRevisionId`). Assim, é possível restaurar um snapshot antigo mesmo com outro rascunho ativo, desde que o estado não tenha mudado desde a abertura do formulário. A transação revalida versão e revisão ativa antes de gravar. Divergências retornam HTTP 409; a revisão escolhida recebe `applied`, e as demais revisões pendentes recebem `superseded`. Após sucesso, os identificadores do formulário são atualizados.
 
-#### 8.17.9. Verificações de regressão e limites de validação
+#### 8.17.9. Contabilização Canônica de Views em Páginas Institucionais e Auto-migração de `view_dedupe`
+
+* **Desacoplamento e Suporte a Páginas Institucionais:** A tabela `view_dedupe` utiliza `post_id BIGINT NOT NULL` sem chave estrangeira estrita (`FOREIGN KEY`) com a tabela `posts`. Esse arranjo permite o registro de identificadores negativos para páginas institucionais (`$dedupeId = -$targetId`), prevenindo colisões de ID com posts e eliminando erros de restrição relacional em MySQL e SQLite.
+* **Auto-migração Idempotente e Proteção contra Cache Nginx:** `Schema::ensureViewDedupeSchema()` executa a verificação e adequação da tabela `view_dedupe` sem causar commits implícitos indesejados. O endpoint `public/api/view.php` chama o método fora de transações abertas antes de processar beacons de páginas institucionais, assegurando a migração mesmo quando o conteúdo HTML da página tiver sido servido diretamente a partir do FastCGI Cache do Nginx.
+
+#### 8.17.10. Fluxo Editorial de Revisão (`pending_review`) para Autores e Padronização Visual do Admin
+
+* **Ciclo de Vida para Autores (`author`):** Colaboradores com papel de autor não possuem permissão de publicação direta (`Authorization::ACTION_PUBLISH_POST`). Ao criarem ou editarem matérias, a submissão transita o artigo para o estado `pending_review`. A versão correspondente em `post_revisions` registra adequadamente `status = 'pending_review'`, fornecendo rastreabilidade e histórico para a equipe editorial aprovar ou publicar.
+* **Interface do Editor:** A barra de ações em `public/admin/editor.php` renderiza condicionalmente o botão de submissão: para autores, é disponibilizado *"📤 Enviar para Revisão Editorial"*; para editores e administradores, botões diretos de *"🚀 Publicar Agora"*, *"Atualizar Publicação"* ou *"📅 Salvar Agendamento"*.
+* **Sincronização de Design Tokens e Classes no Admin:** Padronização completa de classes CSS nas páginas administrativas (`system.php`, `plugins.php`, `users.php` e `settings.php`), cobrindo grids responsivos (`.grid-details`), cartões informativos (`.card-title`, `.info-row`), badges semânticos (`.badge-ok`, `.badge-warn`, `.badge-err`, `.badge-active`, `.badge-inactive`), caixas de links temporários (`.token-box`, `.token-input`), botões de perigo (`.btn-danger`) e elementos de layout com suporte a modo escuro (`[data-theme="dark"]`).
+
+#### 8.17.11. Verificações de regressão e limites de validação
 
 Execute, com PHP 8.4 e as extensões do projeto:
 

@@ -381,6 +381,22 @@ require __DIR__ . '/header.php';
         text-overflow: ellipsis;
         color: var(--text);
     }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+    .page-title { font-size: 1.75rem; font-weight: 800; color: var(--primary); letter-spacing: -0.02em; }
+    .page-desc { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .section-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+    .section-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .browser-tab-mockup { display: flex; flex-direction: column; gap: 0.6rem; }
+    .tab-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px 8px 0 0; padding: 0.55rem 0.9rem; display: inline-flex; align-items: center; gap: 0.6rem; min-width: 240px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .tab-icon { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
+    .tab-title { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+    .tab-close { margin-left: auto; font-size: 0.7rem; color: var(--text-muted); }
+    .icon-sizes { display: flex; gap: 1.25rem; align-items: flex-end; }
+    .icon-box { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+    .icon-box img { border: 1px dashed var(--border); border-radius: 6px; padding: 2px; background: var(--surface); object-fit: contain; }
+    .modal-content { background: var(--surface); border-radius: 12px; width: 100%; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; }
+    .modal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1rem; }
 </style>
 
     <div class="container">
