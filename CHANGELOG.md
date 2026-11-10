@@ -7,6 +7,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Roteamento Canônico e Contabilização de Views em Páginas Institucionais — 2026-11-09
+
+- **Template de Páginas Institucionais (`templates/page.php`):**
+  - Migração do disparo assíncrono de beacon/fetch da URL bloqueada `/api/view.php?type=page&id=` para o endpoint canônico `/api/view/page/{id}`.
+- **Roteador Principal (`public/index.php`):**
+  - Registro dedicado das rotas `POST /api/view/page/{id}` e `POST /api/view/page/{id}/`, com precedência de correspondência antes do roteamento genérico de notícias, garantindo passagem limpa de `type=page` para o processador de views.
+- **Esquema Relacional e Auto-migração (`core/Schema.php` e `bin/schema.sql`):**
+  - Adequação da tabela `view_dedupe`: remoção da restrição de chave estrangeira com a tabela `posts` e definição de `post_id BIGINT NOT NULL` (assinado).
+  - Viabilização do armazenamento de identificadores negativos para páginas institucionais (`$dedupeId = -$targetId`), prevenindo colisões com IDs de posts e eliminando erros de constraint `FOREIGN KEY` e estouro de `INT UNSIGNED` no MySQL e SQLite.
+  - Implementação de `Schema::ensureViewDedupeSchema()` para auto-migração segura e idempotente em bases MySQL e SQLite existentes, executada automaticamente em `ensurePagesTable()`, `installMysql()` e `installSqlite()`.
+- **Testes de Regressão Automatizados (`bin/test_security_fixes.py`):**
+  - Adição da suíte `[10] Testando Contador de Views de Páginas Institucionais e Schema view_dedupe`, cobrindo rotas, template, schema DDL e deduplicação atômica com IDs negativos, totalizando 52 testes com 100% de aprovação.
+
+
 ### Proteção do Último Administrador e Defesa contra Path Traversal na Mídia — 2026-11-09
 
 - **Gestão de Usuários e Concorrência Atômica (`public/admin/users.php`):**
