@@ -73,13 +73,14 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
     <!-- Master Lead Story (8 Cols) -->
     <article class="lg:col-span-8 group relative flex flex-col justify-end min-h-[460px] lg:min-h-[540px] rounded-xl overflow-hidden bg-carbon-black shadow-md cursor-pointer border border-subtle-border dark:border-[#2a303c]">
         <a href="/<?= Security::e($mainLead['slug']) ?>/" class="absolute inset-0 z-0 overflow-hidden block">
-            <?php if (!empty($mainLead['featured_image'])): ?>
+            <?php if (!empty($mainLead['featured_image'])): 
+                $mainLeadImgDesc = ImageProcessor::getImageDescription($mainLead['featured_image']);
+            ?>
                 <figure class="w-full h-full m-0 p-0 overflow-hidden">
                     <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
                          src="<?= Security::e(ImageProcessor::toAvifUrl($mainLead['featured_image'])) ?>" 
-                         alt="<?= Security::e($mainLead['title']) ?>"
-                         title="<?= Security::e($mainLead['title']) ?>">
-                    <figcaption class="sr-only"><?= Security::e($mainLead['title']) ?></figcaption>
+                         alt="<?= Security::e($mainLeadImgDesc) ?>"
+                         title="<?= Security::e($mainLeadImgDesc) ?>">
                 </figure>
             <?php else: ?>
                 <div class="w-full h-full bg-carbon-surface flex items-center justify-center text-secondary">Sem imagem</div>
@@ -149,14 +150,15 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
 
                 <!-- Thumbnail Compacta à Direita -->
                 <a href="/<?= Security::e($sec['slug']) ?>/" class="w-24 h-24 sm:w-28 sm:h-24 shrink-0 rounded-lg overflow-hidden relative bg-surface-container dark:bg-[#151920] block group-hover:opacity-95 transition-opacity" title="<?= Security::e($sec['title']) ?>">
-                    <?php if (!empty($sec['featured_image'])): ?>
+                    <?php if (!empty($sec['featured_image'])): 
+                        $secImgDesc = ImageProcessor::getImageDescription($sec['featured_image']);
+                    ?>
                         <figure class="w-full h-full m-0 p-0 overflow-hidden">
                             <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                  src="<?= Security::e(ImageProcessor::toThumbUrl($sec['featured_image'], 'avif')) ?>" 
-                                 alt="<?= Security::e($sec['title']) ?>" 
-                                 title="<?= Security::e($sec['title']) ?>" 
+                                 alt="<?= Security::e($secImgDesc) ?>" 
+                                 title="<?= Security::e($secImgDesc) ?>" 
                                  loading="lazy">
-                            <figcaption class="sr-only"><?= Security::e($sec['title']) ?></figcaption>
                         </figure>
                     <?php else: ?>
                         <div class="w-full h-full flex items-center justify-center text-secondary text-xs">Sem foto</div>
@@ -187,14 +189,15 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
             <?php foreach ($posts as $item): ?>
                 <article class="group bg-pure-white dark:bg-carbon-surface p-space-md rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all flex flex-col sm:flex-row gap-space-md items-start">
                     <a href="/<?= Security::e($item['slug']) ?>/" class="w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0 relative bg-surface-container dark:bg-[#151920] block">
-                        <?php if (!empty($item['featured_image'])): ?>
+                        <?php if (!empty($item['featured_image'])): 
+                            $feedImgDesc = ImageProcessor::getImageDescription($item['featured_image']);
+                        ?>
                             <figure class="w-full h-full m-0 p-0 overflow-hidden">
                                 <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                      src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
-                                     alt="<?= Security::e($item['title']) ?>" 
-                                     title="<?= Security::e($item['title']) ?>" 
+                                     alt="<?= Security::e($feedImgDesc) ?>" 
+                                     title="<?= Security::e($feedImgDesc) ?>" 
                                      loading="lazy">
-                                <figcaption class="sr-only"><?= Security::e($item['title']) ?></figcaption>
                             </figure>
                         <?php else: ?>
                             <div class="w-full h-full flex items-center justify-center text-secondary dark:text-secondary-fixed-dim text-xs">Sem foto</div>

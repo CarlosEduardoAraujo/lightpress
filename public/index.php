@@ -396,17 +396,8 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     );
 
     if ($post && !empty($post['featured_image'])) {
-        $post['image_alt'] = '';
+        $post['image_alt'] = ImageProcessor::getImageDescription($post['featured_image']);
         $post['image_caption'] = '';
-        $likeFeatured = '%' . Security::escapeLike($post['featured_image']) . '%';
-        $mediaMeta = Database::fetchOne(
-            "SELECT alt_text, caption FROM media WHERE variants_manifest LIKE ? LIMIT 1",
-            [$likeFeatured]
-        );
-        if ($mediaMeta) {
-            $post['image_alt'] = (string)($mediaMeta['alt_text'] ?? '');
-            $post['image_caption'] = (string)($mediaMeta['caption'] ?? '');
-        }
     }
 
     if (!$post) {

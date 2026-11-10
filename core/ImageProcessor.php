@@ -177,6 +177,73 @@ class ImageProcessor
     }
 
     /**
+     * Resolve o texto descritivo real da imagem (ALT / TITLE) a partir dos metadados da mídia.
+     * Retorna estritamente metadados da imagem (alt_text ou caption da IA, ou nome do arquivo amigável).
+     * NUNCA retorna o título da matéria jornalística.
+     *
+     * @param string $imageUrl URL da imagem
+     * @param ?string $fallbackAlt Texto alternativo opcional se já conhecido
+     * @return string Descrição visual relacionada estritamente à imagem
+     */
+    public static function getImageDescription(string $imageUrl, ?string $fallbackAlt = null): string
+    {
+        if (!empty($fallbackAlt)) {
+            return trim($fallbackAlt);
+        }
+
+        if (empty($imageUrl)) {
+            return '';
+        }
+
+        $cleanPath = parse_url($imageUrl, PHP_URL_PATH) ?? $imageUrl;
+        $cleanPath = ltrim((string)$cleanPath, '/');
+        $baseName = pathinfo($cleanPath, PATHINFO_FILENAME);
+        $cleanBase = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $baseName);
+
+        try {
+            $likePath = '%' . Security::escapeLike($cleanPath) . '%';
+            $likeEscaped = '%' . Security::escapeLike(str_replace('/', '\/', $cleanPath)) . '%';
+            $likeBase = '%' . Security::escapeLike((string)$cleanBase) . '%';
+
+            $media = Database::fetchOne(
+                "SELECT alt_text, caption, original_name FROM media 
+                 WHERE variants_manifest LIKE ? 
+                    OR variants_manifest LIKE ? 
+                    OR original_name LIKE ? 
+                    OR variants_manifest LIKE ? 
+                 ORDER BY (alt_text IS NOT NULL AND alt_text != '') DESC, id DESC 
+                 LIMIT 1",
+                [$likePath, $likeEscaped, $likeBase, $likeBase]
+            );
+
+            if ($media) {
+                if (!empty($media['alt_text'])) {
+                    return trim((string)$media['alt_text']);
+                }
+                if (!empty($media['caption'])) {
+                    return trim((string)$media['caption']);
+                }
+                if (!empty($media['original_name'])) {
+                    $origBase = pathinfo((string)$media['original_name'], PATHINFO_FILENAME);
+                    $cleanOrig = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $origBase);
+                    if (!preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanOrig)) {
+                        return trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanOrig)));
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Em caso de falha de banco, prossegue para extração de nome
+        }
+
+        // Formata o nome do arquivo da imagem como descrição amigável se não for genérico
+        if (!empty($cleanBase) && !preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanBase)) {
+            return trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanBase)));
+        }
+
+        return '';
+    }
+
+    /**
      * Processa um arquivo enviado via upload ($_FILES).
      *
      * @param string $tmpFilePath Caminho temporário do arquivo

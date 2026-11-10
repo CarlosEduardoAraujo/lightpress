@@ -101,14 +101,15 @@ $searchQuery = Security::e($query ?? '');
                     <?php foreach ($posts as $item): ?>
                         <article class="group bg-pure-white dark:bg-carbon-surface p-space-md rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md dark:hover:border-racing-red/50 transition-all flex flex-col sm:flex-row gap-space-md items-start">
                             <a href="/<?= Security::e($item['slug']) ?>/" class="w-full sm:w-48 h-32 rounded-lg overflow-hidden shrink-0 relative bg-surface-container dark:bg-[#151920] block">
-                                <?php if (!empty($item['featured_image'])): ?>
+                                <?php if (!empty($item['featured_image'])): 
+                                    $searchImgDesc = ImageProcessor::getImageDescription($item['featured_image']);
+                                ?>
                                     <figure class="w-full h-full m-0 p-0 overflow-hidden">
                                         <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                              src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
-                                             alt="<?= Security::e($item['title']) ?>" 
-                                             title="<?= Security::e($item['title']) ?>" 
+                                             alt="<?= Security::e($searchImgDesc) ?>" 
+                                             title="<?= Security::e($searchImgDesc) ?>" 
                                              loading="lazy">
-                                        <figcaption class="sr-only"><?= Security::e($item['title']) ?></figcaption>
                                     </figure>
                                 <?php else: ?>
                                     <div class="w-full h-full flex items-center justify-center text-secondary dark:text-secondary-fixed-dim text-xs">Sem foto</div>

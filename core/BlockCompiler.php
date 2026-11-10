@@ -432,6 +432,9 @@ class BlockCompiler
         
         // Escape contextual estrito para atributo alt (LP-03)
         $rawAlt = !empty($block['alt']) ? (string)$block['alt'] : strip_tags($block['caption'] ?? '');
+        if (empty($rawAlt) && !empty($url)) {
+            $rawAlt = ImageProcessor::getImageDescription($url);
+        }
         $altAttr = Security::e(trim(strip_tags($rawAlt)));
         $lazyAttr = $isFirstImage ? '' : ' loading="lazy"';
 
@@ -471,7 +474,7 @@ class BlockCompiler
                     }
 
                     if (!empty($defaultSrc)) {
-                        $hoverText = !empty($block['caption']) ? strip_tags((string)$block['caption']) : $rawAlt;
+                        $hoverText = !empty($rawAlt) ? $rawAlt : (!empty($block['caption']) ? strip_tags((string)$block['caption']) : '');
                         $hoverAttr = Security::e(trim($hoverText));
                         $html = "<figure>\n  <picture>\n";
                         if (!empty($avifSrcset)) {
@@ -482,10 +485,6 @@ class BlockCompiler
                         }
                         $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$altAttr}\" title=\"{$hoverAttr}\"{$lazyAttr}>\n";
                         $html .= "  </picture>";
-                        $capText = !empty($captionHtml) ? $captionHtml : $altAttr;
-                        if (!empty($capText)) {
-                            $html .= "\n  <figcaption class=\"sr-only\">{$capText}</figcaption>";
-                        }
                         $html .= "\n</figure>";
                         return $html;
                     }
@@ -506,15 +505,11 @@ class BlockCompiler
             return '';
         }
 
-        $hoverText = !empty($block['caption']) ? strip_tags((string)$block['caption']) : $rawAlt;
+        $hoverText = !empty($rawAlt) ? $rawAlt : (!empty($block['caption']) ? strip_tags((string)$block['caption']) : '');
         $hoverAttr = Security::e(trim($hoverText));
 
         $html = "<figure>";
         $html .= "<img src=\"{$url}\" alt=\"{$altAttr}\" title=\"{$hoverAttr}\"{$lazyAttr}>";
-        $capText = !empty($captionHtml) ? $captionHtml : $altAttr;
-        if (!empty($capText)) {
-            $html .= "<figcaption class=\"sr-only\">{$capText}</figcaption>";
-        }
         $html .= "</figure>";
 
         return $html;

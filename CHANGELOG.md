@@ -7,18 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
-### Semântica HTML5 Padronizada com `<figure>` e `<figcaption>` em Todas as Imagens de Notícias — 2026-11-10
+### Remoção de `<figcaption>` e Correção de Descrição Real de Imagens (ALT/TITLE) — 2026-11-10
 
-- **Estrutura Semântica Universal de Imagens:**
-  - Todas as imagens de notícias — sejam Miniaturas/Thumbnails (300px), Intermediárias (1024px) ou Completas (Full/AVIF) — passam a ser encapsuladas rigorosamente sob o padrão semântico HTML5 `<figure><img src="..." alt="..."><figcaption>...</figcaption></figure>`.
-- **Página da Notícia (`templates/post.php` e `public/index.php`):**
-  - Imagem de Destaque Hero: remoção completa de legendas visíveis abaixo da imagem; metadados (`alt` e `title`) integrados na tag `<img>` para exibição nativa do texto gerado pela IA ou título da matéria ao passar o mouse por cima (hover tooltip), com `<figcaption class="sr-only">` para conformidade semântica sem poluição visual.
-  - Notícias Relacionadas no Rodapé: miniaturas em `<figure><img alt="..." title="..." ...><figcaption class="sr-only">...</figcaption></figure>`.
-  - Estilização de Conteúdo: ocultação global de legendas abaixo de fotos no corpo da matéria (`.article-body figcaption { display: none; }`).
-- **Página Inicial e Listagens (`templates/home.php`, `category.php`, `tag.php`, `search.php`, `page.php`):**
-  - Todas as tags `<img>` (Hero, trio de secundários e feed de notícias) atualizadas com atributo `title="..."` correspondente ao ALT/título da imagem para tooltip nativo ao passar o mouse, preservando a semântica `<figure>` e `<figcaption class="sr-only">`.
-- **Compilador e Editores (`core/BlockCompiler.php`, `editor.php`, `page-edit.php`):**
-  - Injeção obrigatória do atributo `title` idêntico ao `alt` nas tags `<img>` e sanitização de `<figcaption class="sr-only">`.
+- **Remoção Completa de `<figcaption>` no Frontend Público:**
+  - Remoção de qualquer tag `<figcaption>` e `<figcaption class="sr-only">` abaixo das imagens em todas as páginas públicas (`templates/post.php`, `templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/page.php`) e no compilador de blocos (`core/BlockCompiler.php`), eliminando vazamentos de texto abaixo da foto.
+- **Resolução Exclusiva de Descrição da Imagem (`core/ImageProcessor::getImageDescription`):**
+  - Implementação de resolvedor de metadados visuais em `ImageProcessor::getImageDescription($imageUrl)` com busca normalizada na tabela `media` por caminhos unescaped e escaped no JSON `variants_manifest` e nome base do arquivo.
+  - Ordem estrita de precedência: `alt_text` (IA/Editor) -> `caption` (IA/Editor) -> `original_name` formatado -> nome de arquivo limpo formatado (ignorando prefixos genéricos como `img`, `dsc`, `whatsapp` e números).
+  - **Eliminação Total de Alucinação do Título da Notícia:** Nenhuma imagem do portal mais recebe o título da matéria (`$post['title']`) em seus atributos `alt` ou `title`. Ao passar o mouse sobre a imagem (hover tooltip), o texto exibido descreve rigorosamente o conteúdo da foto.
+- **Páginas e Templates Atualizados:**
+  - `templates/post.php`: Destaque Hero e Notícias Relacionadas utilizam descrição da foto nos atributos `alt` e `title`, sem `<figcaption>`.
+  - `templates/home.php`: Destaque Principal (Main Lead), Notícias Secundárias e Feed de Notícias exibem descrição real da imagem em `alt` e `title`.
+  - `templates/category.php`, `templates/tag.php`, `templates/search.php` e `templates/page.php`: Listagens e páginas institucionais com `alt` e `title` contextuais da imagem sem poluição de `<figcaption>`.
+  - `core/BlockCompiler.php`: Geração de `<figure>` e `<picture>` com `title` e `alt` resolvidos da mídia, sem injeção de `<figcaption class="sr-only">`.
 
 ### Plugin ai-copilot: Linkagem Interna Inteligente e Visão Computacional em Mídias — 2026-11-10
 
