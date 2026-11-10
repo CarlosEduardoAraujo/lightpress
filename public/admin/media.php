@@ -207,8 +207,11 @@ $whereClauses = [];
 $params = [];
 
 if (!empty($filterSearch)) {
-    $whereClauses[] = "(m.original_name LIKE ? OR m.variants_manifest LIKE ? OR m.id = ?)";
+    $whereClauses[] = "(m.original_name LIKE ? OR m.alt_text LIKE ? OR m.ai_tags LIKE ? OR m.caption LIKE ? OR m.variants_manifest LIKE ? OR m.id = ?)";
     $escapedFilter = '%' . Security::escapeLike($filterSearch) . '%';
+    $params[] = $escapedFilter;
+    $params[] = $escapedFilter;
+    $params[] = $escapedFilter;
     $params[] = $escapedFilter;
     $params[] = $escapedFilter;
     $params[] = $filterSearch;
@@ -249,6 +252,9 @@ $queryParams = array_merge($params, [$perPage, $offset]);
 $mediaList = Database::fetchAll($querySql, $queryParams);
 
 $csrfToken = Security::generateCsrfToken();
+$isAiCopilotActive = \LightPress\Core\PluginManager::isActive('ai-copilot');
+$isVisionEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_copilot_vision_enabled', '1') === '1');
+$visionMode = (string)\LightPress\Core\Settings::get('ai_copilot_vision_mode', 'auto');
 
 // Função auxiliar para montar URLs com parâmetros de busca e paginação
 function buildMediaUrl(array $overrides = []): string {
@@ -573,6 +579,39 @@ require __DIR__ . '/header.php';
                                 </button>
                             <?php endif; ?>
 
+                            <?php if (!empty($item['alt_text']) || !empty($item['ai_tags'])): ?>
+                                <div class="media-ai-meta" id="ai-meta-<?= Security::e($item['id']) ?>" style="margin-top:0.4rem; padding:0.45rem; background:rgba(0,0,0,0.03); border-radius:4px; font-size:0.75rem; border:1px solid var(--border); text-align:left;">
+                                    <?php if (!empty($item['alt_text'])): ?>
+                                        <div style="margin-bottom:0.25rem;">
+                                            <strong style="color:var(--text);">Alt:</strong> <span class="alt-val" style="color:var(--text-muted);"><?= Security::e($item['alt_text']) ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['caption'])): ?>
+                                        <div style="margin-bottom:0.25rem;">
+                                            <strong style="color:var(--text);">Legenda:</strong> <span class="caption-val" style="color:var(--text-muted);"><?= Security::e($item['caption']) ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['ai_tags'])): ?>
+                                        <div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.25rem;">
+                                            <?php foreach (explode(',', (string)$item['ai_tags']) as $t): $t = trim($t); if ($t === '') continue; ?>
+                                                <span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600;"><?= Security::e($t) ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="media-ai-meta" id="ai-meta-<?= Security::e($item['id']) ?>" style="display:none; margin-top:0.4rem; padding:0.45rem; background:rgba(0,0,0,0.03); border-radius:4px; font-size:0.75rem; border:1px solid var(--border); text-align:left;"></div>
+                            <?php endif; ?>
+
+                            <?php if ($isVisionEnabled): ?>
+                                <button type="button" class="btn-copy btn-describe-ai" 
+                                        onclick="describeMediaAi('<?= Security::e($item['id']) ?>', this)" 
+                                        style="background:#f0fdf4; color:#166534; border-color:#bbf7d0; font-weight:600; margin-top:0.35rem;" 
+                                        title="Gera ou atualiza Alt Text, Legenda e Tags visuais usando IA">
+                                    ✨ <?= !empty($item['alt_text']) ? 'Atualizar com IA' : 'Descrever com IA' ?>
+                                </button>
+                            <?php endif; ?>
+
                             <?php 
                             $canDeleteItem = in_array($currentUser['role'], ['admin', 'editor'], true) || ((int)($item['user_id'] ?? 0) === (int)$currentUser['id']);
                             if ($canDeleteItem): 
@@ -702,6 +741,7 @@ require __DIR__ . '/header.php';
 
             let successCount = 0;
             let errorMessages = [];
+            const uploadedMediaIds = [];
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -741,6 +781,9 @@ require __DIR__ . '/header.php';
 
                     if (res.ok && data && data.ok) {
                         successCount++;
+                        if (data.media && data.media.id) {
+                            uploadedMediaIds.push(data.media.id);
+                        }
                     } else {
                         const errMsg = (data && data.error) ? data.error : ('HTTP ' + res.status);
                         errorMessages.push('"' + file.name + '": ' + errMsg);
@@ -764,6 +807,12 @@ require __DIR__ . '/header.php';
                     : successCount + ' imagens enviadas e convertidas com sucesso!';
                 showAlert(msg, errorMessages, false);
                 triggerLiveSearch(1);
+
+                if (isVisionAuto && uploadedMediaIds.length > 0) {
+                    uploadedMediaIds.forEach(function(mId) {
+                        describeMediaAi(mId, null);
+                    });
+                }
             } else if (errorMessages.length > 0) {
                 showAlert('', errorMessages, true);
             }
@@ -891,6 +940,68 @@ require __DIR__ . '/header.php';
                     if (grid) grid.style.opacity = '1';
                     if (searchSpinner) searchSpinner.style.display = 'none';
                 });
+        }
+
+        const isVisionAuto = <?= ($isVisionEnabled && $visionMode === 'auto') ? 'true' : 'false' ?>;
+
+        async function describeMediaAi(mediaId, btnElement) {
+            let originalText = '';
+            if (btnElement) {
+                originalText = btnElement.innerText;
+                btnElement.disabled = true;
+                btnElement.innerText = '✨ Analisando com IA...';
+            }
+
+            try {
+                const res = await fetch('/admin/api/ai.php?action=describe_media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrfToken,
+                        'media_id': mediaId
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    const cardMeta = document.getElementById('ai-meta-' + mediaId);
+                    if (cardMeta) {
+                        let tagsHtml = '';
+                        if (data.ai_tags) {
+                            const tags = data.ai_tags.split(',');
+                            tagsHtml = '<div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.25rem;">' +
+                                tags.map(t => '<span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600;">' + escapeHtml(t.trim()) + '</span>').join('') +
+                                '</div>';
+                        }
+                        cardMeta.innerHTML = 
+                            '<div style="margin-bottom:0.25rem;"><strong style="color:var(--text);">Alt:</strong> <span class="alt-val" style="color:var(--text-muted);">' + escapeHtml(data.alt_text) + '</span></div>' +
+                            '<div style="margin-bottom:0.25rem;"><strong style="color:var(--text);">Legenda:</strong> <span class="caption-val" style="color:var(--text-muted);">' + escapeHtml(data.caption) + '</span></div>' +
+                            tagsHtml;
+                        cardMeta.style.display = 'block';
+                    }
+                    if (btnElement) {
+                        btnElement.innerText = '✨ Atualizar com IA';
+                        btnElement.disabled = false;
+                    }
+                    showAlert('Descrição da imagem gerada com sucesso pela IA!', [], false);
+                } else {
+                    const err = (data && data.error) ? data.error : 'Falha ao descrever imagem';
+                    showAlert('', [err], true);
+                    if (btnElement) {
+                        btnElement.innerText = originalText;
+                        btnElement.disabled = false;
+                    }
+                }
+            } catch (err) {
+                showAlert('', ['Erro de rede ao conectar com a IA: ' + err.message], true);
+                if (btnElement) {
+                    btnElement.innerText = originalText;
+                    btnElement.disabled = false;
+                }
+            }
         }
 
         function attachPaginationListeners() {

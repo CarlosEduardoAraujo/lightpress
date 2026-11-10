@@ -315,6 +315,7 @@ lightpress/
 │   ├── PluginManager.php      # Gerenciador central de plugins e ciclo de vida
 │   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
 ├── plugins/                   # Plugins isolados fora da raiz pública
+│   ├── ai-copilot/            # Plugin oficial de IA para linkagem interna e visão computacional
 │   └── webhook-sender/        # Plugin nativo para envio de webhooks em publicações
 ├── storage/                   # Dados privados; acesso web proibido
 │   ├── staging/               # Originais temporários e conversões em andamento
@@ -802,6 +803,33 @@ O primeiro módulo construído sobre a nova arquitetura é o **Webhook Sender** 
 * **Tolerância a Falhas de Rede (`is_success`):** Falhas transitórias externas (timeout ou HTTP 4xx/5xx) são sinalizadas como erro nos logs, permitindo retentativas manuais pelo painel ou nova execução, sem bloquear o sistema.
 * **Interface Administrativa:** Painel integrado em `/admin/plugin-settings.php?plugin=webhook-sender` com teste de ping imediato e tabela de auditoria dos últimos envios com status de entrega e botão de reenvio em 1 clique.
 
+#### 8.13.2. Segundo Plugin Oficial: AI Copilot (`plugins/ai-copilot/`)
+
+O segundo módulo da plataforma adiciona assistência de Inteligência Artificial generativa e multimodal de alto nível para a redação, preservando integralmente os pilares do LightPress:
+
+* **Zero Impacto no Frontend Público:** A execução de recursos de IA ocorre exclusivamente em rotas administrativas autenticadas (`/admin/`). Os leitores anônimos continuam recebendo 100% de cache FastCGI em HTML puro.
+* **Grounding Estrito (Anti-Alucinação de Links):** A IA jamais inventa URLs ou títulos. O banco de dados MySQL do LightPress é a única fonte da verdade para matérias existentes; a IA atua apenas como curadora semântica dos resultados reais retornados pela busca determinística FULLTEXT.
+* **Cliente HTTP Multiprovedor Leve (`src/AiClient.php`):** Motor cURL nativo com zero dependências externas, timeout rígido (8s padrão), parser tolerante a markdown e suporte a:
+  - **Google Gemini API** (ex: `gemini-2.5-flash`);
+  - **OpenAI API** (ex: `gpt-4o-mini`);
+  - **Endpoints Locais / Compatíveis com OpenAI** (Ollama, vLLM ou automações n8n na rede local privada RFC 1918, com blindagem estrita contra SSRF e metadados de nuvem).
+* **Precedência e Privacidade de Chaves de API:** Suporte prioritário a constantes em `config.local.php` (ex: `AI_COPILOT_GEMINI_API_KEY`, invisíveis no banco) com fallback seguro para persistência na tabela `settings` com mascaramento visual (`••••`).
+* **Módulo 1: Linkagem Interna Inteligente (SEO Interno):**
+  - **Pré-Filtragem Determinística FULLTEXT:** Extração de sementes semânticas a partir do título, tags e categoria, consultando o índice `idx_fulltext_search (title, summary, tags)` no MySQL para selecionar de 10 a 15 matérias candidatas reais publicadas.
+  - **Pareamento e Ancoragem Semântica:** A IA seleciona os 2 a 4 artigos mais aderentes e indica o texto âncora literal (2 a 6 palavras) e a chamada para bloco "Leia Também".
+  - **Validação de Substring Anti-Alucinação:** O backend e o JavaScript validam se o trecho sugerido existe de forma literal no texto (`mb_stripos`). Se falhar, o sistema converte automaticamente para o formato "Leia Também".
+  - **Aplicação em 1 Clique:** O editor visual insere o link `<a>` diretamente no `#editorCanvas` via manipulação segura de nós de texto no DOM ou insere o bloco `<p class="post-related-link">`.
+* **Módulo 2: Visão Computacional no Catálogo de Mídias:**
+  - **Economia Extrema de Tokens:** Em vez de enviar fotos originais pesadas de 8 MiB, o sistema envia a variante `intermediate` (1024px WebP, ~25 a 50 KiB) gerada pelo `ImageProcessor`, consumindo o mínimo de tokens visuais.
+  - **Prompt Especializado em Automobilismo:** Retorna metadados em português do Brasil:
+    - `alt_text`: Descrição objetiva para acessibilidade e Google Imagens (até 125 caracteres);
+    - `caption`: Legenda jornalística contextualizada para `<figcaption>` (até 250 caracteres);
+    - `ai_tags`: Palavras-chave visuais e técnicas separadas por vírgula (ex: "fórmula 1, ferrari, chuva, interlagos").
+  - **Upload Não-Bloqueante:** O enriquecimento automático ocorre em background via JavaScript após a conclusão do upload físico, evitando timeouts e lentidão no Nginx/PHP-FPM.
+  - **Busca por Conteúdo Visual em 30.000+ Fotos:** A consulta na biblioteca (`media.php` e `api/media.php`) pesquisa em `alt_text`, `caption` e `ai_tags`, permitindo localizar qualquer foto pelo que aparece nela (ex: buscando "chuva" ou "podio").
+* **Auto-Migração Idempotente:** A ativação do plugin adiciona automaticamente as colunas `alt_text`, `caption` e `ai_tags` na tabela `media` tanto em MySQL quanto em SQLite.
+* **Painel de Configurações Interativo:** Tela em `/admin/plugin-settings.php?plugin=ai-copilot` com botão **"⚡ Testar Conexão com a IA"** para checagem imediata de latência e conectividade com a API configurada.
+
 ---
 
 ### 8.14. Prevenção Contra Redirecionamentos Abertos (Open Redirect / CWE-601)
@@ -990,6 +1018,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
 * **FASE CONCLUÍDA — Extensibilidade & Plugins (Zero Bloatware):**
   - [x] **Arquitetura de Hooks & Plugins:** Barramento ultraleve de eventos (`Hook`), gerenciador de ciclo de vida (`PluginManager`), manifesto `plugin.json` e menu de administração dinâmico com dropdown de plugins (`AdminNav`).
   - [x] **Primeiro Plugin Oficial (`webhook-sender`):** Disparo de webhooks para múltiplos servidores (Discord, Slack, n8n, Zapier) na publicação de matérias, com tabela relacional própria (`plugin_webhook_sender_logs`), integração atômica com agendamento de posts, resolução canônica em CLI/cron e painel de controle com testes e reenvio.
+  - [x] **Segundo Plugin Oficial (`ai-copilot`):** Assistente de IA generativa e multimodal com zero dependências externas (cURL nativo), suporte a Google Gemini, OpenAI e Ollama local, módulo de linkagem interna com busca FULLTEXT e ancoragem semântica estrita, visão computacional com variantes WebP 1024px e auto-migração de metadados (`alt_text`, `caption`, `ai_tags`) na tabela `media`.
 
 * **FASE CONCLUÍDA — Polimento & Padronização da Área Administrativa (/admin):**
   - [x] **Header e Footer Unificados (`header.php` e `footer.php`):** Centralização da estrutura HTML, `<head>`, metatags, script anti-flash de tema claro/escuro e navegação completa com submenu de plugins em todas as páginas do `/admin`.

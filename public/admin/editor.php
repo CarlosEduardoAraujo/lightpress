@@ -25,6 +25,8 @@ $postId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $post = null;
 $message = '';
 $error = '';
+$isAiCopilotActive = \LightPress\Core\PluginManager::isActive('ai-copilot');
+$isAiLinkingEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_copilot_linking_enabled', '1') === '1');
 $hasActiveDraftRevision = false;
 $draftRevisionDate = null;
 $activeRevisionId = 0;
@@ -695,6 +697,9 @@ require __DIR__ . '/header.php';
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="promptLink()" title="Inserir Link">🔗 Link</button>
                             <button type="button" class="tool-btn" onclick="openMediaModal('content')" style="background: #e0f2fe; color: #0369a1;" title="Inserir Foto da Biblioteca">📷 Inserir Foto</button>
+                            <?php if ($isAiLinkingEnabled): ?>
+                                <button type="button" class="tool-btn" onclick="openInternalLinksModal()" style="background: #fdf2f8; color: #be185d; font-weight: 700;" title="Sugerir matérias relevantes do banco para linkagem interna">✨ Links IA</button>
+                            <?php endif; ?>
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Limpar Formatação">✕ Limpar</button>
                             <button type="button" class="tool-btn" onclick="toggleHtmlSource()" id="btnToggleSource" style="margin-left: auto;" title="Alternar entre Visual e Código HTML">&lt;/&gt; HTML</button>
@@ -859,6 +864,20 @@ require __DIR__ . '/header.php';
                             <textarea id="seo_description" name="seo_description" rows="3" placeholder="Resumo de até 160 caracteres exibido na página de resultados..."><?= Security::e($post['seo_description'] ?? '') ?></textarea>
                         </div>
                     </div>
+
+                    <?php if ($isAiLinkingEnabled): ?>
+                        <div class="card" style="background: #fdf2f8; border-color: #fbcfe8;">
+                            <h3 style="font-size: 0.95rem; font-weight: 800; color: #9d174d; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <span>✨</span> Linkagem Interna (IA)
+                            </h3>
+                            <p style="font-size: 0.8rem; color: #831843; margin-bottom: 0.75rem; line-height: 1.4;">
+                                Cruze o texto da matéria com o acervo histórico do banco e receba sugestões semânticas com âncoras automáticas.
+                            </p>
+                            <button type="button" class="btn btn-secondary" onclick="openInternalLinksModal()" style="width: 100%; background: #ffffff; color: #be185d; border-color: #f472b6; font-weight: 700;">
+                                🔗 Sugerir Links Internos
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </form>
@@ -899,16 +918,72 @@ require __DIR__ . '/header.php';
                 <div class="media-modal-grid" id="modalMediaGrid"></div>
             </div>
 
-            <div class="media-modal-footer">
-                <div id="modalSelectionDetails" style="font-size: 0.85rem; color: #475569;">
-                    Nenhuma imagem selecionada.
+            <div class="media-modal-footer" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+                <div id="modalContentMetaFields" style="display: none; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Texto Alternativo (Alt Text - Acessibilidade & SEO)</label>
+                            <input type="text" id="modalAltTextInput" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text);" placeholder="Descrição visual da foto...">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Legenda da Imagem (&lt;figcaption&gt;)</label>
+                            <input type="text" id="modalCaptionInput" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text);" placeholder="Legenda editorial exibida sob a foto...">
+                        </div>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="closeMediaModal()">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="btnApplySelection" disabled onclick="applyMediaSelection()">
-                        Confirmar Seleção
-                    </button>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div id="modalSelectionDetails" style="font-size: 0.85rem; color: #475569;">
+                        Nenhuma imagem selecionada.
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeMediaModal()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnApplySelection" disabled onclick="applyMediaSelection()">
+                            Confirmar Seleção
+                        </button>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Sugestão de Links Internos (AI Copilot) -->
+    <div id="internalLinksModal" class="media-modal" style="display: none;">
+        <div class="media-modal-backdrop" onclick="closeInternalLinksModal()"></div>
+        <div class="media-modal-dialog" style="max-width: 680px; width: 90%;">
+            <div class="media-modal-header" style="background: #fdf2f8; border-bottom: 1px solid #fbcfe8;">
+                <div>
+                    <h2 style="font-size: 1.15rem; font-weight: 800; color: #9d174d; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>🔗</span> Sugestão de Links Internos (IA)
+                    </h2>
+                    <div style="font-size: 0.8rem; color: #be185d; margin-top: 0.2rem;">
+                        Curadoria semântica baseada estritamente em artigos reais publicados no banco de dados.
+                    </div>
+                </div>
+                <button type="button" class="media-modal-close" onclick="closeInternalLinksModal()">&times;</button>
+            </div>
+
+            <div class="media-modal-body" style="padding: 1.5rem; max-height: 65vh; overflow-y: auto;">
+                <div id="aiLinksLoading" style="display: none; text-align: center; padding: 2.5rem 1rem;">
+                    <div style="font-size: 2rem; margin-bottom: 0.75rem;">✨</div>
+                    <div style="font-weight: 700; color: var(--text); font-size: 1rem;">Analisando matéria e consultando acervo...</div>
+                    <div style="color: var(--text-muted); font-size: 0.82rem; margin-top: 0.35rem;">Buscando candidatos relevantes via SQL FULLTEXT e pareando trechos.</div>
+                </div>
+
+                <div id="aiLinksError" class="alert-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius); background: #fee2e2; color: #991b1b; font-weight: 600; font-size: 0.88rem;"></div>
+
+                <div id="aiLinksEmpty" style="display: none; text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
+                    <p style="font-weight: 600; margin: 0;">Nenhuma sugestão encontrada para o texto atual.</p>
+                    <p style="font-size: 0.82rem; margin-top: 0.25rem;">Certifique-se de que o título e o texto estão preenchidos com termos relevantes.</p>
+                </div>
+
+                <div id="aiLinksList" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+
+            <div class="media-modal-footer" style="background: var(--bg); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <div id="aiCandidatesCount" style="font-size: 0.8rem; color: var(--text-muted);"></div>
+                <button type="button" class="btn btn-secondary" onclick="closeInternalLinksModal()">Fechar</button>
             </div>
         </div>
     </div>
@@ -1222,6 +1297,13 @@ require __DIR__ . '/header.php';
             document.getElementById('btnApplySelection').disabled = true;
             document.getElementById('modalSearchInput').value = '';
 
+            var metaBox = document.getElementById('modalContentMetaFields');
+            if (metaBox) {
+                metaBox.style.display = (target === 'content') ? 'block' : 'none';
+            }
+            if (document.getElementById('modalAltTextInput')) document.getElementById('modalAltTextInput').value = '';
+            if (document.getElementById('modalCaptionInput')) document.getElementById('modalCaptionInput').value = '';
+
             document.getElementById('modalHeaderTitle').innerText = (target === 'featured')
                 ? 'Selecionar Imagem de Destaque'
                 : 'Inserir Imagem no Conteúdo da Notícia';
@@ -1244,6 +1326,13 @@ require __DIR__ . '/header.php';
                     el.classList.remove('selected');
                 }
             });
+
+            if (document.getElementById('modalAltTextInput')) {
+                document.getElementById('modalAltTextInput').value = item.alt_text || item.original_name || '';
+            }
+            if (document.getElementById('modalCaptionInput')) {
+                document.getElementById('modalCaptionInput').value = item.caption || item.original_name || '';
+            }
 
             var detailsEl = document.getElementById('modalSelectionDetails');
             detailsEl.textContent = '';
@@ -1458,8 +1547,11 @@ require __DIR__ . '/header.php';
                 document.getElementById('featuredPreviewBox').style.display = 'block';
             } else if (currentModalTarget === 'content') {
                 var safeUrl = escapeHtml(selectedMediaItem.full_url);
-                var safeName = escapeHtml(selectedMediaItem.original_name);
-                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeName + '"><figcaption>' + safeName + '</figcaption></figure><p></p>';
+                var altInput = document.getElementById('modalAltTextInput');
+                var capInput = document.getElementById('modalCaptionInput');
+                var safeAlt = escapeHtml(altInput && altInput.value.trim() ? altInput.value.trim() : (selectedMediaItem.alt_text || selectedMediaItem.original_name));
+                var safeCap = escapeHtml(capInput && capInput.value.trim() ? capInput.value.trim() : (selectedMediaItem.caption || selectedMediaItem.original_name));
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '"><figcaption>' + safeCap + '</figcaption></figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {
@@ -1493,6 +1585,219 @@ require __DIR__ . '/header.php';
             }
             btn.style.background = 'var(--primary-accent)';
             btn.innerHTML = '<?= ($post && $post['status'] === 'published') ? 'Atualizar Publicação' : '🚀 Publicar Agora' ?>';
+        }
+
+        // -------------------------------------------------------------
+        // Módulo de Linkagem Interna Inteligente (AI Copilot)
+        // -------------------------------------------------------------
+        window._currentAiSuggestions = [];
+
+        function openInternalLinksModal() {
+            var modal = document.getElementById('internalLinksModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+
+            var loading = document.getElementById('aiLinksLoading');
+            var errorBox = document.getElementById('aiLinksError');
+            var emptyBox = document.getElementById('aiLinksEmpty');
+            var list = document.getElementById('aiLinksList');
+            var countEl = document.getElementById('aiCandidatesCount');
+
+            loading.style.display = 'block';
+            errorBox.style.display = 'none';
+            emptyBox.style.display = 'none';
+            list.innerHTML = '';
+            countEl.innerText = '';
+
+            var titleEl = document.getElementById('title');
+            var title = (titleEl ? titleEl.value : '').trim();
+            var tagsEl = document.getElementById('tags');
+            var tags = (tagsEl ? tagsEl.value : '').trim();
+            var catEl = document.getElementById('category_id') || document.getElementById('category');
+            var categoryName = (catEl && catEl.selectedIndex >= 0) ? catEl.options[catEl.selectedIndex].text : '';
+            var postId = <?= (int)($post['id'] ?? 0) ?>;
+            var contentText = isSourceMode ? rawHtmlArea.value : editorCanvas.innerText;
+            var csrfInput = document.querySelector('input[name="_csrf_token"]');
+            var csrf = csrfInput ? csrfInput.value : '';
+
+            if (!title) {
+                loading.style.display = 'none';
+                errorBox.style.display = 'block';
+                errorBox.innerText = 'Por favor, preencha o título da notícia antes de solicitar sugestões de links internos.';
+                return;
+            }
+
+            fetch('/admin/api/ai.php?action=suggest_links', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': csrf
+                },
+                body: new URLSearchParams({
+                    '_csrf_token': csrf,
+                    'post_id': postId,
+                    'title': title,
+                    'tags': tags,
+                    'category_name': categoryName,
+                    'content_text': contentText
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                loading.style.display = 'none';
+                if (!data.ok) {
+                    errorBox.style.display = 'block';
+                    errorBox.innerText = data.error || data.message || 'Erro ao processar sugestões de IA.';
+                    return;
+                }
+
+                if (!data.suggestions || data.suggestions.length === 0) {
+                    emptyBox.style.display = 'block';
+                    if (data.message) {
+                        var p = emptyBox.querySelector('p');
+                        if (p) p.innerText = data.message;
+                    }
+                    return;
+                }
+
+                countEl.innerText = 'Acervo consultado: ' + (data.candidates_count || 0) + ' artigos reais pré-filtrados no banco.';
+                renderLinkSuggestions(data.suggestions);
+            })
+            .catch(function(err) {
+                loading.style.display = 'none';
+                errorBox.style.display = 'block';
+                errorBox.innerText = 'Falha de rede ao conectar à API de IA: ' + err.message;
+            });
+        }
+
+        function closeInternalLinksModal() {
+            var modal = document.getElementById('internalLinksModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function renderLinkSuggestions(suggestions) {
+            var list = document.getElementById('aiLinksList');
+            list.innerHTML = '';
+            window._currentAiSuggestions = suggestions;
+
+            suggestions.forEach(function(item, idx) {
+                var card = document.createElement('div');
+                card.style.border = '1px solid var(--border)';
+                card.style.borderRadius = 'var(--radius)';
+                card.style.padding = '1rem';
+                card.style.background = 'var(--surface)';
+
+                var headerHtml = '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.4rem;">' +
+                    '<h4 style="margin:0; font-size:0.95rem; font-weight:700;"><a href="' + escapeHtml(item.url) + '" target="_blank" style="color:var(--text); text-decoration:none;">' + escapeHtml(item.title) + ' ↗</a></h4>' +
+                    '</div>';
+
+                var reasonHtml = '<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">' +
+                    '💡 ' + escapeHtml(item.relevance_reason) +
+                    '</div>';
+
+                var actionsHtml = '<div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">';
+
+                if (item.anchor_valid && item.anchor_text) {
+                    actionsHtml += '<button type="button" class="btn btn-primary btn-sm" id="btn-anchor-' + idx + '" onclick="applyInlineLink(' + idx + ')" style="font-size:0.8rem; padding:0.35rem 0.65rem;">' +
+                        '🔗 Inserir Link no Texto ("' + escapeHtml(item.anchor_text) + '")' +
+                        '</button>';
+                }
+
+                actionsHtml += '<button type="button" class="btn btn-secondary btn-sm" id="btn-callout-' + idx + '" onclick="applyCalloutLink(' + idx + ')" style="font-size:0.8rem; padding:0.35rem 0.65rem;">' +
+                    '📄 Inserir como \'Leia Também\'' +
+                    '</button>';
+
+                actionsHtml += '</div>';
+
+                card.innerHTML = headerHtml + reasonHtml + actionsHtml;
+                list.appendChild(card);
+            });
+        }
+
+        function applyInlineLink(idx) {
+            var item = window._currentAiSuggestions[idx];
+            if (!item || !item.anchor_text) return;
+
+            var safeUrl = item.url;
+            var anchor = item.anchor_text;
+
+            if (isSourceMode) {
+                var src = rawHtmlArea.value;
+                var re = new RegExp(escapeRegex(anchor), 'i');
+                if (re.test(src)) {
+                    rawHtmlArea.value = src.replace(re, '<a href="' + safeUrl + '">' + anchor + '</a>');
+                    var btn = document.getElementById('btn-anchor-' + idx);
+                    if (btn) { btn.disabled = true; btn.innerText = '✓ Inserido no Código'; }
+                } else {
+                    alert('O trecho exato não foi encontrado no código HTML.');
+                }
+            } else {
+                var success = replaceFirstTextOccurrence(editorCanvas, anchor, safeUrl);
+                if (success) {
+                    var btn = document.getElementById('btn-anchor-' + idx);
+                    if (btn) { btn.disabled = true; btn.innerText = '✓ Inserido no Texto'; }
+                } else {
+                    alert('Não foi possível localizar o trecho "' + anchor + '" no editor visual. Use a opção "Leia Também".');
+                }
+            }
+        }
+
+        function applyCalloutLink(idx) {
+            var item = window._currentAiSuggestions[idx];
+            if (!item) return;
+
+            var calloutText = item.related_callout || ('Leia também: ' + item.title);
+            var safeUrl = item.url;
+            var blockHtml = '<p class="post-related-link"><strong>' + escapeHtml(calloutText) + '</strong> — <a href="' + escapeHtml(safeUrl) + '">Confira a matéria completa</a></p><p></p>';
+
+            if (isSourceMode) {
+                rawHtmlArea.value += '\n' + blockHtml;
+            } else {
+                editorCanvas.focus();
+                document.execCommand('insertHTML', false, blockHtml);
+            }
+
+            var btn = document.getElementById('btn-callout-' + idx);
+            if (btn) { btn.disabled = true; btn.innerText = '✓ Inserido como Bloco'; }
+        }
+
+        function escapeRegex(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function replaceFirstTextOccurrence(rootNode, searchText, href) {
+            var walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT, null, false);
+            var node;
+            var lowerSearch = searchText.toLowerCase();
+
+            while ((node = walker.nextNode())) {
+                var parentTag = node.parentNode ? node.parentNode.nodeName.toUpperCase() : '';
+                if (parentTag === 'A' || parentTag === 'SCRIPT' || parentTag === 'STYLE') {
+                    continue;
+                }
+
+                var text = node.nodeValue;
+                var index = text.toLowerCase().indexOf(lowerSearch);
+                if (index !== -1) {
+                    var before = text.substring(0, index);
+                    var matched = text.substring(index, index + searchText.length);
+                    var after = text.substring(index + searchText.length);
+
+                    var frag = document.createDocumentFragment();
+                    if (before) frag.appendChild(document.createTextNode(before));
+
+                    var a = document.createElement('a');
+                    a.href = href;
+                    a.textContent = matched;
+                    frag.appendChild(a);
+
+                    if (after) frag.appendChild(document.createTextNode(after));
+
+                    node.parentNode.replaceChild(frag, node);
+                    return true;
+                }
+            }
+            return false;
         }
 
         </script>

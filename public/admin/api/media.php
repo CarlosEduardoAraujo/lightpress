@@ -20,17 +20,18 @@ $search = trim($_GET['q'] ?? '');
 $limit = min(max((int)($_GET['limit'] ?? 60), 1), 100);
 
 if (!empty($search)) {
+    $searchEscaped = '%' . Security::escapeLike($search) . '%';
     $items = Database::fetchAll(
-        "SELECT id, original_name, file_size, variants_manifest, created_at 
+        "SELECT id, original_name, file_size, variants_manifest, alt_text, caption, ai_tags, created_at 
          FROM media 
-         WHERE original_name LIKE ? OR variants_manifest LIKE ? OR id = ?
+         WHERE original_name LIKE ? OR alt_text LIKE ? OR ai_tags LIKE ? OR caption LIKE ? OR variants_manifest LIKE ? OR id = ?
          ORDER BY created_at DESC 
          LIMIT ?",
-        ['%' . Security::escapeLike($search) . '%', '%' . Security::escapeLike($search) . '%', $search, $limit]
+        [$searchEscaped, $searchEscaped, $searchEscaped, $searchEscaped, $searchEscaped, $search, $limit]
     );
 } else {
     $items = Database::fetchAll(
-        "SELECT id, original_name, file_size, variants_manifest, created_at 
+        "SELECT id, original_name, file_size, variants_manifest, alt_text, caption, ai_tags, created_at 
          FROM media 
          ORDER BY created_at DESC 
          LIMIT ?",
@@ -50,6 +51,9 @@ foreach ($items as $row) {
     $media[] = [
         'id' => $row['id'],
         'original_name' => $row['original_name'],
+        'alt_text' => (string)($row['alt_text'] ?? ''),
+        'caption' => (string)($row['caption'] ?? ''),
+        'ai_tags' => (string)($row['ai_tags'] ?? ''),
         'file_size' => (int)$row['file_size'],
         'thumb_url' => $thumbUrl,
         'full_url' => $fullUrl,

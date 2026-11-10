@@ -475,15 +475,30 @@ require __DIR__ . '/header.php';
                 <div class="media-modal-grid" id="modalMediaGrid"></div>
             </div>
 
-            <div class="media-modal-footer">
-                <div id="modalSelectionDetails" style="font-size: 0.85rem; color: #475569;">
-                    Nenhuma imagem selecionada.
+            <div class="media-modal-footer" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
+                <div id="modalContentMetaFields" style="display: none; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <div>
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Texto Alternativo (Alt Text - Acessibilidade & SEO)</label>
+                            <input type="text" id="modalAltTextInput" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text);" placeholder="Descrição visual da foto...">
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Legenda da Imagem (&lt;figcaption&gt;)</label>
+                            <input type="text" id="modalCaptionInput" style="width: 100%; padding: 0.45rem 0.65rem; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text);" placeholder="Legenda editorial sob a foto...">
+                        </div>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="closeMediaModal()">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="btnApplySelection" disabled onclick="applyMediaSelection()">
-                        Confirmar Seleção
-                    </button>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div id="modalSelectionDetails" style="font-size: 0.85rem; color: #475569;">
+                        Nenhuma imagem selecionada.
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeMediaModal()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btnApplySelection" disabled onclick="applyMediaSelection()">
+                            Confirmar Seleção
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -787,6 +802,13 @@ require __DIR__ . '/header.php';
             document.getElementById('btnApplySelection').disabled = true;
             document.getElementById('modalSearchInput').value = '';
 
+            var metaBox = document.getElementById('modalContentMetaFields');
+            if (metaBox) {
+                metaBox.style.display = (target === 'content') ? 'block' : 'none';
+            }
+            if (document.getElementById('modalAltTextInput')) document.getElementById('modalAltTextInput').value = '';
+            if (document.getElementById('modalCaptionInput')) document.getElementById('modalCaptionInput').value = '';
+
             document.getElementById('modalHeaderTitle').innerText = (target === 'featured')
                 ? 'Selecionar Imagem de Destaque'
                 : 'Inserir Imagem no Conteúdo da Página';
@@ -809,6 +831,13 @@ require __DIR__ . '/header.php';
                     el.classList.remove('selected');
                 }
             });
+
+            if (document.getElementById('modalAltTextInput')) {
+                document.getElementById('modalAltTextInput').value = item.alt_text || item.original_name || '';
+            }
+            if (document.getElementById('modalCaptionInput')) {
+                document.getElementById('modalCaptionInput').value = item.caption || item.original_name || '';
+            }
 
             var detailsEl = document.getElementById('modalSelectionDetails');
             detailsEl.textContent = '';
@@ -1028,8 +1057,11 @@ require __DIR__ . '/header.php';
                 document.getElementById('featuredPreviewBox').style.display = 'block';
             } else if (currentModalTarget === 'content') {
                 var safeUrl = escapeHtml(selectedMediaItem.full_url);
-                var safeName = escapeHtml(selectedMediaItem.original_name);
-                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeName + '"><figcaption>' + safeName + '</figcaption></figure><p></p>';
+                var altInput = document.getElementById('modalAltTextInput');
+                var capInput = document.getElementById('modalCaptionInput');
+                var safeAlt = escapeHtml(altInput && altInput.value.trim() ? altInput.value.trim() : (selectedMediaItem.alt_text || selectedMediaItem.original_name));
+                var safeCap = escapeHtml(capInput && capInput.value.trim() ? capInput.value.trim() : (selectedMediaItem.caption || selectedMediaItem.original_name));
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '"><figcaption>' + safeCap + '</figcaption></figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {

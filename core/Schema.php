@@ -52,6 +52,7 @@ class Schema
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         }
 
+        self::ensureMediaAiSchema(Database::getConnection(), $driver);
         self::ensureViewDedupeSchema(Database::getConnection(), $driver);
 
         // Se a tabela estiver vazia, cria as páginas institucionais padrão
@@ -230,6 +231,7 @@ class Schema
             // Ignora se já existir
         }
 
+        self::ensureMediaAiSchema($pdo, 'mysql');
         self::ensureViewDedupeSchema($pdo, 'mysql');
     }
 
@@ -339,6 +341,9 @@ class Schema
                 file_size INTEGER NOT NULL,
                 variants_manifest TEXT NOT NULL,
                 is_finalized INTEGER NOT NULL DEFAULT 0,
+                alt_text TEXT NULL,
+                caption TEXT NULL,
+                ai_tags TEXT NULL,
                 created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
             );",
@@ -412,6 +417,7 @@ class Schema
 
         self::ensureRevisionsSchema($pdo, 'sqlite');
         self::ensureViewDedupeSchema($pdo, 'sqlite');
+        self::ensureMediaAiSchema($pdo, 'sqlite');
     }
 
     /**
@@ -546,6 +552,45 @@ class Schema
             if ($foreignKeys !== null) {
                 $pdo->exec('PRAGMA foreign_keys = ' . $foreignKeys);
             }
+        }
+    }
+
+    /**
+     * Garante a presença das colunas alt_text, caption e ai_tags na tabela media nos dois bancos.
+     * Auto-migra tabelas existentes sem perda de dados.
+     */
+    public static function ensureMediaAiSchema(PDO $pdo, string $driver = 'mysql'): void
+    {
+        try {
+            if ($driver === 'sqlite') {
+                $cols = $pdo->query("PRAGMA table_info(media)")->fetchAll(PDO::FETCH_ASSOC);
+                $existingCols = array_column($cols, 'name');
+
+                if (!in_array('alt_text', $existingCols, true)) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN alt_text TEXT NULL;");
+                }
+                if (!in_array('caption', $existingCols, true)) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN caption TEXT NULL;");
+                }
+                if (!in_array('ai_tags', $existingCols, true)) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN ai_tags TEXT NULL;");
+                }
+            } else {
+                $existing = $pdo->query("SHOW COLUMNS FROM media LIKE 'alt_text'")->fetch();
+                if (!$existing) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN alt_text VARCHAR(255) NULL AFTER is_finalized");
+                }
+                $existingCap = $pdo->query("SHOW COLUMNS FROM media LIKE 'caption'")->fetch();
+                if (!$existingCap) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN caption VARCHAR(500) NULL AFTER alt_text");
+                }
+                $existingTags = $pdo->query("SHOW COLUMNS FROM media LIKE 'ai_tags'")->fetch();
+                if (!$existingTags) {
+                    $pdo->exec("ALTER TABLE media ADD COLUMN ai_tags VARCHAR(500) NULL AFTER caption");
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Schema] ensureMediaAiSchema error: ' . $e->getMessage());
         }
     }
 }

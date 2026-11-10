@@ -1,0 +1,12 @@
+{
+  "id": "ai-copilot",
+  "name": "AI Copilot",
+  "version": "1.0.0",
+  "description": "Assistente de Inteligência Artificial para linkagem interna inteligente e visão computacional na biblioteca de mídias.",
+  "author": "LightPress Team",
+  "author_url": "https://lightpress.org",
+  "min_lp_version": "1.0.0",
+  "admin_settings": true,
+  "admin_title": "AI Copilot",
+  "requires_db": true
+}

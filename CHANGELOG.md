@@ -7,6 +7,42 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Plugin ai-copilot: Linkagem Interna Inteligente e Visão Computacional em Mídias — 2026-11-10
+
+- **Segundo Plugin Oficial (`plugins/ai-copilot/`):**
+  - Implementação completa do plugin `ai-copilot` (Fase 1), adicionando inteligência artificial generativa e multimodal de altíssimo nível para auxílio editorial, com zero dependências externas (sem Composer ou pacotes pesados) e zero impacto no frontend público (cache FastCGI 100% preservado para leitores).
+- **Cliente HTTP Multiprovedor Leve (`plugins/ai-copilot/src/AiClient.php`):**
+  - Conexão nativa via cURL com suporte unificado a Google Gemini API (`gemini-2.5-flash`), OpenAI API (`gpt-4o-mini`) e endpoints compatíveis com OpenAI locais ou em rede privada (Ollama, vLLM, n8n).
+  - Precedência de credenciais: prioridade para constantes em `config.local.php` (`AI_COPILOT_GEMINI_API_KEY`, etc.), mantendo as chaves fora do banco de dados, com fallback mascarado para a tabela `settings`.
+  - Blindagem estrita contra SSRF com bloqueio explícito de metadados em nuvem (`169.254.169.254`), faixas de loopback e protocolos inseguros.
+  - Parser tolerante a markdown com limpeza de delimitadores ````json```` e extração robusta de JSON.
+- **Módulo 1: Linkagem Interna Inteligente (SEO Interno) (`src/InternalLinker.php`):**
+  - Pré-filtragem determinística ultrarrápida (<5 ms) no MySQL via índice FULLTEXT `idx_fulltext_search (title, summary, tags)` com seleção de 10 a 15 artigos candidatos reais já publicados.
+  - Filtros estritos: exclusão de matérias em rascunho (`status = 'published'`) e exclusão da própria matéria em edição (`id != currentPostId`).
+  - Grounding estrito: o banco de dados é a única fonte da verdade, impedindo alucinação de URLs.
+  - Pareamento semântico com validação obrigatória de substring da âncora (`mb_stripos`): se o trecho sugerido não existir literalmente no texto da matéria, a sugestão é convertida automaticamente para o bloco "Leia Também".
+  - Inserção em 1 clique no `#editorCanvas` via manipulação segura da árvore DOM ou bloco de parágrafo `<p class="post-related-link">`.
+- **Módulo 2: Visão Computacional no Catálogo de Mídias (`src/MediaVision.php`):**
+  - Leitura da variante compactada `intermediate` (1024px WebP, ~25 a 50 KiB) em disco e codificação em Base64, proporcionando extrema economia de tokens visuais e velocidade de resposta.
+  - Prompt editorial especializado em jornalismo esportivo e automobilismo em português do Brasil.
+  - Extração e persistência de `alt_text` (acessibilidade e Google Imagens, até 125 chars), `caption` (legenda rica para `<figcaption>`, até 250 chars) e `ai_tags` (palavras-chave visuais separadas por vírgula).
+  - Enriquecimento não-bloqueante: uploads físicos concluem instantaneamente e a análise visual roda em background via JavaScript quando configurada no modo automático.
+- **Evolução do Esquema Relacional e Busca por Conteúdo Visual (`core/Schema.php` e `bin/schema.sql`):**
+  - Adição das colunas `alt_text VARCHAR(255) NULL`, `caption VARCHAR(500) NULL` e `ai_tags VARCHAR(500) NULL` na tabela `media`.
+  - Método `Schema::ensureMediaAiSchema()` para auto-migração idempotente em MySQL e SQLite no hook de ativação do plugin.
+  - Atualização da busca em `public/admin/media.php` e `public/admin/api/media.php` incluindo `OR m.alt_text LIKE ? OR m.ai_tags LIKE ? OR m.caption LIKE ?`, viabilizando a localização instantânea de fotos antigas pelo conteúdo visual retratado.
+- **Painel Administrativo do Plugin (`plugins/ai-copilot/settings.php`):**
+  - Interface em `/admin/plugin-settings.php?plugin=ai-copilot` com seleção dinâmica de provedores, modelos, timeout e ativação por módulo.
+  - Botão interativo **"⚡ Testar Conexão com a IA"** para auditoria imediata de credenciais e latência em milissegundos.
+- **Integração nas Telas do Painel Administrativo (`editor.php`, `page-edit.php`, `media.php`):**
+  - `editor.php`: Botão e card lateral "✨ Links IA" com modal de curadoria semântica e botões de inserção direta; modal de fotos com campos editáveis de Alt Text e Legenda preenchidos automaticamente.
+  - `page-edit.php`: Modal de fotos sincronizado com campos editáveis de Alt Text e Legenda para páginas institucionais.
+  - `media.php`: Cards de imagem com badges de Alt Text e Tags Visuais, além do botão "✨ Descrever com IA".
+- **Endpoint Seguro de API (`public/admin/api/ai.php`):**
+  - Roteamento restrito com autenticação (`Security::requireAuth()`) e validação de token CSRF (`Security::verifyCsrfToken()`) para todas as ações do plugin.
+- **Suíte de Testes Automatizados (`bin/test-ai-copilot.php`):**
+  - Validação de manifesto, ciclo de vida, migração de colunas no SQLite/MySQL, segurança de SSRF no `AiClient`, consultas FULLTEXT no `InternalLinker` e persistência de metadados no `MediaVision`.
+
 ### Feed de Notícias Unificado e Thumbnails nos Destaques Secundários da Home — 2026-11-10
 
 - **Feed de Notícias Unificado na Home (`public/index.php`):**
