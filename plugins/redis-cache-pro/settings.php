@@ -137,21 +137,19 @@ $commandLogs = QueryProfiler::getLogs();
 $settings = $diagnostics['config'] ?? [];
 
 $pageTitle = 'Redis Cache Pro · LightPress';
+$activePage = 'plugin-settings';
+
+$pluginCss = file_exists(__DIR__ . '/assets/css/admin.css') ? (string)file_get_contents(__DIR__ . '/assets/css/admin.css') : '';
+$extraHead = '<link rel="stylesheet" href="/assets/plugins/redis-cache-pro/css/admin.css">';
+if ($pluginCss !== '') {
+    $extraHead .= "\n    <style>\n" . $pluginCss . "\n    </style>";
+}
+
+require dirname(__DIR__, 2) . '/public/admin/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= Security::e($pageTitle) ?></title>
-    <link rel="stylesheet" href="/admin/css/admin.css">
-    <link rel="stylesheet" href="/assets/plugins/redis-cache-pro/css/admin.css">
-</head>
-<body style="background:#f1f5f9;margin:0;padding:0;">
 
-<?= AdminNav::renderHeader('plugin-settings', $currentUser, $csrfToken) ?>
-
-<div class="rcp-wrap">
+<div class="container" style="max-width: var(--admin-max-width, 1900px);">
+<div class="rcp-wrap" style="margin-top: 0; max-width: 100%;">
     <!-- Header do Painel -->
     <header class="rcp-header">
         <div class="rcp-header-brand">
@@ -598,12 +596,22 @@ $pageTitle = 'Redis Cache Pro · LightPress';
         </div>
     </div>
 </div>
+</div>
 
 <script>
     window.rcpCsrfToken = "<?= Security::e($csrfToken) ?>";
     window.rcpHistoryData = <?= json_encode($historyData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="/assets/plugins/redis-cache-pro/js/admin.js"></script>
+<?php
+$pluginJs = file_exists(__DIR__ . '/assets/js/admin.js') ? (string)file_get_contents(__DIR__ . '/assets/js/admin.js') : '';
+if ($pluginJs !== ''): ?>
+<script>
+if (!window.rcpScriptLoaded) {
+    window.rcpScriptLoaded = true;
+    <?= $pluginJs ?>
+}
+</script>
+<?php endif; ?>
 
-</body>
-</html>
+<?php require dirname(__DIR__, 2) . '/public/admin/footer.php'; ?>

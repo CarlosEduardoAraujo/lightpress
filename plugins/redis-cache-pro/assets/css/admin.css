@@ -1,22 +1,31 @@
 /* Redis Cache Pro - Estilos Administrativos */
 :root {
-    --rcp-bg: #f8fafc;
-    --rcp-surface: #ffffff;
-    --rcp-border: #e2e8f0;
-    --rcp-text: #0f172a;
-    --rcp-text-muted: #64748b;
-    --rcp-primary: #2563eb;
-    --rcp-primary-hover: #1d4ed8;
+    --rcp-bg: var(--bg, #f8fafc);
+    --rcp-surface: var(--surface, #ffffff);
+    --rcp-border: var(--border, #e2e8f0);
+    --rcp-text: var(--text, #0f172a);
+    --rcp-text-muted: var(--text-muted, #64748b);
+    --rcp-primary: var(--primary-accent, #2563eb);
+    --rcp-primary-hover: var(--primary-hover, #1d4ed8);
     --rcp-success: #10b981;
     --rcp-warning: #f59e0b;
     --rcp-danger: #ef4444;
     --rcp-purple: #8b5cf6;
-    --rcp-radius: 10px;
+    --rcp-radius: var(--radius, 10px);
     --rcp-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
+[data-theme="dark"] {
+    --rcp-bg: var(--bg, #090d16);
+    --rcp-surface: var(--surface, #111827);
+    --rcp-border: var(--border, #1f2937);
+    --rcp-text: var(--text, #f1f5f9);
+    --rcp-text-muted: var(--text-muted, #94a3b8);
+    --rcp-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+}
+
 .rcp-wrap {
-    max-width: 1300px;
+    width: 100%;
     margin: 1.5rem auto 3rem;
     font-family: inherit;
     color: var(--rcp-text);
@@ -144,7 +153,7 @@
 .rcp-tabs {
     display: flex;
     gap: 0.5rem;
-    background: #f1f5f9;
+    background: var(--rcp-border);
     padding: 0.35rem;
     border-radius: var(--rcp-radius);
     margin-bottom: 1.5rem;
@@ -172,7 +181,7 @@
 }
 
 .rcp-tab-btn.is-active {
-    background: #ffffff;
+    background: var(--rcp-surface);
     color: var(--rcp-primary);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
@@ -359,7 +368,7 @@
 }
 
 .rcp-table th {
-    background: #f8fafc;
+    background: var(--rcp-bg);
     padding: 0.75rem 1rem;
     border-bottom: 2px solid var(--rcp-border);
     font-weight: 700;
@@ -373,7 +382,10 @@
 }
 
 .rcp-table-striped tbody tr:nth-child(even) {
-    background: #fafafa;
+    background: rgba(0, 0, 0, 0.02);
+}
+[data-theme="dark"] .rcp-table-striped tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .rcp-code-tag {
@@ -381,8 +393,8 @@
     padding: 0.15rem 0.4rem;
     font-family: monospace;
     font-size: 0.78rem;
-    background: #e2e8f0;
-    color: #334155;
+    background: var(--rcp-border);
+    color: var(--rcp-text);
     border-radius: 4px;
     font-weight: 700;
 }
@@ -414,7 +426,7 @@
     font-size: 0.88rem;
     border: 1px solid var(--rcp-border);
     border-radius: 8px;
-    background: #ffffff;
+    background: var(--rcp-surface);
     color: var(--rcp-text);
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -422,7 +434,7 @@
 .rcp-input:focus, .rcp-textarea:focus, .rcp-select:focus {
     outline: none;
     border-color: var(--rcp-primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.15);
 }
 
 .rcp-help {
@@ -455,7 +467,7 @@
     padding: 1rem;
     border: 1px solid var(--rcp-border);
     border-radius: 8px;
-    background: #f8fafc;
+    background: var(--rcp-bg);
 }
 
 .rcp-group-desc {
@@ -476,7 +488,7 @@
     display: flex;
     gap: 1rem;
     padding: 1.25rem;
-    background: #f8fafc;
+    background: var(--rcp-bg);
     border: 1px solid var(--rcp-border);
     border-radius: var(--rcp-radius);
 }
