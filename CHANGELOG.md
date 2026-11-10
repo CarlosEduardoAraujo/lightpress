@@ -13,12 +13,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Migração do disparo assíncrono de beacon/fetch da URL bloqueada `/api/view.php?type=page&id=` para o endpoint canônico `/api/view/page/{id}`.
 - **Roteador Principal (`public/index.php`):**
   - Registro dedicado das rotas `POST /api/view/page/{id}` e `POST /api/view/page/{id}/`, com precedência de correspondência antes do roteamento genérico de notícias, garantindo passagem limpa de `type=page` para o processador de views.
-- **Esquema Relacional e Auto-migração (`core/Schema.php` e `bin/schema.sql`):**
+- **Esquema Relacional e Auto-migração (`core/Schema.php`, `bin/schema.sql` e `public/api/view.php`):**
   - Adequação da tabela `view_dedupe`: remoção da restrição de chave estrangeira com a tabela `posts` e definição de `post_id BIGINT NOT NULL` (assinado).
   - Viabilização do armazenamento de identificadores negativos para páginas institucionais (`$dedupeId = -$targetId`), prevenindo colisões com IDs de posts e eliminando erros de constraint `FOREIGN KEY` e estouro de `INT UNSIGNED` no MySQL e SQLite.
-  - Implementação de `Schema::ensureViewDedupeSchema()` para auto-migração segura e idempotente em bases MySQL e SQLite existentes, executada automaticamente em `ensurePagesTable()`, `installMysql()` e `installSqlite()`.
+  - Implementação de `Schema::ensureViewDedupeSchema()` para auto-migração segura e idempotente em bases MySQL e SQLite existentes, executada automaticamente em `ensurePagesTable()`, `installMysql()`, `installSqlite()` e diretamente em `public/api/view.php` antes de abrir `Database::transaction()` para requisições de páginas.
+  - Mitigação de cache FastCGI: mesmo que o visitante receba a página estática diretamente do cache do Nginx sem acionar o PHP, o primeiro disparo do beacon de visualização auto-migra a tabela fora da transação, evitando erros e prevenindo commits implícitos de DDL no MySQL.
 - **Testes de Regressão Automatizados (`bin/test_security_fixes.py`):**
-  - Adição da suíte `[10] Testando Contador de Views de Páginas Institucionais e Schema view_dedupe`, cobrindo rotas, template, schema DDL e deduplicação atômica com IDs negativos, totalizando 52 testes com 100% de aprovação.
+  - Adição da suíte `[10] Testando Contador de Views de Páginas Institucionais e Schema view_dedupe`, cobrindo rotas, template, schema DDL, invocação pré-transacional em `view.php` e deduplicação atômica com IDs negativos, totalizando 53 testes com 100% de aprovação.
 
 
 ### Proteção do Último Administrador e Defesa contra Path Traversal na Mídia — 2026-11-09
