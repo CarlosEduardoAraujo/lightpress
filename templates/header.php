@@ -22,12 +22,14 @@ $menuCategories = [
 $trendingTags = [];
 try {
     // 1. Buscar tags das notícias publicadas nas últimas 24 horas
+    $twentyFourHoursAgo = gmdate('Y-m-d H:i:s', time() - 86400);
     $recentTagsRaw = Database::fetchAll(
         "SELECT tags FROM posts 
          WHERE status = 'published' 
-           AND published_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
+           AND published_at >= ? 
            AND tags IS NOT NULL AND tags != '' 
-         LIMIT 50"
+         LIMIT 50",
+        [$twentyFourHoursAgo]
     );
 
     // Se hoje tiver poucas matérias com tags, busca das últimas 50 matérias publicadas

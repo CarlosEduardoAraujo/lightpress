@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Hardening de SSRF, Defesa de Roteamento, Metadados em Revisões e Multi-Banco — 2026-11-09
+
+- **Blindagem de SSRF no WebhookSender (`plugins/webhook-sender/webhook-sender.php`):**
+  - Adicionado bloqueio a faixas de CGNAT e Alibaba Cloud Metadata (`100.64.0.0/10`), IETF Protocol Assignments e Oracle Cloud Metadata (`192.0.0.0/24`), além de faixas de Multicast e Reservado (`>= 224.0.0.0` - Classes D e E) no validador `isSafeIp()`.
+  - Formatação canônica de endereços IPv6 com colchetes (`[ipv6]`) na diretiva `CURLOPT_RESOLVE` em `dispatch()`, prevenindo falhas de resolução ambígua em conexões cURL.
+- **Resiliência do Roteador contra TypeError (`core/Router.php`):**
+  - Tratamento defensivo do retorno `false` de `parse_url()` em `dispatch()` e em `isValidRedirectTarget()` para esquema e host de destino, prevenindo exceções fatais de `TypeError` sob `declare(strict_types=1);` com URIs malformadas.
+- **Preservação de HTML Compilado e Metadados Editoriais (`public/admin/revisions.php` e `core/PostService.php`):**
+  - Em `revisions.php`: Garantia de fallback automático para `content_html` original da tabela `post_revisions` caso o payload desserializado não contenha a chave antes da chamada `$postService->publishOrUpdate()`.
+  - Em `core/PostService.php` (`createPost()`): Inclusão de `content_html`, `tags`, `featured_image`, `seo_title`, `seo_description` e `focus_keyword` no snapshot JSON de `post_revisions`, assegurando paridade e preservação de metadados.
+- **Compatibilidade Multi-Banco SQLite e MySQL (`templates/header.php` e `core/ImageProcessor.php`):**
+  - Em `templates/header.php`: Substituição de `DATE_SUB(NOW(), INTERVAL 24 HOUR)` por parâmetro preparado com `gmdate('Y-m-d H:i:s', time() - 86400)`, garantindo funcionamento portátil entre SQLite e MySQL.
+  - Em `core/ImageProcessor.php` (`syncRefs()`): Alternância dinâmica entre `INSERT OR IGNORE INTO` (SQLite) e `INSERT IGNORE INTO` (MySQL) via inspeção de `Database::getDriver()`.
+- **Testes de Regressão Automatizados (`bin/test_security_fixes.py`):**
+  - Adição da seção `[14] Testando Hardening do WebhookSender, Router, Restauração e Multi-Banco`, elevando a suíte de testes de segurança para 70 verificações aprovadas com 100% de sucesso.
+
 ### Fluxo Editorial para Autores (pending_review) e Sincronização de CSS do Admin — 2026-11-09
 
 - **Fluxo de Submissão Editorial para Autores (`public/admin/editor.php`):**

@@ -198,6 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                         $payload['published_at'] = $targetPubAt;
                     }
 
+                    if (!array_key_exists('content_html', $payload) || $payload['content_html'] === null) {
+                        $payload['content_html'] = $rev['content_html'];
+                    }
+
                     $postService->publishOrUpdate($postId, $payload, (int)$currentUser['id'], $knownVersion, $knownRevisionId, $revId);
                     $message = "Revisão #{$revId} aprovada e aplicada à versão pública com sucesso!";
                 }

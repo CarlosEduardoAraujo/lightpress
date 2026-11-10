@@ -153,8 +153,23 @@ final class WebhookSenderService
                 return false;
             }
 
+            // CGNAT / Alibaba Cloud Metadata: 100.64.0.0/10 (ex: 100.100.100.200)
+            if (($long & 0xFFC00000) === (int)ip2long('100.64.0.0')) {
+                return false;
+            }
+
             // Link-local / Cloud Metadata: 169.254.0.0/16
             if (($long & 0xFFFF0000) === (int)ip2long('169.254.0.0')) {
+                return false;
+            }
+
+            // IETF Protocol Assignments / Oracle Cloud Metadata: 192.0.0.0/24 (ex: 192.0.0.192)
+            if (($long & 0xFFFFFF00) === (int)ip2long('192.0.0.0')) {
+                return false;
+            }
+
+            // Multicast e Reservado (Classe D e E): 224.0.0.0/4 e 240.0.0.0/4 (>= 224.0.0.0)
+            if ((($long >> 24) & 0xFF) >= 224) {
                 return false;
             }
 
@@ -469,7 +484,11 @@ final class WebhookSenderService
             // Para hostnames, fixa exatamente o mesmo endereço IP previamente validado (DNS Pinning rigoroso)
             // sem executar uma segunda consulta DNS
             if (!empty($target['pinned_ip'])) {
-                $curlOptions[CURLOPT_RESOLVE] = ["{$target['host']}:{$target['port']}:{$target['pinned_ip']}"];
+                $pinnedIp = $target['pinned_ip'];
+                if (filter_var(trim($pinnedIp, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                    $pinnedIp = '[' . trim($pinnedIp, '[]') . ']';
+                }
+                $curlOptions[CURLOPT_RESOLVE] = ["{$target['host']}:{$target['port']}:{$pinnedIp}"];
             }
 
             $ch = curl_init();

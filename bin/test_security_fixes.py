@@ -822,6 +822,92 @@ assert_check(
     and ".modal-grid" in settings_content
 )
 
+# 14. Testes de Hardening do WebhookSender, Router, Restauração de Revisões e Multi-Banco
+print("[14] Testando Hardening do WebhookSender, Router, Restauração e Multi-Banco")
+
+with open("plugins/webhook-sender/webhook-sender.php", "r", encoding="utf-8") as f:
+    webhook_code = f.read()
+
+assert_check(
+    "webhook-sender.php bloqueia CGNAT/Alibaba Metadata (100.64.0.0/10)",
+    "($long & 0xFFC00000) === (int)ip2long('100.64.0.0')" in webhook_code
+)
+
+assert_check(
+    "webhook-sender.php bloqueia IETF/Oracle Metadata (192.0.0.0/24)",
+    "($long & 0xFFFFFF00) === (int)ip2long('192.0.0.0')" in webhook_code
+)
+
+assert_check(
+    "webhook-sender.php bloqueia Multicast e Reservado (>= 224.0.0.0)",
+    "(($long >> 24) & 0xFF) >= 224" in webhook_code
+)
+
+assert_check(
+    "webhook-sender.php formata IPv6 com colchetes em CURLOPT_RESOLVE",
+    "filter_var(trim($pinnedIp, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)" in webhook_code
+    and "'[' . trim($pinnedIp, '[]') . ']'" in webhook_code
+)
+
+with open("core/Router.php", "r", encoding="utf-8") as f:
+    router_code = f.read()
+
+assert_check(
+    "Router.php protege dispatch() contra retorno false de parse_url",
+    "$parsedPath = parse_url($uri, PHP_URL_PATH);" in router_code
+    and "$path = (is_string($parsedPath) && $parsedPath !== '') ? $parsedPath : '/';" in router_code
+)
+
+assert_check(
+    "Router.php protege isValidRedirectTarget() contra retorno false de parse_url",
+    "$scheme = parse_url($target, PHP_URL_SCHEME);" in router_code
+    and "if ($scheme === false)" in router_code
+    and "$targetHost = parse_url($target, PHP_URL_HOST);" in router_code
+    and "if ($targetHost === false || !is_string($targetHost))" in router_code
+)
+
+with open("public/admin/revisions.php", "r", encoding="utf-8") as f:
+    revisions_code = f.read()
+
+assert_check(
+    "revisions.php preserva content_html da revisão antes de publishOrUpdate",
+    "!array_key_exists('content_html', $payload) || $payload['content_html'] === null" in revisions_code
+    and "$payload['content_html'] = $rev['content_html'];" in revisions_code
+)
+
+with open("core/PostService.php", "r", encoding="utf-8") as f:
+    postservice_code = f.read()
+
+assert_check(
+    "PostService::createPost inclui metadados e content_html no snapshot de post_revisions",
+    "'tags' => $tags," in postservice_code
+    and "'featured_image' => $featuredImage," in postservice_code
+    and "'content_html' => $contentHtml," in postservice_code
+    and "'seo_title' => $seoTitle," in postservice_code
+    and "'seo_description' => $seoDesc," in postservice_code
+    and "'focus_keyword' => $focusKw," in postservice_code
+)
+
+with open("templates/header.php", "r", encoding="utf-8") as f:
+    header_code = f.read()
+
+assert_check(
+    "templates/header.php utiliza gmdate e parâmetro seguro compatível com SQLite/MySQL",
+    "DATE_SUB(NOW(), INTERVAL 24 HOUR)" not in header_code
+    and "gmdate('Y-m-d H:i:s', time() - 86400)" in header_code
+    and "published_at >= ?" in header_code
+)
+
+with open("core/ImageProcessor.php", "r", encoding="utf-8") as f:
+    img_code = f.read()
+
+assert_check(
+    "ImageProcessor::syncRefs alterna entre INSERT OR IGNORE (SQLite) e INSERT IGNORE (MySQL)",
+    "Database::getDriver() === 'sqlite'" in img_code
+    and "INSERT OR IGNORE INTO media_refs" in img_code
+    and "INSERT IGNORE INTO media_refs" in img_code
+)
+
 print("\n========================================================")
 print(f"Total de Testes: {tests_passed + tests_failed}")
 print(f"Aprovados:       {tests_passed}")

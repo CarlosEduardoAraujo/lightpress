@@ -838,7 +838,8 @@ Em conformidade com a auditoria de segurança profunda de novembro de 2026, os s
 * **8.17.2. Blindagem SSRF em Webhooks com Suporte a Rede Local e DNS Pinning (SEC-02):**
   - **Prevenção de DNS Rebinding e TOCTOU (`WebhookSenderService::resolveSafeTarget`):** Resolução dual-stack atômica executada uma única vez, rejeitando explicitamente respostas vazias. O primeiro IP validado é fixado diretamente na conexão cURL via `CURLOPT_RESOLVE => ["$host:$port:$pinnedIp"]`, eliminando consultas DNS secundárias concorrentes e garantindo que o cURL conecte estritamente ao endereço aprovado.
   - **Normalização Binária de IPv6:** Conversão rigorosa de IPv6 via `inet_pton()` de 16 bytes, interceptando notações hexadecimais de IPv4-mapped (`::ffff:7f00:1`, `::ffff:a9fe:a9fe`), IPv4-compatible e prefixos NAT64 (`64:ff9b::`), garantindo que representações alternativas de loopback e metadados de nuvem sejam bloqueadas.
-  - **Bloqueio Rigoroso de Ameaças:** Rejeição de loopback (`127.0.0.0/8`, `::1`), metadados de nuvem (`169.254.169.254`, `metadata.google.internal`), link-local (`fe80::/10`) e faixas privadas quando não autorizadas.
+  - **Bloqueio Rigoroso de Ameaças:** Rejeição de loopback (`127.0.0.0/8`, `::1`), metadados de nuvem (`169.254.169.254`, `metadata.google.internal`), CGNAT / Alibaba Cloud Metadata (`100.64.0.0/10`), IETF Protocol Assignments / Oracle Cloud Metadata (`192.0.0.0/24`), Multicast e Reservado (`>= 224.0.0.0` - Classes D e E), link-local (`fe80::/10`) e faixas privadas quando não autorizadas.
+  - **Formatação Canônica IPv6 no cURL:** Encadeamento de colchetes `[ipv6]` na opção `CURLOPT_RESOLVE` para hosts resolvidos em IPv6, garantindo separação inequívoca de porta e endereço no libcurl.
   - **Suporte a Portas Customizadas e LAN:** Aceita portas personalizadas (ex: `5678`) e tráfego em rede local privada (RFC1918 como `http://192.168.3.165:5678`), atendendo a servidores internos de automação (n8n/Zapier local) com total segurança.
 * **8.17.3. Blindagem de Rate Limiting no Nginx para Métricas (SEC-03):**
   - **Bloqueio Direto de Scripts (`nginx/lightpress.conf`):** O script `/api/view.php` tem acesso direto negado via Nginx (`return 404;`), forçando todo o tráfego de visualizações a transitar pela rota canônica `^~ /api/view/`, sujeita ao limitador `limit_req zone=lp_views burst=10 nodelay`.
@@ -877,7 +878,13 @@ A restauração distingue três valores: a versão pública conhecida, o identif
 * **Interface do Editor:** A barra de ações em `public/admin/editor.php` renderiza condicionalmente o botão de submissão: para autores, é disponibilizado *"📤 Enviar para Revisão Editorial"*; para editores e administradores, botões diretos de *"🚀 Publicar Agora"*, *"Atualizar Publicação"* ou *"📅 Salvar Agendamento"*.
 * **Sincronização de Design Tokens e Classes no Admin:** Padronização completa de classes CSS nas páginas administrativas (`system.php`, `plugins.php`, `users.php` e `settings.php`), cobrindo grids responsivos (`.grid-details`), cartões informativos (`.card-title`, `.info-row`), badges semânticos (`.badge-ok`, `.badge-warn`, `.badge-err`, `.badge-active`, `.badge-inactive`), caixas de links temporários (`.token-box`, `.token-input`), botões de perigo (`.btn-danger`) e elementos de layout com suporte a modo escuro (`[data-theme="dark"]`).
 
-#### 8.17.11. Verificações de regressão e limites de validação
+#### 8.17.11. Resiliência do Roteador, Integridade de Metadados e Compatibilidade Multi-Banco
+
+* **Defesa contra TypeError no Roteador (`Router.php`):** Tratamento rigoroso do retorno `false` de `parse_url()` ao despachar rotas e validar alvos de redirecionamento, prevenindo que entradas malformadas causem interrupções fatais sob tipagem estrita (`declare(strict_types=1);`).
+* **Preservação de HTML e Metadados em Revisões (`revisions.php` e `PostService.php`):** A restauração de snapshots em `revisions.php` preserva o `content_html` original gravado em `post_revisions` caso o payload desserializado não contenha a chave. O método `PostService::createPost()` grava o snapshot inicial com todos os metadados (`content_html`, `tags`, `featured_image`, `seo_title`, `seo_description`, `focus_keyword`), garantindo histórico completo.
+* **Compatibilidade Portável SQLite e MySQL:** Eliminação de cláusulas específicas como `DATE_SUB(NOW(), INTERVAL 24 HOUR)` em `templates/header.php` em favor de parâmetros preparados com `gmdate()`. Em `ImageProcessor::syncRefs()`, alternância transparente de dialeto entre `INSERT OR IGNORE INTO` (SQLite) e `INSERT IGNORE INTO` (MySQL).
+
+#### 8.17.12. Verificações de regressão e limites de validação
 
 Execute, com PHP 8.4 e as extensões do projeto:
 

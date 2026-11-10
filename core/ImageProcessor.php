@@ -458,8 +458,11 @@ class ImageProcessor
                         ['%' . Security::escapeLike($url) . '%']
                     );
                     if ($mediaId) {
+                        $sql = (Database::getDriver() === 'sqlite')
+                            ? "INSERT OR IGNORE INTO media_refs (media_id, post_id, revision_id) VALUES (?, ?, ?)"
+                            : "INSERT IGNORE INTO media_refs (media_id, post_id, revision_id) VALUES (?, ?, ?)";
                         Database::query(
-                            "INSERT IGNORE INTO media_refs (media_id, post_id, revision_id) VALUES (?, ?, ?)",
+                            $sql,
                             [$mediaId, $postId, $revisionId]
                         );
                     }

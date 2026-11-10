@@ -97,11 +97,17 @@ class Router
 
         // URLs absolutas: valida esquema seguro (apenas http/https) e restringe ao mesmo host
         $scheme = parse_url($target, PHP_URL_SCHEME);
-        if ($scheme !== null && !in_array(strtolower($scheme), ['http', 'https'], true)) {
+        if ($scheme === false) {
+            return false;
+        }
+        if (is_string($scheme) && !in_array(strtolower($scheme), ['http', 'https'], true)) {
             return false;
         }
 
         $targetHost = parse_url($target, PHP_URL_HOST);
+        if ($targetHost === false || !is_string($targetHost)) {
+            $targetHost = '';
+        }
         $currentHost = $_SERVER['HTTP_HOST'] ?? '';
         if (!empty($targetHost) && !empty($currentHost)) {
             $cleanCurrentHost = explode(':', $currentHost)[0];
@@ -167,8 +173,9 @@ class Router
             $method = 'GET';
         }
 
-        // Isola o caminho da Query String
-        $path = parse_url($uri, PHP_URL_PATH) ?? '/';
+        // Isola o caminho da Query String tratando retorno false em URIs malformadas
+        $parsedPath = parse_url($uri, PHP_URL_PATH);
+        $path = (is_string($parsedPath) && $parsedPath !== '') ? $parsedPath : '/';
 
         // Prevenir bypasses de Open Redirect via backslash (\), protocolo relativo (//) ou misto (/\)
         if (str_starts_with($path, '//') || str_starts_with($path, '/\\') || str_starts_with($path, '\\')) {

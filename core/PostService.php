@@ -208,7 +208,13 @@ class PostService
                 'slug' => $slug,
                 'summary' => $summary,
                 'category' => $category,
+                'tags' => $tags,
+                'featured_image' => $featuredImage,
                 'content_json' => $contentJson,
+                'content_html' => $contentHtml,
+                'seo_title' => $seoTitle,
+                'seo_description' => $seoDesc,
+                'focus_keyword' => $focusKw,
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
             Database::query(
