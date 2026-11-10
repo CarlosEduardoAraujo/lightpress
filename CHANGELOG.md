@@ -7,6 +7,43 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Plugin redis-cache-pro: Motor Corporativo de Cache Persistente em Memória RAM com PhpRedis — 2026-11-10
+
+- **Terceiro Plugin Oficial (`plugins/redis-cache-pro/`):**
+  - Implementação completa do plugin **Redis Cache Pro** (`redis-cache-pro`), fornecendo um motor de cache de objetos persistente em memória RAM com comunicação nativa de altíssima performance via extensão C `phpredis`, compatível com TCP, Unix Domain Socket, Sentinel e Cluster.
+- **Invalidação Atômica em $O(1)$ (Eliminação de `FLUSHDB` e `KEYS *`):**
+  - **Invalidação Global por Namespace:** Geração de novos hashes randômicos de versão global em `lp_cache:global:version`, tornando instantaneamente obsoletas todas as chaves da instalação sem travar o daemon Redis.
+  - **Invalidação Granular por Grupo:** Versionamento atômico individual por grupo de dados (`posts`, `settings`, `categories`, `users`, `transient`) em `group:{group}:version`, permitindo limpar apenas o grupo de posts ao publicar notícias sem desalocar opções ou categorias já aquecidas.
+  - **Desalocação Não-Bloqueante com `UNLINK`:** Substituição de `DEL` síncrono por `UNLINK` assíncrono no kernel do Redis, eliminando pausas na CPU causadas por chaves volumosas.
+- **Disjuntor de Alta Resiliência (Circuit Breaker):**
+  - Monitoramento contínuo de exceções e timeouts no Redis.
+  - Após 3 falhas consecutivas, o disjuntor desarma para o estado `OPEN`, acionando automaticamente o modo de bypass seguro durante 30 segundos de cooldown.
+  - As requisições são atendidas transparentemente pelo banco relacional e cache efêmero em memória da requisição, impedindo que quedas do Redis derrubem ou travem o portal.
+  - Recuperação gradual em estado `HALF_OPEN` antes de restabelecer o modo normal `CLOSED`.
+- **Proteção contra Cache Stampede (Dogpile Lock):**
+  - Lock distribuído atômico `SET NX PX 5000` via método `RedisCache::remember()`.
+  - Impede a recomputação concorrente destrutiva de consultas pesadas quando uma chave expira sob alto tráfego.
+- **Separação de Bancos (Split Database):**
+  - Suporte a direcionar dados efêmeros e voláteis (transientes e sessões) para um banco secundário do Redis (ex: DB 1), preservando o banco principal (DB 0) para posts e configurações.
+- **Codecs Modernos de Alta Velocidade:**
+  - Suporte ao serializador `igbinary` com fallback para o serializador padrão PHP.
+  - Suporte a algoritmos rápidos de compressão `zstd` (Zstandard) e `lz4` se compilados na extensão `phpredis`.
+- **Precedência de Configuração e Sobrescrita Segura (`WP_REDIS_CONFIG`):**
+  - Suporte para definição da constante `WP_REDIS_CONFIG` em `config.local.php` e `config.local.php.example`, permitindo controle de infraestrutura em nível de arquivo com fallback para a tabela `settings`.
+- **Painel Administrativo Completo com 5 Abas (`/admin/plugin-settings.php?plugin=redis-cache-pro`):**
+  - **Aba 1 (Visão Geral & Telemetria 24h):** Radial Gauge animado de Hit Ratio (%), status da conexão, latência RTT em ms, consumo e pico de memória RAM e gráfico vetorial interativo em SVG das últimas 24 horas.
+  - **Aba 2 (Comandos em Tempo Real):** Query Profiler em tempo real das últimas 30 operações com comando, chave, origem do chamador, duração (ms) e status.
+  - **Aba 3 (Configuração & Pre-warming):** Parâmetros de conexão do servidor Redis e rotinas de pré-aquecimento inteligente para configurações globais, matérias recentes e URLs personalizadas.
+  - **Aba 4 (Grupos & Big Key Hunter):** Scanner incremental de chaves pesadas via cursor `SCAN` identificando os 15 maiores objetos em RAM com botão para remoção individual via `UNLINK` e purga granular por grupo.
+  - **Aba 5 (Alertas & Incidentes):** Disparo de webhooks ricos em formato embed (Discord, Slack, Teams, n8n) e alertas por e-mail em caso de pico de RAM ou disparo do Circuit Breaker, com botão de teste imediato de notificação.
+- **Facade Pública do LightPress (`\LightPress\Plugin\RedisCachePro\RedisCache`):**
+  - Métodos estáticos: `get()`, `set()`, `delete()`, `remember()`, `flushGroup()`, `flush()`, `isConnected()` e `client()`.
+  - Invalidação automática via listeners de eventos do CMS (`post_saved`, `post_deleted`, `settings_updated`).
+- **Suíte de Testes Automatizados:**
+  - Criação de dublê determinístico do PhpRedis em memória (`plugins/redis-cache-pro/tests/FakeRedis.php`) e script de validação de regressão (`plugins/redis-cache-pro/tests/test-redis-cache-pro.php`).
+- **Sincronização de Assets Públicos:**
+  - Arquivos CSS e JS sincronizados para entrega estática direta pelo Nginx em `/public/assets/plugins/redis-cache-pro/`.
+
 ### Remoção de `<figcaption>` e Correção de Descrição Real de Imagens (ALT/TITLE) — 2026-11-10
 
 - **Remoção Completa de `<figcaption>` no Frontend Público:**

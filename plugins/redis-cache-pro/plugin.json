@@ -1,0 +1,12 @@
+{
+  "id": "redis-cache-pro",
+  "name": "Redis Cache Pro",
+  "version": "1.0.0",
+  "description": "Enterprise-grade persistent object cache engine com PhpRedis, non-blocking UNLINK, circuit breaker, telemetria 24h, big key hunter e monitoramento em tempo real.",
+  "author": "LightPress / Clean-Room Engineering",
+  "author_url": "https://lightpress.org",
+  "min_lp_version": "1.0.0",
+  "admin_settings": true,
+  "admin_title": "Redis Cache Pro",
+  "requires_db": false
+}

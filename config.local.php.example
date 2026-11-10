@@ -8,6 +8,21 @@ declare(strict_types=1);
  * cp config.local.php.example config.local.php
  */
 
+if (!defined('WP_REDIS_CONFIG')) {
+    define('WP_REDIS_CONFIG', [
+        'host'         => '127.0.0.1',
+        'port'         => 6379,
+        'password'     => null,
+        'database'     => 0,
+        'timeout'      => 1.0,
+        'read_timeout' => 1.0,
+        'prefix'       => 'speedracing_',
+        'async_flush'  => true,
+        'compression'  => 'zstd',
+        'serializer'   => 'igbinary',
+    ]);
+}
+
 return [
     'app' => [
         'env' => 'production',

@@ -316,6 +316,7 @@ lightpress/
 │   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
 ├── plugins/                   # Plugins isolados fora da raiz pública
 │   ├── ai-copilot/            # Plugin oficial de IA para linkagem interna e visão computacional
+│   ├── redis-cache-pro/       # Plugin empresarial de cache persistente em memória RAM com PhpRedis
 │   └── webhook-sender/        # Plugin nativo para envio de webhooks em publicações
 ├── storage/                   # Dados privados; acesso web proibido
 │   ├── staging/               # Originais temporários e conversões em andamento
@@ -830,6 +831,54 @@ O segundo módulo da plataforma adiciona assistência de Inteligência Artificia
 * **Auto-Migração Idempotente:** A ativação do plugin adiciona automaticamente as colunas `alt_text`, `caption` e `ai_tags` na tabela `media` tanto em MySQL quanto em SQLite.
 * **Painel de Configurações Interativo:** Tela em `/admin/plugin-settings.php?plugin=ai-copilot` com botão **"⚡ Testar Conexão com a IA"** para checagem imediata de latência e conectividade com a API configurada.
 
+#### 8.13.3. Terceiro Plugin Oficial: Redis Cache Pro (`plugins/redis-cache-pro/`)
+
+O terceiro módulo corporativo do ecossistema LightPress introduz um motor de cache de objetos persistente em memória RAM com arquitetura de alta resiliência, baixa latência e concorrência extrema:
+
+* **Desempenho C-Driver Nativo via PhpRedis:** Comunicação direta em nível de kernel sem overhead de bibliotecas PHP interpretadas, com suporte unificado a TCP, Unix Domain Socket, Sentinel e Cluster.
+* **Invalidação Atômica em $O(1)$ (Sem `FLUSHDB` ou `KEYS *`):**
+  - **Invalidação Global por Namespace:** Ao solicitar a limpeza do cache da aplicação, o motor gera e persiste instantaneamente um novo hash de geração em `lp_cache:global:version`. Todo o acervo anterior torna-se inacessível em microssegundos sem travar o servidor Redis.
+  - **Invalidação Granular por Grupo:** Cada agrupamento de dados (`posts`, `settings`, `categories`, `users`, `transient`) possui versionamento próprio em `group:{group}:version`. Purgar o grupo de notícias não afeta configurações ou termos já aquecidos em memória.
+  - **Desalocação Assíncrona com `UNLINK`:** Liberação de memória não-bloqueante no kernel do Redis, eliminando pausas na CPU causadas pelo comando `DEL` tradicional sobre objetos volumosos.
+* **Disjuntor de Alta Resiliência (Circuit Breaker):**
+  - Monitora falhas consecutivas de comunicação (timeout, recusa de conexão ou indisponibilidade).
+  - Em 3 falhas seguidas, o disjuntor trip-out para o estado `OPEN`, ativando o modo de proteção por 30 segundos.
+  - Durante o estado de bypass, as requisições transitam de forma transparente e segura pelo banco de dados relacional e cache efêmero da requisição, garantindo que o portal permaneça 100% no ar mesmo se o daemon Redis cair.
+  - Transiciona suavemente para `HALF_OPEN` para testar a recuperação da infraestrutura antes de restaurar o estado `CLOSED`.
+* **Proteção contra Cache Stampede (Dogpile Lock):**
+  - Implementação de locks atômicos distribuídos `SET NX PX 5000` através do método `RedisCache::remember()`.
+  - Ao expirar uma chave de alto acesso concorrente, apenas um worker recalcula a query pesada no MySQL enquanto as demais requisições aguardam brevemente ou recebem o valor sem sobrecarregar o banco de dados.
+* **Separação de Banco (Split Database):**
+  - Suporte a direcionar dados efêmeros e transientes para um banco secundário do Redis (ex: DB 1), isolando dados de sessão e requisições externas do banco principal de posts e configurações (DB 0).
+* **Codecs Modernos de Alta Velocidade:**
+  - Serializadores: suporte prioritário a `igbinary` (redução drástica de CPU e consumo de bytes em RAM) com fallback transparente para o serializador nativo do PHP.
+  - Algoritmos de Compressão: detecção e aplicação automática de `zstd` (Zstandard) e `lz4` se compilados na extensão `phpredis`.
+* **Precedência de Configuração e Sobrescrita Segura:**
+  - Prioridade estrita para a constante `WP_REDIS_CONFIG` em `config.local.php`, mantendo credenciais e parâmetros de infraestrutura sob controle de versão local/produção:
+    ```php
+    define('WP_REDIS_CONFIG', [
+        'host'         => '127.0.0.1',
+        'port'         => 6379,
+        'password'     => null,
+        'database'     => 0,
+        'timeout'      => 1.0,
+        'read_timeout' => 1.0,
+        'prefix'       => 'speedracing_',
+        'async_flush'  => true,
+        'compression'  => 'zstd',
+        'serializer'   => 'igbinary',
+    ]);
+    ```
+* **Painel Administrativo com 5 Abas (`/admin/plugin-settings.php?plugin=redis-cache-pro`):**
+  - **Aba 1 (Visão Geral & Telemetria 24h):** Radial Gauge animado de Hit Ratio (%), status do disjuntor, latência média RTT (ms), consumo de memória atual vs pico e gráfico vetorial interativo SVG com histórico de 24 horas.
+  - **Aba 2 (Comandos em Tempo Real):** Query Profiler com as últimas 30 operações de cache executadas na requisição, duração em milissegundos e identificação do chamador no core.
+  - **Aba 3 (Configuração & Pre-warming):** Parâmetros de rede e formulário de pré-aquecimento inteligente para configurações globais, matérias recentes e rotas estratégicas.
+  - **Aba 4 (Grupos & Big Key Hunter):** Scanner incremental via cursor `SCAN` para localizar os 15 maiores objetos armazenados em RAM com botão para `UNLINK` individual e purga granular por grupo.
+  - **Aba 5 (Alertas & Incidentes):** Disparo de webhooks ricos em formato embed (compatível com Discord, Slack, Teams e n8n) e alertas por e-mail em caso de pico de RAM ou disparo do Circuit Breaker.
+* **Facade e Helpers de Cache (`\LightPress\Plugin\RedisCachePro\RedisCache`):**
+  - Interface estática de alto nível: `get()`, `set()`, `delete()`, `remember()`, `flushGroup()`, `flush()` e `isConnected()`.
+  - Invalidação automática vinculada aos hooks de ciclo de vida do LightPress (`post_saved`, `post_deleted`, `settings_updated`).
+
 ---
 
 ### 8.14. Prevenção Contra Redirecionamentos Abertos (Open Redirect / CWE-601)
@@ -1019,6 +1068,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Arquitetura de Hooks & Plugins:** Barramento ultraleve de eventos (`Hook`), gerenciador de ciclo de vida (`PluginManager`), manifesto `plugin.json` e menu de administração dinâmico com dropdown de plugins (`AdminNav`).
   - [x] **Primeiro Plugin Oficial (`webhook-sender`):** Disparo de webhooks para múltiplos servidores (Discord, Slack, n8n, Zapier) na publicação de matérias, com tabela relacional própria (`plugin_webhook_sender_logs`), integração atômica com agendamento de posts, resolução canônica em CLI/cron e painel de controle com testes e reenvio.
   - [x] **Segundo Plugin Oficial (`ai-copilot`):** Assistente de IA generativa e multimodal com zero dependências externas (cURL nativo), suporte a Google Gemini, OpenAI e Ollama local, módulo de linkagem interna com busca FULLTEXT e ancoragem semântica estrita, visão computacional com variantes WebP 1024px e auto-migração de metadados (`alt_text`, `caption`, `ai_tags`) na tabela `media`.
+  - [x] **Terceiro Plugin Oficial (`redis-cache-pro`):** Motor corporativo de cache persistente com PhpRedis, Circuit Breaker, versionamento atômico O(1), UNLINK não-bloqueante, telemetria 24h, Big Key Hunter, proteção contra Cache Stampede (Dogpile Lock), alertas via Webhooks e painel administrativo interativo com gráficos SVG.
 
 * **FASE CONCLUÍDA — Polimento & Padronização da Área Administrativa (/admin):**
   - [x] **Header e Footer Unificados (`header.php` e `footer.php`):** Centralização da estrutura HTML, `<head>`, metatags, script anti-flash de tema claro/escuro e navegação completa com submenu de plugins em todas as páginas do `/admin`.
