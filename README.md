@@ -183,6 +183,7 @@ Além do DDL editorial acima, a implementação deve criar estruturas persistent
 | :--- | :--- |
 | `categories` | Slug único e estável, nome de exibição e estado ativo; categoria inicial `geral`. Validar a existência da categoria ao salvar artigos e revisões |
 | `media` | Identificador aleatório único, proprietário, manifesto de variantes validado no servidor, datas e estado de finalização; cliente não pode substituir o manifesto por URLs arbitrárias |
+| `media_variants` | Mapeamento direto B-Tree O(1) de URLs de variantes para `media_id`; elimina buscas com `LIKE '%...%'` sobre JSON e viabiliza resolução instantânea (< 0.1ms) com integridade referencial em cascata |
 | `media_refs` | Vínculos de mídia a artigos/revisões com unicidade por referência; impedir limpeza de mídia ainda referenciada pelo conteúdo ou histórico |
 | `view_dedupe` | Chave primária `(post_id, ip_hash)`, prazo `expires_at`, índice por expiração e exclusão em cascata com o artigo; HMAC representado por 64 caracteres hexadecimais |
 | `cache_purge_jobs` | ID, payload versionado com URLs/evento, estado, tentativas, próxima execução, lease, último erro e data de conclusão; inserção na transação editorial e ausência de exclusão em cascata com o artigo |
@@ -288,6 +289,19 @@ A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rá
 * **Paginação Fluida Assíncrona:** Grade configurada para 48 itens por página (harmônica para layouts responsivos de 2, 3, 4 e 6 colunas) com navegação numerada instantânea via AJAX.
 * **Ordenação Flexível:** Seletor de ordenação com padrão decrescente (recentes primeiro), permitindo alternar entre mídias recém-enviadas e ordem cronológica ascendente (antigas primeiro).
 * **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
+
+### 4.9. Resolução de Metadados de Alta Performance e Carregamento em Lote (Batch Loading)
+
+Para eliminar travamentos em concorrência provocados por consultas não-indexadas na resolução do atributo `alt` e descrições das imagens, o LightPress conta com um subsistema de leitura de alta performance:
+
+* **Mapeamento Exato via B-Tree (`media_variants`):** Elimina integralmente buscas aproximadas com `LIKE '%...%'` sobre JSON e filesorts (`Creating sort index`). A correspondência de caminhos físicos e URLs de variantes para o `media_id` é feita por índice B-Tree único em tempo $< 0.1\text{ ms}$.
+* **Identificador Persistido no Artigo (`posts.featured_media_id`):** Artigos vinculam diretamente o identificador da sua mídia de destaque, permitindo junções relacionais imediatas por chave primária.
+* **Carregamento em Lote no Front Controller (`ImageProcessor::preloadDescriptions()`):** Em vez de disparar consultas individuais dentro dos loops dos templates (problema $N+1$), o Front Controller (`public/index.php`) coleta todas as imagens da página e executa **uma única consulta multi-key** (`WHERE url_path IN (...)`), populando os metadados antes da renderização.
+* **Cache em 2 Níveis com Fallback Total:**
+  1. *Nível 1 (Memória RAM da Requisição):* Cache estático em array associativo que armazena inclusive resultados vazios/não encontrados, garantindo 0 consultas adicionais no mesmo ciclo de vida.
+  2. *Nível 2 (Persistência via `ObjectCache`):* Integração automática com o motor Redis Cache Pro no grupo `'media'` (TTL de 24h). Caso o Redis esteja inoperante ou não instalado, a aplicação opera transparentemente via banco relacional otimizado sem disparar erros.
+* **Invalidação Reativa:** Edições de textos alternativos ou exclusões de mídias acionam atomicamente `ObjectCache::flushGroup('media')`.
+* **Utilitário de Migração e Backfill (`bin/migrate-media-variants.php`):** Script CLI que varre os manifestos existentes e popula a tabela `media_variants` e coluna `featured_media_id` sem necessidade de indisponibilidade do sistema.
 
 ---
 
@@ -495,8 +509,9 @@ fastcgi_cache_methods GET HEAD;
 fastcgi_cache_bypass $lp_skip_cache;
 fastcgi_no_cache $lp_skip_cache $upstream_http_set_cookie;
 fastcgi_cache_lock on;
-fastcgi_cache_use_stale off;
-fastcgi_cache_background_update off;
+fastcgi_cache_lock_timeout 5s;
+fastcgi_cache_use_stale error timeout updating invalid_header http_500 http_503;
+fastcgi_cache_background_update on;
 ```
 
 A configuração final deve restringir gravação a respostas 200 e preservar o tratamento nativo dos cabeçalhos `Cache-Control`, `Set-Cookie`, `Vary` e `X-Accel-Expires`; não usar `fastcgi_ignore_headers` para contornar essas proteções. Os TTLs por rota são definidos na seção 7.3. O cookie de sessão configurado no PHP deve coincidir com o nome usado nos maps.

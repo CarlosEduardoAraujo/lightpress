@@ -159,6 +159,16 @@ class PostService
         $category = !empty($data['category']) ? Security::slugify($data['category']) : 'geral';
         $tags = $data['tags'] ?? null;
         $featuredImage = $data['featured_image'] ?? null;
+        $featuredMediaId = $data['featured_media_id'] ?? null;
+        if (empty($featuredMediaId) && !empty($featuredImage)) {
+            $cleanImg = ltrim(parse_url((string)$featuredImage, PHP_URL_PATH) ?? (string)$featuredImage, '/');
+            try {
+                $featuredMediaId = Database::fetchValue(
+                    "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",
+                    [$cleanImg]
+                ) ?: null;
+            } catch (\Throwable) {}
+        }
 
         if (!empty($data['content_html'])) {
             $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
@@ -175,22 +185,22 @@ class PostService
         $focusKw = $data['focus_keyword'] ?? null;
 
         return Database::transaction(function (\PDO $pdo) use (
-            $userId, $slug, $title, $summary, $category, $tags, $featuredImage,
+            $userId, $slug, $title, $summary, $category, $tags, $featuredImage, $featuredMediaId,
             $contentJson, $contentHtml, $seoTitle, $seoDesc, $focusKw, &$createdRevId
         ): int {
             // 1. Inserir artigo em posts
             Database::query(
                 "INSERT INTO posts (
-                    user_id, slug, title, summary, category, tags, featured_image,
+                    user_id, slug, title, summary, category, tags, featured_image, featured_media_id,
                     content_json, content_html, status, is_featured, version,
                     seo_title, seo_description, focus_keyword, published_at, updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, 'draft', 0, 1,
                     ?, ?, ?, NULL, CURRENT_TIMESTAMP
                 )",
                 [
-                    $userId, $slug, $title, $summary, $category, $tags, $featuredImage,
+                    $userId, $slug, $title, $summary, $category, $tags, $featuredImage, $featuredMediaId,
                     $contentJson, $contentHtml,
                     $seoTitle, $seoDesc, $focusKw
                 ]
@@ -306,6 +316,16 @@ class PostService
             $category = !empty($data['category']) ? Security::slugify($data['category']) : $current['category'];
             $tags = $data['tags'] ?? null;
             $featuredImage = $data['featured_image'] ?? null;
+            $featuredMediaId = $data['featured_media_id'] ?? null;
+            if (empty($featuredMediaId) && !empty($featuredImage)) {
+                $cleanImg = ltrim(parse_url((string)$featuredImage, PHP_URL_PATH) ?? (string)$featuredImage, '/');
+                try {
+                    $featuredMediaId = Database::fetchValue(
+                        "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",
+                        [$cleanImg]
+                    ) ?: null;
+                } catch (\Throwable) {}
+            }
             $isFeatured = array_key_exists('is_featured', $data) ? (!empty($data['is_featured']) ? 1 : 0) : (int)$current['is_featured'];
 
             if (array_key_exists('content_html', $data) && $data['content_html'] !== null) {
@@ -377,12 +397,12 @@ class PostService
             // Atualiza o artigo condicionalmente
             $stmt = Database::query(
                 "UPDATE posts SET
-                    slug = ?, title = ?, summary = ?, category = ?, tags = ?, featured_image = ?,
+                    slug = ?, title = ?, summary = ?, category = ?, tags = ?, featured_image = ?, featured_media_id = ?,
                     content_json = ?, content_html = ?, status = ?, is_featured = ?, version = ?,
                     seo_title = ?, seo_description = ?, focus_keyword = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND version = ?",
                 [
-                    $slug, $title, $summary, $category, $tags, $featuredImage,
+                    $slug, $title, $summary, $category, $tags, $featuredImage, $featuredMediaId,
                     $contentJson, $contentHtml, $targetStatus, $isFeatured, $newVersion,
                     $seoTitle, $seoDesc, $focusKw, $publishedAt,
                     $postId, $knownVersion

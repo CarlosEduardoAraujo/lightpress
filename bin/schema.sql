@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS posts (
     category VARCHAR(100) NOT NULL DEFAULT 'geral',
     tags TEXT NULL,
     featured_image VARCHAR(500) NULL,
+    featured_media_id VARCHAR(32) NULL,
     
     -- Conteúdo Desacoplado
     content_json MEDIUMTEXT NOT NULL,
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS posts (
     INDEX idx_featured (is_featured, status, published_at DESC),
     INDEX idx_category (category, status, published_at DESC),
     INDEX idx_author (user_id),
+    INDEX idx_featured_media (featured_media_id),
     FULLTEXT INDEX idx_fulltext_search (title, summary, tags),
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -137,6 +139,16 @@ CREATE TABLE IF NOT EXISTS media_refs (
     INDEX idx_ref_post (post_id),
     CONSTRAINT fk_ref_media FOREIGN KEY (media_id) REFERENCES media (id) ON DELETE CASCADE,
     CONSTRAINT fk_ref_post FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8.1. Tabela de Variantes e Mapeamento Direto O(1) de URLs para Media
+CREATE TABLE IF NOT EXISTS media_variants (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    media_id VARCHAR(32) NOT NULL,
+    url_path VARCHAR(255) NOT NULL,
+    UNIQUE KEY uq_media_variant_url (url_path),
+    INDEX idx_media_variant_mid (media_id),
+    CONSTRAINT fk_media_variants_media FOREIGN KEY (media_id) REFERENCES media (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. Deduplicação Atômica de Visualizações (Privacidade com HMAC)

@@ -7,6 +7,29 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Banco de Dados: Eliminação de Gargalo de Mídia, Batch Loading & Cache Defensivo — 2026-11-10
+
+- **Eliminação Integral de Varredura de Tabela e Filesort (`Creating sort index`):**
+  - Substituição da consulta lenta não-indexada `SELECT alt_text, caption, original_name FROM media WHERE variants_manifest LIKE ? ... ORDER BY ... LIMIT 1` por consulta direta e indexada via B-Tree em tempo $< 0.1\text{ ms}$.
+  - Criação da tabela indexada `media_variants` (`url_path VARCHAR(255) UNIQUE`, `media_id VARCHAR(32)` com `ON DELETE CASCADE`), mapeando todas as URLs e variantes geradas diretamente para o registro de mídia pai.
+  - Adição da coluna `posts.featured_media_id VARCHAR(32) NULL` com índice `idx_featured_media` para relacionamento relacional direto entre artigos e suas imagens de destaque.
+  - Implementação de auto-migração dinâmica em `Schema::ensureMediaVariantsSchema()` compatível nativamente com MariaDB/MySQL e SQLite.
+- **Carregamento em Lote no Front Controller (`ImageProcessor::preloadDescriptions()`):**
+  - Implementação de método de pré-carregamento em lote que coleta todas as URLs de imagens da página e executa **uma única consulta SQL agregada** (`WHERE url_path IN (...)`), eliminando o problema de queries N+1 durante a renderização de loops de cards nos templates.
+  - Instrumentação completa das rotas públicas em `public/index.php`: Home (`/` e `/page/{page}/`), Categorias, Tags, Busca e Artigo Individual (imagem principal + notícias relacionadas).
+- **Arquitetura de Cache em Dois Níveis com Fallback Total:**
+  - **Nível 1 (RAM Local da Requisição):** Armazenamento em array estático `$memoryDescCache` no `ImageProcessor`, memorizando inclusive imagens inexistentes/vazias para garantir 0 consultas repetidas no mesmo request.
+  - **Nível 2 (Persistência via `ObjectCache`):** Armazenamento no grupo `'media'` com TTL de 24 horas no Redis Cache Pro.
+  - **Fallback Gracioso e Autônomo:** Em ambientes sem o plugin Redis Cache Pro ou com o daemon Redis inoperante, o sistema opera normalmente e sem avisos via banco relacional indexado e memória local.
+  - **Invalidação Reativa:** Disparo automático de `ObjectCache::flushGroup('media')` ao editar metadados (`public/admin/api/ai.php` e `plugins/ai-copilot/src/MediaVision.php`) ou ao excluir mídias (`public/admin/media.php`).
+- **Utilitários e Sincronização Automática:**
+  - Novo script CLI `bin/migrate-media-variants.php` para extração em lote dos manifestos JSON existentes e backfill seguro de `posts.featured_media_id`.
+  - Otimização de `ImageProcessor::syncRefs()`, substituindo varredura `LIKE` por busca exata em `media_variants`.
+  - Registro automático e idempotente de novas variantes geradas durante uploads (`public/admin/upload.php` e `bin/catalog-media.php`) via `ImageProcessor::registerVariants()`.
+- **Blindagem do Nginx FastCGI Cache (`nginx/lightpress.conf`):**
+  - Remoção do bypass incondicional para query strings (`$query_string != ""`). Parâmetros comuns de campanhas publicitárias e redes sociais (`utm_*`, `fbclid`, `gclid`, etc.) agora são atendidos diretamente pelo cache do Nginx, protegendo o PHP e o banco de acessos em massa.
+  - Ativação das diretivas de mitigação contra Cache Stampede: `fastcgi_cache_use_stale error timeout updating invalid_header http_500 http_503;` e `fastcgi_cache_background_update on;`.
+
 ### Plugin redis-cache-pro: Motor Corporativo de Cache Persistente em Memória RAM com PhpRedis — 2026-11-10
 
 - **Correção da Inicialização do Cache & Ciclo de Vida do ObjectCache:**

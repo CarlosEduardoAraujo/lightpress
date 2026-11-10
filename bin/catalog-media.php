@@ -245,7 +245,12 @@ $insertRefSql = ($driver === 'mysql')
     : "INSERT OR IGNORE INTO media_refs (media_id, post_id, revision_id, created_at) VALUES (?, ?, NULL, ?)";
 $insertRefStmt = (!$isDryRun && !$skipRefs) ? $pdo->prepare($insertRefSql) : null;
 
-$updatePostSql = "UPDATE posts SET featured_image = ? WHERE id = ?";
+$insertVariantSql = ($driver === 'mysql')
+    ? "INSERT IGNORE INTO media_variants (media_id, url_path) VALUES (?, ?)"
+    : "INSERT OR IGNORE INTO media_variants (media_id, url_path) VALUES (?, ?)";
+$insertVariantStmt = !$isDryRun ? $pdo->prepare($insertVariantSql) : null;
+
+$updatePostSql = "UPDATE posts SET featured_image = ?, featured_media_id = ? WHERE id = ?";
 $updatePostStmt = (!$isDryRun && $updatePosts) ? $pdo->prepare($updatePostSql) : null;
 
 $insertedCount = 0;
@@ -385,6 +390,12 @@ foreach ($groupKeys as $idx => $groupKey) {
     // Registrar URLs nos mídias existentes locais para evitar duplicatas em runtime
     foreach ($group['files'] as $f) {
         $existingUrls[$f['rel_url']] = $mediaId;
+        if (!$isDryRun && $insertVariantStmt) {
+            try {
+                $cleanPath = ltrim(parse_url($f['rel_url'], PHP_URL_PATH) ?? $f['rel_url'], '/');
+                $insertVariantStmt->execute([$mediaId, $cleanPath]);
+            } catch (\Throwable) {}
+        }
     }
 
     $insertedCount++;
@@ -411,7 +422,7 @@ foreach ($groupKeys as $idx => $groupKey) {
                     ?? ($group['files'][0]['rel_url'] ?? ''));
                 if (!empty($bestUrl)) {
                     try {
-                        $updatePostStmt->execute([$bestUrl, $pId]);
+                        $updatePostStmt->execute([$bestUrl, $mediaId, $pId]);
                         $postsUpdated++;
                     } catch (\Throwable $e) {}
                 }

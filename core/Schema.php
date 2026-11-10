@@ -53,6 +53,7 @@ class Schema
         }
 
         self::ensureMediaAiSchema(Database::getConnection(), $driver);
+        self::ensureMediaVariantsSchema(Database::getConnection(), $driver);
         self::ensureViewDedupeSchema(Database::getConnection(), $driver);
 
         // Se a tabela estiver vazia, cria as páginas institucionais padrão
@@ -232,6 +233,7 @@ class Schema
         }
 
         self::ensureMediaAiSchema($pdo, 'mysql');
+        self::ensureMediaVariantsSchema($pdo, 'mysql');
         self::ensureViewDedupeSchema($pdo, 'mysql');
     }
 
@@ -418,6 +420,7 @@ class Schema
         self::ensureRevisionsSchema($pdo, 'sqlite');
         self::ensureViewDedupeSchema($pdo, 'sqlite');
         self::ensureMediaAiSchema($pdo, 'sqlite');
+        self::ensureMediaVariantsSchema($pdo, 'sqlite');
     }
 
     /**
@@ -591,6 +594,51 @@ class Schema
             }
         } catch (\Throwable $e) {
             error_log('[Schema] ensureMediaAiSchema error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Garante a criação da tabela media_variants e a coluna featured_media_id na tabela posts.
+     * Auto-migra tabelas existentes sem indisponibilidade ou perda de dados.
+     */
+    public static function ensureMediaVariantsSchema(PDO $pdo, string $driver = 'mysql'): void
+    {
+        try {
+            if ($driver === 'sqlite') {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS media_variants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    media_id TEXT NOT NULL,
+                    url_path TEXT NOT NULL UNIQUE,
+                    FOREIGN KEY (media_id) REFERENCES media (id) ON DELETE CASCADE
+                );");
+                $pdo->exec("CREATE INDEX IF NOT EXISTS idx_media_variant_mid ON media_variants (media_id);");
+                $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_media_variant_url ON media_variants (url_path);");
+
+                $cols = $pdo->query("PRAGMA table_info(posts)")->fetchAll(PDO::FETCH_ASSOC);
+                $existingCols = array_column($cols, 'name');
+                if (!in_array('featured_media_id', $existingCols, true)) {
+                    $pdo->exec("ALTER TABLE posts ADD COLUMN featured_media_id TEXT NULL;");
+                    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_featured_media ON posts (featured_media_id);");
+                }
+            } else {
+                // MariaDB / MySQL
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `media_variants` (
+                    `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    `media_id` VARCHAR(32) NOT NULL,
+                    `url_path` VARCHAR(255) NOT NULL,
+                    UNIQUE KEY `uq_media_variant_url` (`url_path`),
+                    INDEX `idx_media_variant_mid` (`media_id`),
+                    CONSTRAINT `fk_media_variants_media` FOREIGN KEY (`media_id`) REFERENCES `media` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+                $hasCol = $pdo->query("SHOW COLUMNS FROM posts LIKE 'featured_media_id'")->fetch();
+                if (!$hasCol) {
+                    $pdo->exec("ALTER TABLE posts ADD COLUMN featured_media_id VARCHAR(32) NULL AFTER featured_image");
+                    $pdo->exec("ALTER TABLE posts ADD INDEX idx_featured_media (featured_media_id)");
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Schema] ensureMediaVariantsSchema error: ' . $e->getMessage());
         }
     }
 }

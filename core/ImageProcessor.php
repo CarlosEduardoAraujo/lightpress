@@ -15,6 +15,12 @@ use Throwable;
  */
 class ImageProcessor
 {
+    /**
+     * Cache estático em memória RAM para o ciclo de vida da requisição atual.
+     * @var array<string, string>
+     */
+    private static array $memoryDescCache = [];
+
     private string $uploadDir;
     private string $stagingDir;
     private int $maxFileSize;
@@ -177,9 +183,23 @@ class ImageProcessor
     }
 
     /**
+     * Limpa o cache estático em memória da requisição (útil para testes unitários).
+     */
+    public static function clearMemoryCache(): void
+    {
+        self::$memoryDescCache = [];
+    }
+
+    /**
      * Resolve o texto descritivo real da imagem (ALT / TITLE) a partir dos metadados da mídia.
      * Retorna estritamente metadados da imagem (alt_text ou caption da IA, ou nome do arquivo amigável).
      * NUNCA retorna o título da matéria jornalística.
+     *
+     * Arquitetura de Performance Defensiva:
+     * 1. Consulta em memória RAM da requisição O(1).
+     * 2. Consulta defensiva no ObjectCache (Redis persistente) se disponível.
+     * 3. Busca direta indexada B-Tree na tabela media_variants (sem LIKE nem filesort).
+     * 4. Fallback semântico formatado pelo nome do arquivo.
      *
      * @param string $imageUrl URL da imagem
      * @param ?string $fallbackAlt Texto alternativo opcional se já conhecido
@@ -197,50 +217,171 @@ class ImageProcessor
 
         $cleanPath = parse_url($imageUrl, PHP_URL_PATH) ?? $imageUrl;
         $cleanPath = ltrim((string)$cleanPath, '/');
+        if (empty($cleanPath)) {
+            return '';
+        }
+
+        // 1. Verificação em memória RAM local da requisição atual O(1)
+        if (array_key_exists($cleanPath, self::$memoryDescCache)) {
+            return self::$memoryDescCache[$cleanPath];
+        }
+
+        // 2. Verificação defensiva no ObjectCache (Redis persistente)
+        $cacheKey = 'media_desc:' . md5($cleanPath);
+        if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+            $cached = ObjectCache::get($cacheKey, 'media');
+            if ($cached !== false && is_string($cached)) {
+                self::$memoryDescCache[$cleanPath] = $cached;
+                return $cached;
+            }
+        }
+
         $baseName = pathinfo($cleanPath, PATHINFO_FILENAME);
         $cleanBase = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $baseName);
 
+        // 3. Busca direta e indexada O(1) na tabela media_variants (elimina LIKE e filesort)
         try {
-            $likePath = '%' . Security::escapeLike($cleanPath) . '%';
-            $likeEscaped = '%' . Security::escapeLike(str_replace('/', '\/', $cleanPath)) . '%';
-            $likeBase = '%' . Security::escapeLike((string)$cleanBase) . '%';
-
             $media = Database::fetchOne(
-                "SELECT alt_text, caption, original_name FROM media 
-                 WHERE variants_manifest LIKE ? 
-                    OR variants_manifest LIKE ? 
-                    OR original_name LIKE ? 
-                    OR variants_manifest LIKE ? 
-                 ORDER BY (alt_text IS NOT NULL AND alt_text != '') DESC, id DESC 
+                "SELECT m.alt_text, m.caption, m.original_name 
+                 FROM media_variants mv
+                 JOIN media m ON m.id = mv.media_id
+                 WHERE mv.url_path = ?
                  LIMIT 1",
-                [$likePath, $likeEscaped, $likeBase, $likeBase]
+                [$cleanPath]
             );
 
+            // Se não encontrou pela URL exata, tenta buscar diretamente pelo nome base exato ou ID
+            if (!$media && !empty($cleanBase)) {
+                $media = Database::fetchOne(
+                    "SELECT alt_text, caption, original_name FROM media 
+                     WHERE original_name = ? OR id = ?
+                     LIMIT 1",
+                    [$baseName, $cleanBase]
+                );
+            }
+
             if ($media) {
+                $result = '';
                 if (!empty($media['alt_text'])) {
-                    return trim((string)$media['alt_text']);
-                }
-                if (!empty($media['caption'])) {
-                    return trim((string)$media['caption']);
-                }
-                if (!empty($media['original_name'])) {
+                    $result = trim((string)$media['alt_text']);
+                } elseif (!empty($media['caption'])) {
+                    $result = trim((string)$media['caption']);
+                } elseif (!empty($media['original_name'])) {
                     $origBase = pathinfo((string)$media['original_name'], PATHINFO_FILENAME);
                     $cleanOrig = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $origBase);
                     if (!preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanOrig)) {
-                        return trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanOrig)));
+                        $result = trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanOrig)));
                     }
+                }
+
+                if (!empty($result)) {
+                    self::$memoryDescCache[$cleanPath] = $result;
+                    if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+                        ObjectCache::set($cacheKey, $result, 'media', 86400);
+                    }
+                    return $result;
                 }
             }
         } catch (\Throwable $e) {
-            // Em caso de falha de banco, prossegue para extração de nome
+            // Em caso de falha de banco, prossegue para extração do nome
         }
 
-        // Formata o nome do arquivo da imagem como descrição amigável se não for genérico
+        // 4. Fallback semântico amigável pelo nome do arquivo
+        $fallback = '';
         if (!empty($cleanBase) && !preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanBase)) {
-            return trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanBase)));
+            $fallback = trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanBase)));
         }
 
-        return '';
+        // Memoriza o resultado (inclusive vazio) para nunca reconsultar no mesmo request
+        self::$memoryDescCache[$cleanPath] = $fallback;
+        if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+            ObjectCache::set($cacheKey, $fallback, 'media', 86400);
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Pré-carrega em lote (Batch Loading) as descrições de múltiplas imagens em uma única query.
+     * Elimina o problema N+1 nos loops de renderização dos templates.
+     *
+     * @param array<string|null> $imageUrls Lista de URLs de imagens
+     */
+    public static function preloadDescriptions(array $imageUrls): void
+    {
+        $toFetch = [];
+        foreach ($imageUrls as $url) {
+            if (empty($url) || !is_string($url)) {
+                continue;
+            }
+            $cleanPath = ltrim(parse_url($url, PHP_URL_PATH) ?? $url, '/');
+            if (empty($cleanPath) || array_key_exists($cleanPath, self::$memoryDescCache)) {
+                continue;
+            }
+
+            // Se estiver no ObjectCache, recupera direto
+            $cacheKey = 'media_desc:' . md5($cleanPath);
+            if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+                $cached = ObjectCache::get($cacheKey, 'media');
+                if ($cached !== false && is_string($cached)) {
+                    self::$memoryDescCache[$cleanPath] = $cached;
+                    continue;
+                }
+            }
+
+            $toFetch[$cleanPath] = $cleanPath;
+        }
+
+        if (empty($toFetch)) {
+            return;
+        }
+
+        try {
+            $paths = array_values($toFetch);
+            $placeholders = implode(',', array_fill(0, count($paths), '?'));
+            $rows = Database::fetchAll(
+                "SELECT mv.url_path, m.alt_text, m.caption, m.original_name
+                 FROM media_variants mv
+                 JOIN media m ON m.id = mv.media_id
+                 WHERE mv.url_path IN ({$placeholders})",
+                $paths
+            );
+
+            $resolved = [];
+            foreach ($rows as $row) {
+                $uPath = (string)$row['url_path'];
+                $desc = '';
+                if (!empty($row['alt_text'])) {
+                    $desc = trim((string)$row['alt_text']);
+                } elseif (!empty($row['caption'])) {
+                    $desc = trim((string)$row['caption']);
+                } elseif (!empty($row['original_name'])) {
+                    $origBase = pathinfo((string)$row['original_name'], PATHINFO_FILENAME);
+                    $cleanOrig = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $origBase);
+                    if (!preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanOrig)) {
+                        $desc = trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanOrig)));
+                    }
+                }
+                $resolved[$uPath] = $desc;
+            }
+
+            foreach ($paths as $path) {
+                $desc = $resolved[$path] ?? '';
+                if (empty($desc)) {
+                    $baseName = pathinfo($path, PATHINFO_FILENAME);
+                    $cleanBase = preg_replace('~-(1024|1920|thumb|\d+x\d+)$~i', '', $baseName);
+                    if (!empty($cleanBase) && !preg_match('/^(image|img|dsc|whatsapp|foto|\d+)$/i', (string)$cleanBase)) {
+                        $desc = trim(ucwords(str_replace(['-', '_'], ' ', (string)$cleanBase)));
+                    }
+                }
+                self::$memoryDescCache[$path] = $desc;
+                if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+                    ObjectCache::set('media_desc:' . md5($path), $desc, 'media', 86400);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[ImageProcessor Preload Error] ' . $e->getMessage());
+        }
     }
 
     /**
@@ -544,7 +685,44 @@ class ImageProcessor
     }
 
     /**
+     * Registra variantes geradas de uma mídia na tabela media_variants de forma idempotente.
+     *
+     * @param string $mediaId Identificador da mídia
+     * @param array $variants Matriz de variantes com URLs
+     */
+    public static function registerVariants(string $mediaId, array $variants): void
+    {
+        if (empty($mediaId) || empty($variants)) {
+            return;
+        }
+
+        $driver = Database::getDriver();
+        $sql = ($driver === 'sqlite')
+            ? "INSERT OR IGNORE INTO media_variants (media_id, url_path) VALUES (?, ?)"
+            : "INSERT IGNORE INTO media_variants (media_id, url_path) VALUES (?, ?)";
+
+        $urls = [];
+        array_walk_recursive($variants, function ($val) use (&$urls) {
+            if (is_string($val) && str_contains($val, 'uploads/')) {
+                $clean = ltrim(parse_url($val, PHP_URL_PATH) ?? $val, '/');
+                if (!empty($clean)) {
+                    $urls[$clean] = true;
+                }
+            }
+        });
+
+        foreach (array_keys($urls) as $path) {
+            try {
+                Database::query($sql, [$mediaId, $path]);
+            } catch (\Throwable) {
+                // Silencioso se a tabela ainda estiver em transição
+            }
+        }
+    }
+
+    /**
      * Sincroniza vínculos normalizados entre mídias e artigos/revisões na tabela media_refs.
+     * Utiliza a tabela indexada media_variants para busca instantânea O(1) sem varredura LIKE.
      */
     public static function syncRefs(int $postId, ?int $revisionId, ?string $html, ?string $featuredImage = null): void
     {
@@ -557,10 +735,21 @@ class ImageProcessor
             $urls = array_unique($matches[0]);
             foreach ($urls as $url) {
                 try {
+                    $clean = ltrim(parse_url($url, PHP_URL_PATH) ?? $url, '/');
                     $mediaId = Database::fetchValue(
-                        "SELECT id FROM media WHERE variants_manifest LIKE ? LIMIT 1",
-                        ['%' . Security::escapeLike($url) . '%']
+                        "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",
+                        [$clean]
                     );
+
+                    // Fallback rápido por nome de arquivo se a variante não estiver cadastrada
+                    if (!$mediaId) {
+                        $base = basename($clean);
+                        $mediaId = Database::fetchValue(
+                            "SELECT id FROM media WHERE original_name = ? LIMIT 1",
+                            [$base]
+                        );
+                    }
+
                     if ($mediaId) {
                         $sql = (Database::getDriver() === 'sqlite')
                             ? "INSERT OR IGNORE INTO media_refs (media_id, post_id, revision_id) VALUES (?, ?, ?)"

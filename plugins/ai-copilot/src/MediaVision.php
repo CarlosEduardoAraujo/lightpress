@@ -80,6 +80,10 @@ PROMPT;
             [$altText, $caption, $aiTags, $mediaId]
         );
 
+        if (class_exists(\LightPress\Core\ObjectCache::class) && \LightPress\Core\ObjectCache::isAvailable()) {
+            \LightPress\Core\ObjectCache::flushGroup('media');
+        }
+
         return [
             'ok' => true,
             'media_id' => $mediaId,
@@ -104,6 +108,10 @@ PROMPT;
             "UPDATE media SET alt_text = ?, caption = ?, ai_tags = ? WHERE id = ?",
             [$alt, $cap, $tags, $mediaId]
         );
+
+        if (class_exists(\LightPress\Core\ObjectCache::class) && \LightPress\Core\ObjectCache::isAvailable()) {
+            \LightPress\Core\ObjectCache::flushGroup('media');
+        }
 
         return [
             'ok' => true,

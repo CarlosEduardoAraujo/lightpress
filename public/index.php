@@ -91,6 +91,15 @@ $router->get('/', function () use ($config, $router): void {
         );
     }, 'posts');
 
+    // Pré-carregamento em lote de metadados das imagens da home (Batch Loading O(1))
+    $allImages = array_filter(array_merge(
+        array_column($featuredPosts, 'featured_image'),
+        array_column($posts, 'featured_image')
+    ));
+    if (!empty($allImages)) {
+        ImageProcessor::preloadDescriptions($allImages);
+    }
+
     $pageTitle = $config['app']['name'] . ' - ' . (!empty($config['app']['description']) ? $config['app']['description'] : 'Portal de Notícias');
     require $config['paths']['templates'] . '/home.php';
 });
@@ -118,6 +127,11 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$nowUtc, (int)$perPage, (int)$offset]
     );
+
+    $pageImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($pageImages)) {
+        ImageProcessor::preloadDescriptions($pageImages);
+    }
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de 4 destaques
     $pageTitle = "Página {$page} - " . $config['app']['name'];
@@ -161,6 +175,11 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
         [$categorySlug, $nowUtc, (int)$perPage]
     );
 
+    $catImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($catImages)) {
+        ImageProcessor::preloadDescriptions($catImages);
+    }
+
     $pageTitle = $category['name'] . ' - ' . $config['app']['name'];
     require $config['paths']['templates'] . '/category.php';
 });
@@ -203,6 +222,11 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$categorySlug, $nowUtc, (int)$perPage, (int)$offset]
     );
+
+    $catImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($catImages)) {
+        ImageProcessor::preloadDescriptions($catImages);
+    }
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de destaques
     $pageTitle = $category['name'] . " - Página {$page} - " . $config['app']['name'];
@@ -294,6 +318,12 @@ $router->get('/busca/', function () use ($config): void {
     $pageTitle = $page > 1
         ? "Busca: {$query} - Página {$page} - " . $config['app']['name']
         : "Busca: {$query} - " . $config['app']['name'];
+
+    $searchImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($searchImages)) {
+        ImageProcessor::preloadDescriptions($searchImages);
+    }
+
     require $config['paths']['templates'] . '/search.php';
 });
 
@@ -342,6 +372,12 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
 
     $tagName = ucwords($tagClean);
     $pageTitle = "Tópico: #{$tagName} - " . $config['app']['name'];
+
+    $tagImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($tagImages)) {
+        ImageProcessor::preloadDescriptions($tagImages);
+    }
+
     require $config['paths']['templates'] . '/tag.php';
 });
 
@@ -380,6 +416,11 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
     );
+
+    $tagImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($tagImages)) {
+        ImageProcessor::preloadDescriptions($tagImages);
+    }
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de destaques
     $tagName = ucwords($tagClean);
@@ -456,6 +497,15 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $cleanText = strip_tags($post['content_html']);
     $wordCount = str_word_count($cleanText);
     $readingTime = max(1, (int)ceil($wordCount / 200));
+
+    // Pré-carregamento em lote: imagem principal e imagens das matérias relacionadas
+    $postImages = array_filter(array_merge(
+        [!empty($post['featured_image']) ? (string)$post['featured_image'] : null],
+        array_column($relatedPosts, 'featured_image')
+    ));
+    if (!empty($postImages)) {
+        ImageProcessor::preloadDescriptions($postImages);
+    }
 
     header('X-Accel-Expires: 3600'); // 60 minutos de cache para matéria publicada (LP-09)
     $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];

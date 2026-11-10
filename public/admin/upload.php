@@ -69,6 +69,9 @@ try {
         [$mediaId, $userId, $originalName, 'image/webp', $fileSize, $variantsJson]
     );
 
+    // Mapeamento direto de variantes O(1)
+    ImageProcessor::registerVariants($mediaId, $manifest['variants'] ?? []);
+
     echo json_encode([
         'ok' => true,
         'media' => $manifest,

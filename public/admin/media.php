@@ -10,6 +10,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth();
@@ -195,6 +196,9 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
 
                 Database::query("DELETE FROM media_refs WHERE media_id = ?", [$mediaId]);
                 Database::query("DELETE FROM media WHERE id = ?", [$mediaId]);
+                if (class_exists(ObjectCache::class) && ObjectCache::isAvailable()) {
+                    ObjectCache::flushGroup('media');
+                }
                 $message = "Mídia excluída com sucesso!";
             }
         }
