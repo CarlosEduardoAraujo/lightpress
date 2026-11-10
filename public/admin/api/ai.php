@@ -11,8 +11,15 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'error' => 'Método não permitido. Use POST.']);
+    exit;
+}
+
 $config = require dirname(__DIR__, 3) . '/core/bootstrap.php';
 
+use LightPress\Core\Database;
 use LightPress\Core\PluginManager;
 use LightPress\Core\Security;
 use LightPress\Core\Settings;
@@ -57,7 +64,30 @@ try {
                 exit;
             }
 
-            $test = AiClient::testConnection();
+            $overrideConfig = [];
+            if (!empty($_POST['provider'])) {
+                $overrideConfig['provider'] = trim((string)$_POST['provider']);
+            }
+            if (!empty($_POST['model'])) {
+                $overrideConfig['model'] = trim((string)$_POST['model']);
+            }
+            if (!empty($_POST['gemini_key'])) {
+                $overrideConfig['gemini_key'] = trim((string)$_POST['gemini_key']);
+            }
+            if (!empty($_POST['openai_key'])) {
+                $overrideConfig['openai_key'] = trim((string)$_POST['openai_key']);
+            }
+            if (!empty($_POST['custom_endpoint'])) {
+                $overrideConfig['custom_endpoint'] = trim((string)$_POST['custom_endpoint']);
+            }
+            if (!empty($_POST['custom_key'])) {
+                $overrideConfig['custom_key'] = trim((string)$_POST['custom_key']);
+            }
+            if (!empty($_POST['timeout'])) {
+                $overrideConfig['timeout'] = (int)$_POST['timeout'];
+            }
+
+            $test = AiClient::testConnection(!empty($overrideConfig) ? $overrideConfig : null);
             echo json_encode($test);
             break;
 
@@ -98,6 +128,19 @@ try {
                 exit;
             }
 
+            // RBAC: Se o usuário for author, só pode descrever suas próprias mídias
+            $mediaItem = Database::fetchOne("SELECT user_id FROM media WHERE id = ? LIMIT 1", [$mediaId]);
+            if (!$mediaItem) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'error' => 'Mídia não encontrada.']);
+                exit;
+            }
+            if (!in_array($currentUser['role'] ?? '', ['admin', 'editor', 'superadmin'], true) && (int)($mediaItem['user_id'] ?? 0) !== (int)$currentUser['id']) {
+                http_response_code(403);
+                echo json_encode(['ok' => false, 'error' => 'Permissão negada. Você só pode acionar a IA para imagens enviadas por você.']);
+                exit;
+            }
+
             $result = MediaVision::describeMedia($mediaId);
             echo json_encode($result);
             break;
@@ -111,6 +154,19 @@ try {
             if (empty($mediaId)) {
                 http_response_code(400);
                 echo json_encode(['ok' => false, 'error' => 'Identificador da imagem não informado.']);
+                exit;
+            }
+
+            // RBAC: Se o usuário for author, só pode editar metadados de suas próprias mídias
+            $mediaItem = Database::fetchOne("SELECT user_id FROM media WHERE id = ? LIMIT 1", [$mediaId]);
+            if (!$mediaItem) {
+                http_response_code(404);
+                echo json_encode(['ok' => false, 'error' => 'Mídia não encontrada.']);
+                exit;
+            }
+            if (!in_array($currentUser['role'] ?? '', ['admin', 'editor', 'superadmin'], true) && (int)($mediaItem['user_id'] ?? 0) !== (int)$currentUser['id']) {
+                http_response_code(403);
+                echo json_encode(['ok' => false, 'error' => 'Permissão negada. Você só pode gerenciar metadados de imagens enviadas por você.']);
                 exit;
             }
 

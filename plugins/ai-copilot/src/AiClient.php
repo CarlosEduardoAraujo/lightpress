@@ -195,23 +195,40 @@ final class AiClient
 
     /**
      * Testa a conectividade com o provedor configurado enviando um ping de baixo custo.
+     * Suporta passagem de configurações e chaves da tela em tempo real antes de salvar.
      *
+     * @param array<string, mixed>|null $overrideConfig Parâmetros temporários da interface
      * @return array{ok: bool, message: string, provider: string, model: string, duration_ms: int}
      */
-    public static function testConnection(): array
+    public static function testConnection(?array $overrideConfig = null): array
     {
         $start = microtime(true);
-        $provider = self::getActiveProvider();
-        $model = self::getModel();
+        $provider = !empty($overrideConfig['provider']) ? (string)$overrideConfig['provider'] : self::getActiveProvider();
+        $model = !empty($overrideConfig['model']) ? (string)$overrideConfig['model'] : self::getModel();
+        $timeout = !empty($overrideConfig['timeout']) ? (int)$overrideConfig['timeout'] : self::getTimeout();
+
+        $systemPrompt = 'Você é um assistente de teste de conexão. Responda estritamente em JSON no formato {"ping": "pong"}.';
+        $userPrompt = 'Teste de conexão. Retorne pong em JSON.';
 
         try {
-            $res = self::chatJson(
-                'Você é um assistente de teste de conexão. Responda estritamente em JSON no formato {"ping": "pong"}.',
-                'Teste de conexão. Retorne pong em JSON.',
-                null,
-                null,
-                null
-            );
+            if ($provider === self::PROVIDER_GEMINI) {
+                $apiKey = !empty($overrideConfig['gemini_key']) ? (string)$overrideConfig['gemini_key'] : self::getApiKey(self::PROVIDER_GEMINI);
+                if (empty($apiKey)) {
+                    throw new RuntimeException('Chave de API do Google Gemini não está preenchida.');
+                }
+                $res = self::callGemini($model, $systemPrompt, $userPrompt, null, null, $timeout, $apiKey);
+            } elseif ($provider === self::PROVIDER_OPENAI) {
+                $apiKey = !empty($overrideConfig['openai_key']) ? (string)$overrideConfig['openai_key'] : self::getApiKey(self::PROVIDER_OPENAI);
+                if (empty($apiKey)) {
+                    throw new RuntimeException('Chave de API da OpenAI não está preenchida.');
+                }
+                $res = self::callOpenAi('https://api.openai.com/v1', $apiKey, $model, $systemPrompt, $userPrompt, null, null, $timeout);
+            } else {
+                $endpoint = !empty($overrideConfig['custom_endpoint']) ? (string)$overrideConfig['custom_endpoint'] : self::getCustomEndpoint();
+                self::validateEndpointUrl($endpoint);
+                $apiKey = !empty($overrideConfig['custom_key']) ? (string)$overrideConfig['custom_key'] : self::getApiKey(self::PROVIDER_CUSTOM);
+                $res = self::callOpenAi($endpoint, $apiKey, $model, $systemPrompt, $userPrompt, null, null, $timeout);
+            }
 
             $durationMs = (int)round((microtime(true) - $start) * 1000);
             return [
@@ -243,9 +260,10 @@ final class AiClient
         string $userPrompt,
         ?string $imageBase64,
         ?string $imageMime,
-        int $timeout
+        int $timeout,
+        ?string $overrideApiKey = null
     ): array {
-        $apiKey = self::getApiKey(self::PROVIDER_GEMINI);
+        $apiKey = !empty($overrideApiKey) ? $overrideApiKey : self::getApiKey(self::PROVIDER_GEMINI);
         if (empty($apiKey)) {
             throw new RuntimeException('Chave de API do Google Gemini não está configurada.');
         }

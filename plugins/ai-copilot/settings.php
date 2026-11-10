@@ -328,9 +328,36 @@ function testConnection() {
     const alertBox = document.getElementById('testAlert');
     const csrfToken = document.getElementById('csrfToken').value;
 
+    const provider = document.getElementById('provider') ? document.getElementById('provider').value : '';
+    const model = document.getElementById('model') ? document.getElementById('model').value.trim() : '';
+    const timeout = document.getElementById('timeout') ? document.getElementById('timeout').value : '';
+
+    const geminiInput = document.getElementById('gemini_key');
+    const geminiKey = (geminiInput && !geminiInput.disabled && !geminiInput.value.includes('•')) ? geminiInput.value.trim() : '';
+
+    const openaiInput = document.getElementById('openai_key');
+    const openaiKey = (openaiInput && !openaiInput.disabled && !openaiInput.value.includes('•')) ? openaiInput.value.trim() : '';
+
+    const customKeyInput = document.getElementById('custom_key');
+    const customKey = (customKeyInput && !customKeyInput.disabled && !customKeyInput.value.includes('•')) ? customKeyInput.value.trim() : '';
+
+    const customEndpointInput = document.getElementById('custom_endpoint');
+    const customEndpoint = customEndpointInput ? customEndpointInput.value.trim() : '';
+
     btn.disabled = true;
     btn.innerText = '⏳ Testando conexão...';
     alertBox.style.display = 'none';
+
+    const params = new URLSearchParams({
+        '_csrf_token': csrfToken,
+        'provider': provider,
+        'model': model,
+        'timeout': timeout
+    });
+    if (geminiKey) params.append('gemini_key', geminiKey);
+    if (openaiKey) params.append('openai_key', openaiKey);
+    if (customKey) params.append('custom_key', customKey);
+    if (customEndpoint) params.append('custom_endpoint', customEndpoint);
 
     fetch('/admin/api/ai.php?action=test_connection', {
         method: 'POST',
@@ -338,9 +365,7 @@ function testConnection() {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRF-Token': csrfToken
         },
-        body: new URLSearchParams({
-            '_csrf_token': csrfToken
-        })
+        body: params
     })
     .then(r => r.json())
     .then(data => {
