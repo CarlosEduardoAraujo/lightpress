@@ -348,12 +348,21 @@ function testConnection() {
         btn.innerText = '⚡ Testar Conexão com a IA';
         alertBox.style.display = 'block';
 
+        alertBox.textContent = '';
+        const strong = document.createElement('strong');
+
         if (data.ok) {
             alertBox.className = 'alert-success';
-            alertBox.innerHTML = '<strong>Sucesso!</strong> ' + data.message + ' (Modelo: ' + data.model + ', ' + data.duration_ms + 'ms)';
+            strong.textContent = 'Sucesso! ';
+            alertBox.appendChild(strong);
+            const msg = (data.message || 'Conexão estabelecida') + ' (Modelo: ' + (data.model || '') + ', ' + (data.duration_ms || 0) + 'ms)';
+            alertBox.appendChild(document.createTextNode(msg));
         } else {
             alertBox.className = 'alert-error';
-            alertBox.innerHTML = '<strong>Erro:</strong> ' + (data.error || data.message || 'Falha ao conectar com o provedor.');
+            strong.textContent = 'Erro: ';
+            alertBox.appendChild(strong);
+            const errorMsg = String(data.error || data.message || 'Falha ao conectar com o provedor.');
+            alertBox.appendChild(document.createTextNode(errorMsg));
         }
     })
     .catch(err => {
@@ -361,7 +370,11 @@ function testConnection() {
         btn.innerText = '⚡ Testar Conexão com a IA';
         alertBox.style.display = 'block';
         alertBox.className = 'alert-error';
-        alertBox.innerHTML = '<strong>Erro de Requisição:</strong> ' + err.message;
+        alertBox.textContent = '';
+        const strong = document.createElement('strong');
+        strong.textContent = 'Erro de Requisição: ';
+        alertBox.appendChild(strong);
+        alertBox.appendChild(document.createTextNode(err.message || 'Falha na comunicação.'));
     });
 }
 </script>

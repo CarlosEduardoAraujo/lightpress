@@ -27,6 +27,11 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 - **Segundo Plugin Oficial (`plugins/ai-copilot/`):**
   - Implementação completa do plugin `ai-copilot` (Fase 1), adicionando inteligência artificial generativa e multimodal de altíssimo nível para auxílio editorial, com zero dependências externas (sem Composer ou pacotes pesados) e zero impacto no frontend público (cache FastCGI 100% preservado para leitores).
+- **Ajustes Finos de Segurança e Lógica no Plugin ai-copilot:**
+  - `MediaVision::resolveLocalFilePath()`: Validação estrita via `realpath()` e `str_starts_with()`, garantindo que apenas variantes contidas no diretório `/public/uploads/` sejam lidas em disco (mitigação contra Path Traversal / Arbitrary File Read).
+  - `InternalLinker::findCandidates()`: Filtro temporal `status IN ('published', 'scheduled') AND published_at <= ?` com `$nowUtc`, garantindo que apenas artigos já públicos sejam recomendados para linkagem interna.
+  - `settings.php` (`testConnection()`): Eliminação de `innerHTML` no retorno do teste de conexão, migrando para manipulação segura via DOM nativo (`textContent`, `createElement`, `createTextNode`) contra XSS.
+  - `AiClient::executeCurl()` e `validateEndpointUrl()`: Injeção de `CURLOPT_FOLLOWLOCATION => false` e `CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS`, além de resolução de IP (`gethostbyname`) com bloqueio de faixas de metadados de nuvem (`169.254.0.0/16` e `100.64.0.0/10`) para prevenção contra DNS Rebinding e SSRF.
 - **Cliente HTTP Multiprovedor Leve (`plugins/ai-copilot/src/AiClient.php`):**
   - Conexão nativa via cURL com suporte unificado a Google Gemini API (`gemini-2.5-flash`), OpenAI API (`gpt-4o-mini`) e endpoints compatíveis com OpenAI locais ou em rede privada (Ollama, vLLM, n8n).
   - Precedência de credenciais: prioridade para constantes em `config.local.php` (`AI_COPILOT_GEMINI_API_KEY`, etc.), mantendo as chaves fora do banco de dados, com fallback mascarado para a tabela `settings`.

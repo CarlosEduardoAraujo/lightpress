@@ -114,10 +114,16 @@ PROMPT;
     /**
      * Resolve o caminho físico em disco da variante mais econômica e adequada da imagem.
      * Prioridade: intermediate WebP (1024px) -> thumb WebP (300px) -> full WebP.
+     * Validação estrita via realpath() garantindo contenção exclusiva dentro de /public/uploads (anti-traversal).
      */
     private static function resolveLocalFilePath(array $variants): ?string
     {
         $root = dirname(__DIR__, 3); // C:\Web\lightpress
+        $resolvedUploadDir = realpath($root . '/public/uploads');
+        if (!$resolvedUploadDir) {
+            return null;
+        }
+        $baseDir = rtrim(str_replace('\\', '/', $resolvedUploadDir), '/') . '/';
 
         $candidates = [
             $variants['intermediate']['webp']['url'] ?? null,
@@ -137,8 +143,12 @@ PROMPT;
             $cleanRel = ltrim($relUrl, '/\\');
             $fullPath = $root . '/public/' . $cleanRel;
 
-            if (file_exists($fullPath)) {
-                return $fullPath;
+            $resolvedFile = realpath($fullPath);
+            if ($resolvedFile && is_file($resolvedFile)) {
+                $target = str_replace('\\', '/', $resolvedFile);
+                if (str_starts_with($target, $baseDir)) {
+                    return $resolvedFile;
+                }
             }
         }
 

@@ -397,6 +397,8 @@ final class AiClient
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_SSL_VERIFYPEER => true,
@@ -464,7 +466,7 @@ final class AiClient
     }
 
     /**
-     * Valida URLs de endpoints personalizados contra SSRF e metadados de nuvem.
+     * Valida URLs de endpoints personalizados contra SSRF, DNS Rebinding e metadados de nuvem.
      */
     private static function validateEndpointUrl(string $url): void
     {
@@ -473,17 +475,34 @@ final class AiClient
             throw new RuntimeException('URL do endpoint personalizado é inválida.');
         }
 
-        $host = strtolower($parsed['host']);
-
-        // Bloqueia expressamente AWS/GCP/Azure metadata service
-        if ($host === '169.254.169.254' || str_contains($host, 'metadata.google.internal')) {
-            throw new RuntimeException('Acesso a serviços de metadados de nuvem é estritamente proibido.');
-        }
-
-        // Permite localhost/127.0.0.1 em desenvolvimento e IPs de rede local privada (RFC 1918)
         // Bloqueia esquemas não-HTTP(S)
         if (!in_array($parsed['scheme'], ['http', 'https'], true)) {
             throw new RuntimeException('Apenas protocolos HTTP e HTTPS são permitidos para endpoints de IA.');
+        }
+
+        $host = strtolower($parsed['host']);
+
+        // Bloqueia expressamente AWS/GCP/Azure metadata service por nome de host
+        if ($host === '169.254.169.254' || str_contains($host, 'metadata.google.internal') || str_starts_with($host, 'fe80:') || str_starts_with($host, 'fd00:ec2:')) {
+            throw new RuntimeException('Acesso a serviços de metadados de nuvem é estritamente proibido.');
+        }
+
+        // Resolução de IP para mitigar DNS Rebinding contra faixas de metadados de nuvem
+        $resolvedIp = filter_var($host, FILTER_VALIDATE_IP) ? $host : gethostbyname($host);
+        if (filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $ipLong = ip2long($resolvedIp);
+            if ($ipLong !== false) {
+                // 169.254.0.0/16 (Link-local / AWS / GCP / Azure metadata 169.254.169.254)
+                $mask16 = ip2long('255.255.0.0');
+                if (($ipLong & $mask16) === (ip2long('169.254.0.0') & $mask16)) {
+                    throw new RuntimeException('Acesso a serviços de metadados de nuvem (169.254.0.0/16) é estritamente proibido.');
+                }
+                // 100.64.0.0/10 (Carrier-Grade NAT / Alibaba Cloud metadata 100.100.100.200)
+                $mask10 = ip2long('255.192.0.0');
+                if (($ipLong & $mask10) === (ip2long('100.64.0.0') & $mask10)) {
+                    throw new RuntimeException('Acesso a endereços da faixa Carrier-Grade / Cloud Metadata (100.64.0.0/10) é estritamente proibido.');
+                }
+            }
         }
     }
 }

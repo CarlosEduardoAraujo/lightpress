@@ -43,6 +43,7 @@ final class InternalLinker
         int $limit = 12
     ): array {
         $driver = Database::getDriver();
+        $nowUtc = gmdate('Y-m-d H:i:s');
         $keywords = self::extractKeywords($title, $tags, $categoryName);
 
         if (empty($keywords)) {
@@ -50,10 +51,10 @@ final class InternalLinker
             $rows = Database::fetchAll(
                 "SELECT id, title, slug, summary, published_at 
                  FROM posts 
-                 WHERE status = 'published' AND id != ? 
+                 WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ? 
                  ORDER BY published_at DESC 
                  LIMIT ?",
-                [$currentPostId, $limit]
+                [$currentPostId, $nowUtc, $limit]
             );
             return self::normalizeCandidates($rows);
         }
@@ -66,11 +67,11 @@ final class InternalLinker
                     "SELECT id, title, slug, summary, published_at,
                             MATCH(title, summary, tags) AGAINST(? IN NATURAL LANGUAGE MODE) AS score
                      FROM posts
-                     WHERE status = 'published' AND id != ?
+                     WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
                        AND MATCH(title, summary, tags) AGAINST(? IN NATURAL LANGUAGE MODE) > 0
                      ORDER BY score DESC, published_at DESC
                      LIMIT ?",
-                    [$searchQuery, $currentPostId, $searchQuery, $limit]
+                    [$searchQuery, $currentPostId, $nowUtc, $searchQuery, $limit]
                 );
 
                 if (!empty($rows)) {
@@ -83,7 +84,7 @@ final class InternalLinker
 
         // Fallback robusto compatível com SQLite e consultas MySQL sem MATCH
         $whereParts = [];
-        $params = [$currentPostId];
+        $params = [$currentPostId, $nowUtc];
 
         $subConds = [];
         foreach (array_slice($keywords, 0, 5) as $kw) {
@@ -95,7 +96,7 @@ final class InternalLinker
 
         $sql = "SELECT id, title, slug, summary, published_at 
                 FROM posts 
-                WHERE status = 'published' AND id != ?";
+                WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ?";
 
         if (!empty($subConds)) {
             $sql .= " AND (" . implode(' OR ', $subConds) . ")";
