@@ -535,7 +535,7 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                 <div class="rcp-card-header">
                     <span class="rcp-card-title">Resiliência & Circuit Breaker</span>
                 </div>
-                <div style="background:#f8fafc;padding:1rem;border-radius:8px;border:1px solid var(--rcp-border);margin-bottom:1rem;">
+                <div style="background:var(--rcp-bg);padding:1rem;border-radius:8px;border:1px solid var(--rcp-border);margin-bottom:1rem;">
                     <div style="font-size:0.85rem;color:var(--rcp-text-muted);">Estado Atual do Disjuntor</div>
                     <div style="font-size:1.5rem;font-weight:800;color:<?= $diagnostics['circuit_breaker'] === 'CLOSED' ? '#10b981' : '#ef4444' ?>;">
                         <?= Security::e($diagnostics['circuit_breaker']) ?>
