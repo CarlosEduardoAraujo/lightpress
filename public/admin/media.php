@@ -411,6 +411,33 @@ require __DIR__ . '/header.php';
     .btn-delete { color: #dc2626; font-size: 0.75rem; text-decoration: none; font-weight: 600; margin-top: auto; padding-top: 0.5rem; }
     .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
     .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+
+    /* Modal de Edição de Metadados */
+    .media-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .media-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+    }
+    .media-modal-dialog {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+    }
+    [data-theme="dark"] .media-modal-dialog { background: #0f172a; border-color: #334155; }
 </style>
 
     <div class="container">
@@ -579,7 +606,7 @@ require __DIR__ . '/header.php';
                                 </button>
                             <?php endif; ?>
 
-                            <?php if (!empty($item['alt_text']) || !empty($item['ai_tags'])): ?>
+                            <?php if (!empty($item['alt_text']) || !empty($item['caption']) || !empty($item['ai_tags'])): ?>
                                 <div class="media-ai-meta" id="ai-meta-<?= Security::e($item['id']) ?>" style="margin-top:0.4rem; padding:0.45rem; background:rgba(0,0,0,0.03); border-radius:4px; font-size:0.75rem; border:1px solid var(--border); text-align:left;">
                                     <?php if (!empty($item['alt_text'])): ?>
                                         <div style="margin-bottom:0.25rem;">
@@ -602,6 +629,19 @@ require __DIR__ . '/header.php';
                             <?php else: ?>
                                 <div class="media-ai-meta" id="ai-meta-<?= Security::e($item['id']) ?>" style="display:none; margin-top:0.4rem; padding:0.45rem; background:rgba(0,0,0,0.03); border-radius:4px; font-size:0.75rem; border:1px solid var(--border); text-align:left;"></div>
                             <?php endif; ?>
+
+                            <button type="button" class="btn-copy btn-edit-media" 
+                                    data-id="<?= Security::e($item['id']) ?>"
+                                    data-name="<?= Security::e($item['original_name']) ?>"
+                                    data-alt="<?= Security::e((string)($item['alt_text'] ?? '')) ?>"
+                                    data-caption="<?= Security::e((string)($item['caption'] ?? '')) ?>"
+                                    data-tags="<?= Security::e((string)($item['ai_tags'] ?? '')) ?>"
+                                    data-thumb="<?= Security::e($thumbDisplayUrl) ?>"
+                                    onclick="openEditMediaModal(this)" 
+                                    style="background:#f8fafc; color:#1e293b; border-color:#cbd5e1; font-weight:600; margin-top:0.35rem;" 
+                                    title="Editar texto alternativo, legenda e tags da imagem">
+                                ✏️ Editar Metadados
+                            </button>
 
                             <?php if ($isVisionEnabled): ?>
                                 <button type="button" class="btn-copy btn-describe-ai" 
@@ -665,6 +705,72 @@ require __DIR__ . '/header.php';
                     </div>
                 </div>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Modal de Edição de Metadados da Imagem -->
+    <div id="editMediaModal" class="media-modal" style="display: none;">
+        <div class="media-modal-backdrop" onclick="closeEditMediaModal()"></div>
+        <div class="media-modal-dialog" style="max-width: 580px; width: 90%;">
+            <div class="media-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--surface);">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                    <span>✏️</span> Editar Informações da Imagem
+                </h3>
+                <button type="button" class="media-modal-close" onclick="closeEditMediaModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1;">&times;</button>
+            </div>
+            <div class="media-modal-body" style="padding: 1.25rem; overflow-y: auto;">
+                <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.25rem; padding: 0.75rem; background: rgba(0,0,0,0.02); border: 1px solid var(--border); border-radius: var(--radius);">
+                    <img id="editModalThumb" src="" alt="" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; background: #e2e8f0; flex-shrink: 0;">
+                    <div style="overflow: hidden;">
+                        <div id="editModalFileName" style="font-weight: 700; font-size: 0.85rem; word-break: break-all; color: var(--text);"></div>
+                        <div id="editModalId" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;"></div>
+                    </div>
+                </div>
+
+                <form id="editMediaForm" onsubmit="event.preventDefault(); saveEditMediaModal();">
+                    <input type="hidden" id="editMediaId" value="">
+
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="editAltText" style="font-size: 0.82rem; font-weight: 700; color: var(--text);">Texto Alternativo (Alt Text)</label>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">Acessibilidade & Google Imagens</span>
+                        </div>
+                        <input type="text" id="editAltText" maxlength="255" class="form-input" style="width: 100%; box-sizing: border-box;" placeholder="Descrição visual objetiva do conteúdo da imagem...">
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="editCaption" style="font-size: 0.82rem; font-weight: 700; color: var(--text);">Legenda Editorial (&lt;figcaption&gt;)</label>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">Exibida sob a foto nas matérias</span>
+                        </div>
+                        <textarea id="editCaption" maxlength="500" rows="2" class="form-input" style="width: 100%; box-sizing: border-box; resize: vertical;" placeholder="Legenda jornalística explicativa..."></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <label for="editAiTags" style="font-size: 0.82rem; font-weight: 700; color: var(--text);">Palavras-chave Visuais (Tags)</label>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">Separadas por vírgula para busca no acervo</span>
+                        </div>
+                        <input type="text" id="editAiTags" maxlength="500" class="form-input" style="width: 100%; box-sizing: border-box;" placeholder="Ex: ferrari, f1, interlagos, chuva, capacete">
+                    </div>
+
+                    <div id="editModalAlert" style="display: none; padding: 0.65rem 0.85rem; border-radius: var(--radius); font-size: 0.85rem; margin-bottom: 1rem;"></div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 1rem;">
+                        <?php if ($isVisionEnabled): ?>
+                            <button type="button" id="btnModalGenerateAi" onclick="generateAiInEditModal()" class="btn-filter" style="background: #f0fdf4; color: #166534; border-color: #bbf7d0; font-size: 0.82rem;">
+                                ✨ Gerar com IA
+                            </button>
+                        <?php else: ?>
+                            <div></div>
+                        <?php endif; ?>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button" onclick="closeEditMediaModal()" class="btn-filter" style="font-size: 0.82rem;">Cancelar</button>
+                            <button type="submit" id="btnSaveMediaMeta" class="btn-filter btn-primary" style="font-size: 0.82rem;">💾 Salvar Alterações</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -942,6 +1048,208 @@ require __DIR__ . '/header.php';
                 });
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        let currentEditBtn = null;
+
+        function openEditMediaModal(btn) {
+            currentEditBtn = btn;
+            const mId = btn.dataset.id;
+            const name = btn.dataset.name || '';
+            const alt = btn.dataset.alt || '';
+            const caption = btn.dataset.caption || '';
+            const tags = btn.dataset.tags || '';
+            const thumb = btn.dataset.thumb || '';
+
+            document.getElementById('editMediaId').value = mId;
+            document.getElementById('editModalFileName').textContent = name;
+            document.getElementById('editModalId').textContent = 'ID: ' + mId;
+            document.getElementById('editModalThumb').src = thumb;
+            document.getElementById('editAltText').value = alt;
+            document.getElementById('editCaption').value = caption;
+            document.getElementById('editAiTags').value = tags;
+
+            const alertBox = document.getElementById('editModalAlert');
+            alertBox.style.display = 'none';
+            alertBox.textContent = '';
+
+            document.getElementById('editMediaModal').style.display = 'flex';
+        }
+
+        function closeEditMediaModal() {
+            document.getElementById('editMediaModal').style.display = 'none';
+            currentEditBtn = null;
+        }
+
+        async function generateAiInEditModal() {
+            const mId = document.getElementById('editMediaId').value;
+            if (!mId) return;
+
+            const btnAi = document.getElementById('btnModalGenerateAi');
+            const oldText = btnAi ? btnAi.innerHTML : '';
+            if (btnAi) {
+                btnAi.disabled = true;
+                btnAi.innerHTML = '⏳ Gerando com IA...';
+            }
+
+            const alertBox = document.getElementById('editModalAlert');
+            alertBox.style.display = 'none';
+
+            try {
+                const res = await fetch('/admin/api/ai.php?action=describe_media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrfToken,
+                        'media_id': mId
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    document.getElementById('editAltText').value = data.alt_text || '';
+                    document.getElementById('editCaption').value = data.caption || '';
+                    document.getElementById('editAiTags').value = data.ai_tags || '';
+
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#dcfce7';
+                    alertBox.style.color = '#166534';
+                    alertBox.textContent = '✨ Campos preenchidos automaticamente com IA! Revise e clique em "Salvar Alterações".';
+
+                    if (btnAi) {
+                        btnAi.innerHTML = '✨ Gerado!';
+                        setTimeout(function() { btnAi.innerHTML = oldText; btnAi.disabled = false; }, 2000);
+                    }
+                } else {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#fee2e2';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.textContent = (data && data.error) ? data.error : 'Erro ao gerar metadados via IA.';
+                    if (btnAi) {
+                        btnAi.innerHTML = oldText;
+                        btnAi.disabled = false;
+                    }
+                }
+            } catch (err) {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fee2e2';
+                alertBox.style.color = '#991b1b';
+                alertBox.textContent = 'Erro de rede: ' + err.message;
+                if (btnAi) {
+                    btnAi.innerHTML = oldText;
+                    btnAi.disabled = false;
+                }
+            }
+        }
+
+        async function saveEditMediaModal() {
+            const mId = document.getElementById('editMediaId').value;
+            const alt = document.getElementById('editAltText').value.trim();
+            const caption = document.getElementById('editCaption').value.trim();
+            const tags = document.getElementById('editAiTags').value.trim();
+
+            const saveBtn = document.getElementById('btnSaveMediaMeta');
+            const oldText = saveBtn ? saveBtn.innerHTML : '';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '💾 Salvando...';
+            }
+
+            const alertBox = document.getElementById('editModalAlert');
+            alertBox.style.display = 'none';
+
+            try {
+                const res = await fetch('/admin/api/ai.php?action=save_media_meta', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrfToken,
+                        'media_id': mId,
+                        'alt_text': alt,
+                        'caption': caption,
+                        'ai_tags': tags
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    if (currentEditBtn) {
+                        currentEditBtn.dataset.alt = alt;
+                        currentEditBtn.dataset.caption = caption;
+                        currentEditBtn.dataset.tags = tags;
+                    }
+
+                    const cardMeta = document.getElementById('ai-meta-' + mId);
+                    if (cardMeta) {
+                        let tagsHtml = '';
+                        if (tags) {
+                            const tagArr = tags.split(',');
+                            tagsHtml = '<div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.25rem;">' +
+                                tagArr.map(function(t) { return '<span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600;">' + escapeHtml(t.trim()) + '</span>'; }).join('') +
+                                '</div>';
+                        }
+
+                        let contentHtml = '';
+                        if (alt) {
+                            contentHtml += '<div style="margin-bottom:0.25rem;"><strong style="color:var(--text);">Alt:</strong> <span class="alt-val" style="color:var(--text-muted);">' + escapeHtml(alt) + '</span></div>';
+                        }
+                        if (caption) {
+                            contentHtml += '<div style="margin-bottom:0.25rem;"><strong style="color:var(--text);">Legenda:</strong> <span class="caption-val" style="color:var(--text-muted);">' + escapeHtml(caption) + '</span></div>';
+                        }
+                        contentHtml += tagsHtml;
+
+                        if (contentHtml) {
+                            cardMeta.innerHTML = contentHtml;
+                            cardMeta.style.display = 'block';
+                        } else {
+                            cardMeta.innerHTML = '';
+                            cardMeta.style.display = 'none';
+                        }
+                    }
+
+                    const cardEl = document.getElementById('media-card-' + mId);
+                    if (cardEl) {
+                        const aiBtn = cardEl.querySelector('.btn-describe-ai');
+                        if (aiBtn) {
+                            aiBtn.innerHTML = alt ? '✨ Atualizar com IA' : '✨ Descrever com IA';
+                        }
+                    }
+
+                    showAlert('Informações da imagem atualizadas com sucesso!', [], false);
+                    closeEditMediaModal();
+                } else {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#fee2e2';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.textContent = (data && data.error) ? data.error : 'Erro ao salvar informações.';
+                }
+            } catch (err) {
+                alertBox.style.display = 'block';
+                alertBox.style.background = '#fee2e2';
+                alertBox.style.color = '#991b1b';
+                alertBox.textContent = 'Erro de conexão: ' + err.message;
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = oldText;
+                }
+            }
+        }
+
         const isVisionAuto = <?= ($isVisionEnabled && $visionMode === 'auto') ? 'true' : 'false' ?>;
 
         async function describeMediaAi(mediaId, btnElement) {
@@ -967,13 +1275,20 @@ require __DIR__ . '/header.php';
 
                 const data = await res.json();
                 if (res.ok && data.ok) {
+                    const editBtn = document.querySelector('.btn-edit-media[data-id="' + mediaId + '"]');
+                    if (editBtn) {
+                        editBtn.dataset.alt = data.alt_text || '';
+                        editBtn.dataset.caption = data.caption || '';
+                        editBtn.dataset.tags = data.ai_tags || '';
+                    }
+
                     const cardMeta = document.getElementById('ai-meta-' + mediaId);
                     if (cardMeta) {
                         let tagsHtml = '';
                         if (data.ai_tags) {
                             const tags = data.ai_tags.split(',');
                             tagsHtml = '<div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.25rem;">' +
-                                tags.map(t => '<span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600;">' + escapeHtml(t.trim()) + '</span>').join('') +
+                                tags.map(function(t) { return '<span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.35rem; border-radius:3px; font-size:0.68rem; font-weight:600;">' + escapeHtml(t.trim()) + '</span>'; }).join('') +
                                 '</div>';
                         }
                         cardMeta.innerHTML = 

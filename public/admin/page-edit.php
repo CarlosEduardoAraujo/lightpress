@@ -23,6 +23,8 @@ $pageId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $page = null;
 $message = '';
 $error = '';
+$isAiCopilotActive = \LightPress\Core\PluginManager::isActive('ai-copilot');
+$isAiVisionEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_copilot_vision_enabled', '1') === '1');
 
 if ($pageId > 0) {
     $page = Database::fetchOne("SELECT * FROM pages WHERE id = ? LIMIT 1", [$pageId]);
@@ -93,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         try {
                             $cacheMgr = new CacheManager($config);
                             $cacheMgr->purgeUrls(["/{$slug}/", "/sitemap.xml"]);
-                        } catch (\Throwable) {}
+                        } catch (\Throwable $e) {}
 
                         header("Location: /admin/page-edit.php?id={$newId}&saved=1");
                         exit;
@@ -114,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $purgeUrls[] = "/{$page['slug']}/";
                             }
                             $cacheMgr->purgeUrls($purgeUrls);
-                        } catch (\Throwable) {}
+                        } catch (\Throwable $e) {}
 
                         header("Location: /admin/page-edit.php?id={$pageId}&saved=1");
                         exit;
@@ -477,6 +479,14 @@ require __DIR__ . '/header.php';
 
             <div class="media-modal-footer" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
                 <div id="modalContentMetaFields" style="display: none; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">Metadados da Imagem para a Página</span>
+                        <?php if ($isAiVisionEnabled): ?>
+                            <button type="button" id="btnModalAiDescribe" class="btn btn-secondary btn-sm" onclick="generateAiInMediaModal(this)" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; background: #f0fdf4; color: #166534; border-color: #bbf7d0; font-weight: 600;" title="Gera texto alternativo e legenda automaticamente usando IA">
+                                ✨ Gerar com IA
+                            </button>
+                        <?php endif; ?>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                         <div>
                             <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Texto Alternativo (Alt Text - Acessibilidade & SEO)</label>
@@ -832,11 +842,14 @@ require __DIR__ . '/header.php';
                 }
             });
 
+            if (document.getElementById('modalContentMetaFields')) {
+                document.getElementById('modalContentMetaFields').style.display = 'block';
+            }
             if (document.getElementById('modalAltTextInput')) {
-                document.getElementById('modalAltTextInput').value = item.alt_text || item.original_name || '';
+                document.getElementById('modalAltTextInput').value = item.alt_text || '';
             }
             if (document.getElementById('modalCaptionInput')) {
-                document.getElementById('modalCaptionInput').value = item.caption || item.original_name || '';
+                document.getElementById('modalCaptionInput').value = item.caption || '';
             }
 
             var detailsEl = document.getElementById('modalSelectionDetails');
@@ -851,6 +864,66 @@ require __DIR__ . '/header.php';
             detailsEl.appendChild(textNode);
 
             document.getElementById('btnApplySelection').disabled = false;
+        }
+
+        async function generateAiInMediaModal(btn) {
+            if (!selectedMediaItem || !selectedMediaItem.id) {
+                alert('Selecione uma imagem na lista antes de gerar metadados.');
+                return;
+            }
+
+            var oldText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Gerando com IA...';
+            }
+
+            var csrfInput = document.getElementById('csrfToken') || document.querySelector('input[name="_csrf_token"]');
+            var csrf = csrfInput ? csrfInput.value : '';
+
+            try {
+                var res = await fetch('/admin/api/ai.php?action=describe_media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrf
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrf,
+                        'media_id': selectedMediaItem.id
+                    })
+                });
+
+                var data = await res.json();
+                if (res.ok && data.ok) {
+                    if (document.getElementById('modalAltTextInput')) {
+                        document.getElementById('modalAltTextInput').value = data.alt_text || '';
+                    }
+                    if (document.getElementById('modalCaptionInput')) {
+                        document.getElementById('modalCaptionInput').value = data.caption || '';
+                    }
+                    selectedMediaItem.alt_text = data.alt_text || '';
+                    selectedMediaItem.caption = data.caption || '';
+                    selectedMediaItem.ai_tags = data.ai_tags || '';
+
+                    if (btn) {
+                        btn.innerHTML = '✨ Gerado!';
+                        setTimeout(function() { btn.innerHTML = oldText; btn.disabled = false; }, 2000);
+                    }
+                } else {
+                    alert((data && data.error) ? data.error : 'Erro ao analisar imagem com IA.');
+                    if (btn) {
+                        btn.innerHTML = oldText;
+                        btn.disabled = false;
+                    }
+                }
+            } catch (err) {
+                alert('Falha de conexão com a IA: ' + err.message);
+                if (btn) {
+                    btn.innerHTML = oldText;
+                    btn.disabled = false;
+                }
+            }
         }
 
         function loadMediaCatalog(query, autoSelectId) {
@@ -1059,9 +1132,13 @@ require __DIR__ . '/header.php';
                 var safeUrl = escapeHtml(selectedMediaItem.full_url);
                 var altInput = document.getElementById('modalAltTextInput');
                 var capInput = document.getElementById('modalCaptionInput');
-                var safeAlt = escapeHtml(altInput && altInput.value.trim() ? altInput.value.trim() : (selectedMediaItem.alt_text || selectedMediaItem.original_name));
-                var safeCap = escapeHtml(capInput && capInput.value.trim() ? capInput.value.trim() : (selectedMediaItem.caption || selectedMediaItem.original_name));
-                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '"><figcaption>' + safeCap + '</figcaption></figure><p></p>';
+                var reviewedAlt = altInput ? altInput.value.trim() : '';
+                var reviewedCap = capInput ? capInput.value.trim() : '';
+
+                var safeAlt = escapeHtml(reviewedAlt || selectedMediaItem.alt_text || '');
+                var safeCap = escapeHtml(reviewedCap || selectedMediaItem.caption || '');
+                var capTag = safeCap ? '<figcaption>' + safeCap + '</figcaption>' : '';
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '">' + capTag + '</figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {

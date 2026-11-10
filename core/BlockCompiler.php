@@ -334,9 +334,10 @@ class BlockCompiler
                     if ($imgs->length > 0) {
                         $img = $imgs->item(0);
                         $url = $img->getAttribute('src');
+                        $alt = $img->getAttribute('alt');
                         $captionNode = $node->getElementsByTagName('figcaption');
                         $caption = $captionNode->length > 0 ? trim($captionNode->item(0)->textContent) : '';
-                        $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $caption];
+                        $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $caption, 'alt' => $alt];
                     }
                 } elseif ($tag === 'img') {
                     $url = $node->getAttribute('src');

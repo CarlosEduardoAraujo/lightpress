@@ -35,10 +35,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Painel Administrativo do Plugin (`plugins/ai-copilot/settings.php`):**
   - Interface em `/admin/plugin-settings.php?plugin=ai-copilot` com seleção dinâmica de provedores, modelos, timeout e ativação por módulo.
   - Botão interativo **"⚡ Testar Conexão com a IA"** para auditoria imediata de credenciais e latência em milissegundos.
-- **Integração nas Telas do Painel Administrativo (`editor.php`, `page-edit.php`, `media.php`):**
-  - `editor.php`: Botão e card lateral "✨ Links IA" com modal de curadoria semântica e botões de inserção direta; modal de fotos com campos editáveis de Alt Text e Legenda preenchidos automaticamente.
-  - `page-edit.php`: Modal de fotos sincronizado com campos editáveis de Alt Text e Legenda para páginas institucionais.
-  - `media.php`: Cards de imagem com badges de Alt Text e Tags Visuais, além do botão "✨ Descrever com IA".
+- **Integração e Refinamentos nas Telas do Painel Administrativo (`editor.php`, `page-edit.php`, `media.php`):**
+  - `media.php`: Adição do botão **"✏️ Editar Metadados"** em todos os cartões da biblioteca de fotos com modal interativo (`#editMediaModal`) para edição imediata de Texto Alternativo, Legenda e Palavras-chave Visuais, com botão **"✨ Gerar com IA"** integrado e salvamento assíncrono via `/admin/api/ai.php?action=save_media_meta` atualizando o DOM em tempo real.
+  - `public/admin/api/media.php` e `media.php`: Cláusulas `WHERE` de busca expandidas cobrindo `original_name`, `alt_text`, `ai_tags`, `caption` e `variants_manifest`.
+  - `editor.php` e `page-edit.php` (Modal de Mídias): Rodapé do modal atualizado para exibir campos editáveis rápidos de Texto Alternativo (`alt_text`) e Legenda (`caption`) ao selecionar qualquer imagem, preenchidos com os dados da IA e acompanhados de botão **"✨ Gerar com IA"** sob demanda. Na inserção da foto, são utilizados estritamente o `alt_text` e a legenda revisados em `<figure><img alt="..."><figcaption>...</figcaption></figure>`, eliminando o nome bruto do arquivo (`original_name`).
+  - `editor.php` (Linkagem Interna IA): Botão da barra de ferramentas atualizado para **"🔗 Links Internos IA"**. Ação de "Inserir 'Leia Também'" padronizada para injetar a tag limpa `<p><strong>Leia também:</strong> <a href="/slug/">Título da Matéria</a></p>` compatível com o `BlockCompiler`, posicionada exatamente **abaixo do parágrafo sugerido** onde o termo-âncora foi identificado (ou após o parágrafo do cursor ativo), com rolagem suave e destaque temporário.
+  - `core/BlockCompiler.php`: Preservação do atributo `alt` das tags `<img>` dentro de `<figure>` no compilador de blocos, garantindo compatibilidade bidirecional de acessibilidade e legendas.
 - **Endpoint Seguro de API (`public/admin/api/ai.php`):**
   - Roteamento restrito com autenticação (`Security::requireAuth()`) e validação de token CSRF (`Security::verifyCsrfToken()`) para todas as ações do plugin.
 - **Suíte de Testes Automatizados (`bin/test-ai-copilot.php`):**

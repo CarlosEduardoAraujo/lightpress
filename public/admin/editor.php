@@ -27,6 +27,7 @@ $message = '';
 $error = '';
 $isAiCopilotActive = \LightPress\Core\PluginManager::isActive('ai-copilot');
 $isAiLinkingEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_copilot_linking_enabled', '1') === '1');
+$isAiVisionEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_copilot_vision_enabled', '1') === '1');
 $hasActiveDraftRevision = false;
 $draftRevisionDate = null;
 $activeRevisionId = 0;
@@ -698,7 +699,7 @@ require __DIR__ . '/header.php';
                             <button type="button" class="tool-btn" onclick="promptLink()" title="Inserir Link">🔗 Link</button>
                             <button type="button" class="tool-btn" onclick="openMediaModal('content')" style="background: #e0f2fe; color: #0369a1;" title="Inserir Foto da Biblioteca">📷 Inserir Foto</button>
                             <?php if ($isAiLinkingEnabled): ?>
-                                <button type="button" class="tool-btn" onclick="openInternalLinksModal()" style="background: #fdf2f8; color: #be185d; font-weight: 700;" title="Sugerir matérias relevantes do banco para linkagem interna">✨ Links IA</button>
+                                <button type="button" class="tool-btn" onclick="openInternalLinksModal()" style="background: #fdf2f8; color: #be185d; font-weight: 700;" title="Sugerir matérias relevantes do banco para linkagem interna">🔗 Links Internos IA</button>
                             <?php endif; ?>
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Limpar Formatação">✕ Limpar</button>
@@ -920,6 +921,14 @@ require __DIR__ . '/header.php';
 
             <div class="media-modal-footer" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
                 <div id="modalContentMetaFields" style="display: none; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">Metadados da Imagem para o Artigo</span>
+                        <?php if ($isAiVisionEnabled): ?>
+                            <button type="button" id="btnModalAiDescribe" class="btn btn-secondary btn-sm" onclick="generateAiInMediaModal(this)" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; background: #f0fdf4; color: #166534; border-color: #bbf7d0; font-weight: 600;" title="Gera texto alternativo e legenda automaticamente usando IA">
+                                ✨ Gerar com IA
+                            </button>
+                        <?php endif; ?>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                         <div>
                             <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.25rem;">Texto Alternativo (Alt Text - Acessibilidade & SEO)</label>
@@ -1327,11 +1336,14 @@ require __DIR__ . '/header.php';
                 }
             });
 
+            if (document.getElementById('modalContentMetaFields')) {
+                document.getElementById('modalContentMetaFields').style.display = 'block';
+            }
             if (document.getElementById('modalAltTextInput')) {
-                document.getElementById('modalAltTextInput').value = item.alt_text || item.original_name || '';
+                document.getElementById('modalAltTextInput').value = item.alt_text || '';
             }
             if (document.getElementById('modalCaptionInput')) {
-                document.getElementById('modalCaptionInput').value = item.caption || item.original_name || '';
+                document.getElementById('modalCaptionInput').value = item.caption || '';
             }
 
             var detailsEl = document.getElementById('modalSelectionDetails');
@@ -1343,6 +1355,66 @@ require __DIR__ . '/header.php';
             detailsEl.appendChild(textNode);
 
             document.getElementById('btnApplySelection').disabled = false;
+        }
+
+        async function generateAiInMediaModal(btn) {
+            if (!selectedMediaItem || !selectedMediaItem.id) {
+                alert('Selecione uma imagem na lista antes de gerar metadados.');
+                return;
+            }
+
+            var oldText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Gerando com IA...';
+            }
+
+            var csrfInput = document.getElementById('csrfToken') || document.querySelector('input[name="_csrf_token"]');
+            var csrf = csrfInput ? csrfInput.value : '';
+
+            try {
+                var res = await fetch('/admin/api/ai.php?action=describe_media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrf
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrf,
+                        'media_id': selectedMediaItem.id
+                    })
+                });
+
+                var data = await res.json();
+                if (res.ok && data.ok) {
+                    if (document.getElementById('modalAltTextInput')) {
+                        document.getElementById('modalAltTextInput').value = data.alt_text || '';
+                    }
+                    if (document.getElementById('modalCaptionInput')) {
+                        document.getElementById('modalCaptionInput').value = data.caption || '';
+                    }
+                    selectedMediaItem.alt_text = data.alt_text || '';
+                    selectedMediaItem.caption = data.caption || '';
+                    selectedMediaItem.ai_tags = data.ai_tags || '';
+
+                    if (btn) {
+                        btn.innerHTML = '✨ Gerado!';
+                        setTimeout(function() { btn.innerHTML = oldText; btn.disabled = false; }, 2000);
+                    }
+                } else {
+                    alert((data && data.error) ? data.error : 'Erro ao analisar imagem com IA.');
+                    if (btn) {
+                        btn.innerHTML = oldText;
+                        btn.disabled = false;
+                    }
+                }
+            } catch (err) {
+                alert('Falha de conexão com a IA: ' + err.message);
+                if (btn) {
+                    btn.innerHTML = oldText;
+                    btn.disabled = false;
+                }
+            }
         }
 
         function loadMediaCatalog(query, autoSelectId) {
@@ -1549,9 +1621,13 @@ require __DIR__ . '/header.php';
                 var safeUrl = escapeHtml(selectedMediaItem.full_url);
                 var altInput = document.getElementById('modalAltTextInput');
                 var capInput = document.getElementById('modalCaptionInput');
-                var safeAlt = escapeHtml(altInput && altInput.value.trim() ? altInput.value.trim() : (selectedMediaItem.alt_text || selectedMediaItem.original_name));
-                var safeCap = escapeHtml(capInput && capInput.value.trim() ? capInput.value.trim() : (selectedMediaItem.caption || selectedMediaItem.original_name));
-                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '"><figcaption>' + safeCap + '</figcaption></figure><p></p>';
+                var reviewedAlt = altInput ? altInput.value.trim() : '';
+                var reviewedCap = capInput ? capInput.value.trim() : '';
+
+                var safeAlt = escapeHtml(reviewedAlt || selectedMediaItem.alt_text || '');
+                var safeCap = escapeHtml(reviewedCap || selectedMediaItem.caption || '');
+                var capTag = safeCap ? '<figcaption>' + safeCap + '</figcaption>' : '';
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '">' + capTag + '</figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {
@@ -1746,19 +1822,94 @@ require __DIR__ . '/header.php';
             var item = window._currentAiSuggestions[idx];
             if (!item) return;
 
-            var calloutText = item.related_callout || ('Leia também: ' + item.title);
-            var safeUrl = item.url;
-            var blockHtml = '<p class="post-related-link"><strong>' + escapeHtml(calloutText) + '</strong> — <a href="' + escapeHtml(safeUrl) + '">Confira a matéria completa</a></p><p></p>';
+            var rawUrl = item.url || ('/' + String(item.slug || '').replace(/^\/+|\/+$/g, '') + '/');
+            if (!rawUrl.startsWith('/')) rawUrl = '/' + rawUrl;
+            if (!rawUrl.endsWith('/')) rawUrl = rawUrl + '/';
+            var safeUrl = escapeHtml(rawUrl);
+            var safeTitle = escapeHtml(item.title || 'Confira a matéria completa');
+            var blockHtml = '<p><strong>Leia também:</strong> <a href="' + safeUrl + '">' + safeTitle + '</a></p>';
+
+            var anchor = item.anchor_text ? item.anchor_text.trim() : '';
+            var inserted = false;
 
             if (isSourceMode) {
-                rawHtmlArea.value += '\n' + blockHtml;
+                var src = rawHtmlArea.value;
+                if (anchor) {
+                    var lowerSrc = src.toLowerCase();
+                    var lowerAnchor = anchor.toLowerCase();
+                    var anchorIdx = lowerSrc.indexOf(lowerAnchor);
+                    if (anchorIdx !== -1) {
+                        var closePIdx = lowerSrc.indexOf('</p>', anchorIdx);
+                        if (closePIdx !== -1) {
+                            var insertPos = closePIdx + 4;
+                            rawHtmlArea.value = src.substring(0, insertPos) + '\n' + blockHtml + '\n' + src.substring(insertPos);
+                            inserted = true;
+                        }
+                    }
+                }
+                if (!inserted) {
+                    rawHtmlArea.value += '\n' + blockHtml + '\n';
+                }
             } else {
-                editorCanvas.focus();
-                document.execCommand('insertHTML', false, blockHtml);
+                if (anchor) {
+                    var targetParagraph = findParagraphContainingText(editorCanvas, anchor);
+                    if (targetParagraph) {
+                        var tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = blockHtml;
+                        var newPara = tempDiv.firstElementChild;
+                        targetParagraph.insertAdjacentElement('afterend', newPara);
+                        inserted = true;
+
+                        newPara.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        newPara.style.transition = 'background 0.4s ease';
+                        newPara.style.background = '#fef08a';
+                        setTimeout(function() { newPara.style.background = 'transparent'; }, 1500);
+                    }
+                }
+
+                if (!inserted) {
+                    var sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0 && editorCanvas.contains(sel.anchorNode)) {
+                        var node = sel.anchorNode;
+                        var block = (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement).closest('p, blockquote, h2, h3, h4');
+                        if (block && editorCanvas.contains(block)) {
+                            var tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = blockHtml;
+                            var newPara = tempDiv.firstElementChild;
+                            block.insertAdjacentElement('afterend', newPara);
+                            inserted = true;
+                        }
+                    }
+
+                    if (!inserted) {
+                        editorCanvas.focus();
+                        document.execCommand('insertHTML', false, blockHtml + '<p></p>');
+                    }
+                }
             }
 
             var btn = document.getElementById('btn-callout-' + idx);
-            if (btn) { btn.disabled = true; btn.innerText = '✓ Inserido como Bloco'; }
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '✓ Inserido Abaixo do Parágrafo';
+            }
+        }
+
+        function findParagraphContainingText(rootNode, text) {
+            if (!text) return null;
+            var lowerText = text.toLowerCase();
+            var blocks = rootNode.querySelectorAll('p, blockquote, div');
+            for (var i = 0; i < blocks.length; i++) {
+                var el = blocks[i];
+                if (el !== rootNode && el.textContent && el.textContent.toLowerCase().indexOf(lowerText) !== -1) {
+                    var innerP = el.querySelector('p');
+                    if (innerP && innerP.textContent && innerP.textContent.toLowerCase().indexOf(lowerText) !== -1) {
+                        return innerP;
+                    }
+                    return el;
+                }
+            }
+            return null;
         }
 
         function escapeRegex(str) {
