@@ -105,7 +105,9 @@ $searchQuery = Security::e($query ?? '');
                                     <figure class="w-full h-full m-0 p-0 overflow-hidden">
                                         <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                              src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
-                                             alt="<?= Security::e($item['title']) ?>" loading="lazy">
+                                             alt="<?= Security::e($item['title']) ?>" 
+                                             title="<?= Security::e($item['title']) ?>" 
+                                             loading="lazy">
                                         <figcaption class="sr-only"><?= Security::e($item['title']) ?></figcaption>
                                     </figure>
                                 <?php else: ?>

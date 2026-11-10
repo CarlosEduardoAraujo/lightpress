@@ -156,14 +156,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
         border-color: #2a303c;
     }
     .article-body figcaption {
-        font-size: 0.875rem;
-        color: #5c5e63;
-        text-align: center;
-        margin-top: 0.5rem;
-        font-family: 'Work Sans', sans-serif;
-    }
-    html.dark .article-body figcaption {
-        color: #c5c6cc;
+        display: none;
     }
     .article-body ul {
         list-style-type: disc;
@@ -292,9 +285,13 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
 
             <!-- 2. Feature Hero Image Block -->
             <?php if (!empty($post['featured_image'])): ?>
+                <?php 
+                    $heroImageText = !empty($post['image_alt']) ? $post['image_alt'] : (!empty($post['image_caption']) ? $post['image_caption'] : $post['title']);
+                ?>
                 <figure class="-mx-margin-mobile sm:mx-0 my-space-xs">
                     <div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group bg-carbon-black border border-subtle-border dark:border-[#2a303c]">
-                        <img alt="<?= Security::e(!empty($post['image_alt']) ? $post['image_alt'] : $post['title']) ?>" 
+                        <img alt="<?= Security::e($heroImageText) ?>" 
+                             title="<?= Security::e($heroImageText) ?>" 
                              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" 
                              src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>"
                              loading="eager"
@@ -305,13 +302,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                             <span>SPEEDRACING • <?= Security::e(strtoupper($post['category'])) ?></span>
                         </div>
                     </div>
-                    <?php if (!empty($post['image_caption'])): ?>
-                        <figcaption class="text-xs text-text-muted dark:text-[#94a3b8] mt-2 italic flex items-center gap-1.5 px-1 sm:px-0">
-                            <span>📷</span> <?= Security::e($post['image_caption']) ?>
-                        </figcaption>
-                    <?php else: ?>
-                        <figcaption class="sr-only"><?= Security::e(!empty($post['image_alt']) ? $post['image_alt'] : $post['title']) ?></figcaption>
-                    <?php endif; ?>
+                    <figcaption class="sr-only"><?= Security::e($heroImageText) ?></figcaption>
                 </figure>
             <?php endif; ?>
 
@@ -409,7 +400,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                 <div class="w-20 h-20 rounded-md overflow-hidden shrink-0 shadow-xs relative bg-surface-container dark:bg-[#151920]">
                                     <?php if (!empty($rel['featured_image'])): ?>
                                         <figure class="w-full h-full m-0 p-0 overflow-hidden">
-                                            <img alt="<?= Security::e($rel['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="<?= Security::e(ImageProcessor::toThumbUrl($rel['featured_image'], 'avif')) ?>" loading="lazy">
+                                            <img alt="<?= Security::e($rel['title']) ?>" title="<?= Security::e($rel['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="<?= Security::e(ImageProcessor::toThumbUrl($rel['featured_image'], 'avif')) ?>" loading="lazy">
                                             <figcaption class="sr-only"><?= Security::e($rel['title']) ?></figcaption>
                                         </figure>
                                     <?php else: ?>

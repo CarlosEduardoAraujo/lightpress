@@ -1137,8 +1137,10 @@ require __DIR__ . '/header.php';
 
                 var safeAlt = escapeHtml(reviewedAlt || selectedMediaItem.alt_text || '');
                 var safeCap = escapeHtml(reviewedCap || selectedMediaItem.caption || '');
+                var hoverTitle = safeAlt || safeCap;
+                var titleAttr = hoverTitle ? ' title="' + hoverTitle + '"' : '';
                 var capTag = safeCap ? '<figcaption>' + safeCap + '</figcaption>' : '';
-                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '">' + capTag + '</figure><p></p>';
+                var imgHtml = '<figure><img src="' + safeUrl + '" alt="' + safeAlt + '"' + titleAttr + '>' + capTag + '</figure><p></p>';
                 if (isSourceMode) {
                     rawHtmlArea.value += '\n' + imgHtml;
                 } else {

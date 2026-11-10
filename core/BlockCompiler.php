@@ -471,6 +471,8 @@ class BlockCompiler
                     }
 
                     if (!empty($defaultSrc)) {
+                        $hoverText = !empty($block['caption']) ? strip_tags((string)$block['caption']) : $rawAlt;
+                        $hoverAttr = Security::e(trim($hoverText));
                         $html = "<figure>\n  <picture>\n";
                         if (!empty($avifSrcset)) {
                             $html .= '    <source type="image/avif" srcset="' . implode(', ', $avifSrcset) . "\">\n";
@@ -478,12 +480,11 @@ class BlockCompiler
                         if (!empty($webpSrcset)) {
                             $html .= '    <source type="image/webp" srcset="' . implode(', ', $webpSrcset) . "\">\n";
                         }
-                        $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$altAttr}\"{$lazyAttr}>\n";
+                        $html .= "    <img src=\"{$defaultSrc}\" alt=\"{$altAttr}\" title=\"{$hoverAttr}\"{$lazyAttr}>\n";
                         $html .= "  </picture>";
-                        if (!empty($captionHtml)) {
-                            $html .= "\n  <figcaption>{$captionHtml}</figcaption>";
-                        } elseif (!empty($altAttr)) {
-                            $html .= "\n  <figcaption class=\"sr-only\">{$altAttr}</figcaption>";
+                        $capText = !empty($captionHtml) ? $captionHtml : $altAttr;
+                        if (!empty($capText)) {
+                            $html .= "\n  <figcaption class=\"sr-only\">{$capText}</figcaption>";
                         }
                         $html .= "\n</figure>";
                         return $html;
@@ -505,12 +506,14 @@ class BlockCompiler
             return '';
         }
 
+        $hoverText = !empty($block['caption']) ? strip_tags((string)$block['caption']) : $rawAlt;
+        $hoverAttr = Security::e(trim($hoverText));
+
         $html = "<figure>";
-        $html .= "<img src=\"{$url}\" alt=\"{$altAttr}\"{$lazyAttr}>";
-        if (!empty($captionHtml)) {
-            $html .= "<figcaption>{$captionHtml}</figcaption>";
-        } elseif (!empty($altAttr)) {
-            $html .= "<figcaption class=\"sr-only\">{$altAttr}</figcaption>";
+        $html .= "<img src=\"{$url}\" alt=\"{$altAttr}\" title=\"{$hoverAttr}\"{$lazyAttr}>";
+        $capText = !empty($captionHtml) ? $captionHtml : $altAttr;
+        if (!empty($capText)) {
+            $html .= "<figcaption class=\"sr-only\">{$capText}</figcaption>";
         }
         $html .= "</figure>";
 

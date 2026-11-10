@@ -77,7 +77,8 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                 <figure class="w-full h-full m-0 p-0 overflow-hidden">
                     <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
                          src="<?= Security::e(ImageProcessor::toAvifUrl($mainLead['featured_image'])) ?>" 
-                         alt="<?= Security::e($mainLead['title']) ?>">
+                         alt="<?= Security::e($mainLead['title']) ?>"
+                         title="<?= Security::e($mainLead['title']) ?>">
                     <figcaption class="sr-only"><?= Security::e($mainLead['title']) ?></figcaption>
                 </figure>
             <?php else: ?>
@@ -153,6 +154,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                             <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                  src="<?= Security::e(ImageProcessor::toThumbUrl($sec['featured_image'], 'avif')) ?>" 
                                  alt="<?= Security::e($sec['title']) ?>" 
+                                 title="<?= Security::e($sec['title']) ?>" 
                                  loading="lazy">
                             <figcaption class="sr-only"><?= Security::e($sec['title']) ?></figcaption>
                         </figure>
@@ -189,7 +191,9 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                             <figure class="w-full h-full m-0 p-0 overflow-hidden">
                                 <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                      src="<?= Security::e(ImageProcessor::toThumbUrl($item['featured_image'], 'avif')) ?>" 
-                                     alt="<?= Security::e($item['title']) ?>" loading="lazy">
+                                     alt="<?= Security::e($item['title']) ?>" 
+                                     title="<?= Security::e($item['title']) ?>" 
+                                     loading="lazy">
                                 <figcaption class="sr-only"><?= Security::e($item['title']) ?></figcaption>
                             </figure>
                         <?php else: ?>

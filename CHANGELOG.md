@@ -12,16 +12,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Estrutura Semântica Universal de Imagens:**
   - Todas as imagens de notícias — sejam Miniaturas/Thumbnails (300px), Intermediárias (1024px) ou Completas (Full/AVIF) — passam a ser encapsuladas rigorosamente sob o padrão semântico HTML5 `<figure><img src="..." alt="..."><figcaption>...</figcaption></figure>`.
 - **Página da Notícia (`templates/post.php` e `public/index.php`):**
-  - Imagem de Destaque Hero: encapsulada em `<figure>` e enriquecida com os metadados da tabela `media`, exibindo legenda editorial estilizada `<figcaption>` sob a foto quando disponível, ou legenda acessível via `sr-only`.
-  - Notícias Relacionadas no Rodapé: thumbnails dos cards encapsulados em `<figure><img ...><figcaption class="sr-only">...</figcaption></figure>`.
-- **Página Inicial (`templates/home.php`):**
-  - Destaque Principal do Hero, destaques secundários e feed de notícias com imagens encapsuladas em `<figure><img ...><figcaption class="sr-only">...</figcaption></figure>`.
-- **Listagens e Resultados (`templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/page.php`):**
-  - Padronização completa em `<figure><img ...><figcaption class="sr-only">...</figcaption></figure>` em todos os cards de listagens e páginas institucionais.
-- **Pipeline de Mídia (`core/ImageProcessor.php`):**
-  - Adicionado método auxiliar `ImageProcessor::toIntermediateUrl($url, 'avif')` para entrega otimizada da resolução intermediária (1024px).
-- **Compilador de Conteúdo (`core/BlockCompiler.php`):**
-  - Garantia de injeção de `<figcaption class="sr-only">` para blocos de imagem sem legenda editorial explícita no corpo do texto.
+  - Imagem de Destaque Hero: remoção completa de legendas visíveis abaixo da imagem; metadados (`alt` e `title`) integrados na tag `<img>` para exibição nativa do texto gerado pela IA ou título da matéria ao passar o mouse por cima (hover tooltip), com `<figcaption class="sr-only">` para conformidade semântica sem poluição visual.
+  - Notícias Relacionadas no Rodapé: miniaturas em `<figure><img alt="..." title="..." ...><figcaption class="sr-only">...</figcaption></figure>`.
+  - Estilização de Conteúdo: ocultação global de legendas abaixo de fotos no corpo da matéria (`.article-body figcaption { display: none; }`).
+- **Página Inicial e Listagens (`templates/home.php`, `category.php`, `tag.php`, `search.php`, `page.php`):**
+  - Todas as tags `<img>` (Hero, trio de secundários e feed de notícias) atualizadas com atributo `title="..."` correspondente ao ALT/título da imagem para tooltip nativo ao passar o mouse, preservando a semântica `<figure>` e `<figcaption class="sr-only">`.
+- **Compilador e Editores (`core/BlockCompiler.php`, `editor.php`, `page-edit.php`):**
+  - Injeção obrigatória do atributo `title` idêntico ao `alt` nas tags `<img>` e sanitização de `<figcaption class="sr-only">`.
 
 ### Plugin ai-copilot: Linkagem Interna Inteligente e Visão Computacional em Mídias — 2026-11-10
 
