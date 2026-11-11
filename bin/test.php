@@ -81,11 +81,17 @@ $inactiveUser = ['id' => 5, 'role' => 'admin', 'is_active' => 0];
 
 $ownPost = ['id' => 100, 'user_id' => 10];
 $otherPost = ['id' => 101, 'user_id' => 99];
+$editorOwnPost = ['id' => 102, 'user_id' => 20];
 
 assertTest("Autor pode editar seu próprio post", Authorization::can($author, Authorization::ACTION_EDIT_POST, $ownPost));
 assertTest("Autor NÃO pode editar post de outro autor", !Authorization::can($author, Authorization::ACTION_EDIT_POST, $otherPost));
 assertTest("Autor NÃO pode publicar posts", !Authorization::can($author, Authorization::ACTION_PUBLISH_POST, $ownPost));
 assertTest("Editor PODE publicar posts", Authorization::can($editor, Authorization::ACTION_PUBLISH_POST, $otherPost));
+assertTest("Editor PODE excluir post de sua própria autoria", Authorization::can($editor, Authorization::ACTION_DELETE_POST, $editorOwnPost));
+assertTest("Editor NÃO pode excluir post de outro autor", !Authorization::can($editor, Authorization::ACTION_DELETE_POST, $otherPost));
+assertTest("Editor NÃO pode excluir post sem contexto de matéria", !Authorization::can($editor, Authorization::ACTION_DELETE_POST));
+assertTest("Autor NÃO pode excluir post mesmo de sua autoria", !Authorization::can($author, Authorization::ACTION_DELETE_POST, $ownPost));
+assertTest("Administrador PODE excluir qualquer post", Authorization::can($admin, Authorization::ACTION_DELETE_POST, $otherPost));
 assertTest("Editor NÃO pode gerenciar usuários", !Authorization::can($editor, Authorization::ACTION_MANAGE_USERS));
 assertTest("Administrador PODE gerenciar usuários", Authorization::can($admin, Authorization::ACTION_MANAGE_USERS));
 assertTest("Usuário inativo NÃO possui permissões mesmo sendo admin", !Authorization::can($inactiveUser, Authorization::ACTION_MANAGE_USERS));

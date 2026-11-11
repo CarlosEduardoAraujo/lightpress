@@ -60,9 +60,11 @@ class Authorization
                 self::ACTION_SET_FEATURED,
                 self::ACTION_MANAGE_CATEGORIES => true,
 
-                // Editores não gerenciam outros usuários nem realizam exclusão definitiva
-                self::ACTION_MANAGE_USERS,
-                self::ACTION_DELETE_POST => false,
+                // Editores podem excluir publicações de sua própria autoria
+                self::ACTION_DELETE_POST => $post !== null && (int)($post['user_id'] ?? 0) === $userId,
+
+                // Editores não gerenciam outros usuários
+                self::ACTION_MANAGE_USERS => false,
 
                 default => false,
             };

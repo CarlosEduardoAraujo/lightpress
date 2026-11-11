@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Controle de Acesso RBAC: Permissão de Exclusão de Matérias Próprias para Editores — 2026-11-11
+
+- **Permissão de Exclusão por Autoria para Editores (`core/Authorization.php`, `public/admin/dashboard.php`):**
+  - Atualização da matriz de controle de acesso (RBAC) em `Authorization::can()` para a ação `ACTION_DELETE_POST`: usuários com papel de `editor` agora possuem permissão para excluir publicações das quais sejam os autores (`$post['user_id'] === $userId`).
+  - Passagem de contexto da publicação (`$targetPost` no backend e `$p` na listagem) em `public/admin/dashboard.php`:
+    - O botão vermelho de exclusão (`✕`) é renderizado na listagem do painel apenas para as matérias de autoria do próprio editor logado (e em todas para administradores).
+    - O backend valida a autoria antes de processar a exclusão, bloqueando tentativas de exclusão de matérias de terceiros por editores.
+  - Matérias de outros autores e editores permanecem estritamente protegidas contra exclusão por editores não proprietários.
+  - O papel `author` permanece sem permissão de exclusão (mesmo de matérias próprias), e o papel `admin` mantém acesso irrestrito de exclusão.
+- **Cobertura de Testes Automatizados (`bin/test.php`):**
+  - Inclusão de asserções unitárias para validar que editores podem excluir matérias próprias, não podem excluir matérias de terceiros, não podem excluir sem contexto de post, e que autores e administradores mantêm seus comportamentos respectivos.
+
 ### Otimização de Banco de Dados: Eliminação de Gargalo de Mídia, Batch Loading & Cache Defensivo — 2026-11-10
 
 - **Eliminação Integral de Varredura de Tabela e Filesort (`Creating sort index`):**

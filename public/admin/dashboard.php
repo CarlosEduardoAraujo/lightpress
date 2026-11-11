@@ -55,7 +55,7 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
     $targetPost = Database::fetchOne("SELECT id, slug, category, tags, user_id FROM posts WHERE id = ? LIMIT 1", [$delPostId]);
     
     if ($targetPost) {
-        if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST)) {
+        if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $targetPost)) {
             $affectedUrls = [
                 '/',
                 '/' . $targetPost['slug'] . '/',
@@ -573,7 +573,7 @@ require __DIR__ . '/header.php';
                                     <?php endif; ?>
 
                                     <?php 
-                                    $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST); 
+                                    $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $p); 
                                     if ($canDelete):
                                     ?>
                                         <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta publicação? Essa ação removerá o artigo e seu cache no Nginx.');">

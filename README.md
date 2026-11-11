@@ -665,7 +665,7 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
 | Publicar, atualizar versão pública, arquivar | Não | Sim | Sim |
 | Alterar autoria, destaque e catálogo de categorias | Não | Sim | Sim |
 | Gerir usuários, perfis e configurações | Não | Não | Sim |
-| Excluir definitivamente artigos | Não | Não | Sim |
+| Excluir definitivamente artigos | Não | Apenas artigos de sua própria autoria | Sim |
 
 * Centralizar as decisões em `Authorization.php`, por exemplo `can($user, $action, $post)`, com negação por padrão. Verificar todas as requisições e operações de serviço, incluindo AJAX, prévias, upload e aplicação de revisões.
 * IDs recebidos nunca provam propriedade. Conferir `posts.user_id` e validar campos permitidos por perfil; um autor não pode forjar `user_id`, `status`, destaque ou privilégios no JSON. O vínculo de uma imagem a um artigo também exige autorização sobre ambos.
