@@ -22,7 +22,11 @@ class Seo
      *   updated_at?: string,
      *   author_name?: string,
      *   category?: string,
-     *   slug?: string
+     *   slug?: string,
+     *   seo_title?: string,
+     *   seo_description?: string,
+     *   focus_keyword?: string,
+     *   tags?: string
      * }|null $post
      * @param array $appConfig
      * @return string
@@ -39,7 +43,11 @@ class Seo
             $rawImage = !empty($post['featured_image']) ? (str_starts_with($post['featured_image'], 'http') ? $post['featured_image'] : "{$canonicalOrigin}{$post['featured_image']}") : '';
             // Forçar WebP para Open Graph e Twitter Cards (redes sociais como X/Twitter ainda não aceitam AVIF)
             $image = !empty($rawImage) ? ImageProcessor::toWebpUrl($rawImage) : '';
+            $secureImageUrl = !empty($image) ? preg_replace('~^http://~i', 'https://', $image) : '';
+            $avifImage = !empty($rawImage) ? ImageProcessor::toAvifUrl($rawImage) : '';
             $type = 'article';
+            $keywords = !empty($post['focus_keyword']) ? trim((string)$post['focus_keyword']) : (!empty($post['tags']) ? trim((string)$post['tags']) : '');
+            $imgDimensions = !empty($image) ? self::getImageDimensions($image) : null;
         } else {
             $title = $siteName . ' - ' . (!empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Portal de Notícias');
             $description = !empty($appConfig['app']['description']) ? $appConfig['app']['description'] : 'Notícias, coberturas em tempo real e análises aprofundadas com máxima velocidade.';
@@ -59,9 +67,32 @@ class Seo
             }
             $image = str_starts_with($webpFavicon, 'http') ? $webpFavicon : "{$canonicalOrigin}{$webpFavicon}";
             $type = 'website';
+            $secureImageUrl = '';
+            $avifImage = '';
+            $keywords = '';
+            $imgDimensions = null;
         }
 
         $html = [];
+
+        // Metadados específicos de Notícias / Artigos
+        if ($post !== null) {
+            $html[] = "<meta name='robots' content='index, max-snippet:-1, max-image-preview:large, max-video-preview:-1, follow' />";
+            $html[] = '<meta name="google" content="nositelinkssearchbox" >';
+            if ($imgDimensions !== null) {
+                $html[] = '<meta property="og:image:height" content="' . $imgDimensions['height'] . '" />';
+                $html[] = '<meta property="og:image:width" content="' . $imgDimensions['width'] . '" />';
+            }
+            $html[] = '<link rel="canonical" href="' . Security::e($url) . '" />';
+            if (!empty($description)) {
+                $html[] = '<meta name="description" content="' . Security::e($description) . '">';
+            }
+            if (!empty($keywords)) {
+                $html[] = '<meta name="keywords" content="' . Security::e($keywords) . '">';
+            }
+        }
+
+        // Open Graph
         $html[] = '<meta property="og:site_name" content="' . Security::e($siteName) . '">';
         $html[] = '<meta property="og:title" content="' . Security::e($title) . '">';
         $html[] = '<meta property="og:description" content="' . Security::e($description) . '">';
@@ -69,14 +100,24 @@ class Seo
         $html[] = '<meta property="og:type" content="' . Security::e($type) . '">';
         if (!empty($image)) {
             $html[] = '<meta property="og:image" content="' . Security::e($image) . '">';
+            if ($post !== null && !empty($secureImageUrl)) {
+                $html[] = '<meta property="og:secure_url" content="' . Security::e($secureImageUrl) . '" />';
+            }
         }
 
         // Twitter Cards
         $html[] = '<meta name="twitter:card" content="summary_large_image">';
+        if ($post !== null) {
+            $html[] = '<meta name="twitter:url" content="' . Security::e($url) . '" />';
+        }
         $html[] = '<meta name="twitter:title" content="' . Security::e($title) . '">';
         $html[] = '<meta name="twitter:description" content="' . Security::e($description) . '">';
         if (!empty($image)) {
             $html[] = '<meta name="twitter:image" content="' . Security::e($image) . '">';
+        }
+
+        if ($post !== null && !empty($avifImage)) {
+            $html[] = '<meta name="thumbnail" content="' . Security::e($avifImage) . '">';
         }
 
         // Metadados específicos de Artigo
@@ -92,6 +133,54 @@ class Seo
         }
 
         return implode("\n    ", $html);
+    }
+
+    /**
+     * Obtém as dimensões de largura e altura da imagem.
+     * Retorna array com ['width' => int, 'height' => int].
+     *
+     * @param string $imageUrl URL absoluta ou relativa da imagem
+     * @return array{width: int, height: int}
+     */
+    public static function getImageDimensions(string $imageUrl): array
+    {
+        $default = ['width' => 1200, 'height' => 675];
+        if (empty($imageUrl)) {
+            return $default;
+        }
+
+        $parsedPath = parse_url($imageUrl, PHP_URL_PATH);
+        if (empty($parsedPath)) {
+            return $default;
+        }
+
+        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $localPath = rtrim($docRoot, '/\\') . '/' . ltrim($parsedPath, '/\\');
+
+        if (file_exists($localPath)) {
+            $info = @getimagesize($localPath);
+            if (!empty($info[0]) && !empty($info[1])) {
+                return ['width' => (int)$info[0], 'height' => (int)$info[1]];
+            }
+        }
+
+        // Se for variante WebP ou AVIF inexistente, busca variante equivalente com o mesmo prefixo
+        $dir = dirname($localPath);
+        if (is_dir($dir)) {
+            $filename = pathinfo($localPath, PATHINFO_FILENAME);
+            $baseWithoutSuffix = preg_replace('~-(thumb|1024|1920)$~', '', $filename);
+            $matches = glob($dir . '/' . $baseWithoutSuffix . '*.*');
+            if (!empty($matches)) {
+                foreach ($matches as $match) {
+                    $info = @getimagesize($match);
+                    if (!empty($info[0]) && !empty($info[1])) {
+                        return ['width' => (int)$info[0], 'height' => (int)$info[1]];
+                    }
+                }
+            }
+        }
+
+        return $default;
     }
 
     /**

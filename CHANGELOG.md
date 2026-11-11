@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Meta Tags Avançadas de Notícias: SEO Nativo, Open Graph e Twitter Cards — 2026-11-11
+
+- **Marcação Completa no Bloco Open Graph & Twitter Cards (`core/Seo.php`, `templates/header.php`):**
+  - Implementação das diretivas avançadas de robôs e indexação para o Google Notícias e Google Discover:
+    - `<meta name='robots' content='index, max-snippet:-1, max-image-preview:large, max-video-preview:-1, follow' />`
+    - `<meta name="google" content="nositelinkssearchbox" >`
+  - Tag canônica formal `<link rel="canonical" href="LINKDANOTÍCIA" />` e `<meta name="twitter:url" content="LINKDANOTÍCIA" />` apontando para a URL amigável absoluta com barra final.
+  - Meta Description nativa otimizada: `<meta name="description" content="...">` priorizando o campo editorial `seo_description` com fallback automático e transparente para o resumo (`summary`).
+  - Proteção contra duplicação em `templates/header.php`: a `<meta name="description">` global do site é condicionada a páginas não-artigo (`empty($post)`).
+  - Palavra-chave principal (Focus Keyword): `<meta name="keywords" content="...">` renderizada a partir do campo `focus_keyword` com fallback inteligente para `tags`.
+  - Protocolo de Imagem Segura WebP: `<meta property="og:secure_url" content="...webp" />` assegurando conexão HTTPS e compatibilidade com redes sociais.
+  - Metadados de Dimensões Físicas de Imagem: métodos estáticos `Seo::getImageDimensions()` inspecionando fisicamente arquivos no disco com `getimagesize()` e emitindo `<meta property="og:image:width">` e `<meta property="og:image:height">` (com fallback padrão editorial 1200x675).
+  - Miniatura de Próxima Geração AVIF: `<meta name="thumbnail" content="...avif">` consumindo a variante AVIF de alta compressão via `ImageProcessor::toAvifUrl()`.
+- **Cobertura de Testes Automatizados (`bin/test_seo_news_tags.py`):**
+  - Criação de suíte de testes automatizados com 22 asserções cobrindo integridade sintática, simulação funcional completa de artigos com e sem imagem, fallbacks de resumo e tags, e isolamento da Home/páginas gerais.
+
 ### Controle de Acesso RBAC: Permissão de Exclusão de Matérias Próprias para Editores — 2026-11-11
 
 - **Permissão de Exclusão por Autoria para Editores (`core/Authorization.php`, `public/admin/dashboard.php`):**

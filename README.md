@@ -732,12 +732,24 @@ O gerenciamento de metadados fundamentais do portal opera desacoplado de arquivo
 * **Invalidação Proativa de Cache:** Salvar as configurações expurga imediatamente o FastCGI Cache da Home (`/`), sitemap e feeds RSS (`/feed.xml`).
 * **Seletor de Fuso Horário:** Catálogo com fusos recomendados para motorsport e lista completa de offsets fixos de UTC-12 a UTC+14, ajustando `date_default_timezone_set()` de ponta a ponta.
 
-### 8.9. SEO Dinâmico e Compartilhamento Social Otimizado em WebP (`core/Seo.php`)
+### 8.9. SEO Dinâmico, Meta Tags Avançadas de Notícias e Compartilhamento Social (`core/Seo.php`)
 
-Para maximizar a compatibilidade com redes sociais (WhatsApp, X/Twitter, Facebook, LinkedIn) que rejeitam formatos como AVIF em cards de pré-visualização:
-* **Home, Categorias e Tags:** As tags `<meta property="og:image">` e `<meta name="twitter:image">` consomem dinamicamente o Favicon configurado no portal.
-* **Conversão Forçada para WebP:** O método `ImageProcessor::toWebpUrl()` substitui extensões `.avif`, `.png`, `.jpg` ou `.ico` pela variante correspondente `.webp`, acompanhada do domínio canônico absoluto (`https://...`).
-* **Artigos Individuais:** A imagem de destaque da matéria (`featured_image`) é convertida automaticamente para WebP de alta resolução nas metatags sociais.
+Para maximizar a visibilidade editorial no Google Notícias, Google Discover e garantir compatibilidade universal com redes sociais (WhatsApp, X/Twitter, Facebook, LinkedIn):
+
+* **Diretivas Avançadas de Indexação para Notícias:**
+  - `<meta name='robots' content='index, max-snippet:-1, max-image-preview:large, max-video-preview:-1, follow' />`: Instrução explícita autorizando snippets sem truncamento e prévia em tamanho grande no Google Discover e resultados de pesquisa.
+  - `<meta name="google" content="nositelinkssearchbox" >`: Desativa a caixa de pesquisa interna nos sitelinks do Google para artigos individuais.
+* **Canonicalização e Twitter Cards:**
+  - `<link rel="canonical" href="LINKDANOTÍCIA" />` e `<meta name="twitter:url" content="LINKDANOTÍCIA" />`: Vinculam formalmente a URL canônica com barra final (`/{slug}/`).
+* **SEO Nativo vs Resumo com Prevenção de Duplicação:**
+  - `<meta name="description" content="...">`: Consome prioritariamente o campo nativo `seo_description`. Caso vazio, utiliza automaticamente o subtítulo/resumo (`summary`). O `templates/header.php` condiciona a meta description global apenas a páginas não-artigo, prevenindo duplicatas no `<head>`.
+* **Palavra-chave Principal (Focus Keyword):**
+  - `<meta name="keywords" content="...">`: Renderiza o campo `focus_keyword` cadastrado no painel com fallback transparente para o campo `tags`.
+* **Otimização de Imagens e Dimensões Físicas:**
+  - **Dimensões Físicas (`og:image:width` e `og:image:height`):** O método estático `Seo::getImageDimensions()` inspeciona localmente o arquivo físico com `@getimagesize()` (com fallback para 1200x675 px na proporção 16:9).
+  - **Imagem Segura WebP (`og:secure_url` e `og:image`):** Garante entrega com scheme seguro `https://` e conversão obrigatória para WebP (`ImageProcessor::toWebpUrl()`).
+  - **Miniatura AVIF de Próxima Geração (`<meta name="thumbnail">`):** Aponta diretamente para a variante `.avif` de alta compressão (`ImageProcessor::toAvifUrl()`).
+* **Home, Categorias e Tags:** As tags `<meta property="og:image">` e `<meta name="twitter:image">` consomem dinamicamente o Favicon configurado no portal em WebP.
 
 ### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `/admin/page-edit.php`, `templates/page.php`)
 

@@ -75,12 +75,10 @@ if (empty($trendingTags)) {
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title><?= Security::e($pageTitle ?? ($config['app']['name'] ?? 'SpeedRacing') . ' - Automobilismo e Velocidade') ?></title>
-    <?php if (!empty($post['seo_description'])): ?>
-        <meta name="description" content="<?= Security::e($post['seo_description']) ?>">
-    <?php elseif (!empty($post['summary'])): ?>
-        <meta name="description" content="<?= Security::e($post['summary']) ?>">
-    <?php elseif (!empty($config['app']['description'])): ?>
-        <meta name="description" content="<?= Security::e($config['app']['description']) ?>">
+    <?php if (empty($post)): ?>
+        <?php if (!empty($config['app']['description'])): ?>
+            <meta name="description" content="<?= Security::e($config['app']['description']) ?>">
+        <?php endif; ?>
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($config['app']['name'] ?? 'SpeedRacing') ?>" href="/feed.xml">
 
