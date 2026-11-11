@@ -442,7 +442,8 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     }
 
     // Consulta atômica do artigo com cache em memória RAM (Redis/ObjectCache)
-    $post = ObjectCache::remember("post_slug:{$slug}", 3600, function () use ($slug, $nowUtc): ?array {
+    $post = ObjectCache::get("post_slug:{$slug}", 'posts');
+    if ($post === false || !is_array($post)) {
         $p = Database::fetchOne(
             "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
              FROM posts p
@@ -452,12 +453,33 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
             [$slug, $nowUtc]
         );
 
-        if ($p && !empty($p['featured_image'])) {
-            $p['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($p['featured_image']);
-            $p['image_caption'] = '';
+        if ($p) {
+            if (!empty($p['featured_image'])) {
+                $p['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($p['featured_image']);
+                $p['image_caption'] = '';
+            }
+
+            // TTL Estratificado Inteligente no Redis:
+            // Até 1 dia da publicação ou da última atualização: 1 dia (86.400s)
+            // Mais de 1 dia da publicação/atualização: 10 dias (864.000s)
+            $lastTime = 0;
+            if (!empty($p['updated_at'])) {
+                $lastTime = (int)strtotime((string)$p['updated_at']);
+            }
+            if ($lastTime <= 0 && !empty($p['published_at'])) {
+                $lastTime = (int)strtotime((string)$p['published_at']);
+            }
+            if ($lastTime <= 0) {
+                $lastTime = time();
+            }
+
+            $postTtl = (time() - $lastTime <= 86400) ? 86400 : 864000;
+            ObjectCache::set("post_slug:{$slug}", $p, 'posts', $postTtl);
+            $post = $p;
+        } else {
+            $post = null;
         }
-        return $p ?: null;
-    }, 'posts');
+    }
 
     if (!$post) {
         // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
@@ -507,7 +529,22 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         ImageProcessor::preloadDescriptions($postImages);
     }
 
-    header('X-Accel-Expires: 3600'); // 60 minutos de cache para matéria publicada (LP-09)
+    // TTL Estratificado Inteligente para o FastCGI Cache do Nginx:
+    // Se a matéria foi publicada ou atualizada nas últimas 24h: 1 dia (86.400s)
+    // Se tem mais de 24h sem nenhuma modificação: 10 dias (864.000s)
+    $lastActionTime = 0;
+    if (!empty($post['updated_at'])) {
+        $lastActionTime = (int)strtotime((string)$post['updated_at']);
+    }
+    if ($lastActionTime <= 0 && !empty($post['published_at'])) {
+        $lastActionTime = (int)strtotime((string)$post['published_at']);
+    }
+    if ($lastActionTime <= 0) {
+        $lastActionTime = time();
+    }
+
+    $cacheTtl = (time() - $lastActionTime <= 86400) ? 86400 : 864000;
+    header("X-Accel-Expires: {$cacheTtl}");
     $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
     require $config['paths']['templates'] . '/post.php';
 });

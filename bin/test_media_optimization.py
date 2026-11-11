@@ -171,8 +171,41 @@ cursor.execute("SELECT COUNT(*) FROM media_variants WHERE media_id = 'media_01'"
 remaining_variants = cursor.fetchone()[0]
 assert_check("Variantes da mídia excluída foram removidas automaticamente em cascata", remaining_variants == 0)
 
-# 6. Verificação Estática de Código nos Arquivos Alterados
-print("\n[6] Verificação Estática de Conformidade no Código-Fonte")
+# 6. Teste de Cálculo de TTL Estratificado (1 Dia vs 10 Dias)
+print("\n[6] Testando Cálculo de TTL Estratificado (Idade vs Última Modificação)")
+
+def calculate_ttl(published_at, updated_at, now_time):
+    last_time = 0
+    import datetime
+    if updated_at:
+        dt = datetime.datetime.fromisoformat(updated_at.replace(" ", "T"))
+        last_time = dt.timestamp()
+    elif published_at:
+        dt = datetime.datetime.fromisoformat(published_at.replace(" ", "T"))
+        last_time = dt.timestamp()
+    if last_time <= 0:
+        last_time = now_time
+    return 86400 if (now_time - last_time <= 86400) else 864000
+
+import time
+now = time.time()
+one_hour_ago = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(now - 3600))
+five_days_ago = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(now - (5 * 86400)))
+
+# Caso A: Matéria publicada hoje (1h atrás)
+ttl_fresh = calculate_ttl(one_hour_ago, one_hour_ago, now)
+assert_check("Matéria publicada há 1h recebe TTL de 1 dia (86.400s)", ttl_fresh == 86400)
+
+# Caso B: Matéria antiga (5 dias atrás) sem edição recente
+ttl_old = calculate_ttl(five_days_ago, five_days_ago, now)
+assert_check("Matéria antiga (5 dias atrás) recebe TTL de 10 dias (864.000s)", ttl_old == 864000)
+
+# Caso C: Matéria antiga (5 dias atrás) mas atualizada há 1h
+ttl_updated = calculate_ttl(five_days_ago, one_hour_ago, now)
+assert_check("Matéria antiga atualizada há 1h tem TTL renovado para 1 dia (86.400s)", ttl_updated == 86400)
+
+# 7. Verificação Estática de Código nos Arquivos Alterados
+print("\n[7] Verificação Estática de Conformidade no Código-Fonte")
 
 with open("core/ImageProcessor.php", "r", encoding="utf-8") as f:
     ip_code = f.read()

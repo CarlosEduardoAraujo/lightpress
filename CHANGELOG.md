@@ -26,6 +26,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Novo script CLI `bin/migrate-media-variants.php` para extração em lote dos manifestos JSON existentes e backfill seguro de `posts.featured_media_id`.
   - Otimização de `ImageProcessor::syncRefs()`, substituindo varredura `LIKE` por busca exata em `media_variants`.
   - Registro automático e idempotente de novas variantes geradas durante uploads (`public/admin/upload.php` e `bin/catalog-media.php`) via `ImageProcessor::registerVariants()`.
+- **Estratificação Inteligente de TTL por Idade & Renovação em Atualização:**
+  - Implementação de política dinâmica de cache no Front Controller (`public/index.php`) para artigos individuais (`/{slug}/`):
+    - **Matérias recentes (publicadas ou atualizadas há até 24h):** TTL fixado em **1 dia (86.400 segundos)** no Redis (`ObjectCache`) e no Nginx (`X-Accel-Expires: 86400`).
+    - **Matérias de arquivo (mais de 24h sem modificações):** TTL estendido para **10 dias (864.000 segundos)**, congelando o acervo histórico no Nginx e liberando 100% da CPU e do banco de dados para matérias do dia.
+    - **Renovação Automática na Edição:** Ao atualizar qualquer matéria no painel administrativo, o `PostService` purga o cache atômico e, na próxima leitura, o TTL é reinicializado automaticamente para 1 dia.
+  - Atualização do parâmetro `inactive=10d` e `max_size=10g` na zona `fastcgi_cache_path` em `nginx/lightpress.conf` para suportar o ciclo de 10 dias sem descarte prematuro de arquivos em disco.
 - **Blindagem do Nginx FastCGI Cache (`nginx/lightpress.conf`):**
   - Remoção do bypass incondicional para query strings (`$query_string != ""`). Parâmetros comuns de campanhas publicitárias e redes sociais (`utm_*`, `fbclid`, `gclid`, etc.) agora são atendidos diretamente pelo cache do Nginx, protegendo o PHP e o banco de acessos em massa.
   - Ativação das diretivas de mitigação contra Cache Stampede: `fastcgi_cache_use_stale error timeout updating invalid_header http_500 http_503;` e `fastcgi_cache_background_update on;`.

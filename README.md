@@ -539,7 +539,8 @@ Essa política evita servir conteúdo expirado em caso de falha por meio de `use
 
 | Recurso | TTL máximo | Atualização |
 | :--- | :--- | :--- |
-| Artigo publicado | 60 minutos | Purga em alteração pública ou retirada |
+| Artigo recente (publicado/editado até 24h) | 1 dia (86.400s) | Purga atômica em alteração ou despublicação; renova para 1 dia |
+| Artigo de acervo (publicado há mais de 24h) | 10 dias (864.000s) | Congelado em disco/RAM; purga atômica imediata em alteração |
 | Home e categoria, página principal | 5 minutos | Purga em alteração pública relevante |
 | Paginações secundárias, feeds e sitemap | 5 minutos | Expiração natural para mudanças editoriais comuns |
 | Rotas privadas, APIs, erros e redirecionamentos | Sem cache FastCGI | Resposta dinâmica ou estática apropriada |
