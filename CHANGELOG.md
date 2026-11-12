@@ -7,6 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de ALT/TITLE e atualização dos metadados de imagens — 2026-11-12
+
+- **Problema investigado:** a matéria de Felipe Fraga e a Home entregavam o nome amigável do arquivo em `alt`/`title`, apesar de a biblioteca mostrar texto alternativo e legenda preenchidos. O comportamento também ocorreu em respostas com Cloudflare/FastCGI MISS; o registro específico de vínculo/cache em produção não foi inspecionado.
+- **Resolução unificada (`core/ImageProcessor.php`):** consulta individual e pré-carregamento em lotes de até 100 caminhos compartilham as regras de associação e descrição. Preservada a prioridade `media.alt_text` → `media.caption` → nome amigável → vazio, ignorando campos contendo somente espaços.
+- **Recuperação de vínculos:** corrigida a comparação alternativa de `original_name`, usando nomes completos com extensão e candidatos sem sufixos de tamanho. Pasta e nome base são confirmados no manifesto; homônimos ambíguos não são associados automaticamente. O ID informado é priorizado quando compatível com o manifesto.
+- **Cache de descrições:** namespace `media_desc:v2` ignora valores anteriores. Resultados sem vínculo e falhas de banco não persistem fallbacks por 24 horas.
+- **Imagem principal da notícia (`public/index.php`, `templates/post.php`):** deixa de armazenar/consumir `image_alt` no cache do post e resolve os metadados atuais, passando `featured_media_id` quando disponível.
+- **Atualização manual e por IA (`plugins/ai-copilot/src/MediaVision.php`):** invalida memória e grupos `media`/`posts`, identifica páginas afetadas e registra purgas na fila existente. Até 30 URLs são purgadas imediatamente; lotes maiores dependem do worker `bin/retry-cache-purge.php`.
+- **Retentativa de purga (`core/CacheManager.php`):** falhas e exceções da Cloudflare passam a ser refletidas no resultado, evitando que o worker interprete uma falha remota como sucesso.
+- **Diagnóstico (`bin/audit-media-links.php`):** relatório JSON sem gravação por padrão; `--apply` adiciona variantes inequívocas e preenche IDs de mídia ausentes em posts, sem sobrescrever conflitos ou IDs existentes. Não executado em produção nesta implementação.
+- **Validação:** 27 verificações isoladas aprovadas em `bin/test-image-descriptions.php` (24) e `bin/test-cache-purge-results.php` (3), além da verificação de sintaxe dos arquivos PHP envolvidos. SQLite em memória e simulações evitam acesso ao banco/cache de produção.
+- **Documentação:** seção 4.9 do README revisada e procedimento operacional em `docs/IMAGE-METADATA-FIX.md`. A publicação exige diagnóstico/reparo conforme necessário e purga do HTML antigo. Buscas com query strings já em cache dependem de expiração ou purga explícita; o HTML das imagens no corpo não é reescrito. Nenhuma publicação, reparação ou purga em produção foi executada nesta etapa.
+
 ### Meta Tags Avançadas de Notícias: SEO Nativo, Open Graph e Twitter Cards — 2026-11-11
 
 - **Marcação Completa no Bloco Open Graph & Twitter Cards (`core/Seo.php`, `templates/header.php`):**

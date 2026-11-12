@@ -290,18 +290,49 @@ A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rá
 * **Ordenação Flexível:** Seletor de ordenação com padrão decrescente (recentes primeiro), permitindo alternar entre mídias recém-enviadas e ordem cronológica ascendente (antigas primeiro).
 * **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
 
-### 4.9. Resolução de Metadados de Alta Performance e Carregamento em Lote (Batch Loading)
+### 4.9. Resolução de `alt`/`title`, vínculos de mídia e cache
 
-Para eliminar travamentos em concorrência provocados por consultas não-indexadas na resolução do atributo `alt` e descrições das imagens, o LightPress conta com um subsistema de leitura de alta performance:
+A Home (destaques e feed), categorias, tags, busca, notícias relacionadas e imagens principais institucionais resolvem a descrição por `ImageProcessor::getImageDescription()`. A imagem principal da notícia também usa esse resolvedor, passando `posts.featured_media_id` quando disponível. Nos templates de capas e miniaturas, `alt` e `title` recebem a mesma descrição; não são preenchidos pelo título da notícia nem por um campo independente de título da mídia.
 
-* **Mapeamento Exato via B-Tree (`media_variants`):** Elimina integralmente buscas aproximadas com `LIKE '%...%'` sobre JSON e filesorts (`Creating sort index`). A correspondência de caminhos físicos e URLs de variantes para o `media_id` é feita por índice B-Tree único em tempo $< 0.1\text{ ms}$.
-* **Identificador Persistido no Artigo (`posts.featured_media_id`):** Artigos vinculam diretamente o identificador da sua mídia de destaque, permitindo junções relacionais imediatas por chave primária.
-* **Carregamento em Lote no Front Controller (`ImageProcessor::preloadDescriptions()`):** Em vez de disparar consultas individuais dentro dos loops dos templates (problema $N+1$), o Front Controller (`public/index.php`) coleta todas as imagens da página e executa **uma única consulta multi-key** (`WHERE url_path IN (...)`), populando os metadados antes da renderização.
-* **Cache em 2 Níveis com Fallback Total:**
-  1. *Nível 1 (Memória RAM da Requisição):* Cache estático em array associativo que armazena inclusive resultados vazios/não encontrados, garantindo 0 consultas adicionais no mesmo ciclo de vida.
-  2. *Nível 2 (Persistência via `ObjectCache`):* Integração automática com o motor Redis Cache Pro no grupo `'media'` (TTL de 24h). Caso o Redis esteja inoperante ou não instalado, a aplicação opera transparentemente via banco relacional otimizado sem disparar erros.
-* **Invalidação Reativa:** Edições de textos alternativos ou exclusões de mídias acionam atomicamente `ObjectCache::flushGroup('media')`.
-* **Utilitário de Migração e Backfill (`bin/migrate-media-variants.php`):** Script CLI que varre os manifestos existentes e popula a tabela `media_variants` e coluna `featured_media_id` sem necessidade de indisponibilidade do sistema.
+**Prioridade dos textos:** `media.alt_text` → `media.caption` → nome amigável do arquivo → vazio. Textos contendo somente espaços não impedem o próximo fallback. O nome amigável remove extensão e sufixos reconhecidos de tamanho, substitui hífens/sublinhados por espaços e descarta alguns nomes genéricos. Na imagem principal da notícia e nos relacionados, uma descrição vazia mantém `alt=""` e omite `title`; nas demais capas/listagens, ambos podem ser emitidos vazios.
+
+**Localização da mídia:** o caminho da URL, sem host, query string e barra inicial, é consultado por igualdade em `media_variants.url_path`. Um ID fornecido é priorizado quando seu manifesto confirma pasta e nome base compatíveis. Quando não há vínculo exato, a recuperação consulta nomes completos com extensão (`jpg`, `jpeg`, `png`, `webp`, `avif`, `gif`), incluindo candidatos sem sufixo de tamanho, e exige correspondência no manifesto. Homônimos ambíguos não são escolhidos arbitrariamente. Essa recuperação substitui a comparação incorreta entre `original_name` com extensão e um nome sem extensão.
+
+**Carregamento em lote:** `preloadDescriptions()` compartilha o resolvedor da consulta individual e processa até 100 caminhos por lote. Os vínculos exatos usam consulta agregada `WHERE url_path IN (...)`; nomes e IDs de recuperação também são consultados em lote quando necessários. Isso mantém os mesmos critérios na Home e na página da notícia.
+
+**Cache e atualização:**
+
+- A memória da requisição memoriza inclusive fallbacks e resultados vazios.
+- O cache persistente de descrições usa o grupo `media`, namespace `media_desc:v2` e TTL de 24 horas. A versão ignora valores antigos; ausência de vínculo e falhas de banco não persistem o fallback.
+- A imagem principal resolve os metadados após carregar o post. O antigo `$post['image_alt']` armazenado no cache editorial deixa de prevalecer.
+- Salvar metadados manualmente ou gerar descrições por IA limpa a memória e os grupos `media` e `posts`, identifica páginas afetadas e registra um job de purga. Os destinos incluem Home/paginação, categorias/paginação, notícias da categoria que podem mostrar relacionados, tags/paginação e páginas institucionais identificadas.
+- Até 30 URLs são purgadas também na requisição; lotes maiores ficam com `bin/retry-cache-purge.php`. Seu cron deve permanecer ativo. Falhas ou exceções de purga Cloudflare são retornadas como falha pelo `CacheManager`, permitindo a retentativa da fila.
+- URLs de busca com query strings arbitrárias já em cache dependem de expiração ou purga explícita. A publicação inicial também exige invalidar o HTML antigo; mudar o namespace de objetos não remove páginas já armazenadas no Nginx/Cloudflare.
+
+**Imagens no corpo do conteúdo:** os atributos permanecem no HTML salvo. A inserção pelo editor usa o texto alternativo revisado ou cadastrado para `alt`, e esse texto ou a legenda para `title`. Blocos JSON seguem sua própria prioridade (`block.alt` → `block.caption` → descrição da URL). Esta correção não reescreve o HTML editorial nem sincroniza automaticamente imagens antigas do corpo.
+
+**Diagnóstico e reparo de vínculos:**
+
+```bash
+# Padrão: relatório JSON sem INSERT/UPDATE e sem carregar o bootstrap editorial
+php bin/audit-media-links.php
+
+# Após revisar o relatório: adiciona variantes inequívocas e preenche IDs ausentes
+php bin/audit-media-links.php --apply
+```
+
+O diagnóstico compara manifestos, `media_variants` e IDs ausentes em posts. O reparo não cria tabelas, não sobrescreve vínculos conflitantes ou IDs preenchidos e não purga caches. Conflitos exigem revisão manual. O utilitário anterior `bin/migrate-media-variants.php` continua disponível para migração/backfill.
+
+**Testes de regressão isolados:**
+
+```bash
+php bin/test-image-descriptions.php
+php bin/test-cache-purge-results.php
+```
+
+As 27 verificações (24 de resolução/invalidação e 3 de resultado de purga) usam SQLite em memória e simulações de cache/purga, sem carregar credenciais locais ou acessar serviços de produção. Requerem PHP 8.4+, PDO SQLite e mbstring. Cobrem JPG → AVIF sem vínculo, resolução em lote, normalização da URL, cache antigo, espaços no alt, homônimos, ID compatível, atualização dos metadados e falhas de banco/Cloudflare.
+
+O procedimento de publicação, diagnóstico, reparo e verificação com cache MISS/HIT está em [docs/IMAGE-METADATA-FIX.md](docs/IMAGE-METADATA-FIX.md). A implementação e os testes locais não representam publicação nem reparação já executada em produção.
 
 ---
 
