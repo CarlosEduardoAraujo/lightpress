@@ -22,6 +22,18 @@ jobs:
         extensions: pdo, pdo_mysql, pdo_sqlite, gd, mbstring, fileinfo
         ini-values: memory_limit=256M, date.timezone=UTC
 
+    - name: Configurar ambiente de testes (SQLite)
+      run: |
+        cat << 'EOF' > config.local.php
+        <?php
+        return [
+          'database' => [
+            'driver' => 'sqlite',
+            'sqlite_path' => __DIR__ . '/storage/test.sqlite',
+          ],
+        ];
+        EOF
+
     - name: Verificação de Sintaxe (PHP Lint)
       run: |
         find . -name "*.php" ! -path "./storage/*" -exec php -l {} +
@@ -36,17 +48,7 @@ jobs:
       run: php bin/test-revision-safety.php
 
     - name: Testar Setup de Banco de Dados (SQLite)
-      run: |
-        cat << 'EOF' > config.local.php
-        <?php
-        return [
-          'database' => [
-            'driver' => 'sqlite',
-            'sqlite_path' => __DIR__ . '/storage/test.sqlite',
-          ],
-        ];
-        EOF
-        php bin/setup.php
+      run: php bin/setup.php
 
     - name: Testar Seeder de Demonstração
       run: php bin/seed.php --count=25

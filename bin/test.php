@@ -238,7 +238,7 @@ assertTest("Hook Action respeita prioridade de execução", $executionTrace === 
 }, 10);
 
 \LightPress\Core\Hook::addFilter('test_filter', function (string $text): string {
-    return strtoupper($text);
+    return mb_strtoupper($text, 'UTF-8');
 }, 20);
 
 assertTest("Hook Filter encadeia transformações em ordem", \LightPress\Core\Hook::applyFilters('test_filter', 'Olá') === 'OLÁ MUNDO');
@@ -248,8 +248,27 @@ assertTest("Descoberta do plugin 'webhook-sender' em /plugins/", isset($availabl
 
 if (isset($available['webhook-sender'])) {
     require_once $available['webhook-sender']['entrypoint'];
-    $cleanUrls = WebhookSenderService::parseUrls("https://discord.com/api/webhooks/123/abc, https://meuservidor.com/webhook\nhttp://insecure.test/hook, invalido");
-    assertTest("Parsing e validação de URLs de Webhook por vírgula", count($cleanUrls) === 3);
+    // Fixar o DNS dos fixtures para não depender da rede durante os testes.
+    $previousDnsMock = WebhookSenderService::$dnsMock;
+    WebhookSenderService::setDnsMock([
+        'webhook-a.test' => ['93.184.216.34'],
+        'webhook-b.test' => ['93.184.216.35'],
+        'webhook-c.test' => ['93.184.216.36'],
+        'unresolved.test' => [],
+    ]);
+    try {
+        $cleanUrls = WebhookSenderService::parseUrls("https://webhook-a.test/hook, https://webhook-b.test/hook\nhttp://webhook-c.test/hook, invalido, https://webhook-a.test/hook");
+        assertTest("Parsing e validação de URLs de Webhook por vírgula", $cleanUrls === [
+            'https://webhook-a.test/hook',
+            'https://webhook-b.test/hook',
+            'http://webhook-c.test/hook',
+        ]);
+        assertTest("Webhook rejeita DNS vazio, loopback e metadados de nuvem", WebhookSenderService::parseUrls(
+            "http://unresolved.test/hook, http://127.0.0.1/hook, http://169.254.169.254/latest/meta-data"
+        ) === []);
+    } finally {
+        WebhookSenderService::setDnsMock($previousDnsMock);
+    }
 }
 
 // -------------------------------------------------------------
