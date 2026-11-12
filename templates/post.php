@@ -186,12 +186,12 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
     <!-- Breadcrumbs & Live Pill Strip -->
     <nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pb-space-md">
         <div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-            <a class="hover:text-racing-red transition-colors flex items-center gap-1" href="/">
+            <a class="hover:text-racing-red-text dark:hover:text-racing-red transition-colors flex items-center gap-1" href="/">
                 <?= Icon::svg('home', '', 15) ?>
                 Home
             </a>
             <?= Icon::svg('chevron_right', 'text-secondary-fixed-dim', 13) ?>
-            <a class="hover:text-racing-red transition-colors capitalize" href="/categoria/<?= Security::e($post['category']) ?>/">
+            <a class="hover:text-racing-red-text dark:hover:text-racing-red transition-colors capitalize" href="/categoria/<?= Security::e($post['category']) ?>/">
                 <?= Security::e($post['category']) ?>
             </a>
             <?= Icon::svg('chevron_right', 'text-secondary-fixed-dim', 13) ?>
@@ -217,7 +217,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                     <a href="/categoria/<?= Security::e($post['category']) ?>/" class="bg-carbon-black text-pure-white text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm hover:bg-racing-red transition-colors">
                         <?= Security::e($post['category']) ?>
                     </a>
-                    <span class="bg-surface-container dark:bg-carbon-surface text-racing-red text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm font-bold border border-subtle-border dark:border-[#2a303c]">
+                    <span class="bg-surface-container dark:bg-carbon-surface text-racing-red-text dark:text-racing-red text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm font-bold border border-subtle-border dark:border-[#2a303c]">
                         <?= Security::e($primarySubtopic) ?>
                     </span>
                     <span class="bg-surface-container-high dark:bg-[#252b36] text-on-surface-variant dark:text-secondary-fixed text-label-category font-label-category px-space-sm py-1 uppercase rounded-sm flex items-center gap-1">
@@ -245,7 +245,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                             <?php if (!empty($post['author_avatar'])): ?>
                                 <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
                             <?php else: ?>
-                                <span class="text-racing-red font-headline-sm"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
+                                <span class="text-racing-red-text dark:text-racing-red font-headline-sm"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="flex flex-col">
@@ -273,8 +273,8 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                         <a href="https://api.whatsapp.com/send?text=<?= $postTitleEncoded ?>%20-%20<?= $postUrlEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-flag-green flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no WhatsApp">
                             <?= Icon::svg('chat', 'text-flag-green', 18) ?>
                         </a>
-                        <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-racing-red flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no Telegram">
-                            <?= Icon::svg('send', 'text-racing-red', 18) ?>
+                        <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-racing-red-text dark:text-racing-red flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no Telegram">
+                            <?= Icon::svg('send', 'text-racing-red-text dark:text-racing-red', 18) ?>
                         </a>
                         <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da matéria">
                             <span id="copy-icon"><?= Icon::svg('link', 'text-carbon-black dark:text-pure-white', 18) ?></span>
@@ -330,7 +330,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                         <?php if (!empty($post['author_avatar'])): ?>
                             <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
                         <?php else: ?>
-                            <span class="text-racing-red"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
+                            <span class="text-racing-red-text dark:text-racing-red"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
                         <?php endif; ?>
                     </div>
                     <div class="flex flex-col">
@@ -357,13 +357,13 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
             <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
                 <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                     <span>Publicidade</span>
-                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
+                    <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
                     <picture>
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.avif" type="image/avif">
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.webp" type="image/webp">
-                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
+                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" width="400" height="716" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
                     </picture>
                 </a>
             </div>
@@ -372,10 +372,10 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
             <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
                 <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                     <span>Publicidade</span>
-                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
+                    <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <div class="w-full aspect-[300/250] bg-surface-container-low dark:bg-[#151920] rounded-lg border border-dashed border-subtle-border dark:border-[#2a303c] flex flex-col items-center justify-center p-4 text-center group hover:border-racing-red transition-colors">
-                    <?= Icon::svg('verified', 'text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
+                    <?= Icon::svg('verified', 'text-racing-red-text dark:text-racing-red mb-2 group-hover:scale-110 transition-transform', 42) ?>
                     <span class="font-headline-sm text-body-md font-bold text-carbon-black dark:text-pure-white">Espaço Parceiro SpeedRacing</span>
                     <span class="text-label-meta text-[11px] text-secondary dark:text-secondary-fixed-dim mt-1">300x250 • Banner Publicitário</span>
                     <a href="/contato/" class="mt-3 px-space-md py-1.5 rounded bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-[11px] uppercase font-bold transition-colors shadow-xs">
@@ -389,7 +389,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <div class="bg-pure-white dark:bg-carbon-surface rounded-xl p-space-md shadow-xs border border-subtle-border dark:border-[#2a303c] flex flex-col gap-space-sm">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <?= Icon::svg('recommend', 'text-racing-red', 20) ?>
+                            <?= Icon::svg('recommend', 'text-racing-red-text dark:text-racing-red', 20) ?>
                             <h4 class="font-headline-sm text-headline-sm text-carbon-black dark:text-pure-white font-bold">Notícias Relacionadas</h4>
                         </div>
                         <?= Icon::svg('trending_up', 'text-secondary dark:text-secondary-fixed-dim', 18) ?>
@@ -412,10 +412,10 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                     <?php endif; ?>
                                 </div>
                                 <div class="flex flex-col gap-1 min-w-0 flex-1">
-                                    <span class="text-[10px] font-label-category uppercase text-racing-red font-bold">
+                                    <span class="text-[10px] font-label-category uppercase text-racing-red-text dark:text-racing-red font-bold">
                                         <?= Security::e($rel['category']) ?>
                                     </span>
-                                    <h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red line-clamp-2 transition-colors leading-snug">
+                                    <h5 class="font-headline-sm text-body-sm font-semibold text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red line-clamp-2 transition-colors leading-snug">
                                         <?= Security::e($rel['title']) ?>
                                     </h5>
                                     <span class="text-[11px] font-label-meta text-secondary dark:text-secondary-fixed-dim">

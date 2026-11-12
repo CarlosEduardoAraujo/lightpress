@@ -116,7 +116,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     <!-- Breadcrumbs -->
     <nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pb-space-md">
         <div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-            <a class="hover:text-racing-red transition-colors flex items-center gap-1" href="/">
+            <a class="hover:text-racing-red-text dark:hover:text-racing-red transition-colors flex items-center gap-1" href="/">
                 <?= Icon::svg('home', '', 15) ?>
                 Home
             </a>
@@ -176,13 +176,13 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
             <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
                 <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                     <span>Publicidade</span>
-                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
+                    <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
                     <picture>
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.avif" type="image/avif">
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.webp" type="image/webp">
-                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
+                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" width="400" height="716" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
                     </picture>
                 </a>
             </div>

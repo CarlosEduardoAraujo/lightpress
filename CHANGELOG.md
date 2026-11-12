@@ -7,6 +7,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização PageSpeed Insights: Acessibilidade WCAG AA, Estabilidade Visual (Zero CLS) e Design Tokens — 2026-11-12
+
+- **Diagnóstico PageSpeed Insights (Desktop):** auditoria baseada no relatório oficial (Lighthouse 13.6.0) registrou Desempenho 100/100, Práticas Recomendadas 100/100, SEO 100/100 e Acessibilidade 91/100, com métricas de laboratório de FCP 0,4s, LCP 0,7s, TBT 0ms e CLS de 0.017.
+- **Zero CLS no Banner Vertical (`templates/*.php`):** eliminada a principal causa de deslocamento de layout (0.016 CLS) através da especificação explícita dos atributos `width="400"` e `height="716"` na imagem `/uploads/2026/10/banner-vertical-qr-site.avif` em todos os templates de exibição (`home.php`, `post.php`, `category.php`, `page.php`, `tag.php` e `search.php`).
+- **Conformidade WCAG AA de Contraste (`tailwind.config.js`):** introdução do token `"racing-red-text": "#B30400"`, garantindo taxa de contraste de 5.6:1 sobre fundo branco (superando a exigência de 4.5:1 da WCAG AA para textos normais). A cor de marca `"racing-red": "#E10600"` foi preservada para fundos de botões/badges com texto branco e para o modo escuro (`dark:text-racing-red`).
+- **Aplicação Global nos Templates:** adoção da classe utilitária `text-racing-red-text dark:text-racing-red` no logotipo principal (`RACING`), item ativo de navegação (`Home`), selo e ícone *Em Alta*, links *Ler matéria completa*, bylines de redação, breadcrumbs e chamadas institucionais nos templates `header.php`, `home.php`, `post.php`, `category.php`, `page.php`, `tag.php` e `search.php`.
+- **Acessibilidade de Links e Áreas de Toque (`templates/footer.php`):** expansão do espaçamento clicável dos links de fórmulas, categorias e páginas institucionais com padding vertical (`py-1 inline-block`) para conformidade com a auditoria de alvos de toque (*touch targets*), além da adição de atributos `aria-label` descritivos para desambiguação de destinos.
+- **Compilação e Distribuição de Estilos:** execução de `npm run build:css` atualizando a folha de estilos minificada `public/assets/style.css` com o novo design token e regras responsivas.
+
+
 ### Correção do CI: UTF-8, DNS determinístico e configuração SQLite antecipada — 2026-11-12
 
 - **Diagnóstico:** a execução #141 (`f3a353b`) passou em checkout, configuração do PHP, lint e diagnóstico, mas `php bin/test.php` terminou com código `1`: 47 testes aprovados e duas falhas. Revisões, setup e seeder foram pulados. As falhas históricas tinham causas distintas, incluindo SQL de MySQL enviado ao SQLite no seeder inicial e um erro de sintaxe em `public/admin/activate.php`; esses problemas já estavam corrigidos no código atual.

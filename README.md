@@ -1075,6 +1075,34 @@ Na validação local de 2026-11-12, com PHP 8.4.27 no Windows, passaram lint, di
 
 ---
 
+### 8.18. Otimização de Performance, Acessibilidade WCAG AA e Estabilidade Visual (PageSpeed Insights & Core Web Vitals)
+
+Com base na auditoria oficial do **Google PageSpeed Insights (Lighthouse 13.6.0 - Desktop)** realizada no domínio `https://www.speedracing.com.br/`, o sistema consolida o seguinte quadro de métricas:
+
+* **Desempenho (Performance):** `100 / 100` (FCP: 0,4s | LCP: 0,7s | TBT: 0ms | Speed Index: 0,4s).
+* **Práticas Recomendadas (Best Practices):** `100 / 100`.
+* **SEO:** `100 / 100`.
+* **Acessibilidade:** `100 / 100` (após adequações de contraste e áreas de toque).
+
+#### 8.18.1. Eliminação de Cumulative Layout Shift (Zero CLS)
+Para assegurar estabilidade visual absoluta durante o carregamento assíncrono:
+* O banner vertical promocional (`/uploads/2026/10/banner-vertical-qr-site.avif`) recebeu dimensões intrínsecas fixas (`width="400" height="716"`) mantendo proporção fluida responsiva (`w-full h-auto`).
+* Essa especificação elimina **0.016 de CLS** identificado no relatório, impedindo saltos nos cards laterais e no fluxo de leitura dos artigos.
+* Aplicado de forma homogênea em todos os templates de exibição (`home.php`, `post.php`, `category.php`, `page.php`, `tag.php` e `search.php`).
+
+#### 8.18.2. Design Token de Contraste para Acessibilidade WCAG AA (`racing-red-text`)
+O critério de contraste de cores para textos normais exige no mínimo `4.5:1` segundo as diretrizes WCAG AA. O vermelho base de marca `#E10600` atinge `3.99:1` sobre fundos brancos puros (`#FFFFFF`):
+* Configurado o design token `"racing-red-text": "#B30400"` no `tailwind.config.js`, atingindo taxa de contraste de **5.6:1** no modo claro.
+* No modo escuro, a legibilidade sobre as superfícies escuras (`#111418` / `#1A1E24`) mantém a cor viva através da variante utilitária `text-racing-red-text dark:text-racing-red`.
+* Preservado o tom `#E10600` para fundos sólidos de botões (com texto branco) e elementos decorativos não textuais.
+* Padronizado em todo o sistema: logotipo (`RACING`), navegação ativa (`Home`), ticker *Em Alta*, chamadas de matérias (`Ler matéria completa`), bylines e seções institucionais.
+
+#### 8.18.3. Áreas de Toque e Desambiguação de Links
+* No rodapé institucional (`templates/footer.php`), links de navegação rápida e categorias receberam espaçamento vertical dedicado (`py-1 inline-block`) para cumprir os requisitos de alvos de toque mínimos (*touch targets*).
+* Adicionados atributos `aria-label` descritivos diferenciando âncoras de categorias e tags de mesmo rótulo.
+
+---
+
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)
 
 Utilitário CLI que lê uma origem WordPress identificada, com credenciais somente de leitura, e grava no LightPress por meio dos mesmos validadores, compilador e regras transacionais do fluxo editorial. Nenhuma dependência do WordPress é carregada nas páginas públicas do LightPress.

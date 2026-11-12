@@ -20,28 +20,28 @@ use LightPress\Core\Security;
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-space-xs">
-                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Fórmulas</span>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/formula-1/">Fórmula 1</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/formula-2/">Fórmula 2</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/formula-e/">Fórmula E</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/indycar/">IndyCar Series</a>
+                <div class="flex flex-col gap-1">
+                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red pb-1">Fórmulas</span>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/formula-1/" aria-label="Notícias da Categoria Fórmula 1">Fórmula 1</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/formula-2/" aria-label="Notícias da Categoria Fórmula 2">Fórmula 2</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/formula-e/" aria-label="Notícias da Categoria Fórmula E">Fórmula E</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/indycar/" aria-label="Notícias da Categoria IndyCar">IndyCar Series</a>
                 </div>
 
-                <div class="flex flex-col gap-space-xs">
-                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Turismo &amp; Endurance</span>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/stockcar/">Stock Car Pro Series</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/nascar/">NASCAR Cup</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/wec/">FIA WEC / 24h Le Mans</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/categoria/motovelocidade/">Motovelocidade</a>
+                <div class="flex flex-col gap-1">
+                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red pb-1">Turismo &amp; Endurance</span>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/stockcar/" aria-label="Notícias da Categoria Stock Car">Stock Car Pro Series</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/nascar/" aria-label="Notícias da Categoria NASCAR">NASCAR Cup</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/wec/" aria-label="Notícias da Categoria FIA WEC">FIA WEC / 24h Le Mans</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/motovelocidade/" aria-label="Notícias da Categoria Motovelocidade">Motovelocidade</a>
                 </div>
 
-                <div class="flex flex-col gap-space-xs">
-                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red">Institucional</span>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/nossa-equipe/">Nossa Equipe Editorial</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/codigo-de-etica/">Código de Ética</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/politica-de-privacidade/">Política de Privacidade</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors" href="/contato/">Fale Conosco / Anuncie</a>
+                <div class="flex flex-col gap-1">
+                    <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red pb-1">Institucional</span>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/nossa-equipe/">Nossa Equipe Editorial</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/codigo-de-etica/">Código de Ética</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/politica-de-privacidade/">Política de Privacidade</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/contato/">Fale Conosco / Anuncie</a>
                 </div>
             </div>
 

@@ -48,7 +48,7 @@ $searchQuery = Security::e($query ?? '');
     <header class="flex flex-col gap-space-sm pb-space-sm border-b border-subtle-border dark:border-[#2a303c]">
         <!-- Breadcrumb -->
         <nav aria-label="Navegação Estrutural" class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-            <a class="hover:text-racing-red transition-colors flex items-center gap-1" href="/">
+            <a class="hover:text-racing-red-text dark:hover:text-racing-red transition-colors flex items-center gap-1" href="/">
                 <?= Icon::svg('home', '', 15) ?>
                 Home
             </a>
@@ -126,7 +126,7 @@ $searchQuery = Security::e($query ?? '');
                                         <span>•</span>
                                         <span class="capitalize"><?= Security::e($getSubtopic($item['tags'] ?? null, $item['category'])) ?></span>
                                     </div>
-                                    <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black dark:text-pure-white group-hover:text-racing-red dark:group-hover:text-racing-red transition-colors font-bold leading-snug">
+                                    <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red transition-colors font-bold leading-snug">
                                         <a href="/<?= Security::e($item['slug']) ?>/">
                                             <?= Security::e($item['title']) ?>
                                         </a>
@@ -137,7 +137,7 @@ $searchQuery = Security::e($query ?? '');
                                         </p>
                                     <?php endif; ?>
                                 </div>
-                                <div class="pt-space-sm flex items-center text-racing-red font-label-category text-label-category uppercase tracking-wider gap-1">
+                                <div class="pt-space-sm flex items-center text-racing-red-text dark:text-racing-red font-label-category text-label-category uppercase tracking-wider gap-1">
                                     <a href="/<?= Security::e($item['slug']) ?>/" class="flex items-center gap-1 hover:underline">
                                         Ler matéria completa <?= Icon::svg('arrow_forward', '', 14) ?>
                                     </a>
@@ -204,13 +204,13 @@ $searchQuery = Security::e($query ?? '');
             <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
                 <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                     <span>Publicidade</span>
-                    <span class="text-racing-red font-bold">Parceiro Oficial</span>
+                    <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
                 </div>
                 <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
                     <picture>
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.avif" type="image/avif">
                         <source srcset="/uploads/2026/10/banner-vertical-qr-site.webp" type="image/webp">
-                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
+                        <img src="/uploads/2026/10/banner-vertical-qr-site.avif" alt="Parceiro Oficial SpeedRacing" width="400" height="716" class="w-full h-auto object-cover rounded-lg group-hover:scale-[1.02] transition-transform duration-300" loading="lazy">
                     </picture>
                 </a>
             </div>
@@ -233,7 +233,7 @@ $searchQuery = Security::e($query ?? '');
             <!-- FAST NEWSLETTER -->
             <div id="newsletter" class="bg-surface-container-low dark:bg-carbon-surface rounded-xl p-space-md space-y-space-sm border border-subtle-border dark:border-[#2a303c]">
                 <div class="flex items-center gap-2 text-carbon-black dark:text-pure-white font-headline-sm text-headline-sm font-bold">
-                    <?= Icon::svg('mail', 'text-racing-red', 20) ?>
+                    <?= Icon::svg('mail', 'text-racing-red-text dark:text-racing-red', 20) ?>
                     <span>Grid SpeedRacing</span>
                 </div>
                 <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">
