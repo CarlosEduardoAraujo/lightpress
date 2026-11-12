@@ -1071,6 +1071,8 @@ return [
 
 Na validação local de 2026-11-12, com PHP 8.4.27 no Windows, passaram lint, diagnóstico, os sete testes de revisões, setup, seeder de 25 publicações e os 14 testes adicionais de `php bin/test-ssrf.php`. As tentativas de conexão ao MySQL desapareceram. A suíte principal passou a ter 50 asserções: 49 aprovadas, incluindo as duas corrigidas, e uma falha preexistente de transliteração de slugs em `iconv` no Windows. Essa asserção passou no runner Ubuntu do log original; a reprodução Windows não equivale à aprovação remota. Consulte o resultado do commit em [GitHub Actions](https://github.com/CarlosEduardoAraujo/lightpress/actions).
 
+**Confirmação remota em 2026-11-12:** a [execução #142](https://github.com/CarlosEduardoAraujo/lightpress/actions/runs/43220120224), do commit `fcae607`, terminou com `success` em todas as etapas: configuração SQLite, lint, diagnóstico, suíte principal, revisões, setup e seeder. Esse resultado confirma a execução completa das correções no runner Ubuntu com PHP 8.4.
+
 ---
 
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)
