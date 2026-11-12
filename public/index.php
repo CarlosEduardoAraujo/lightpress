@@ -454,11 +454,6 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         );
 
         if ($p) {
-            if (!empty($p['featured_image'])) {
-                $p['image_alt'] = \LightPress\Core\ImageProcessor::getImageDescription($p['featured_image']);
-                $p['image_caption'] = '';
-            }
-
             // TTL Estratificado Inteligente no Redis:
             // Até 1 dia da publicação ou da última atualização: 1 dia (86.400s)
             // Mais de 1 dia da publicação/atualização: 10 dias (864.000s)

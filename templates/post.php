@@ -286,7 +286,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
             <!-- 2. Feature Hero Image Block -->
             <?php if (!empty($post['featured_image'])): ?>
                 <?php 
-                    $heroImageDesc = !empty($post['image_alt']) ? $post['image_alt'] : ImageProcessor::getImageDescription($post['featured_image']);
+                    $heroImageDesc = ImageProcessor::getImageDescription($post['featured_image'], null, $post['featured_media_id'] ?? null);
                     $heroAltAttr = !empty($heroImageDesc) ? Security::e($heroImageDesc) : '';
                     $heroTitleAttr = !empty($heroImageDesc) ? ' title="' . Security::e($heroImageDesc) . '"' : '';
                 ?>

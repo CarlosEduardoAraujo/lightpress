@@ -171,8 +171,11 @@ class CacheManager
         // 2. Invalidação Seletiva na Cloudflare (Edge API v4) se configurada
         if (!empty($this->config['cloudflare']['enabled'])) {
             try {
-                CloudflareCache::purgeUrls($uris);
+                if (!CloudflareCache::purgeUrls($uris)) {
+                    $results = array_fill_keys($uris, false);
+                }
             } catch (Throwable $e) {
+                $results = array_fill_keys($uris, false);
                 error_log("[CacheManager] Erro não-bloqueante ao invocar CloudflareCache: " . $e->getMessage());
             }
         }

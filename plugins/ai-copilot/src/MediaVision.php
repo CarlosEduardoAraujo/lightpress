@@ -80,9 +80,7 @@ PROMPT;
             [$altText, $caption, $aiTags, $mediaId]
         );
 
-        if (class_exists(\LightPress\Core\ObjectCache::class) && \LightPress\Core\ObjectCache::isAvailable()) {
-            \LightPress\Core\ObjectCache::flushGroup('media');
-        }
+        \LightPress\Core\ImageProcessor::invalidateMediaMetadata($mediaId);
 
         return [
             'ok' => true,
@@ -109,9 +107,7 @@ PROMPT;
             [$alt, $cap, $tags, $mediaId]
         );
 
-        if (class_exists(\LightPress\Core\ObjectCache::class) && \LightPress\Core\ObjectCache::isAvailable()) {
-            \LightPress\Core\ObjectCache::flushGroup('media');
-        }
+        \LightPress\Core\ImageProcessor::invalidateMediaMetadata($mediaId);
 
         return [
             'ok' => true,
