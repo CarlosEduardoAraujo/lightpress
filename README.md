@@ -1033,7 +1033,43 @@ python bin/test_security_fixes.py
 
 `bin/test-revision-safety.php` não carrega o bootstrap nem `config.local.php`: usa bancos SQLite em memória e as classes reais do projeto. Cobre migração bem-sucedida, preservação de `foreign_keys` ligado/desligado, falha de DDL com rollback e propagação, rejeição de migração dentro de transação externa, publicação inicial e restauração histórica com concorrência. A CI executa esse teste em PHP 8.4.
 
-Na validação local destas correções, passaram os cinco testes reais de migração SQLite e as verificações de sintaxe disponíveis. O PHP local é 7.2: o teste informa explicitamente que a integração editorial foi pulada nessa versão. Os testes Python simulam regras e não substituem a integração PHP. A execução completa em PHP 8.4 e os fluxos HTTP/MySQL ainda precisam ser confirmados em CI ou homologação; adicionar o teste ao workflow não equivale a comprovar sua execução remota.
+Na validação inicial destas correções, o PHP 7.2 local permitiu executar cinco testes reais de migração SQLite, mas a integração editorial foi explicitamente pulada. Em 2026-11-12, a reprodução em uma cópia isolada com PHP 8.4.27 executou e aprovou os sete testes de `bin/test-revision-safety.php`, incluindo concorrência e restauração histórica. Os testes Python simulam regras e não substituem a integração PHP. Os fluxos HTTP/MySQL ainda precisam ser confirmados em homologação.
+
+#### 8.17.13. GitHub Actions: ambiente SQLite e testes determinísticos
+
+O workflow [CI - Testes e Validação do LightPress](.github/workflows/ci.yml) executa em `ubuntu-latest`, com PHP 8.4, nos pushes e pull requests para `main`. Instala PDO MySQL/SQLite, GD, mbstring e fileinfo; configura limite de memória de 256 MiB e timezone UTC.
+
+A ordem das etapas é:
+
+1. Criar `config.local.php` no checkout temporário do runner, selecionando SQLite em `storage/test.sqlite`.
+2. Verificar a sintaxe dos arquivos PHP, excluindo `storage/`.
+3. Executar `php bin/diagnose.php`.
+4. Executar `php bin/test.php`.
+5. Executar `php bin/test-revision-safety.php`, com bancos SQLite em memória próprios.
+6. Executar `php bin/setup.php` para instalar o esquema no banco temporário.
+7. Executar `php bin/seed.php --count=25`.
+
+A configuração SQLite deve existir antes de qualquer comando que carregue o bootstrap. Antes da correção, ela era criada somente na etapa de setup: a suíte tentava acessar o MySQL padrão e registrava `SQLSTATE[HY000] [2002] Connection refused`. Essas exceções eram tratadas; as duas asserções que falhavam determinavam o código de saída `1` e impediam a execução das etapas seguintes.
+
+O [log da execução #141](https://github.com/CarlosEduardoAraujo/lightpress/actions/runs/43214035334) registrou 47 testes aprovados e duas falhas. As correções em `bin/test.php` são:
+
+* **Hooks e UTF-8:** o callback do teste usa `mb_strtoupper($text, 'UTF-8')`, produzindo `OLÁ MUNDO`. `strtoupper()` retornava `OLá MUNDO`, embora o encadeamento dos filtros estivesse correto.
+* **Webhooks sem dependência de DNS externo:** os domínios `.test` usam a simulação existente `WebhookSenderService::setDnsMock()`. A asserção compara a lista exata de URLs, cobrindo separação por vírgulas/quebras de linha, descarte de entradas inválidas, ordem e remoção de duplicatas. O estado anterior do mock é restaurado em `finally`.
+* **Proteção contra SSRF:** uma nova asserção confirma a rejeição de DNS vazio, loopback e metadados de nuvem. A validação de segurança do plugin permanece ativa.
+
+Para reproduzir as etapas, use uma cópia isolada do repositório e configure nela o arquivo `config.local.php` antes dos comandos acima:
+
+```php
+<?php
+return [
+    'database' => [
+        'driver' => 'sqlite',
+        'sqlite_path' => __DIR__ . '/storage/test.sqlite',
+    ],
+];
+```
+
+Na validação local de 2026-11-12, com PHP 8.4.27 no Windows, passaram lint, diagnóstico, os sete testes de revisões, setup, seeder de 25 publicações e os 14 testes adicionais de `php bin/test-ssrf.php`. As tentativas de conexão ao MySQL desapareceram. A suíte principal passou a ter 50 asserções: 49 aprovadas, incluindo as duas corrigidas, e uma falha preexistente de transliteração de slugs em `iconv` no Windows. Essa asserção passou no runner Ubuntu do log original; a reprodução Windows não equivale à aprovação remota. Consulte o resultado do commit em [GitHub Actions](https://github.com/CarlosEduardoAraujo/lightpress/actions).
 
 ---
 

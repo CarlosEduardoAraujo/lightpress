@@ -7,6 +7,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção do CI: UTF-8, DNS determinístico e configuração SQLite antecipada — 2026-11-12
+
+- **Diagnóstico:** a execução #141 (`f3a353b`) passou em checkout, configuração do PHP, lint e diagnóstico, mas `php bin/test.php` terminou com código `1`: 47 testes aprovados e duas falhas. Revisões, setup e seeder foram pulados. As falhas históricas tinham causas distintas, incluindo SQL de MySQL enviado ao SQLite no seeder inicial e um erro de sintaxe em `public/admin/activate.php`; esses problemas já estavam corrigidos no código atual.
+- **Teste de hooks (`bin/test.php`):** substituído `strtoupper()` por `mb_strtoupper($text, 'UTF-8')` no callback do teste, alinhando o resultado com a asserção `OLÁ MUNDO`.
+- **Teste de webhooks (`bin/test.php`):** substituída a dependência de domínios externos por fixtures `.test` com DNS simulado pela API existente do plugin. A comparação da lista exata verifica URLs válidas, separadores, ordem e deduplicação; `finally` restaura o mock anterior.
+- **Regressão SSRF:** adicionada asserção para rejeição de DNS vazio, loopback e metadados de nuvem, preservando as proteções do plugin.
+- **Ambiente do workflow (`.github/workflows/ci.yml`):** criação de `config.local.php` com SQLite movida para antes do lint, diagnóstico e suíte. O setup continua validado em etapa própria. Eliminadas as tentativas de conexão ao MySQL padrão durante a reprodução.
+- **Validação local:** PHP 8.4.27 em cópia isolada no Windows; lint, diagnóstico, sete testes de revisões, 14 testes de SSRF, setup SQLite e seeder de 25 publicações aprovados. Suíte principal com 49/50 asserções aprovadas; a única falha restante é a diferença preexistente de transliteração de slugs via `iconv` no Windows, cujo teste passou no Ubuntu da execução original. A validação local não comprova a aprovação de uma nova execução no GitHub.
+- **Documentação:** README atualizado com a ordem do workflow, causas das falhas, configuração isolada para reprodução e limites da validação. Também atualizado o registro de validação das revisões, agora executadas integralmente em PHP 8.4.
+
 ### Correção de ALT/TITLE e atualização dos metadados de imagens — 2026-11-12
 
 - **Problema investigado:** a matéria de Felipe Fraga e a Home entregavam o nome amigável do arquivo em `alt`/`title`, apesar de a biblioteca mostrar texto alternativo e legenda preenchidos. O comportamento também ocorreu em respostas com Cloudflare/FastCGI MISS; o registro específico de vínculo/cache em produção não foi inspecionado.
