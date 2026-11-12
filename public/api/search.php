@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-$query = trim($_GET['q'] ?? '');
+$query = Security::getSafeString($_GET, 'q');
 $limit = min(10, max(1, (int)($_GET['limit'] ?? 5)));
 
 if (strlen($query) < 2) {

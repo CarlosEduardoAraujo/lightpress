@@ -744,9 +744,9 @@ add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment
 
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
-# Content Security Policy (CSP) base
+# Content Security Policy (CSP) base sem 'unsafe-inline' (scripts estáticos em /assets/js/)
 
-add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'self';" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self';" always;
 ```
 
 ### 8.7. Permissões de Pastas e Coexistência com FTP/SSH (0775 / 0664)
@@ -1100,6 +1100,46 @@ O critério de contraste de cores para textos normais exige no mínimo `4.5:1` s
 #### 8.18.3. Áreas de Toque e Desambiguação de Links
 * No rodapé institucional (`templates/footer.php`), links de navegação rápida e categorias receberam espaçamento vertical dedicado (`py-1 inline-block`) para cumprir os requisitos de alvos de toque mínimos (*touch targets*).
 * Adicionados atributos `aria-label` descritivos diferenciando âncoras de categorias e tags de mesmo rótulo.
+
+### 8.19. Hardening Defensivo de Produção (Anti-SSRF Unificado, Resiliência de Sessão, Timing Constant-Time e Fail-Fast)
+
+Para atender a ambientes de missão crítica em produção e mitigar superfícies de ataque identificadas em auditoria de segurança avançada, o LightPress consolida uma camada robusta de defesas ativas:
+
+#### 8.19.1. Anti-SSRF Centralizado e DNS Pinning (`core/SafeHttpClient.php`)
+O sistema unifica a validação de destinos e requisições HTTP externas através do serviço central `LightPress\Core\SafeHttpClient`, operando com 4 perfis estritos de segurança:
+* **`PROFILE_STRICT_PUBLIC`:** Bloqueia endereços de loopback (`127.0.0.0/8`, `::1`), redes privadas RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), metadados de nuvem AWS/GCP/Azure (`169.254.0.0/16`, `fe80::/10`), CGNAT/Alibaba Cloud (`100.64.0.0/10`), IETF/Oracle (`192.0.0.0/24`), endereços de broadcast/multicast (`>= 224.0.0.0`) e representações hexadecimais/IPv6-mapped (`::ffff:a9fe:a9fe`, `fd00:ec2::`). Utilizado por padrão em webhooks e no `AlertService`.
+* **`PROFILE_LAN`:** Permite redes RFC1918 para integrações internas (ex.: automações locais n8n em `192.168.x.x`), mantendo bloqueio irrestrito a loopback, metadados de nuvem e blocos reservados. Utilizado pelo plugin `webhook-sender` (`$allowPrivate = true`).
+* **`PROFILE_LOCAL_AI`:** Habilita endpoints de inteligência artificial locais (ex.: Ollama ou vLLM em `127.0.0.1:11434` ou servidores dedicados na LAN), bloqueando de forma absoluta o acesso a metadados de provedores de nuvem. Utilizado pelo `AiClient`.
+* **`PROFILE_LOCAL_ORIGIN_ONLY`:** Restringe requisições estritamente ao host canônico do portal (`canonical_origin`), garantindo que o aquecimento de cache (`WarmupService`) não possa ser desviado para domínios ou IPs arbitrários.
+* **DNS Pinning Atômico:** Executa a resolução DNS uma única vez via `dns_get_record()` e fixa o IP auditado diretamente no cURL via `CURLOPT_RESOLVE`, neutralizando vulnerabilidades de DNS Rebinding (TOCTOU). Desativa redirecionamentos automáticos (`CURLOPT_FOLLOWLOCATION = false`) e audita o IP primário final (`CURLINFO_PRIMARY_IP`).
+
+#### 8.19.2. Mitigação de Timing Attack em Autenticação e Helpers Seguros (`core/Security.php`, `login.php`)
+* **Tempo Constante no Login:** Para prevenir enumeração de usuários legítimos via análise do tempo de resposta da CPU, `login.php` utiliza a constante pré-computada `Security::DUMMY_ARGON2ID_HASH` (`m=65536, t=4, p=1`) quando o usuário não existe ou está inativo. A validação via `password_verify()` consome ~136 ms de CPU de forma uniforme e indistinguível de um usuário existente com senha incorreta.
+* **Tipagem Estrita de Parâmetros:** Adicionados os helpers defensivos:
+  * `Security::getSafeString(array $source, string $key, string $default = ''): string`: Converte entradas em strings com `trim()`, com proteção estrita contra injeção de arrays (`?q[]=...`).
+  * `Security::getSafePassword(array $source, string $key): string`: Valida o tipo string **sem** aplicar `trim()`, assegurando que senhas válidas com espaços nas extremidades não sejam corrompidas.
+* **Hardening de Sessão e Proxies Reversos:**
+  * `Security::startSecureSession()` lê `trusted_proxies` com fallback resiliente para `$GLOBALS['config']`.
+  * Trata cadeias de proxies com múltiplos valores em `HTTP_X_FORWARDED_PROTO` (ex: `https, http`).
+  * Força `cookie_secure = true` e `cookie_httponly = true` em produção sobre HTTPS.
+
+#### 8.19.3. Fail-Fast em Produção e Prevenção de Vazamento de Segredos (`core/bootstrap.php`, `public/api/view.php`)
+* **Fail-Fast HTTP:** O arquivo `core/bootstrap.php` aborta imediatamente com HTTP 500 qualquer requisição web (`PHP_SAPI !== 'cli'`) em ambiente `production` caso `hmac_secret` permaneça com a chave pública padrão do repositório ou possua menos de 32 caracteres. O motivo detalhado é gravado exclusivamente no `error_log` do servidor, sem vazar informações ao cliente. Comandos CLI (como `bin/setup.php`) permanecem funcionais para rotinas de manutenção.
+* **Remoção de Segredo Padrão:** A API pública de visualizações ([view.php](file:///c:/Web/lightpress/public/api/view.php)) não utiliza mais fallback inseguro em código (`lightpress_default_secret`), retornando erro HTTP 500 controlado caso a chave não esteja configurada.
+* **Metadados Reais de Mídia:** `ImageProcessor::process()` detecta e armazena o MIME type real inspecionado via `finfo_file` (em vez de forçar `'image/webp'`), e sincroniza variantes geradas tanto no upload tradicional quanto no editor de mídia.
+
+#### 8.19.4. Desacoplamento Frontend e Content Security Policy (CSP) Estrita
+* **Compatibilidade com Nginx FastCGI Full-Page Cache (60m):**
+  * Para manter as páginas estáticas em cache no Nginx sem necessidade de nonces dinâmicos (que quebrariam o cache HTTP completo para visitantes anônimos), todo JavaScript inline foi desacoplado para bibliotecas estáticas versionadas:
+    * `public/assets/js/theme-init.js`: Carregado no `<head>` para inicialização do tema claro/escuro sem flash de layout (Zero FOUC).
+    * `public/assets/js/app.js`: Gerenciamento do seletor de tema, formulários de newsletter, cópia de links para a área de transferência e envio assíncrono de telemetria de visualizações via `navigator.sendBeacon` (com fallback para `fetch` com `keepalive: true`).
+  * Removido `'unsafe-inline'` da diretiva `script-src` tanto no cabeçalho emitido pelo PHP (`public/index.php`) quanto na configuração do Nginx (`nginx/lightpress.conf`).
+* **Sanitização de Canvas:** `public/admin/editor.php` e `public/admin/page-edit.php` aplicam `BlockCompiler::sanitizeHtml()` antes de injetar o conteúdo em atributos `contenteditable`, neutralizando XSS de persistência. Endpoints AJAX administrativos passam a exigir `Accept: application/json`.
+
+#### 8.19.5. Blindagem de Cache Nginx e .htaccess
+* **Cache Bypass DoS Neutralizado:** Removida a regex ambígua `~*/preview` de `$lp_skip_cache_uri` e das query strings no `nginx/lightpress.conf`, impedindo que atacantes forcem bypass de cache sob carga em URLs comuns.
+* **Herança de Cabeçalhos no Nginx:** Re-declarados os cabeçalhos de segurança nos blocos `location ^~ /uploads/` e `location ^~ /assets/`, corrigindo o comportamento nativo do Nginx que silenciava os cabeçalhos do bloco `server`.
+* **Bloqueio no Apache:** Adicionada regra explícita `RewriteRule ^api/view\.php$ - [R=404,L]` no `public/.htaccess`, garantindo que requisições diretas ao script PHP da API de views sejam bloqueadas.
 
 ---
 

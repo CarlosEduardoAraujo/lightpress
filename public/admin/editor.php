@@ -458,9 +458,10 @@ $categories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_act
 $csrfToken = Security::generateCsrfToken();
 
 // Conteúdo inicial para o editor: diferencia campo ausente de conteúdo vazio (string vazia intencional)
-$initialHtml = (array_key_exists('content_html', $post ?? []) && $post['content_html'] !== null)
+$rawInitialHtml = (array_key_exists('content_html', $post ?? []) && $post['content_html'] !== null)
     ? (string)$post['content_html']
     : (!empty($post['content_json']) && $post['content_json'] !== '[]' ? BlockCompiler::compile($post['content_json']) : '');
+$initialHtml = BlockCompiler::sanitizeHtml($rawInitialHtml);
 $pageTitle = !empty($post['id']) ? 'Editar Notícia' : 'Nova Notícia';
 $activePage = 'dashboard';
 require __DIR__ . '/header.php';
@@ -1377,6 +1378,7 @@ require __DIR__ . '/header.php';
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
                         'X-CSRF-Token': csrf
                     },
                     body: new URLSearchParams({
@@ -1709,6 +1711,7 @@ require __DIR__ . '/header.php';
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
                     'X-CSRF-Token': csrf
                 },
                 body: new URLSearchParams({

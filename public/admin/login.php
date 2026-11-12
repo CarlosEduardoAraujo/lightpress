@@ -39,8 +39,8 @@ if ($lockRemaining !== null) {
     if (!Security::verifyCsrfToken($token)) {
         $error = 'Sessão expirada ou requisição inválida. Tente novamente.';
     } else {
-        $username = trim($_POST['username'] ?? '');
-        $password = (string)($_POST['password'] ?? '');
+        $username = Security::getSafeString($_POST, 'username');
+        $password = Security::getSafePassword($_POST, 'password');
 
         $_SESSION['login_failures'] = ($_SESSION['login_failures'] ?? 0);
 
@@ -53,7 +53,12 @@ if ($lockRemaining !== null) {
                 [$username, $username]
             );
 
-            if ($user && !empty($user['is_active']) && Security::verifyPassword($password, $user['password_hash'])) {
+            // Mitigação de timing attack: se usuário não existe OU conta inativa, valida contra DUMMY_ARGON2ID_HASH
+            $isValidAccount = ($user && !empty($user['is_active']));
+            $hashToVerify = $isValidAccount ? (string)$user['password_hash'] : Security::DUMMY_ARGON2ID_HASH;
+            $passwordMatches = Security::verifyPassword($password, $hashToVerify);
+
+            if ($isValidAccount && $passwordMatches) {
                 // Sucesso: limpar bloqueio por IP e sessão
                 Security::clearLoginFailures($clientIp);
                 unset($_SESSION['login_failures']);

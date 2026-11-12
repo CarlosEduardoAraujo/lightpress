@@ -6,6 +6,9 @@
     RewriteEngine On
     RewriteBase /
 
+    # Bloqueio de acesso direto ao micro-endpoint do contador (Paridade Nginx)
+    RewriteRule ^api/view\.php$ - [R=404,L]
+
     # Ignora arquivos estáticos existentes
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d

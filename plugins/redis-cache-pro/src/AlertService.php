@@ -141,31 +141,24 @@ final class AlertService
             ];
 
             try {
-                $ch = curl_init($webhookUrl);
                 $jsonData = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                
-                curl_setopt_array($ch, [
-                    CURLOPT_POST           => true,
-                    CURLOPT_POSTFIELDS     => $jsonData,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_HTTPHEADER     => [
+
+                $res = \LightPress\Core\SafeHttpClient::request($webhookUrl, [
+                    CURLOPT_POST       => true,
+                    CURLOPT_POSTFIELDS => $jsonData,
+                    CURLOPT_HTTPHEADER => [
                         'Content-Type: application/json',
                         'User-Agent: LightPress-RedisCachePro/1.0',
                     ],
                     CURLOPT_TIMEOUT        => 6,
                     CURLOPT_CONNECTTIMEOUT => 3,
-                    CURLOPT_SSL_VERIFYPEER => true,
-                ]);
+                ], \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC);
 
-                $response = curl_exec($ch);
-                $responseCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $curlError = curl_error($ch);
-                curl_close($ch);
-
-                if ($responseCode >= 200 && $responseCode < 300) {
+                $responseCode = $res['status'];
+                if ($res['ok']) {
                     $success = true;
                 } else {
-                    $errorMsg = "HTTP {$responseCode}: " . ($curlError ?: substr((string)$response, 0, 150));
+                    $errorMsg = "HTTP {$responseCode}: " . ($res['error'] ?: substr($res['body'], 0, 150));
                 }
             } catch (Throwable $e) {
                 $errorMsg = $e->getMessage();

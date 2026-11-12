@@ -135,7 +135,8 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
         
         <!-- Left Column (Page Core - 8 Cols) -->
-        <article class="lg:col-span-8 flex flex-col gap-space-md bg-pure-white dark:bg-carbon-surface p-space-md sm:p-space-xl rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c]">
+        <!-- Endpoint canônico de visualização: var endpoint = '/api/view/page/' + pageId; -->
+        <article class="lg:col-span-8 flex flex-col gap-space-md bg-pure-white dark:bg-carbon-surface p-space-md sm:p-space-xl rounded-xl shadow-xs border border-subtle-border dark:border-[#2a303c]" data-view-endpoint="/api/view/page/<?= (int)$page['id'] ?>">
             
             <!-- Header Section -->
             <header class="flex flex-col gap-space-xs pb-space-sm border-b border-subtle-border dark:border-[#2a303c]">
@@ -215,7 +216,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
                 <p class="font-body-sm text-body-sm text-surface-container">
                     Toda manhã direto na sua caixa de entrada, com rigor editorial e sem enrolação.
                 </p>
-                <form class="flex flex-col gap-space-xs mt-1" onsubmit="event.preventDefault(); alert('Inscrição confirmada no Grid SpeedRacing!');">
+                <form class="form-newsletter flex flex-col gap-space-xs mt-1">
                     <input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red border border-[#2a303c]" placeholder="Seu melhor e-mail" required="" type="email"/>
                     <button class="w-full py-2.5 bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm" type="submit">
                         <span>Garantir Vaga no Grid</span>
@@ -230,20 +231,5 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
         </aside>
     </div>
 </div>
-
-<!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->
-<script>
-(function() {
-    var pageId = <?= (int)$page['id'] ?>;
-    var endpoint = '/api/view/page/' + pageId;
-    try {
-        if (navigator.sendBeacon) {
-            navigator.sendBeacon(endpoint);
-        } else {
-            fetch(endpoint, { method: 'POST', keepalive: true }).catch(function() {});
-        }
-    } catch (e) {}
-})();
-</script>
 
 <?php require __DIR__ . '/footer.php'; ?>

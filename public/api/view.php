@@ -64,7 +64,12 @@ $throttleSeconds = (int)($config['security']['rate_limit']['view_throttle_second
 $expiresAt = gmdate('Y-m-d H:i:s', time() + $throttleSeconds);
 
 $ip = Security::getClientIp($config['security']['trusted_proxies'] ?? null);
-$secret = $config['security']['hmac_secret'] ?? 'lightpress_default_secret';
+$secret = (string)($config['security']['hmac_secret'] ?? '');
+if (empty($secret)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Server configuration error']);
+    exit;
+}
 $ipHash = Security::hashIp($ip, $secret);
 
 // Para páginas institucionais, garantir o esquema de view_dedupe antes de iniciar a transação (evita commit implícito no MySQL)

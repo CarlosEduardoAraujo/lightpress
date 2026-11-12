@@ -405,12 +405,17 @@ final class AiClient
      */
     private static function executeCurl(string $url, array $headers, string $payload, int $timeout): string
     {
-        $ch = curl_init($url);
+        $target = \LightPress\Core\SafeHttpClient::resolveSafeTarget($url, \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_AI);
+        if ($target === null) {
+            throw new RuntimeException('Destino bloqueado por políticas defensivas de segurança (SSRF).');
+        }
+
+        $ch = curl_init($target['url']);
         if ($ch === false) {
             throw new RuntimeException('Falha ao inicializar cURL.');
         }
 
-        curl_setopt_array($ch, [
+        $curlOpts = [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_HTTPHEADER => $headers,
@@ -422,7 +427,15 @@ final class AiClient
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_USERAGENT => 'LightPress-AiCopilot/1.0',
-        ]);
+        ];
+
+        if (!empty($target['pinned_ip'])) {
+            $pinnedIp = $target['pinned_ip'];
+            $formattedIp = str_contains($pinnedIp, ':') ? "[{$pinnedIp}]" : $pinnedIp;
+            $curlOpts[CURLOPT_RESOLVE] = ["{$target['host']}:{$target['port']}:{$formattedIp}"];
+        }
+
+        curl_setopt_array($ch, $curlOpts);
 
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -485,42 +498,14 @@ final class AiClient
 
     /**
      * Valida URLs de endpoints personalizados contra SSRF, DNS Rebinding e metadados de nuvem.
+     * Suporta Ollama/vLLM local e na rede local (127.0.0.1 / RFC1918), mas bloqueia rigorosamente
+     * serviços de metadados de nuvem (AWS/GCP/Azure/Alibaba/Oracle) em todas as representações (IPv4 e IPv6).
      */
     private static function validateEndpointUrl(string $url): void
     {
-        $parsed = parse_url($url);
-        if (!$parsed || empty($parsed['host']) || empty($parsed['scheme'])) {
-            throw new RuntimeException('URL do endpoint personalizado é inválida.');
-        }
-
-        // Bloqueia esquemas não-HTTP(S)
-        if (!in_array($parsed['scheme'], ['http', 'https'], true)) {
-            throw new RuntimeException('Apenas protocolos HTTP e HTTPS são permitidos para endpoints de IA.');
-        }
-
-        $host = strtolower($parsed['host']);
-
-        // Bloqueia expressamente AWS/GCP/Azure metadata service por nome de host
-        if ($host === '169.254.169.254' || str_contains($host, 'metadata.google.internal') || str_starts_with($host, 'fe80:') || str_starts_with($host, 'fd00:ec2:')) {
-            throw new RuntimeException('Acesso a serviços de metadados de nuvem é estritamente proibido.');
-        }
-
-        // Resolução de IP para mitigar DNS Rebinding contra faixas de metadados de nuvem
-        $resolvedIp = filter_var($host, FILTER_VALIDATE_IP) ? $host : gethostbyname($host);
-        if (filter_var($resolvedIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $ipLong = ip2long($resolvedIp);
-            if ($ipLong !== false) {
-                // 169.254.0.0/16 (Link-local / AWS / GCP / Azure metadata 169.254.169.254)
-                $mask16 = ip2long('255.255.0.0');
-                if (($ipLong & $mask16) === (ip2long('169.254.0.0') & $mask16)) {
-                    throw new RuntimeException('Acesso a serviços de metadados de nuvem (169.254.0.0/16) é estritamente proibido.');
-                }
-                // 100.64.0.0/10 (Carrier-Grade NAT / Alibaba Cloud metadata 100.100.100.200)
-                $mask10 = ip2long('255.192.0.0');
-                if (($ipLong & $mask10) === (ip2long('100.64.0.0') & $mask10)) {
-                    throw new RuntimeException('Acesso a endereços da faixa Carrier-Grade / Cloud Metadata (100.64.0.0/10) é estritamente proibido.');
-                }
-            }
+        $target = \LightPress\Core\SafeHttpClient::resolveSafeTarget($url, \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_AI);
+        if ($target === null) {
+            throw new RuntimeException('URL do endpoint personalizado é inválida ou foi bloqueada por políticas defensivas de segurança (SSRF/Metadados de Nuvem).');
         }
     }
 }

@@ -99,19 +99,8 @@ if (empty($trendingTags)) {
     <!-- Schema.org JSON-LD para Google Notícias -->
     <?= Seo::renderJsonLd($post ?? null, $config) ?>
 
-    <!-- Script Anti-Flash de Tema: MODO ESCURO É O PADRÃO -->
-    <script>
-        (function() {
-            var saved = localStorage.getItem('sr_theme');
-            if (saved === 'light') {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
-                document.documentElement.classList.add('dark');
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-        })();
-    </script>
+    <!-- Script Anti-Flash de Tema: MODO ESCURO É O PADRÃO (Externo para conformidade estrita com CSP) -->
+    <script src="/assets/js/theme-init.js"></script>
 
     <!-- Tipografia do Design System SpeedRacing (Kinetic Apex Editorial) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -294,7 +283,7 @@ if (empty($trendingTags)) {
                 </form>
 
                 <!-- Botão de Alternância de Tema Claro / Escuro -->
-                <button type="button" onclick="toggleTheme()" id="btnThemeToggle" aria-label="Alternar modo claro/escuro" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-carbon-surface dark:text-pure-white flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-[#252b35] transition-colors border border-subtle-border dark:border-[#2a303c]" title="Alternar Modo Claro/Escuro">
+                <button type="button" id="btnThemeToggle" aria-label="Alternar modo claro/escuro" class="w-9 h-9 rounded-lg bg-surface-container dark:bg-carbon-surface dark:text-pure-white flex items-center justify-center text-on-surface hover:bg-surface-container-high dark:hover:bg-[#252b35] transition-colors border border-subtle-border dark:border-[#2a303c]" title="Alternar Modo Claro/Escuro">
                     <span id="themeIcon"><?= Icon::svg('light_mode', 'w-4 h-4', 18) ?></span>
                 </button>
                 
@@ -327,34 +316,5 @@ if (empty($trendingTags)) {
     <main class="w-full pt-40 bg-surface dark:bg-carbon-black min-h-[calc(100vh-280px)] transition-colors duration-200">
         <div class="max-w-[1900px] w-full mx-auto px-margin-mobile md:px-margin space-y-space-xl pb-space-xl">
 
-    <script>
-        var SUN_SVG = '<?= addslashes(Icon::svg("light_mode", "w-4 h-4", 18)) ?>';
-        var MOON_SVG = '<?= addslashes(Icon::svg("dark_mode", "w-4 h-4", 18)) ?>';
-
-        function updateThemeButton() {
-            var isDark = document.documentElement.classList.contains('dark');
-            var icon = document.getElementById('themeIcon');
-            var btn = document.getElementById('btnThemeToggle');
-            if (icon) {
-                icon.innerHTML = isDark ? SUN_SVG : MOON_SVG;
-            }
-            if (btn) {
-                btn.setAttribute('title', isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro');
-            }
-        }
-        function toggleTheme() {
-            var isDark = document.documentElement.classList.contains('dark');
-            if (isDark) {
-                document.documentElement.classList.remove('dark');
-                document.documentElement.setAttribute('data-theme', 'light');
-                localStorage.setItem('sr_theme', 'light');
-            } else {
-                document.documentElement.classList.add('dark');
-                document.documentElement.setAttribute('data-theme', 'dark');
-                localStorage.setItem('sr_theme', 'dark');
-            }
-            updateThemeButton();
-        }
-        document.addEventListener('DOMContentLoaded', updateThemeButton);
-        updateThemeButton();
-    </script>
+    <!-- Aplicação JavaScript do Portal (Desacoplado para conformidade estrita com CSP) -->
+    <script src="/assets/js/app.js" defer></script>

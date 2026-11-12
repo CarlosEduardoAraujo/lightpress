@@ -7,7 +7,46 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
-### Roteamento e Navegação: Atualização do slug de WEC para Endurance — 2026-11-12
+### Hardening de Segurança de Produção: Anti-SSRF Centralizado, CSP Estrita, Timing Constant-Time e Fail-Fast — 2026-11-12
+
+- **Serviço Centralizado Anti-SSRF com DNS Pinning (`core/SafeHttpClient.php`):**
+  - Implementação de cliente HTTP defensivo unificado com 4 perfis estritos de segurança: `PROFILE_STRICT_PUBLIC`, `PROFILE_LAN`, `PROFILE_LOCAL_AI` e `PROFILE_LOCAL_ORIGIN_ONLY`.
+  - Resolução DNS atômica em passo único (`dns_get_record()` e `gethostbynamel()`), com validação binária de todos os registros e fixação de IP via `CURLOPT_RESOLVE` para neutralizar ataques de Time-of-Check to Time-of-Use (TOCTOU) e DNS Rebinding.
+  - Bloqueio exaustivo de loopback (`127.0.0.0/8`, `::1`), link-local/metadados de nuvem (`169.254.0.0/16`, `fe80::/10`), CGNAT/Alibaba Cloud (`100.64.0.0/10`), IETF/Oracle (`192.0.0.0/24`), broadcast/multicast (`>= 224.0.0.0`) e mapeamentos IPv6/IPv4-mapped (`::ffff:a9fe:a9fe`, `fd00:ec2::`).
+  - Verificação defensiva pós-conexão do IP primário efetivo (`CURLINFO_PRIMARY_IP`) e desativação estrita de redirecionamentos automáticos (`CURLOPT_FOLLOWLOCATION = false`).
+- **Integração de Segurança de Rede nos Plugins:**
+  - `plugins/webhook-sender/webhook-sender.php`: migração para o motor `SafeHttpClient`, mantendo suporte transparente a redes locais autorizadas (`192.168.x.x`) e compatibilidade total com os testes existentes.
+  - `plugins/ai-copilot/src/AiClient.php`: integração sob perfil `PROFILE_LOCAL_AI`, permitindo instâncias locais do Ollama (`127.0.0.1:11434`) ou servidores na LAN e bloqueando estritamente credenciais e metadados de nuvem.
+  - `plugins/redis-cache-pro/src/AlertService.php`: requisições de alerta de infraestrutura restritas via `PROFILE_STRICT_PUBLIC`.
+  - `plugins/redis-cache-pro/src/WarmupService.php`: aquecimento de cache customizado restrito ao host canônico do portal via `PROFILE_LOCAL_ORIGIN_ONLY`.
+- **Mitigação de Timing Attack em Autenticação (`core/Security.php`, `public/admin/login.php`):**
+  - Introdução da constante `Security::DUMMY_ARGON2ID_HASH` (hash real Argon2id pré-computado). Quando o usuário informado não existe ou está desativado, o login executa `password_verify()` consumindo ~136 ms de CPU de forma uniforme, neutralizando ataques de temporização para enumeração de usuários.
+- **Tipagem Estrita e Proteção de Entradas (`core/Security.php`):**
+  - Criação de `Security::getSafeString()` com tipagem e `trim()`, com proteção contra passagem de arrays aninhados em parâmetros `$_GET` e `$_POST`.
+  - Criação de `Security::getSafePassword()` sem `trim()`, preservando senhas legítimas com espaços nas extremidades.
+  - Aplicação dos helpers em `public/index.php`, `public/api/posts.php`, `public/api/search.php`, `public/admin/dashboard.php`, `public/admin/pages.php`, `public/admin/plugin-settings.php`, `public/admin/media.php`, `public/admin/upload.php`, `public/admin/activate.php` e `public/admin/users.php`.
+- **Resiliência de Sessão e Proxy Reverso (`core/Security.php`):**
+  - `Security::startSecureSession()` lê `trusted_proxies` com fallback automático para `$GLOBALS['config']`.
+  - Trata múltiplos valores em `HTTP_X_FORWARDED_PROTO` (ex: `https, http`) e força `cookie_secure = true` e `cookie_httponly = true` em produção HTTPS.
+- **Fail-Fast em Produção e Prevenção de Vazamento de Segredos (`core/bootstrap.php`, `public/api/view.php`):**
+  - Adicionado fail-fast para requisições HTTP (`PHP_SAPI !== 'cli'`) em ambiente `production` caso `hmac_secret` permaneça com a chave pública padrão ou tenha menos de 32 caracteres, retornando HTTP 500 genérico e gravando a causa no log do servidor. Comandos CLI (`bin/setup.php`) permanecem funcionais.
+  - Removido o segredo fallback `'lightpress_default_secret'` de `public/api/view.php`.
+- **Integridade de Mídia e MIME Types (`core/ImageProcessor.php`, `public/admin/upload.php`, `public/admin/media.php`):**
+  - Detecção e gravação do MIME type real verificado via `finfo_file` no manifesto de imagem (em substituição ao valor hardcoded `'image/webp'`).
+  - Sincronização automática de variantes de imagens no modal de edição de mídia via `ImageProcessor::registerVariants()`.
+- **Desacoplamento de Frontend e Content Security Policy Estrita (`templates/`, `public/assets/js/`):**
+  - Eliminação de todos os manipuladores inline (`onclick`, `onsubmit`) e scripts embutidos nos templates `header.php`, `home.php`, `post.php`, `page.php`, `category.php`, `tag.php` e `search.php`.
+  - Criação dos módulos JavaScript estáticos `public/assets/js/theme-init.js` (carregado no `<head>` sem flash de tema) e `public/assets/js/app.js` (gerenciador de tema, formulários de newsletter, cópia de link e contagem de views via `navigator.sendBeacon` com fallback para `fetch keepalive`).
+  - Remoção de `'unsafe-inline'` da diretiva `script-src` na CSP em `public/index.php` e `nginx/lightpress.conf`, assegurando total compatibilidade com FastCGI Cache de 60m sem necessidade de nonces dinâmicos.
+- **Blindagem de Servidor Web e Rotas (`nginx/lightpress.conf`, `public/.htaccess`):**
+  - Remoção da regex permissiva `~*/preview` que permitia ataques de DoS por bypass de cache no Nginx.
+  - Re-declaração dos cabeçalhos de segurança nos blocos `location ^~ /uploads/` e `location ^~ /assets/` para prevenir a perda de herança de diretivas do Nginx.
+  - Bloqueio com erro 404 para chamadas diretas a `api/view.php` no `.htaccess`.
+- **Sanitização de Canvas e AJAX no Painel (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - Sanitização via `BlockCompiler::sanitizeHtml()` antes de injetar o HTML publicado nos atributos `contenteditable` do canvas de edição.
+  - Inclusão do cabeçalho `Accept: application/json` nas requisições assíncronas do editor e modal de mídia.
+- **Suíte de Testes e Validação:**
+  - 100% de aprovação nas suítes automatizadas: `bin/test-ssrf.php` (14/14 PASS), `bin/test_security_fixes.py` (70/70 PASS), `bin/test-plugins.php` (20/20 PASS) e verificação sintática estrita (`php -l`) em todos os arquivos PHP do projeto.
 
 - **Padronização Canônica de Categoria (`templates/header.php`, `templates/footer.php`):**
   - Atualização do slug da categoria de `wec` para `endurance` no menu de navegação superior (`$menuCategories`) em `templates/header.php`.

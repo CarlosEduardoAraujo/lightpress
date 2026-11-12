@@ -54,8 +54,8 @@ if (isset($_GET['saved'])) {
 }
 
 // Filtros
-$filterSearch = trim($_GET['q'] ?? '');
-$filterStatus = trim($_GET['status'] ?? '');
+$filterSearch = Security::getSafeString($_GET, 'q');
+$filterStatus = Security::getSafeString($_GET, 'status');
 
 $sql = "SELECT p.*, u.name as author_name FROM pages p LEFT JOIN users u ON u.id = p.user_id WHERE 1=1";
 $params = [];

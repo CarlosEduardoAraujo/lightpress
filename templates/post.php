@@ -209,7 +209,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
         
         <!-- Left Column (Article Core - 8 Cols) -->
-        <article class="lg:col-span-8 flex flex-col gap-space-lg">
+        <article class="lg:col-span-8 flex flex-col gap-space-lg" <?= empty($isPreview) ? 'data-view-endpoint="/api/view/' . (int)$post['id'] . '"' : '' ?>>
             
             <!-- 1. Header Section -->
             <header class="flex flex-col gap-space-sm">
@@ -276,7 +276,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                         <a href="https://t.me/share/url?url=<?= $postUrlEncoded ?>&text=<?= $postTitleEncoded ?>" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-racing-red-text dark:text-racing-red flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" title="Compartilhar no Telegram">
                             <?= Icon::svg('send', 'text-racing-red-text dark:text-racing-red', 18) ?>
                         </a>
-                        <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" onclick="copyPostLink(this, '<?= Security::e($postUrl) ?>')" title="Copiar link da matéria">
+                        <button type="button" class="w-8 h-8 rounded-lg bg-surface-container dark:bg-[#252b36] hover:bg-surface-container-high dark:hover:bg-[#2f3744] text-carbon-black dark:text-pure-white flex items-center justify-center transition-colors border border-subtle-border dark:border-[#2a303c]" id="copy-btn" data-copy-url="<?= Security::e($postUrl) ?>" title="Copiar link da matéria">
                             <span id="copy-icon"><?= Icon::svg('link', 'text-carbon-black dark:text-pure-white', 18) ?></span>
                         </button>
                     </div>
@@ -441,7 +441,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <p class="font-body-sm text-body-sm text-surface-container">
                     Toda manhã direto na sua caixa de entrada, com rigor editorial e sem enrolação.
                 </p>
-                <form class="flex flex-col gap-space-xs mt-1" onsubmit="event.preventDefault(); alert('Inscrição confirmada no Grid SpeedRacing!');">
+                <form class="form-newsletter flex flex-col gap-space-xs mt-1">
                     <input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red border border-[#2a303c]" placeholder="Seu melhor e-mail" required="" type="email"/>
                     <button class="w-full py-2.5 bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm" type="submit">
                         <span>Garantir Vaga no Grid</span>
@@ -456,48 +456,5 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
         </aside>
     </div>
 </div>
-
-<!-- Scripts de Interação da Matéria -->
-<script>
-const LINK_SVG = '<?= addslashes(Icon::svg("link", "text-carbon-black dark:text-pure-white", 18)) ?>';
-const CHECK_SVG = '<?= addslashes(Icon::svg("check", "text-flag-green", 18)) ?>';
-
-function copyPostLink(btn, url) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(function() {
-            var iconContainer = document.getElementById('copy-icon');
-            if (iconContainer) {
-                iconContainer.innerHTML = CHECK_SVG;
-                btn.classList.add('text-flag-green');
-                setTimeout(function() {
-                    iconContainer.innerHTML = LINK_SVG;
-                    btn.classList.remove('text-flag-green');
-                }, 2000);
-            }
-        }).catch(function() {
-            prompt('Copie o link:', url);
-        });
-    } else {
-        prompt('Copie o link:', url);
-    }
-}
-</script>
-
-<!-- Disparo Assíncrono e Leve de Visualizações (Views) - Apenas em Leitura Pública Real -->
-<?php if (empty($isPreview)): ?>
-<script>
-(function() {
-    var postId = <?= (int)$post['id'] ?>;
-    var endpoint = '/api/view/' + postId;
-    try {
-        if (navigator.sendBeacon) {
-            navigator.sendBeacon(endpoint);
-        } else {
-            fetch(endpoint, { method: 'POST', keepalive: true }).catch(function() {});
-        }
-    } catch (e) {}
-})();
-</script>
-<?php endif; ?>
 
 <?php require __DIR__ . '/footer.php'; ?>

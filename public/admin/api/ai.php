@@ -52,7 +52,10 @@ if (!PluginManager::isActive('ai-copilot')) {
     exit;
 }
 
-$action = trim((string)($_GET['action'] ?? $_POST['action'] ?? ''));
+$action = Security::getSafeString($_GET, 'action');
+if ($action === '') {
+    $action = Security::getSafeString($_POST, 'action');
+}
 
 try {
     switch ($action) {
@@ -180,9 +183,16 @@ try {
             break;
     }
 } catch (\Throwable $e) {
-    http_response_code(500);
+    error_log('[LightPress AI API Error] ' . $e->getMessage());
+    $code = ($e->getCode() >= 400 && $e->getCode() < 600) ? (int)$e->getCode() : 500;
+    http_response_code($code);
+
+    $clientMsg = ($code < 500 && !($e instanceof \PDOException))
+        ? $e->getMessage()
+        : 'Erro interno ao processar requisição de inteligência artificial.';
+
     echo json_encode([
         'ok' => false,
-        'error' => $e->getMessage(),
+        'error' => $clientMsg,
     ]);
 }

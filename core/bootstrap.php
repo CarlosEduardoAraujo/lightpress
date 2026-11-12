@@ -44,6 +44,35 @@ if (!file_exists($configFile)) {
 
 $config = require $configFile;
 
+// Validação defensiva de segurança em ambiente de produção (fail-fast HTTP)
+if (PHP_SAPI !== 'cli' && ($config['app']['env'] ?? '') === 'production') {
+    $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
+    if (empty($hmacSecret) || $hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32) {
+        http_response_code(500);
+        error_log('[LightPress Security] Chave hmac_secret ausente, padrão ou menor que 32 caracteres em ambiente de produção.');
+
+        $isJson = false;
+        foreach (headers_list() as $hdr) {
+            if (stripos($hdr, 'Content-Type: application/json') !== false) {
+                $isJson = true;
+                break;
+            }
+        }
+        if (!$isJson && isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
+            $isJson = true;
+        }
+
+        if ($isJson) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'Erro interno de configuração do servidor.'], JSON_UNESCAPED_UNICODE);
+        } else {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo '500 - Erro interno de configuração do servidor.';
+        }
+        exit;
+    }
+}
+
 // Inicializar Camada de Banco de Dados
 \LightPress\Core\Database::init($config['database']);
 
@@ -63,7 +92,7 @@ if (!empty($config['app']['debug'])) {
     error_reporting(E_ALL);
 } else {
     ini_set('display_errors', '0');
-    error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+    error_reporting(E_ALL & ~E_DEPRECATED);
 }
 
 ini_set('log_errors', '1');

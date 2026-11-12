@@ -52,7 +52,7 @@ Hook::addFilter('test_filter', function (string $text): string {
 }, 10);
 
 Hook::addFilter('test_filter', function (string $text): string {
-    return strtoupper($text);
+    return mb_strtoupper($text, 'UTF-8');
 }, 20);
 
 $filtered = Hook::applyFilters('test_filter', 'Olá');

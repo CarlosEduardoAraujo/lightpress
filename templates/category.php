@@ -256,7 +256,7 @@ $categoryName = Security::e($category['name'] ?? 'Categoria');
                 <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">
                     O resumo técnico e os bastidores das principais categorias do automobilismo todo dia às 7h no seu e-mail.
                 </p>
-                <form class="flex flex-col gap-2" onsubmit="event.preventDefault(); alert('Obrigado por se inscrever no Grid SpeedRacing!');">
+                <form class="form-newsletter flex flex-col gap-2">
                     <input class="w-full px-space-sm py-2 rounded-lg bg-pure-white dark:bg-[#151920] text-carbon-black dark:text-pure-white placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c]" placeholder="Seu melhor e-mail" type="email" required/>
                     <button class="w-full py-2 rounded-lg bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold transition-colors" type="submit">
                         Inscrever-se Grátis

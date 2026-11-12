@@ -42,7 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['form_action'] ?? 'publish';
         $title = trim($_POST['title'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
-        $contentHtml = trim($_POST['content_html'] ?? '');
+        $rawContentHtml = Security::getSafeString($_POST, 'content_html');
+        $contentHtml = BlockCompiler::sanitizeHtml($rawContentHtml);
         $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['featured_image'])) : null;
         $seoTitle = trim($_POST['seo_title'] ?? '');
         $seoDesc = trim($_POST['seo_description'] ?? '');
@@ -347,7 +348,7 @@ require __DIR__ . '/header.php';
                         </div>
 
                         <!-- Canvas Visual com Suporte a Colar Direto do Docs / Word -->
-                        <div class="editor-canvas" id="editorCanvas" contenteditable="true" spellcheck="true" placeholder="Cole ou digite aqui o conteúdo institucional da página (suporta Ctrl+V direto do Google Docs, Word ou web)..."><?= $page['content_html'] ?? '' ?></div>
+                        <div class="editor-canvas" id="editorCanvas" contenteditable="true" spellcheck="true" placeholder="Cole ou digite aqui o conteúdo institucional da página (suporta Ctrl+V direto do Google Docs, Word ou web)..."><?= BlockCompiler::sanitizeHtml((string)($page['content_html'] ?? '')) ?></div>
                         
                         <!-- Textarea de Fallback / Código HTML Direto -->
                         <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e($page['content_html'] ?? '') ?></textarea>
@@ -885,6 +886,7 @@ require __DIR__ . '/header.php';
                 var res = await fetch('/admin/api/ai.php?action=describe_media', {
                     method: 'POST',
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRF-Token': csrf
                     },

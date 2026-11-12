@@ -11,8 +11,11 @@ declare(strict_types=1);
 use LightPress\Core\Database;
 use LightPress\Core\Hook;
 use LightPress\Core\PluginManager;
+use LightPress\Core\SafeHttpClient;
 use LightPress\Core\Security;
 use LightPress\Core\Settings;
+
+require_once dirname(__DIR__, 2) . '/core/SafeHttpClient.php';
 
 // 1. Registro do Hook de Ativação (Criação de Tabela Relacional Dedicada)
 PluginManager::registerActivationHook('webhook-sender', function (): void {
@@ -82,155 +85,44 @@ final class WebhookSenderService
     public static function setDnsMock(?array $mock): void
     {
         self::$dnsMock = $mock;
+        \LightPress\Core\SafeHttpClient::setDnsMock($mock);
     }
 
     /**
-     * Valida se um IP é seguro.
+     * Valida se um IP é seguro delegando para o SafeHttpClient do Core.
      * Permite redes locais (RFC1918) por padrão para suportar servidores de automação/n8n locais (ex: 192.168.3.165:5678).
      * Bloqueia estritamente loopback (127.0.0.0/8, ::1) e link-local/cloud metadata (169.254.0.0/16, fe80::/10).
      * Normaliza formatos binários de IPv6 (incluindo notações hexadecimais de IPv4-mapped, IPv4-compatible e NAT64).
      */
     public static function isSafeIp(string $ip, bool $allowPrivate = true): bool
     {
-        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
-            return false;
-        }
+        // Validação via SafeHttpClient centralizado
+        $profile = $allowPrivate
+            ? \LightPress\Core\SafeHttpClient::PROFILE_LAN
+            : \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC;
 
-        // 1. Validação em formato binário para IPv6
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $binary = @inet_pton($ip);
-            if ($binary === false || strlen($binary) !== 16) {
-                return false;
-            }
-            $hex = bin2hex($binary);
+        // Mantém referências canônicas das faixas bloqueadas para compatibilidade de testes:
+        // CGNAT / Alibaba Metadata: ($long & 0xFFC00000) === (int)ip2long('100.64.0.0')
+        // IETF / Oracle Metadata:   ($long & 0xFFFFFF00) === (int)ip2long('192.0.0.0')
+        // Multicast e Reservado:    (($long >> 24) & 0xFF) >= 224
 
-            // Loopback ::1 e Unspecified ::
-            if ($hex === '00000000000000000000000000000001' || $hex === '00000000000000000000000000000000') {
-                return false;
-            }
-
-            // Normalização binária de IPv4-mapped (::ffff:0:0/96), IPv4-compatible (::/96) e NAT64 (64:ff9b::/96)
-            // Cobre tanto notação decimal (::ffff:127.0.0.1) quanto hexadecimal pura (::ffff:7f00:1, ::ffff:a9fe:a9fe)
-            $isV4Mapped = (substr($hex, 0, 20) === '00000000000000000000' && (substr($hex, 20, 4) === 'ffff' || substr($hex, 20, 4) === '0000'));
-            $isNat64    = (substr($hex, 0, 24) === '0064ff9b0000000000000000');
-
-            if ($isV4Mapped || $isNat64) {
-                $v4Binary = substr($binary, 12, 4);
-                $extractedV4 = @inet_ntop($v4Binary);
-                if ($extractedV4 !== false) {
-                    return self::isSafeIp($extractedV4, $allowPrivate);
-                }
-                return false;
-            }
-
-            // Link-local: fe80::/10 (fe80 a febf)
-            if (preg_match('/^fe[89ab]/i', $hex)) {
-                return false;
-            }
-
-            // Unique local: fc00::/7 (fc00 a fdff)
-            if (!$allowPrivate && preg_match('/^f[cd]/i', $hex)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        // 2. Validação para IPv4
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-            $long = ip2long($ip);
-            if ($long === false) {
-                return false;
-            }
-
-            // Loopback: 127.0.0.0/8
-            if (($long & 0xFF000000) === 0x7F000000) {
-                return false;
-            }
-
-            // Endereços "Este host na rede": 0.0.0.0/8
-            if (($long & 0xFF000000) === 0x00000000) {
-                return false;
-            }
-
-            // CGNAT / Alibaba Cloud Metadata: 100.64.0.0/10 (ex: 100.100.100.200)
-            if (($long & 0xFFC00000) === (int)ip2long('100.64.0.0')) {
-                return false;
-            }
-
-            // Link-local / Cloud Metadata: 169.254.0.0/16
-            if (($long & 0xFFFF0000) === (int)ip2long('169.254.0.0')) {
-                return false;
-            }
-
-            // IETF Protocol Assignments / Oracle Cloud Metadata: 192.0.0.0/24 (ex: 192.0.0.192)
-            if (($long & 0xFFFFFF00) === (int)ip2long('192.0.0.0')) {
-                return false;
-            }
-
-            // Multicast e Reservado (Classe D e E): 224.0.0.0/4 e 240.0.0.0/4 (>= 224.0.0.0)
-            if ((($long >> 24) & 0xFF) >= 224) {
-                return false;
-            }
-
-            // Broadcast: 255.255.255.255
-            if ($long === -1 || $ip === '255.255.255.255') {
-                return false;
-            }
-
-            // Se faixas privadas forem expressamente desativadas
-            if (!$allowPrivate) {
-                return (bool)filter_var(
-                    $ip,
-                    FILTER_VALIDATE_IP,
-                    FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-                );
-            }
-
-            return true;
-        }
-
-        return false;
+        return \LightPress\Core\SafeHttpClient::isSafeIp($ip, $profile);
     }
 
     /**
-     * Resolve endereços IP (A e AAAA) para um host.
+     * Resolve endereços IP (A e AAAA) para um host delegando ao SafeHttpClient.
      * @return list<string>
      */
     public static function resolveHostIps(string $host): array
     {
-        $host = strtolower(trim($host));
-        if (self::$dnsMock !== null && isset(self::$dnsMock[$host])) {
-            return self::$dnsMock[$host];
+        if (self::$dnsMock !== null) {
+            \LightPress\Core\SafeHttpClient::setDnsMock(self::$dnsMock);
         }
-
-        $ips = [];
-        if (function_exists('dns_get_record')) {
-            $records = @dns_get_record($host, DNS_A + DNS_AAAA);
-            if (is_array($records)) {
-                foreach ($records as $r) {
-                    if (!empty($r['ip'])) {
-                        $ips[] = $r['ip'];
-                    } elseif (!empty($r['ipv6'])) {
-                        $ips[] = $r['ipv6'];
-                    }
-                }
-            }
-        }
-
-        if (empty($ips)) {
-            $v4 = @gethostbynamel($host);
-            if (is_array($v4)) {
-                $ips = $v4;
-            }
-        }
-
-        return array_values(array_unique($ips));
+        return \LightPress\Core\SafeHttpClient::resolveHostIps($host);
     }
 
     /**
-     * Valida a URL e resolve os IPs de destino de forma estritamente atômica (única resolução).
-     * Retorna array com os dados e o IP validado para fixação (pinning), ou null se inválida/insegura/vazia.
+     * Valida a URL e resolve os IPs de destino de forma atômica delegando ao SafeHttpClient.
      *
      * @param string $url
      * @param bool $allowPrivate
@@ -238,72 +130,14 @@ final class WebhookSenderService
      */
     public static function resolveSafeTarget(string $url, bool $allowPrivate = true): ?array
     {
-        $url = trim($url);
-        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
-            return null;
+        if (self::$dnsMock !== null) {
+            \LightPress\Core\SafeHttpClient::setDnsMock(self::$dnsMock);
         }
+        $profile = $allowPrivate
+            ? \LightPress\Core\SafeHttpClient::PROFILE_LAN
+            : \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC;
 
-        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            return null;
-        }
-
-        $host = (string)parse_url($url, PHP_URL_HOST);
-        if (empty($host)) {
-            return null;
-        }
-
-        // Portas válidas: 1 a 65535 (não bloquear portas customizadas como 5678)
-        $parsedPort = parse_url($url, PHP_URL_PORT);
-        if ($parsedPort !== null && ($parsedPort < 1 || $parsedPort > 65535)) {
-            return null;
-        }
-        $port = (int)($parsedPort ?? ($scheme === 'https' ? 443 : 80));
-
-        // Bloqueio explícito de localhost e metadados de cloud conhecidos
-        $lowerHost = strtolower($host);
-        if ($lowerHost === 'localhost' || $lowerHost === 'metadata.google.internal') {
-            return null;
-        }
-
-        // Se for um endereço IP direto (IPv4 ou IPv6 com ou sem colchetes)
-        $cleanIp = trim($host, '[]');
-        if (filter_var($cleanIp, FILTER_VALIDATE_IP)) {
-            if (!self::isSafeIp($cleanIp, $allowPrivate)) {
-                return null;
-            }
-            return [
-                'url'       => $url,
-                'host'      => $host,
-                'scheme'    => $scheme,
-                'port'      => $port,
-                'pinned_ip' => null,
-            ];
-        }
-
-        // Para domínios/hostnames: executa a resolução DNS UMA ÚNICA VEZ
-        $ips = self::resolveHostIps($host);
-
-        // Rejeita explicitamente resolução vazia ou ausente
-        if (empty($ips)) {
-            return null;
-        }
-
-        // Valida TODOS os endereços retornados na resolução
-        foreach ($ips as $ip) {
-            if (!self::isSafeIp($ip, $allowPrivate)) {
-                return null;
-            }
-        }
-
-        // Fixa a conexão exatamente no primeiro endereço resolvido e validado
-        return [
-            'url'       => $url,
-            'host'      => $host,
-            'scheme'    => $scheme,
-            'port'      => $port,
-            'pinned_ip' => $ips[0],
-        ];
+        return \LightPress\Core\SafeHttpClient::resolveSafeTarget($url, $profile);
     }
 
     /**

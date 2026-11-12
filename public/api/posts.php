@@ -13,6 +13,7 @@ header('Cache-Control: public, max-age=60');
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\Security;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
@@ -23,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $page = max(1, (int)($_GET['page'] ?? 1));
 $limit = min(50, max(1, (int)($_GET['limit'] ?? 10)));
 $offset = ($page - 1) * $limit;
-$category = trim($_GET['category'] ?? '');
+$category = Security::getSafeString($_GET, 'category');
 
 $nowUtc = gmdate('Y-m-d H:i:s');
 $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');

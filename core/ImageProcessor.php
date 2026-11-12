@@ -552,6 +552,7 @@ class ImageProcessor
             'original_name' => $sanitizedOriginalName,
             'original_width' => $origWidth,
             'original_height' => $origHeight,
+            'mime_type' => $mime,
             'variants' => [],
         ];
 

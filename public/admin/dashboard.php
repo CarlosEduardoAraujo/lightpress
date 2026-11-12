@@ -110,10 +110,10 @@ $categories = Database::fetchAll("SELECT slug, name FROM categories WHERE is_act
 $authors = Database::fetchAll("SELECT id, name FROM users WHERE is_active = 1 ORDER BY name ASC");
 
 // Parâmetros de Filtro
-$filterStatus = trim($_GET['status'] ?? '');
-$filterCategory = trim($_GET['category'] ?? '');
+$filterStatus = Security::getSafeString($_GET, 'status');
+$filterCategory = Security::getSafeString($_GET, 'category');
 $filterAuthor = (int)($_GET['author_id'] ?? 0);
-$filterSearch = trim($_GET['q'] ?? '');
+$filterSearch = Security::getSafeString($_GET, 'q');
 $filterFeatured = !empty($_GET['featured']) ? 1 : 0;
 
 $whereClauses = ["1=1"];

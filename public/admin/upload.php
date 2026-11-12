@@ -60,13 +60,14 @@ try {
     $mediaId = $manifest['media_id'];
     $userId = (int)$_SESSION['user_id'];
     $originalName = $manifest['original_name'];
+    $realMime = (string)($manifest['mime_type'] ?? 'image/webp');
     $fileSize = (int)$_FILES['image']['size'];
     $variantsJson = json_encode($manifest['variants'], JSON_THROW_ON_ERROR);
 
     Database::query(
         "INSERT INTO media (id, user_id, original_name, mime_type, file_size, variants_manifest, is_finalized)
          VALUES (?, ?, ?, ?, ?, ?, 1)",
-        [$mediaId, $userId, $originalName, 'image/webp', $fileSize, $variantsJson]
+        [$mediaId, $userId, $originalName, $realMime, $fileSize, $variantsJson]
     );
 
     // Mapeamento direto de variantes O(1)
@@ -78,9 +79,16 @@ try {
     ]);
 
 } catch (\Throwable $e) {
-    http_response_code($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500);
+    error_log('[LightPress Upload Error] ' . $e->getMessage());
+    $code = ($e->getCode() >= 400 && $e->getCode() < 600) ? (int)$e->getCode() : 500;
+    http_response_code($code);
+
+    $clientMsg = ($code < 500 && !($e instanceof \PDOException))
+        ? $e->getMessage()
+        : 'Erro interno ao processar upload de imagem.';
+
     echo json_encode([
         'ok' => false,
-        'error' => $e->getMessage(),
+        'error' => $clientMsg,
     ]);
 }

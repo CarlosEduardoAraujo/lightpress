@@ -57,14 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
                 $mediaId = $manifest['media_id'];
                 $userId = (int)$currentUser['id'];
                 $origName = $manifest['original_name'];
+                $realMime = (string)($manifest['mime_type'] ?? 'image/webp');
                 $fileSize = (int)$_FILES['media_file']['size'];
                 $variantsJson = json_encode($manifest['variants'], JSON_THROW_ON_ERROR);
 
                 Database::query(
                     "INSERT INTO media (id, user_id, original_name, mime_type, file_size, variants_manifest, is_finalized)
-                     VALUES (?, ?, ?, 'image/webp', ?, ?, 1)",
-                    [$mediaId, $userId, $origName, $fileSize, $variantsJson]
+                     VALUES (?, ?, ?, ?, ?, ?, 1)",
+                    [$mediaId, $userId, $origName, $realMime, $fileSize, $variantsJson]
                 );
+
+                // Mapeamento direto de variantes O(1) (Paridade com upload.php)
+                ImageProcessor::registerVariants($mediaId, $manifest['variants'] ?? []);
 
                 if ($isAjax) {
                     header('Content-Type: application/json; charset=utf-8');
@@ -84,7 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && 
 
                 $message = "Imagem processada e adicionada à biblioteca com sucesso!";
             } catch (\Throwable $e) {
-                $error = "Erro no upload: " . $e->getMessage();
+                error_log('[LightPress Media Upload Error] ' . $e->getMessage());
+                $error = ($e instanceof RuntimeException && !($e instanceof \PDOException))
+                    ? $e->getMessage()
+                    : "Erro interno no upload de imagem.";
             }
         }
     }
@@ -206,7 +213,7 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
 }
 
 // 3. Filtro de Busca e Paginação de Mídias
-$filterSearch = trim($_GET['q'] ?? '');
+$filterSearch = Security::getSafeString($_GET, 'q');
 $whereClauses = [];
 $params = [];
 
@@ -1112,6 +1119,7 @@ require __DIR__ . '/header.php';
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
                     body: new URLSearchParams({
@@ -1269,6 +1277,7 @@ require __DIR__ . '/header.php';
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
                         'X-CSRF-Token': csrfToken
                     },
                     body: new URLSearchParams({

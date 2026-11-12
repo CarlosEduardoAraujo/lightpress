@@ -10,7 +10,7 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'self';");
+header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'self';");
 
 // Inicialização do Core
 $config = require dirname(__DIR__) . '/core/bootstrap.php';
@@ -31,7 +31,7 @@ $router = new Router($basePath);
 // Rota 1: Home Grid (Últimas notícias e 4 destaques principais)
 $router->get('/', function () use ($config, $router): void {
     header('X-Accel-Expires: 300'); // TTL reduzido de 5m no FastCGI Cache para listagens dinâmicas (LP-09)
-    $query = trim($_GET['q'] ?? '');
+    $query = Security::getSafeString($_GET, 'q');
     if (!empty($query)) {
         $router->redirect('/busca/?q=' . urlencode($query), 302);
         return;
@@ -236,7 +236,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 // Rota 5: Busca Pública de Notícias (/busca/)
 $router->get('/busca/', function () use ($config): void {
     header('X-Accel-Expires: 60'); // TTL 1m FastCGI Cache para buscas (LP-09)
-    $query = trim($_GET['q'] ?? '');
+    $query = Security::getSafeString($_GET, 'q');
     $page = max(1, (int)($_GET['page'] ?? 1));
     $perPage = 12;
     $offset = ($page - 1) * $perPage;
@@ -330,7 +330,7 @@ $router->get('/busca/', function () use ($config): void {
 // Rota 5-Paginada: Redirecionamento canônico de compatibilidade para /busca/page/{page}/
 $router->get('/busca/page/{page}/', function (array $params) use ($config, $router): void {
     $page = max(1, (int)($params['page'] ?? 1));
-    $query = trim($_GET['q'] ?? '');
+    $query = Security::getSafeString($_GET, 'q');
     $target = '/busca/?q=' . urlencode($query) . ($page > 1 ? '&page=' . $page : '');
     $router->redirect($target, 301);
     return;

@@ -15,7 +15,7 @@ use LightPress\Core\Security;
 $currentUser = Security::requireAuth(null, ['admin']);
 $csrfToken = Security::generateCsrfToken();
 
-$pluginSlug = trim((string)($_GET['plugin'] ?? ''));
+$pluginSlug = Security::getSafeString($_GET, 'plugin');
 if (empty($pluginSlug) || !preg_match('/^[a-z0-9\-_]+$/i', $pluginSlug)) {
     http_response_code(400);
     die('Identificador de plugin inválido.');

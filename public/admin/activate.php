@@ -12,7 +12,11 @@ use LightPress\Core\Security;
 
 Security::startSecureSession($config);
 
-$token = trim($_GET['token'] ?? $_POST['token'] ?? '');
+$rawToken = Security::getSafeString($_GET, 'token');
+if ($rawToken === '') {
+    $rawToken = Security::getSafeString($_POST, 'token');
+}
+$token = $rawToken;
 $error = '';
 $success = false;
 
@@ -46,57 +50,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Security::verifyCsrfToken($csrfToken)) {
         $error = "Token CSRF inválido ou expirado. Recarregue a página e tente novamente.";
     } else {
-        $password = (string)($_POST['password'] ?? '');
-    $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
+        $password = Security::getSafePassword($_POST, 'password');
+        $passwordConfirm = Security::getSafePassword($_POST, 'password_confirm');
 
-    if (strlen($password) < 8) {
-        $error = "A senha deve ter pelo menos 8 caracteres.";
-    } elseif ($password !== $passwordConfirm) {
-        $error = "As senhas não coincidem.";
-    } else {
-        try {
-            Database::transaction(function (\PDO $pdo) use ($tokenHash, $password, $nowUtc): void {
-                $lockedToken = Database::fetchOne(
-                    "SELECT t.*, u.id as user_id, u.is_active, u.password_reset_required 
-                     FROM user_reset_tokens t
-                     JOIN users u ON u.id = t.user_id
-                     WHERE t.token_hash = ? AND t.purpose = 'activation' AND t.used_at IS NULL AND t.expires_at > ?
-                     LIMIT 1" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
-                    [$tokenHash, $nowUtc]
-                );
+        if (strlen($password) < 8) {
+            $error = "A senha deve ter pelo menos 8 caracteres.";
+        } elseif ($password !== $passwordConfirm) {
+            $error = "As senhas não coincidem.";
+        } else {
+            try {
+                Database::transaction(function (\PDO $pdo) use ($tokenHash, $password, $nowUtc): void {
+                    $lockedToken = Database::fetchOne(
+                        "SELECT t.*, u.id as user_id, u.is_active, u.password_reset_required 
+                         FROM user_reset_tokens t
+                         JOIN users u ON u.id = t.user_id
+                         WHERE t.token_hash = ? AND t.purpose = 'activation' AND t.used_at IS NULL AND t.expires_at > ?
+                         LIMIT 1" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
+                        [$tokenHash, $nowUtc]
+                    );
 
-                if (!$lockedToken) {
-                    throw new RuntimeException("Este link de ativação expirou, já foi utilizado ou é inválido.");
+                    if (!$lockedToken) {
+                        throw new RuntimeException("Este link de ativação expirou, já foi utilizado ou é inválido.");
+                    }
+
+                    if ((int)$lockedToken['password_reset_required'] !== 1) {
+                        throw new RuntimeException("Esta conta já foi ativada ou não permite ativação por este token.");
+                    }
+
+                    $newHash = Security::hashPassword($password);
+                    $userId = (int)$lockedToken['user_id'];
+
+                    // 1. Atualizar senha do usuário, ativar conta e limpar flag de reset obrigatório
+                    Database::query(
+                        "UPDATE users 
+                         SET password_hash = ?, is_active = 1, password_reset_required = 0, session_version = session_version + 1
+                         WHERE id = ?",
+                        [$newHash, $userId]
+                    );
+
+                    // 2. Marcar todos os tokens pendentes deste usuário como consumidos
+                    Database::query(
+                        "UPDATE user_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+                        [$nowUtc, $userId]
+                    );
+                });
+
+                $success = true;
+            } catch (\Throwable $e) {
+                error_log('[LightPress Activation Error] ' . $e->getMessage());
+                if ($e instanceof RuntimeException && !($e instanceof \PDOException)) {
+                    $error = $e->getMessage();
+                } else {
+                    $error = "Erro interno ao processar a ativação da conta. Tente novamente mais tarde.";
                 }
-
-                if ((int)$lockedToken['password_reset_required'] !== 1) {
-                    throw new RuntimeException("Esta conta já foi ativada ou não permite ativação por este token.");
-                }
-
-                $newHash = Security::hashPassword($password);
-                $userId = (int)$lockedToken['user_id'];
-
-                // 1. Atualizar senha do usuário, ativar conta e limpar flag de reset obrigatório
-                Database::query(
-                    "UPDATE users 
-                     SET password_hash = ?, is_active = 1, password_reset_required = 0, session_version = session_version + 1
-                     WHERE id = ?",
-                    [$newHash, $userId]
-                );
-
-                // 2. Marcar todos os tokens pendentes deste usuário como consumidos
-                Database::query(
-                    "UPDATE user_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
-                    [$nowUtc, $userId]
-                );
-            });
-
-            $success = true;
-        } catch (\Throwable $e) {
-            $error = "Erro ao ativar conta: " . $e->getMessage();
+            }
         }
     }
-}
 }
 
 $csrfToken = Security::generateCsrfToken();

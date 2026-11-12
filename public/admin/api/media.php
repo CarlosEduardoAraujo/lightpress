@@ -16,7 +16,7 @@ use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth();
 
-$search = trim($_GET['q'] ?? '');
+$search = Security::getSafeString($_GET, 'q');
 $limit = min(max((int)($_GET['limit'] ?? 60), 1), 100);
 
 if (!empty($search)) {

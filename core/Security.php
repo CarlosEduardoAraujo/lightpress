@@ -12,6 +12,40 @@ namespace LightPress\Core;
 class Security
 {
     /**
+     * Hash Argon2id pré-computado e estático para mitigação de timing side-channels no login.
+     * Mesmos parâmetros de custo de hashPassword() (m=65536, t=4, p=1).
+     */
+    public const DUMMY_ARGON2ID_HASH = '$argon2id$v=19$m=65536,t=4,p=1$YzAwbndIVFBvM2lzYnREeA$e7jd5wF6lCaWO2ZLQT3PbHe20QzoScofWPzmhT7ancI';
+
+    /**
+     * Obtém com segurança uma string de um array de entrada ($_GET, $_POST, etc.),
+     * prevenindo fatal TypeError em modo declare(strict_types=1) caso o cliente envie um array.
+     * Aplica trim() por padrão.
+     *
+     * @param array<string, mixed> $source Array de entrada
+     * @param string $key Chave desejada
+     * @param string $default Valor padrão caso ausente ou inválido
+     */
+    public static function getSafeString(array $source, string $key, string $default = ''): string
+    {
+        $val = $source[$key] ?? $default;
+        return is_string($val) ? trim($val) : $default;
+    }
+
+    /**
+     * Obtém com segurança uma senha de um array de entrada ($_POST),
+     * prevenindo TypeError caso o cliente envie um array, mas SEM aplicar trim()
+     * para preservar senhas legítimas que possuam espaços no início ou fim.
+     *
+     * @param array<string, mixed> $source Array de entrada
+     * @param string $key Chave do campo de senha
+     */
+    public static function getSafePassword(array $source, string $key): string
+    {
+        $val = $source[$key] ?? '';
+        return is_string($val) ? $val : '';
+    }
+    /**
      * Escape seguro contra XSS para saídas contextuais em templates HTML.
      */
     public static function e(?string $value): string
@@ -80,11 +114,33 @@ class Security
             return;
         }
 
+        $cfg = !empty($appConfig) ? $appConfig : ($GLOBALS['config'] ?? []);
+
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
             || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
 
-        $sessionName = $appConfig['security']['session_name'] ?? 'LIGHTPRESSSESSID';
-        $lifetime = $appConfig['security']['session_lifetime'] ?? 86400;
+        // Se o tráfego passar por proxy confiável com TLS-offloading (ex: Cloudflare Tunnel, Nginx local, Traefik)
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+        $trustedProxies = $cfg['security']['trusted_proxies'] ?? ['127.0.0.1', '::1'];
+        if (!$isHttps && in_array($remoteAddr, $trustedProxies, true)) {
+            if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+                $proto = strtolower(trim(explode(',', (string)$_SERVER['HTTP_X_FORWARDED_PROTO'])[0]));
+                if ($proto === 'https') {
+                    $isHttps = true;
+                }
+            }
+        }
+
+        // Se o ambiente for produção e canonical_origin for HTTPS, força cookie_secure = true diretamente
+        if (!$isHttps && ($cfg['app']['env'] ?? '') === 'production') {
+            $canonical = (string)($cfg['app']['canonical_origin'] ?? '');
+            if (str_starts_with($canonical, 'https://')) {
+                $isHttps = true;
+            }
+        }
+
+        $sessionName = $cfg['security']['session_name'] ?? 'LIGHTPRESSSESSID';
+        $lifetime = $cfg['security']['session_lifetime'] ?? 86400;
 
         session_name($sessionName);
 

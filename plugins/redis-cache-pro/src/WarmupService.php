@@ -107,18 +107,15 @@ final class WarmupService
         $urlsToWarm = array_unique($urlsToWarm);
         foreach ($urlsToWarm as $targetUrl) {
             try {
-                $ch = curl_init($targetUrl);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT        => 2,
-                    CURLOPT_CONNECTTIMEOUT => 1,
-                    CURLOPT_FOLLOWLOCATION => true,
+                $res = \LightPress\Core\SafeHttpClient::request($targetUrl, [
+                    CURLOPT_TIMEOUT        => 3,
+                    CURLOPT_CONNECTTIMEOUT => 2,
                     CURLOPT_USERAGENT      => 'LightPress-Warmup/1.0',
-                    CURLOPT_SSL_VERIFYPEER => false,
-                ]);
-                curl_exec($ch);
-                curl_close($ch);
-                $urlsCount++;
+                ], \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_ORIGIN_ONLY, $siteOrigin);
+
+                if ($res['status'] > 0) {
+                    $urlsCount++;
+                }
             } catch (Throwable) {}
         }
 
