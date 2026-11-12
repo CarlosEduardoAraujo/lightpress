@@ -494,7 +494,7 @@ Como o Nginx entrega a página do cache estático sem invocar o interpretador PH
 
 ### 6.5. Categorias, Tags e Escopo Inicial
 
-Uma categoria principal por artigo na primeira fase. Seu nome e slug são definidos em catálogo controlado por editor/administrador, mantido fora das requisições públicas de escrita; não gerar a identidade de uma categoria livremente a cada salvamento. O campo `category` guarda o slug canônico indexável, com padrão `geral`; o catálogo fornece o nome de exibição. Mudanças de slug exigem atualização dos artigos afetados, redirecionamentos e invalidação correspondente.
+Uma categoria principal por artigo na primeira fase. Seu nome e slug são definidos em catálogo controlado por editor/administrador, mantido fora das requisições públicas de escrita; não gerar a identidade de uma categoria livremente a cada salvamento. O campo `category` guarda o slug canônico indexável, com padrão `geral`; o catálogo fornece o nome de exibição. Mudanças de slug exigem atualização dos artigos afetados, redirecionamentos e invalidação correspondente. A taxonomia oficial de navegação adota slugs canônicos padronizados: `formula-1`, `formula-2`, `formula-e`, `indycar`, `stockcar`, `nascar`, `endurance` (cobrindo FIA WEC, 24 Horas de Le Mans e IMSA) e `motovelocidade`.
 
 `tags` contém uma lista normalizada separada por vírgulas, sem vírgulas dentro de cada tag, com limite total de 255 caracteres. Essa representação serve à exibição; pesquisa e arquivos públicos por tag ficam fora da primeira fase e exigirão modelagem relacional própria se adicionados. Busca interna também fica fora do escopo inicial até definir requisitos e índices. Essa decisão evita usar `LIKE '%tag%'` como estratégia de escala.
 

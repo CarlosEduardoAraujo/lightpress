@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Roteamento e Navegação: Atualização do slug de WEC para Endurance — 2026-11-12
+
+- **Padronização Canônica de Categoria (`templates/header.php`, `templates/footer.php`):**
+  - Atualização do slug da categoria de `wec` para `endurance` no menu de navegação superior (`$menuCategories`) em `templates/header.php`.
+  - Atualização do link de categorias no rodapé em `templates/footer.php` de `/categoria/wec/` para `/categoria/endurance/`.
+  - Refinamento do atributo `aria-label` descritivo no rodapé para `"Notícias da Categoria Endurance (FIA WEC / 24h Le Mans)"`, assegurando coerência semântica e acessibilidade.
+
 ### Otimização PageSpeed Insights: Acessibilidade WCAG AA, Estabilidade Visual (Zero CLS) e Design Tokens — 2026-11-12
 
 - **Diagnóstico PageSpeed Insights (Desktop):** auditoria baseada no relatório oficial (Lighthouse 13.6.0) registrou Desempenho 100/100, Práticas Recomendadas 100/100, SEO 100/100 e Acessibilidade 91/100, com métricas de laboratório de FCP 0,4s, LCP 0,7s, TBT 0ms e CLS de 0.017.

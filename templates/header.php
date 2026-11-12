@@ -14,7 +14,7 @@ $menuCategories = [
     ['slug' => 'indycar', 'name' => 'IndyCar'],
     ['slug' => 'stockcar', 'name' => 'Stock Car'],
     ['slug' => 'nascar', 'name' => 'NASCAR'],
-    ['slug' => 'wec', 'name' => 'Le Mans / WEC'],
+    ['slug' => 'endurance', 'name' => 'Le Mans / WEC'],
     ['slug' => 'motovelocidade', 'name' => 'Motovelocidade'],
 ];
 

@@ -32,7 +32,7 @@ use LightPress\Core\Security;
                     <span class="font-label-category text-label-category uppercase tracking-widest text-racing-red pb-1">Turismo &amp; Endurance</span>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/stockcar/" aria-label="Notícias da Categoria Stock Car">Stock Car Pro Series</a>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/nascar/" aria-label="Notícias da Categoria NASCAR">NASCAR Cup</a>
-                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/wec/" aria-label="Notícias da Categoria FIA WEC">FIA WEC / 24h Le Mans</a>
+                    <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/endurance/" aria-label="Notícias da Categoria Endurance (FIA WEC / 24h Le Mans)">FIA WEC / 24h Le Mans</a>
                     <a class="font-body-sm text-body-sm text-surface-container hover:text-racing-red transition-colors py-1 inline-block" href="/categoria/motovelocidade/" aria-label="Notícias da Categoria Motovelocidade">Motovelocidade</a>
                 </div>
 
