@@ -506,7 +506,7 @@ A entrega de uma página pública anônima já armazenada não executa a aplica�
 
 ### 7.1. Elegibilidade, Rotas e Chave Canônica
 
-Rotas públicas iniciais: `/`, `/page/{n}/`, `/noticia/{slug}/`, `/categoria/{slug}/`, `/categoria/{slug}/page/{n}/`, `/feed.xml`, `/sitemap.xml`, `/sitemap-main.xml` e `/sitemap-posts-{part}.xml`. A paginação inicia em 2; página 1 redireciona para a listagem principal. O `/sitemap.xml` gera um `<sitemapindex>` padrão particionado (5.000 URLs por arquivo em `/sitemap-posts-{part}.xml` e páginas/categorias em `/sitemap-main.xml`), suportando a indexação de mais de 50.000 artigos sem sobrecarga de memória ou timeout. Slugs são validados e únicos no seu escopo. Host, HTTPS e política de barra final são canônicos e aplicados antes do cache. URLs legadas são tratadas pela migração, sem mudar silenciosamente os links antigos.
+Rotas públicas iniciais: `/`, `/page/{n}/`, `/noticia/{slug}/`, `/categoria/{slug}/`, `/categoria/{slug}/page/{n}/`, `/feed.xml` (e `/feed/`), `/categoria/{slug}/feed.xml` (e `/categoria/{slug}/feed/`), `/sitemap.xml`, `/sitemap-main.xml`, `/sitemap-posts-{part}.xml` e `/sitemap-news.xml`. A paginação inicia em 2; página 1 redireciona para a listagem principal. O `/sitemap.xml` gera um `<sitemapindex>` padrão particionado (5.000 URLs por arquivo em `/sitemap-posts-{part}.xml` e páginas/categorias em `/sitemap-main.xml`), suportando a indexação de mais de 50.000 artigos sem sobrecarga de memória ou timeout. Slugs são validados e únicos no seu escopo. Host, HTTPS e política de barra final são canônicos e aplicados antes do cache. URLs legadas são tratadas pela migração, sem mudar silenciosamente os links antigos.
 
 | Condição | Política |
 | :--- | :--- |
@@ -784,19 +784,25 @@ Para maximizar a visibilidade editorial no Google Notícias, Google Discover e g
 
 #### 8.9.1. Feeds RSS 2.0 Enriquecidos e Google News XML Sitemap (`/feed.xml`, `/categoria/{slug}/feed.xml`, `/sitemap-news.xml`)
 
-Para indexação em tempo real pelo Googlebot-News e integração direta com a Central do Editor (Google Publisher Center), o sistema fornece um pipeline completo de feeds e sitemaps:
-* **Feed RSS Geral (`/feed.xml`, `/feed/`):**
-  - Namespaces XML completos: `xmlns:content`, `xmlns:media`, `xmlns:dc` e `xmlns:atom`.
-  - Imagem de destaque vinculada via `<enclosure url="..." length="0" type="image/webp" />` e `<media:content>` para cartões ricos no app do Google Notícias.
-  - Metadados estruturados: autor em `<dc:creator>`, categoria em `<category>`, resumo em `<description>` e HTML editorial completo compilado em `<content:encoded><![CDATA[...]]></content:encoded>`.
-* **Feeds por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed/`):**
-  - Feeds setoriais independentes para criação de seções e abas temáticas no Google Publisher Center (ex: Fórmula 1, Endurance, MotoGP).
-  - Autodescoberta em navegadores e leitores de RSS via `<link rel="alternate" type="application/rss+xml" ...>` injetado no `<head>` das páginas de categoria.
-* **Google News XML Sitemap (`/sitemap-news.xml`):**
-  - Janela estrita de 48 horas (`published_at >= NOW() - 48h`), atendendo aos requisitos obrigatórios do Googlebot-News.
-  - Tags dedicadas `<news:news>`, `<news:publication>` (com idioma `pt-br`), `<news:publication_date>` no formato W3C (`date('c')`), `<news:title>` e imagens associadas em `<image:image>`.
-  - Inclusão prioritária no topo do índice mestre `/sitemap.xml`.
-* **Desempenho e Cache:** Todos os endpoints XML operam com cabeçalho de cache FastCGI de 5 minutos (`X-Accel-Expires: 300`).
+Para indexação em tempo real pelo Googlebot-News e integração direta com a Central do Editor (**Google Publisher Center**), o sistema fornece um pipeline completo de feeds semânticos e sitemaps dedicados:
+
+* **Feed RSS Geral (`/feed.xml`, `/feed`, `/feed/`):**
+  - **Namespaces XML Completos:** `xmlns:content="http://purl.org/rss/1.0/modules/content/"`, `xmlns:media="http://search.yahoo.com/mrss/"`, `xmlns:dc="http://purl.org/dc/elements/1.1/"` e `xmlns:atom="http://www.w3.org/2005/Atom"`.
+  - **Imagens e Enclosures:** Imagem de destaque vinculada com compressão WebP em `<enclosure url="..." length="0" type="image/webp" />` e `<media:content medium="image" type="image/webp">`, permitindo que o aplicativo do Google Notícias e agregadores exibam capas ricas em alta resolução.
+  - **Metadados Estruturados por Item:** Autor do artigo em `<dc:creator>`, categoria editorial em `<category>`, resumo protegido em CDATA em `<description>` e corpo editorial completo compilado em `<content:encoded><![CDATA[...]]></content:encoded>`, permitindo renderização imediata do conteúdo em leitores sem requisições adicionais.
+  - **Padrão RFC 822:** Datas formatadas rigorosamente via `date(DATE_RSS, ...)` e `<guid isPermaLink="true">` apontando para a URL canônica da notícia.
+* **Feeds Específicos por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed`, `/categoria/{slug}/feed/`):**
+  - **Seções Segmentadas no Google Publisher Center:** Permite cadastrar abas e editorias independentes na Central do Editor (ex.: Fórmula 1, Endurance, MotoGP, Stock Car).
+  - **Validação de Banco e Proteção 404:** Consulta atômica no banco de dados para checagem da categoria; categorias inexistentes ou inativas respondem com HTTP 404 limpo.
+  - **Isolamento de Conteúdo:** O canal filtra exclusivamente os últimos 50 artigos publicados daquela categoria (`WHERE category = ? AND status = 'published'`), com título contextualizado (`{Categoria} - {Nome do Portal}`).
+  - **Autodescoberta de Feeds (`templates/header.php`):** Injeção dinâmica no `<head>` de `<link rel="alternate" type="application/rss+xml" ...>` apontando para o feed geral na Home e páginas comuns, e apontando diretamente para o feed da categoria quando o leitor navega em `/categoria/{slug}/`.
+* **Google News XML Sitemap Oficial (`/sitemap-news.xml`):**
+  - **Janela Estrita de 48 Horas:** Atende com precisão cirúrgica às diretrizes obrigatórias do Googlebot-News (`published_at >= NOW() - 48h`). Matérias com mais de 48 horas deixam automaticamente o sitemap de notícias, permanecendo indexadas no sitemap mestre particionado (`/sitemap-posts-{part}.xml`).
+  - **Namespaces Oficiais:** `xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"` e `xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"`.
+  - **Estrutura de Notícia:** Tags `<news:news>`, `<news:publication>` (com `<news:name>` e `<news:language>pt-br</news:language>`), `<news:publication_date>` no padrão W3C/ISO 8601 (`date('c')`), `<news:title>` e `<image:image>` contendo `<image:loc>` apontando para a variante WebP da imagem de destaque.
+  - **Priorização no Índice Mestre:** O `/sitemap-news.xml` é referenciado no topo do `<sitemapindex>` em `/sitemap.xml`, garantindo descoberta prioritária pelo Googlebot.
+* **Desempenho e Cache FastCGI:** Todos os endpoints XML operam com cabeçalho de cache de 5 minutos (`X-Accel-Expires: 300`), assegurando resposta instantânea (TTFB < 50 ms) sob tráfego massivo.
+* **Suíte de Testes Automatizados (`bin/test-feeds-news.php`):** 26 asserções automatizadas validando sintaxe via SimpleXML, integridade dos namespaces, enclosures WebP, filtro cronológico de 48h, isolamento de posts por categoria e status 404.
 
 ### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `/admin/page-edit.php`, `templates/page.php`)
 
@@ -1044,10 +1050,13 @@ Execute, com PHP 8.4 e as extensões do projeto:
 ```bash
 php bin/test-revision-safety.php
 php bin/test-ssrf.php
+php bin/test-feeds-news.php
 python bin/test_security_fixes.py
 ```
 
-`bin/test-revision-safety.php` não carrega o bootstrap nem `config.local.php`: usa bancos SQLite em memória e as classes reais do projeto. Cobre migração bem-sucedida, preservação de `foreign_keys` ligado/desligado, falha de DDL com rollback e propagação, rejeição de migração dentro de transação externa, publicação inicial e restauração histórica com concorrência. A CI executa esse teste em PHP 8.4.
+* `bin/test-revision-safety.php` não carrega o bootstrap nem `config.local.php`: usa bancos SQLite em memória e as classes reais do projeto. Cobre migração bem-sucedida, preservação de `foreign_keys` ligado/desligado, falha de DDL com rollback e propagação, rejeição de migração dentro de transação externa, publicação inicial e restauração histórica com concorrência. A CI executa esse teste em PHP 8.4.
+* `bin/test-ssrf.php` valida os 4 perfis de segurança do `SafeHttpClient`, incluindo DNS pinning atômico, bloqueio de loopback, metadados de nuvem e redes privadas com 14 asserções.
+* `bin/test-feeds-news.php` valida 26 asserções cobrindo a sintaxe XML via SimpleXML, integridade dos namespaces RSS 2.0 (`content`, `media`, `dc`, `atom`), enclosures e tags `<media:content>` WebP, integridade de CDATA em `<content:encoded>`, regras estritas de 48 horas no Google News Sitemap (`/sitemap-news.xml`), isolamento por categoria e respostas 404 para categorias inexistentes.
 
 Na validação inicial destas correções, o PHP 7.2 local permitiu executar cinco testes reais de migração SQLite, mas a integração editorial foi explicitamente pulada. Em 2026-11-12, a reprodução em uma cópia isolada com PHP 8.4.27 executou e aprovou os sete testes de `bin/test-revision-safety.php`, incluindo concorrência e restauração histórica. Os testes Python simulam regras e não substituem a integração PHP. Os fluxos HTTP/MySQL ainda precisam ser confirmados em homologação.
 

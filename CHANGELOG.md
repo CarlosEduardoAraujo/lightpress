@@ -29,6 +29,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Cobertura de Testes Automatizados (`bin/test-feeds-news.php`):**
   - Criação de nova suíte com 26 asserções cobrindo validação sintática XML via SimpleXML, integridade dos namespaces, enclosures de imagem, filtros de 48h no sitemap de notícias, isolamento por categoria e resposta 404. 100% de aprovação.
 
+### Hardening de Segurança de Produção: Anti-SSRF Centralizado, CSP Estrita, Timing Constant-Time e Fail-Fast — 2026-11-12
+
 - **Serviço Centralizado Anti-SSRF com DNS Pinning (`core/SafeHttpClient.php`):**
   - Implementação de cliente HTTP defensivo unificado com 4 perfis estritos de segurança: `PROFILE_STRICT_PUBLIC`, `PROFILE_LAN`, `PROFILE_LOCAL_AI` e `PROFILE_LOCAL_ORIGIN_ONLY`.
   - Resolução DNS atômica em passo único (`dns_get_record()` e `gethostbynamel()`), com validação binária de todos os registros e fixação de IP via `CURLOPT_RESOLVE` para neutralizar ataques de Time-of-Check to Time-of-Use (TOCTOU) e DNS Rebinding.

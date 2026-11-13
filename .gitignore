@@ -18,6 +18,7 @@ node_modules/
 
 # Logs e arquivos do sistema
 *.log
+storage/*.sqlite*
 .DS_Store
 Thumbs.db
 Desktop.ini
