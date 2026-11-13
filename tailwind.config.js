@@ -19,6 +19,7 @@ module.exports = {
         "carbon-surface": "#1A1E24",
         "racing-red": "#E10600",
         "racing-red-text": "#B30400",
+        "racing-red-text-dark": "#FF4D4D",
         "primary": "#b30400",
         "primary-container": "#e10600",
         "tertiary": "#af101a",

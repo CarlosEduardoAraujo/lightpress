@@ -1122,16 +1122,16 @@ Para assegurar estabilidade visual absoluta durante o carregamento assíncrono:
 * Essa especificação elimina **0.016 de CLS** identificado no relatório, impedindo saltos nos cards laterais e no fluxo de leitura dos artigos.
 * Aplicado de forma homogênea em todos os templates de exibição (`home.php`, `post.php`, `category.php`, `page.php`, `tag.php` e `search.php`).
 
-#### 8.18.2. Design Token de Contraste para Acessibilidade WCAG AA (`racing-red-text`)
-O critério de contraste de cores para textos normais exige no mínimo `4.5:1` segundo as diretrizes WCAG AA. O vermelho base de marca `#E10600` atinge `3.99:1` sobre fundos brancos puros (`#FFFFFF`):
-* Configurado o design token `"racing-red-text": "#B30400"` no `tailwind.config.js`, atingindo taxa de contraste de **5.6:1** no modo claro.
-* No modo escuro, a legibilidade sobre as superfícies escuras (`#111418` / `#1A1E24`) mantém a cor viva através da variante utilitária `text-racing-red-text dark:text-racing-red`.
-* Preservado o tom `#E10600` para fundos sólidos de botões (com texto branco) e elementos decorativos não textuais.
-* Padronizado em todo o sistema: logotipo (`RACING`), navegação ativa (`Home`), ticker *Em Alta*, chamadas de matérias (`Ler matéria completa`), bylines e seções institucionais.
+#### 8.18.2. Design Tokens de Contraste para Acessibilidade WCAG AA (`racing-red-text` e `racing-red-text-dark`)
+O critério de contraste de cores para textos normais exige no mínimo `4.5:1` segundo as diretrizes WCAG 2.1 AA. O vermelho base de marca `#E10600` atinge `3.99:1` sobre fundos brancos puros (`#FFFFFF`) e apenas `3.37:1` a `3.72:1` sobre os fundos escuros do sistema (`#111418` e `#1A1E24`). Para assegurar nota 100/100 em Acessibilidade em ambos os temas:
+* **Tema Claro:** Configurado o design token `"racing-red-text": "#B30400"` no `tailwind.config.js`, atingindo taxa de contraste de **7.16:1** no modo claro sobre fundo branco.
+* **Tema Escuro:** Configurado o design token `"racing-red-text-dark": "#FF4D4D"`, com luminância calibrada ($L = 0.268$) atingindo taxas de contraste de **5.10:1** sobre os cards (`#1A1E24`) e **5.62:1** sobre a superfície principal (`#111418`).
+* **Elementos Decorativos e Ações:** Preservado o tom original de marca `#E10600` para fundos sólidos de botões (com texto branco puro `#FFFFFF`, contraste 4.98:1) e elementos gráficos não textuais.
+* **Padronização Global:** Aplicada a variante `text-racing-red-text dark:text-racing-red-text-dark` em todo o sistema: logotipos (`RACING`), navegação ativa (`Home`), ticker *Em Alta*, links de matérias (`Ler matéria completa`), bylines editoriais e rodapé institucional.
 
 #### 8.18.3. Áreas de Toque e Desambiguação de Links
 * No rodapé institucional (`templates/footer.php`), links de navegação rápida e categorias receberam espaçamento vertical dedicado (`py-1 inline-block`) para cumprir os requisitos de alvos de toque mínimos (*touch targets*).
-* Adicionados atributos `aria-label` descritivos diferenciando âncoras de categorias e tags de mesmo rótulo.
+* Adicionados atributos `aria-label` descritivos diferenciando âncoras de categorias e tags de mesmo rótulo (ex.: `aria-label="Categoria Fórmula 1"` vs `aria-label="Tópico em alta: Fórmula 1"`), eliminando avisos de destinos ambíguos (*identical-links-same-purpose*).
 
 ### 8.19. Hardening Defensivo de Produção (Anti-SSRF Unificado, Resiliência de Sessão, Timing Constant-Time e Fail-Fast)
 

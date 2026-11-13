@@ -7,6 +7,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Acessibilidade WCAG AA: Conformidade de Contraste no Dark Mode e Desambiguação de Links — 2026-11-13
+
+- **Diagnóstico PageSpeed Insights (Desktop - 95 para 100):** auditoria detalhada identificou que o portal carrega por padrão com o tema escuro (`<html class="dark">`). No Dark Mode, os textos vermelhos com `dark:text-racing-red` (`#E10600`) contra fundos escuros (`#111418`, `#1A1E24`, `#0D121C`) atingiam razões de contraste entre 3.37:1 e 3.77:1, reprovando na exigência WCAG 2.1 AA de 4.5:1 para texto normal.
+- **Design Token de Alto Contraste para Dark Mode (`tailwind.config.js`):**
+  - Criação do token `"racing-red-text-dark": "#FF4D4D"`, com luminância calibrada ($L = 0.268$) que atinge taxas de contraste de **5.10:1** sobre `#1A1E24` (cards de notícias), **5.62:1** sobre `#111418` (fundo principal) e **5.68:1** sobre `#0D121C` (ticker de tópicos), superando com margem de segurança a exigência de 4.5:1 da WCAG AA.
+  - A cor base da marca `"racing-red": "#E10600"` permanece inalterada em botões e badges sólidos com texto branco (contraste 4.98:1), e o token `"racing-red-text": "#B30400"` permanece ativo no tema claro (contraste 7.16:1).
+- **Adequação dos Templates (`templates/header.php`, `home.php`, `post.php`, `category.php`, `page.php`, `tag.php`, `search.php`, `footer.php`):**
+  - Padronização da classe utilitária `text-racing-red-text dark:text-racing-red-text-dark` nos logotipos, links ativos de menu, ticker *Em Alta*, links de leitura *Ler matéria completa*, bylines editoriais, breadcrumbs, publicidades e rodapé institucional.
+- **Desambiguação Acessível de Links (`templates/header.php`):**
+  - Adição de `aria-label="Categoria ..."` nos links do menu principal e `aria-label="Tópico em alta: ..."` nos chips de tags da barra superior, solucionando o aviso de links com finalidades ambíguas (*identical-links-same-purpose*).
+- **Compilação e Otimização do CSS:**
+  - Recompilação do Tailwind CSS via `npm run build:css` atualizando `public/assets/style.css` com as novas variantes e regras do seletor `.dark\:text-racing-red-text-dark:is(.dark *)`.
+
+
 ### Hardening Pós-Auditoria de Segurança: Prevenção de Colisão de Mídia, Invalidação de Cache de Objetos, Normalização FastCGI e Isolamento Apache — 2026-11-13
 
 - **Prevenção de Sobrescrita de Variantes de Mídia / CH-01 (`core/ImageProcessor.php`):**

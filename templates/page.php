@@ -116,7 +116,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
     <!-- Breadcrumbs -->
     <nav aria-label="Navegação Estrutural" class="flex flex-wrap items-center justify-between gap-space-sm pb-space-md">
         <div class="flex items-center gap-space-xs font-label-meta text-label-meta text-secondary dark:text-secondary-fixed-dim">
-            <a class="hover:text-racing-red-text dark:hover:text-racing-red transition-colors flex items-center gap-1" href="/">
+            <a class="hover:text-racing-red-text dark:hover:text-racing-red-text-dark transition-colors flex items-center gap-1" href="/">
                 <?= Icon::svg('home', '', 15) ?>
                 Home
             </a>
@@ -177,7 +177,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
             <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
                 <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                     <span>Publicidade</span>
-                    <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
+                    <span class="text-racing-red-text dark:text-racing-red-text-dark font-bold">Parceiro Oficial</span>
                 </div>
                 <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
                     <picture>
@@ -207,7 +207,7 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
             <div id="newsletter" class="bg-carbon-black text-pure-white rounded-xl p-space-lg shadow-md relative overflow-hidden flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
                 <div class="w-24 h-24 rounded-full bg-racing-red/20 blur-2xl absolute -top-8 -right-8 pointer-events-none"></div>
                 <div class="flex items-center gap-2">
-                    <?= Icon::svg('mail', 'text-racing-red', 24) ?>
+                    <?= Icon::svg('mail', 'text-racing-red-text-dark', 24) ?>
                     <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Grid SpeedRacing</span>
                 </div>
                 <h4 class="font-headline-sm text-headline-sm text-pure-white leading-tight font-bold">

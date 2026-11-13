@@ -262,17 +262,17 @@ if (empty($trendingTags)) {
             <div class="flex items-center gap-space-lg">
                 <a class="flex items-center gap-space-sm shrink-0" href="/">
                     <div class="flex flex-col">
-                        <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-carbon-black dark:text-pure-white leading-none">SPEED<span class="text-racing-red-text dark:text-racing-red">RACING</span></span>
+                        <span class="font-headline-sm text-headline-sm uppercase tracking-tighter text-carbon-black dark:text-pure-white leading-none">SPEED<span class="text-racing-red-text dark:text-racing-red-text-dark">RACING</span></span>
                         <span class="font-label-category text-[9px] tracking-widest text-secondary dark:text-secondary-fixed uppercase">Desde 2002</span>
                     </div>
                 </a>
 
                 <nav class="hidden xl:flex items-center gap-space-md font-body-sm text-body-sm">
-                    <a aria-current="page" class="transition-colors whitespace-nowrap text-racing-red-text dark:text-racing-red font-semibold" href="/">Home</a>
+                    <a aria-current="page" class="transition-colors whitespace-nowrap text-racing-red-text dark:text-racing-red-text-dark font-semibold" href="/">Home</a>
                     <?php foreach ($menuCategories as $cat): ?>
-                        <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red-text dark:hover:text-racing-red transition-colors whitespace-nowrap" href="/categoria/<?= Security::e($cat['slug']) ?>/"><?= Security::e($cat['name']) ?></a>
+                        <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red-text dark:hover:text-racing-red-text-dark transition-colors whitespace-nowrap" href="/categoria/<?= Security::e($cat['slug']) ?>/" aria-label="Categoria <?= Security::e($cat['name']) ?>"><?= Security::e($cat['name']) ?></a>
                     <?php endforeach; ?>
-                    <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red-text dark:hover:text-racing-red transition-colors whitespace-nowrap" href="/nossa-equipe/">Nossa Equipe</a>
+                    <a class="text-on-surface-variant dark:text-secondary-fixed hover:text-racing-red-text dark:hover:text-racing-red-text-dark transition-colors whitespace-nowrap" href="/nossa-equipe/">Nossa Equipe</a>
                 </nav>
             </div>
 
@@ -291,7 +291,7 @@ if (empty($trendingTags)) {
                 </button>
                 
                 <div class="hidden sm:flex items-center px-space-sm py-1 bg-surface-container dark:bg-carbon-surface rounded-lg text-label-category font-label-category text-carbon-black dark:text-pure-white uppercase tracking-wider gap-1.5 border border-subtle-border dark:border-[#2a303c]">
-                    <?= Icon::svg('language', 'text-racing-red-text dark:text-racing-red', 14) ?>
+                    <?= Icon::svg('language', 'text-racing-red-text dark:text-racing-red-text-dark', 14) ?>
                     <span>BR</span>
                 </div>
 
@@ -304,12 +304,12 @@ if (empty($trendingTags)) {
         <!-- 3. Em Alta Ticker Strip -->
         <div class="bg-surface-container-low dark:bg-[#0d121c] border-t border-subtle-border/60 dark:border-[#1e2533]">
             <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin h-11 flex items-center gap-space-sm overflow-x-auto">
-                <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red-text dark:text-racing-red shrink-0 flex items-center gap-1.5">
-                    <?= Icon::svg('trending_up', 'text-racing-red-text dark:text-racing-red', 14) ?>Em Alta:
+                <span class="font-label-category text-label-category uppercase tracking-wider text-racing-red-text dark:text-racing-red-text-dark shrink-0 flex items-center gap-1.5">
+                    <?= Icon::svg('trending_up', 'text-racing-red-text dark:text-racing-red-text-dark', 14) ?>Em Alta:
                 </span>
                 <div class="flex items-center gap-space-xs font-label-meta text-label-meta">
                     <?php foreach ($trendingTags as $tTag): ?>
-                        <a class="px-space-sm py-1 rounded-full bg-pure-white dark:bg-carbon-surface hover:bg-surface-container-high dark:hover:bg-[#242b38] text-carbon-black dark:text-pure-white whitespace-nowrap transition-colors shadow-xs border border-subtle-border/60 dark:border-[#2a303c]" href="/tag/<?= urlencode(Security::slugify($tTag)) ?>/">#<?= Security::e($tTag) ?></a>
+                        <a class="px-space-sm py-1 rounded-full bg-pure-white dark:bg-carbon-surface hover:bg-surface-container-high dark:hover:bg-[#242b38] text-carbon-black dark:text-pure-white whitespace-nowrap transition-colors shadow-xs border border-subtle-border/60 dark:border-[#2a303c]" href="/tag/<?= urlencode(Security::slugify($tTag)) ?>/" aria-label="Tópico em alta: <?= Security::e($tTag) ?>">#<?= Security::e($tTag) ?></a>
                     <?php endforeach; ?>
                 </div>
             </div>

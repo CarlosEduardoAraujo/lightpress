@@ -110,7 +110,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
 
             <div class="flex items-center gap-space-md pt-space-xs text-secondary-fixed font-label-meta text-label-meta">
                 <span class="flex items-center gap-1.5 text-pure-white font-semibold">
-                    <?= Icon::svg('edit_note', 'text-racing-red-text dark:text-racing-red', 16) ?>
+                    <?= Icon::svg('edit_note', 'text-racing-red-text dark:text-racing-red-text-dark', 16) ?>
                     Por <?= Security::e($mainLead['author_name'] ?? 'Redação SpeedRacing') ?>
                 </span>
                 <span>•</span>
@@ -134,15 +134,15 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                                 <?= $formatTime($sec['published_at']) ?>
                             </span>
                         </div>
-                        <h2 class="font-headline-sm text-body-sm sm:text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red transition-colors line-clamp-2 sm:line-clamp-3 font-bold leading-snug">
+                        <h2 class="font-headline-sm text-body-sm sm:text-headline-sm text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red-text-dark transition-colors line-clamp-2 sm:line-clamp-3 font-bold leading-snug">
                             <a href="/<?= Security::e($sec['slug']) ?>/">
                                 <?= Security::e($sec['title']) ?>
                             </a>
                         </h2>
                     </div>
                     <div class="flex items-center justify-between text-secondary dark:text-secondary-fixed-dim font-label-meta text-label-meta mt-space-xs pt-space-xs">
-                        <span class="text-tertiary dark:text-racing-red font-medium"></span>
-                        <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red-text dark:group-hover:text-racing-red transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
+                        <span class="text-tertiary dark:text-racing-red-text-dark font-medium"></span>
+                        <a href="/<?= Security::e($sec['slug']) ?>/" class="text-secondary dark:text-secondary-fixed-dim group-hover:text-racing-red-text dark:group-hover:text-racing-red-text-dark transition-transform group-hover:translate-x-1 inline-flex items-center" title="Ler matéria">
                             <?= Icon::svg('arrow_forward', '', 18) ?>
                         </a>
                     </div>
@@ -214,7 +214,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                                 <span>•</span>
                                 <span class="capitalize"><?= Security::e($getSubtopic($item['tags'] ?? null, $item['category'])) ?></span>
                             </div>
-                            <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red transition-colors font-bold leading-snug">
+                            <h3 class="font-headline-md text-headline-sm md:text-headline-md text-carbon-black dark:text-pure-white group-hover:text-racing-red-text dark:group-hover:text-racing-red-text-dark transition-colors font-bold leading-snug">
                                 <a href="/<?= Security::e($item['slug']) ?>/">
                                     <?= Security::e($item['title']) ?>
                                 </a>
@@ -225,7 +225,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                                 </p>
                             <?php endif; ?>
                         </div>
-                        <div class="pt-space-sm flex items-center text-racing-red-text dark:text-racing-red font-label-category text-label-category uppercase tracking-wider gap-1">
+                        <div class="pt-space-sm flex items-center text-racing-red-text dark:text-racing-red-text-dark font-label-category text-label-category uppercase tracking-wider gap-1">
                             <a href="/<?= Security::e($item['slug']) ?>/" class="flex items-center gap-1 hover:underline">
                                 Ler matéria completa <?= Icon::svg('arrow_forward', '', 14) ?>
                             </a>
@@ -291,7 +291,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
         <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">
             <div class="w-full flex items-center justify-between pb-2 px-1 text-[10px] font-label-category uppercase tracking-widest text-secondary dark:text-secondary-fixed-dim">
                 <span>Publicidade</span>
-                <span class="text-racing-red-text dark:text-racing-red font-bold">Parceiro Oficial</span>
+                <span class="text-racing-red-text dark:text-racing-red-text-dark font-bold">Parceiro Oficial</span>
             </div>
             <a href="/contato/" class="w-full block rounded-lg overflow-hidden group shadow-2xs hover:opacity-95 transition-opacity" title="Parceiro Oficial SpeedRacing">
                 <picture>
@@ -320,7 +320,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
         <!-- WIDGET 4: FAST NEWSLETTER -->
         <div id="newsletter" class="bg-surface-container-low dark:bg-carbon-surface rounded-xl p-space-md space-y-space-sm border border-subtle-border dark:border-[#2a303c]">
             <div class="flex items-center gap-2 text-carbon-black dark:text-pure-white font-headline-sm text-headline-sm font-bold">
-                <?= Icon::svg('mail', 'text-racing-red-text dark:text-racing-red', 20) ?>
+                <?= Icon::svg('mail', 'text-racing-red-text dark:text-racing-red-text-dark', 20) ?>
                 <span>Grid SpeedRacing</span>
             </div>
             <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">
