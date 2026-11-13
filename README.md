@@ -528,9 +528,14 @@ map $request_method $lp_cache_method {
     HEAD GET;
 }
 
+# Normalização da chave: extrai o caminho original antes do try_files para /index.php sem query string
+map $request_uri $lp_request_path {
+    ~*^(?<path>[^?]+) $path;
+    default $request_uri;
+}
+
 fastcgi_cache_path /var/cache/nginx/lightpress levels=1:2 keys_zone=LIGHTPRESS:100m inactive=60m max_size=5g;
-# Normalização da chave: baseada na $uri canônica sem query string
-fastcgi_cache_key "$scheme$lp_cache_method$host$uri";
+fastcgi_cache_key "$scheme$lp_cache_method$host$lp_request_path";
 
 # Contexto location FastCGI: $lp_skip_cache deve ser definido por maps
 
@@ -1173,18 +1178,26 @@ O sistema unifica a validação de destinos e requisições HTTP externas atrav�
 Com base na auditoria técnica detalhada registrada em `AUDITORIAS/20261113-ch-seguranca.md`, foram implementadas correções defensivas abrangentes para 4 vetores de integridade, cache e implantação:
 
 #### 8.20.1. Prevenção de Sobrescrita de Variantes de Mídia (CH-01)
-* **Preservação de Nomes para SEO:** Os nomes de arquivos originais sanitizados enviados pelos autores são mantidos integralmente no armazenamento físico.
-* **Loop de Colisão Abrangente:** Em `core/ImageProcessor.php`, o teste de existência antes da gravação foi expandido para cobrir simultaneamente todas as variantes (`full`, `1024`, `thumb`) e extensões (`.webp`, `.avif`). O sistema detecta se um upload homônimo anterior (como `noticia-thumb.png`) já utiliza o destino correspondente à miniatura do novo arquivo `noticia.png`, incrementando sufixos numéricos (`-1`, `-2`) automaticamente.
-* **Travas Defensivas pré-Rename:** Adicionada checagem explícita prévia à execução de `rename()` em staging; se o arquivo de destino já existir fisicamente, o processo é abortado com erro HTTP 409 em vez de sobrescrever silenciosamente os bytes da mídia preexistente.
+* **Preservação de Nomes para SEO e Identificadores Físicos Únicos:** Os nomes de arquivos físicos combinam o slug semântico sanitizado com um token de entropia derivado do identificador de catálogo (`{$cleanSlug}-{$shortToken}`), garantindo unicidade absoluta entre uploads de diferentes usuários e matérias sem prejudicar o ranqueamento no Google Imagens.
+* **Loop de Colisão Abrangente:** Em `core/ImageProcessor.php`, o teste de existência antes da gravação cobre simultaneamente todas as variantes (`full`, `1024`, `thumb`) e extensões (`.webp`, `.avif`). O sistema detecta qualquer colisão de variantes ou resoluções preexistentes, incrementando sufixos numéricos (`-1`, `-2`).
+* **Reserva e Gravação Atômica Exclusiva (`fopen('xb')`):** Eliminada a dependência vulnerável de `file_exists()` seguido de `rename()`. A gravação final de cada variante utiliza atomicamente `fopen(..., 'xb')` (`O_CREAT | O_EXCL` no kernel) com cópia direta via streams (`stream_copy_to_stream()`), tornando fisicamente impossível sobrescrever qualquer arquivo preexistente mesmo sob alta concorrência de requisições.
 
 #### 8.20.2. Invalidação Atômica do Cache de Objetos Redis (CH-02)
-* **Exclusão de Artigos (`public/admin/dashboard.php`):** Ao excluir um artigo do banco de dados, o sistema remove a chave `post_slug:{$slug}` do `ObjectCache`, purga o grupo `'posts'` via `ObjectCache::flushGroup('posts')` e dispara o hook `Hook::fire('post_deleted', ...)`.
+* **Exclusão de Artigos (`public/admin/dashboard.php`):** Ao excluir um artigo do banco de dados, o sistema remove a chave `post_slug:{$slug}` do `ObjectCache`, purga o grupo `'posts'` via `ObjectCache::flushGroup('posts')` e dispara a Action oficial `Hook::doAction('post_deleted', ...)`.
 * **Despublicação e Retorno a Rascunho (`public/admin/editor.php`):** Quando uma matéria publicada é alterada para rascunho ou revisão pendente, as chaves de slug anterior e atual são excluídas do `ObjectCache` e o grupo `'posts'` é invalidado.
 * **Ciclo de Vida de Páginas Institucionais (`public/admin/pages.php`, `public/admin/page-edit.php`):** A exclusão e atualização de páginas limpam as chaves `page_slug` e realizam `ObjectCache::flushGroup('pages')`, impedindo que páginas retiradas ou modificadas continuem sendo servidas pela RAM aos visitantes públicos.
 
 #### 8.20.3. Normalização da Chave FastCGI no Nginx e Purga com UTMs (CH-03)
-* **Chave Normalizada com `$uri`:** Em `nginx/lightpress.conf`, a diretiva `fastcgi_cache_key` adota `"$scheme$lp_cache_method$host$uri"`.
-* **Purga Unificada de Cópias com Parâmetros:** Como o conteúdo de páginas e notícias é idêntico independentemente de parâmetros de rastreamento (`utm_source`, `utm_medium`, `fbclid`, `gclid`), todas as variantes de marketing compartilham o mesmo arquivo físico em `/var/cache/nginx/lightpress/`. A purga canônica disparada pelo `CacheManager` remove o arquivo único de cache instantaneamente para todos os leitores.
+* **Extração do Caminho Original (`$lp_request_path`):** Em `nginx/lightpress.conf`, a chave FastCGI utiliza `$lp_request_path` mapeado via regex a partir de `$request_uri`:
+  ```nginx
+  map $request_uri $lp_request_path {
+      ~*^(?<path>[^?]+) $path;
+      default $request_uri;
+  }
+  fastcgi_cache_key "$scheme$lp_cache_method$host$lp_request_path";
+  ```
+  Como o Nginx altera `$uri` para `/index.php` após o `try_files`, utilizar `$uri` diretamente colapsava todas as rotas sob a mesma chave. A variável `$request_uri` preserva a rota original solicitada pelo leitor, e o map descarta a query string com parâmetros analíticos (`utm_*`, `fbclid`, `gclid`).
+* **Purga Unificada de Cópias com Parâmetros:** Com `$lp_request_path`, `/noticia/materia/` e `/noticia/materia/?utm_source=meta` compartilham exatamente o mesmo cache físico em `/var/cache/nginx/lightpress/`, garantindo paridade total com o cálculo de purga canônica do `CacheManager` e eliminando todas as cópias instantaneamente na exclusão ou edição.
 * **Preservação de Buscas Dinâmicas:** Consultas em tempo real (`?q=` e `?s=`) continuam forçando o bypass completo (`$lp_skip_cache = 1`).
 
 #### 8.20.4. Isolamento da Proteção contra Execução de Scripts em Uploads para Apache (CH-04)

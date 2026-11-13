@@ -10,24 +10,25 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ### Hardening Pós-Auditoria de Segurança: Prevenção de Colisão de Mídia, Invalidação de Cache de Objetos, Normalização FastCGI e Isolamento Apache — 2026-11-13
 
 - **Prevenção de Sobrescrita de Variantes de Mídia / CH-01 (`core/ImageProcessor.php`):**
-  - Preservação estrita dos nomes de arquivos originais sanitizados enviados pelos autores, mantendo a integridade semântica para ranqueamento no Google Imagens sem inserção de tokens ou hashes aleatórios.
-  - Expansão do loop de detecção de colisão física para verificar simultaneamente todas as variantes e formatos gerados: `.webp`, `.avif`, `-1024.webp`, `-1024.avif`, `-thumb.webp`, `-thumb.avif`, `-1920.webp` e `-1920.avif`. Caso um arquivo homônimo anterior (ex: `noticia-thumb.png`) já utilize o destino correspondente ao thumbnail da nova imagem (`noticia.png`), o novo upload incrementa automaticamente o sufixo numérico (`-1`, `-2`).
-  - Adicionadas travas de segurança defensivas pré-`rename()` que abortam com erro HTTP 409 caso o arquivo de destino já exista fisicamente, prevenindo condições de corrida (*TOCTOU*) e sobrescritas concorrentes.
+  - Geração de nomes físicos exclusivos combinando o slug semântico com token de entropia do identificador de catálogo (`{$cleanSlug}-{$shortToken}`), eliminando colisões de arquivos entre autores e uploads simultâneos sem prejuízo ao ranqueamento no Google Imagens.
+  - Expansão do loop de detecção de colisão física para verificar simultaneamente todas as variantes e formatos gerados: `.webp`, `.avif`, `-1024.webp`, `-1024.avif`, `-thumb.webp`, `-thumb.avif`, `-1920.webp` e `-1920.avif`.
+  - Gravação atômica e exclusiva com `fopen($target, 'xb')` (`O_CREAT | O_EXCL` no kernel) associada a `stream_copy_to_stream()`. Elimina o intervalo vulnerável (*TOCTOU*) entre `file_exists()` e `rename()`, garantindo que destinos preexistentes nunca sejam sobrescritos mesmo sob simulação de gravação concorrente.
 - **Invalidação Atômica do Cache de Objetos Redis no Ciclo de Vida Editorial / CH-02 (`public/admin/dashboard.php`, `public/admin/editor.php`, `public/admin/pages.php`, `public/admin/page-edit.php`):**
-  - Exclusão de matérias em `dashboard.php` passa a invalidar a chave `post_slug:{$slug}` e executar `ObjectCache::flushGroup('posts')` em memória RAM, além de disparar o hook `Hook::fire('post_deleted', ...)`.
+  - Exclusão de matérias em `dashboard.php` passa a invalidar a chave `post_slug:{$slug}` e executar `ObjectCache::flushGroup('posts')` em memória RAM, disparando o hook oficial via `Hook::doAction('post_deleted', ...)`, prevenindo interrupção fatal e assegurando a purga imediata de URLs.
   - Despublicação de matérias em `editor.php` (alteração de status para rascunho ou pendente de revisão) agora remove as chaves de slug anterior e atual no `ObjectCache` e purga o grupo `'posts'`.
   - Exclusão e edição de páginas institucionais em `pages.php` e `page-edit.php` realizam a invalidação síncrona das chaves `page_slug` e limpam o grupo `'pages'` no `ObjectCache`.
   - Elimina a persistência de conteúdos excluídos ou despublicados que permaneciam servidos pela memória RAM por até 10 dias.
-- **Normalização da Chave de Cache FastCGI no Nginx / CH-03 (`nginx/lightpress.conf`):**
-  - Atualização da diretiva de cache para `fastcgi_cache_key "$scheme$lp_cache_method$host$uri";`, baseando a chave estritamente na rota canônica `$uri` sem parâmetros de consulta.
-  - Requisições públicas com parâmetros analíticos de campanhas e redes sociais (`?utm_source=...`, `?utm_medium=...`, `?fbclid=...`, `?gclid=...`) passam a compartilhar o mesmo arquivo de cache em disco em `/var/cache/nginx/lightpress/`, garantindo que a purga de URL disparada pelo `CacheManager` elimine instantaneamente todas as variações cacheadas.
+- **Normalização da Chave de Cache FastCGI no Nginx com Preservação de Rota / CH-03 (`nginx/lightpress.conf`):**
+  - Implementação de `map $request_uri $lp_request_path` para extrair o caminho original da requisição sem query string, e adoção de `fastcgi_cache_key "$scheme$lp_cache_method$host$lp_request_path";`.
+  - Corrige a colisão de chaves gerada pelo `try_files ... /index.php`, que alterava `$uri` para `/index.php` e fazia matérias distintas compartilharem o mesmo cache. Como `$request_uri` não muda no redirecionamento interno, `$lp_request_path` mantém cada rota isolada (`/artigo-a/` vs `/artigo-b/`).
+  - Requisições públicas com parâmetros analíticos de campanhas e redes sociais (`?utm_source=...`, `?utm_medium=...`, `?fbclid=...`, `?gclid=...`) compartilham o mesmo arquivo físico de cache da rota canônica, garantindo paridade exata com o algoritmo de purga do `CacheManager`.
   - Preservado o bypass obrigatório de cache (`$lp_skip_cache = 1`) para buscas em tempo real (`?q=` e `?s=`).
 - **Isolamento da Proteção contra Execução de Scripts em Uploads para Apache / CH-04 (`public/.htaccess`, `public/uploads/.htaccess`, `.gitignore`):**
   - Remoção da regra `FilesMatch` da raiz `public/.htaccess`, prevenindo que scripts legítimos (`index.php`, login e painel administrativo) fossem indevidamente bloqueados com HTTP 403 Forbidden em ambientes Apache ou LiteSpeed.
   - Criação de `public/uploads/.htaccess` com a regra `<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$"> Require all denied </FilesMatch>` (com fallback para `Order Allow,Deny`), blindando exclusivamente o diretório de mídia contra execução remota de scripts.
   - Adição de exceção no `.gitignore` (`!public/uploads/.htaccess`) para assegurar o versionamento contínuo da regra de segurança.
 - **Cobertura e Validação Automatizada de Regressão:**
-  - Validação de 100% de aprovação na suíte de testes dedicados contra colisões de variantes, invalidação de chaves e grupos no `ObjectCache`, integridade da chave Nginx e sintaxe dos arquivos `.htaccess`.
+  - Validação de 100% de aprovação na suíte de testes dedicados cobrindo exclusividade de caminhos no Nginx, disparo do `Hook::doAction` e proteção atômica contra sobrescrita com `fopen('xb')`.
   - Verificação sintática (`php -l`) limpa em todos os arquivos modificados.
 
 ### Google News: Feeds RSS Enriquecidos, Feeds por Categoria e News XML Sitemap — 2026-11-12

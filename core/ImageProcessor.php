@@ -526,8 +526,9 @@ class ImageProcessor
         }
         $cleanSlug = rtrim(mb_substr($cleanSlug, 0, 100), '-');
 
-        // Se já existir qualquer variante com o mesmo nome na pasta de destino, incrementa sufixo numérico (-1, -2, etc.)
-        $fileBase = $cleanSlug;
+        // Nome base físico exclusivo por mídia combinando o slug semântico com token de entropia do media_id (CH-01)
+        $shortToken = substr($mediaId, 0, 8);
+        $fileBase = "{$cleanSlug}-{$shortToken}";
         $counter = 1;
         while (
             file_exists("{$targetDir}/{$fileBase}.webp") || 
@@ -539,7 +540,7 @@ class ImageProcessor
             file_exists("{$targetDir}/{$fileBase}-1920.webp") || 
             file_exists("{$targetDir}/{$fileBase}-1920.avif")
         ) {
-            $fileBase = "{$cleanSlug}-{$counter}";
+            $fileBase = "{$cleanSlug}-{$shortToken}-{$counter}";
             $counter++;
         }
 
@@ -594,11 +595,17 @@ class ImageProcessor
 
                 if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
                     $webpSize = filesize($webpStaging);
-                    if (file_exists($webpTarget)) {
+                    // Gravação atômica exclusiva via fopen('xb') para neutralizar TOCTOU e sobrescritas concorrentes
+                    $targetFh = @fopen($webpTarget, 'xb');
+                    if ($targetFh === false) {
                         @unlink($webpStaging);
                         throw new RuntimeException("Conflito de destino detectado ao salvar variante WebP ({$webpFilename}).", 409);
                     }
-                    rename($webpStaging, $webpTarget);
+                    $stagingFh = fopen($webpStaging, 'rb');
+                    stream_copy_to_stream($stagingFh, $targetFh);
+                    fclose($stagingFh);
+                    fclose($targetFh);
+                    @unlink($webpStaging);
                     @chmod($webpTarget, 0664);
                     $manifest['variants'][$key]['webp'] = [
                         'url' => "{$relativeDir}/{$webpFilename}",
@@ -628,11 +635,17 @@ class ImageProcessor
 
                         if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
                             $avifSize = filesize($avifStaging);
-                            if (file_exists($avifTarget)) {
+                            // Gravação atômica exclusiva via fopen('xb') para neutralizar TOCTOU e sobrescritas concorrentes
+                            $targetFh = @fopen($avifTarget, 'xb');
+                            if ($targetFh === false) {
                                 @unlink($avifStaging);
                                 throw new RuntimeException("Conflito de destino detectado ao salvar variante AVIF ({$avifFilename}).", 409);
                             }
-                            rename($avifStaging, $avifTarget);
+                            $stagingFh = fopen($avifStaging, 'rb');
+                            stream_copy_to_stream($stagingFh, $targetFh);
+                            fclose($stagingFh);
+                            fclose($targetFh);
+                            @unlink($avifStaging);
                             @chmod($avifTarget, 0664);
                             $manifest['variants'][$key]['avif'] = [
                                 'url' => "{$relativeDir}/{$avifFilename}",

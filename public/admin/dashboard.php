@@ -93,7 +93,7 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
             ObjectCache::flushGroup('posts');
 
             // Disparar hook de exclusão de post
-            Hook::fire('post_deleted', $delPostId, $targetPost);
+            Hook::doAction('post_deleted', $delPostId, $targetPost);
 
             $cacheMgr->purgeUrls($affectedUrls);
 
