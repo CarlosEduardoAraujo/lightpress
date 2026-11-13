@@ -233,7 +233,7 @@ Na classe `ImageProcessor.php`, a leitura AVIF verifica `function_exists('imagec
 
 * **Validação Real de MIME Type:** Nunca confiar na extensão informada no cabeçalho `$_FILES`. Validar via `finfo_file(finfo_open(FILEINFO_MIME_TYPE), $tmpPath)` e verificação de *magic bytes*. Suporte explícito a `image/jpeg`, `image/png`, `image/webp` e `image/avif`.
 * **Re-encoding Completo:** Decodificar e redesenhar a imagem em um novo recurso GD, sem copiar metadados desnecessários. Isso reduz a exposição a conteúdo embutido em metadados; não garante eliminar esteganografia nem substitui atualização das bibliotecas e bloqueio de execução de uploads.
-* **Nomenclatura Semântica Amigável para SEO:** Ao invés de hashes criptográficos aleatórios que prejudicam o ranqueamento no Google Imagens, os arquivos finais preservam com fidelidade o nome original sanitizado (slug) enviado pelo usuário (ex: `dodge-retorna-nascar-cup-series-2027-kaulig-racing-1024.webp`). Colisões de nomes no mesmo diretório mensal são resolvidas automaticamente com incrementos numéricos inteligentes (`-1`, `-2`).
+* **Nomenclatura Semântica Amigável para SEO e Detecção Abrangente de Colisões:** Ao invés de hashes criptográficos aleatórios que prejudicam o ranqueamento no Google Imagens, os arquivos finais preservam com fidelidade o nome original sanitizado (slug) enviado pelo usuário (ex: `dodge-retorna-nascar-cup-series-2027-kaulig-racing-1024.webp`). O loop de detecção de colisão verifica proativamente todas as variantes e resoluções geradas (`.webp`, `.avif`, `-1024.webp`, `-1024.avif`, `-thumb.webp`, `-thumb.avif`, `-1920.webp` e `-1920.avif`), garantindo que uploads com sufixos homônimos (ex: `foto-thumb.png` seguido de `foto.png`) nunca colidam ou sobrescrevam miniaturas ou imagens de outros usuários, incrementando sufixos numéricos (`-1`, `-2`). Travas de segurança pré-`rename()` abortam com HTTP 409 caso o destino já exista fisicamente no disco.
 * **Métricas Transparentes de Compressão:** O manifesto de mídias armazena os tamanhos em bytes de cada variante gerada. O painel administrativo exibe claramente nos cards:
   - Formato e peso do arquivo original (ex: `6400 KiB • 1920x1072px - PNG`)
   - Formato, peso e porcentagem de redução alcançada (ex: `129 KiB • 1920x1072px - AVIF - 98% (redução do tamanho)`)
@@ -516,7 +516,7 @@ Rotas públicas iniciais: `/`, `/page/{n}/`, `/noticia/{slug}/`, `/categoria/{sl
 | Método diferente de GET/HEAD, query string ou rota não prevista | Nunca ler nem gravar cache |
 | Resposta com `Set-Cookie`, indicação `private`/`no-store`/`no-cache` ou status diferente de 200 | Nunca gravar cache |
 
-Requisições públicas elegíveis não iniciam sessão e não emitem cookies. Parâmetros de rastreamento também causam bypass inicialmente; sua eventual normalização precisa de política explícita, sem ignorar parâmetros que mudem o conteúdo. Apenas detectar uma sessão no PHP é insuficiente: as exclusões de requisição precisam ser avaliadas pelo Nginx antes de consultar o cache.
+Requisições públicas elegíveis não iniciam sessão e não emitem cookies. A chave de cache FastCGI é normalizada utilizando a `$uri` canônica (sem query string) para as rotas públicas de conteúdo. Dessa forma, variações de URLs contendo parâmetros analíticos de campanhas (`?utm_source=...`, `?fbclid=...`, `?gclid=...`) compartilham exatamente a mesma entrada física de cache, permitindo que a purga de URLs canônicas invalide instantaneamente todas as cópias do artigo no disco. Consultas dinâmicas que alteram o resultado (`?q=` e `?s=`) continuam forçando o bypass completo do cache (`$lp_skip_cache = 1`).
 
 Trecho de referência para a chave (não é um virtual host completo):
 
@@ -529,7 +529,8 @@ map $request_method $lp_cache_method {
 }
 
 fastcgi_cache_path /var/cache/nginx/lightpress levels=1:2 keys_zone=LIGHTPRESS:100m inactive=60m max_size=5g;
-fastcgi_cache_key "$scheme$lp_cache_method$host$request_uri";
+# Normalização da chave: baseada na $uri canônica sem query string
+fastcgi_cache_key "$scheme$lp_cache_method$host$uri";
 
 # Contexto location FastCGI: $lp_skip_cache deve ser definido por maps
 
@@ -717,7 +718,8 @@ O LightPress adota uma postura defensiva em todas as camadas da aplicação, ali
       add_header X-Content-Type-Options "nosniff";
   }
   ```
-* Arquivos são armazenados com extensões padronizadas restritas (`.webp`, `.avif`) e nomes pseudorrandômicos gerados no servidor.
+* **Bloqueio de Execução no Apache / LiteSpeed:** O diretório `/public/uploads/` conta com arquivo dedicado `.htaccess` contendo bloqueio estrito via `<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$"> Require all denied </FilesMatch>` (compatível com Apache 2.2 e 2.4+), isolando a proteção aos uploads sem impactar o front-controller da raiz pública.
+* Arquivos são armazenados com extensões padronizadas restritas (`.webp`, `.avif`) e nomes semânticos sanitizados preservados para SEO com detecção completa de colisão de variantes.
 * **Exclusão Segura contra Path Traversal:** Ao excluir imagens e variantes na biblioteca de mídia (`public/admin/media.php`), a aplicação resolve o caminho canônico com `realpath()` e garante a terminação com barra separadora (`/`) no diretório base (`$baseUploadDir = rtrim(..., '/') . '/'`), além de exigir `is_file()` antes de invocar `unlink()`. Isso impede que diretórios irmãos de mesmo prefixo (ex: `/public/uploads_backup/`) ou tentativas de navegação arbitrária via `/../` contornem a proteção.
 
 ### 8.6. Cabeçalhos HTTP de Segurança Defensivos
@@ -1165,6 +1167,29 @@ O sistema unifica a validação de destinos e requisições HTTP externas atrav�
 * **Cache Bypass DoS Neutralizado:** Removida a regex ambígua `~*/preview` de `$lp_skip_cache_uri` e das query strings no `nginx/lightpress.conf`, impedindo que atacantes forcem bypass de cache sob carga em URLs comuns.
 * **Herança de Cabeçalhos no Nginx:** Re-declarados os cabeçalhos de segurança nos blocos `location ^~ /uploads/` e `location ^~ /assets/`, corrigindo o comportamento nativo do Nginx que silenciava os cabeçalhos do bloco `server`.
 * **Bloqueio no Apache:** Adicionada regra explícita `RewriteRule ^api/view\.php$ - [R=404,L]` no `public/.htaccess`, garantindo que requisições diretas ao script PHP da API de views sejam bloqueadas.
+
+### 8.20. Hardening Pós-Auditoria de Segurança (Auditoria CH-01 a CH-04)
+
+Com base na auditoria técnica detalhada registrada em `AUDITORIAS/20261113-ch-seguranca.md`, foram implementadas correções defensivas abrangentes para 4 vetores de integridade, cache e implantação:
+
+#### 8.20.1. Prevenção de Sobrescrita de Variantes de Mídia (CH-01)
+* **Preservação de Nomes para SEO:** Os nomes de arquivos originais sanitizados enviados pelos autores são mantidos integralmente no armazenamento físico.
+* **Loop de Colisão Abrangente:** Em `core/ImageProcessor.php`, o teste de existência antes da gravação foi expandido para cobrir simultaneamente todas as variantes (`full`, `1024`, `thumb`) e extensões (`.webp`, `.avif`). O sistema detecta se um upload homônimo anterior (como `noticia-thumb.png`) já utiliza o destino correspondente à miniatura do novo arquivo `noticia.png`, incrementando sufixos numéricos (`-1`, `-2`) automaticamente.
+* **Travas Defensivas pré-Rename:** Adicionada checagem explícita prévia à execução de `rename()` em staging; se o arquivo de destino já existir fisicamente, o processo é abortado com erro HTTP 409 em vez de sobrescrever silenciosamente os bytes da mídia preexistente.
+
+#### 8.20.2. Invalidação Atômica do Cache de Objetos Redis (CH-02)
+* **Exclusão de Artigos (`public/admin/dashboard.php`):** Ao excluir um artigo do banco de dados, o sistema remove a chave `post_slug:{$slug}` do `ObjectCache`, purga o grupo `'posts'` via `ObjectCache::flushGroup('posts')` e dispara o hook `Hook::fire('post_deleted', ...)`.
+* **Despublicação e Retorno a Rascunho (`public/admin/editor.php`):** Quando uma matéria publicada é alterada para rascunho ou revisão pendente, as chaves de slug anterior e atual são excluídas do `ObjectCache` e o grupo `'posts'` é invalidado.
+* **Ciclo de Vida de Páginas Institucionais (`public/admin/pages.php`, `public/admin/page-edit.php`):** A exclusão e atualização de páginas limpam as chaves `page_slug` e realizam `ObjectCache::flushGroup('pages')`, impedindo que páginas retiradas ou modificadas continuem sendo servidas pela RAM aos visitantes públicos.
+
+#### 8.20.3. Normalização da Chave FastCGI no Nginx e Purga com UTMs (CH-03)
+* **Chave Normalizada com `$uri`:** Em `nginx/lightpress.conf`, a diretiva `fastcgi_cache_key` adota `"$scheme$lp_cache_method$host$uri"`.
+* **Purga Unificada de Cópias com Parâmetros:** Como o conteúdo de páginas e notícias é idêntico independentemente de parâmetros de rastreamento (`utm_source`, `utm_medium`, `fbclid`, `gclid`), todas as variantes de marketing compartilham o mesmo arquivo físico em `/var/cache/nginx/lightpress/`. A purga canônica disparada pelo `CacheManager` remove o arquivo único de cache instantaneamente para todos os leitores.
+* **Preservação de Buscas Dinâmicas:** Consultas em tempo real (`?q=` e `?s=`) continuam forçando o bypass completo (`$lp_skip_cache = 1`).
+
+#### 8.20.4. Isolamento da Proteção contra Execução de Scripts em Uploads para Apache (CH-04)
+* **Liberação da Raiz Pública:** A regra `FilesMatch` que negava acesso a arquivos `.php` foi removida da raiz `public/.htaccess`, garantindo que o front-controller `index.php` e os painéis administrativos funcionem sem erro 403 Forbidden em servidores Apache e LiteSpeed.
+* **Proteção Dedicada em Uploads:** Criado o arquivo `public/uploads/.htaccess` com a diretiva `FilesMatch` restrita exclusivamente à pasta de mídia, bloqueando a execução direta de qualquer script malicioso enviado ao diretório de uploads.
 
 ---
 

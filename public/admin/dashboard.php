@@ -13,6 +13,8 @@ use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\CacheManager;
+use LightPress\Core\ObjectCache;
+use LightPress\Core\Hook;
 
 $currentUser = Security::requireAuth();
 
@@ -85,6 +87,13 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
                 
                 $cacheMgr->recordPurgeJob($delPostId, 'post_deletion', $affectedUrls);
             });
+
+            // Invalidação imediata do cache de objetos Redis (CH-02)
+            ObjectCache::delete("post_slug:{$targetPost['slug']}", 'posts');
+            ObjectCache::flushGroup('posts');
+
+            // Disparar hook de exclusão de post
+            Hook::fire('post_deleted', $delPostId, $targetPost);
 
             $cacheMgr->purgeUrls($affectedUrls);
 

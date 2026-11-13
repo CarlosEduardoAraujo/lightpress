@@ -8,6 +8,7 @@ storage/migration/*
 
 public/uploads/*
 !public/uploads/.gitkeep
+!public/uploads/.htaccess
 
 # Configurações com credenciais locais
 config.local.php
@@ -22,3 +23,6 @@ storage/*.sqlite*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Auditoria de segurança
+AUDITORIAS/*

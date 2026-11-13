@@ -13,6 +13,7 @@ use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\Schema;
 use LightPress\Core\CacheManager;
+use LightPress\Core\ObjectCache;
 
 $currentUser = Security::requireAuth(null, ['admin', 'editor'], $config);
 
@@ -34,6 +35,8 @@ if ($isDelPage) {
         $target = Database::fetchOne("SELECT id, title, slug FROM pages WHERE id = ? LIMIT 1", [$deleteId]);
         if ($target) {
             Database::query("DELETE FROM pages WHERE id = ?", [$deleteId]);
+            ObjectCache::delete("page_slug:{$target['slug']}", 'pages');
+            ObjectCache::flushGroup('pages');
             try {
                 $cacheMgr = new CacheManager($config);
                 $cacheMgr->purgeUrls(["/{$target['slug']}/", "/sitemap.xml"]);

@@ -18,13 +18,6 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# Bloqueio de Execução de Scripts em Uploads
-<IfModule mod_authz_core.c>
-    <FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
-        Require all denied
-    </FilesMatch>
-</IfModule>
-
 # Headers HTTP de Segurança
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"

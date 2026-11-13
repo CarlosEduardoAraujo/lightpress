@@ -1,0 +1,17 @@
+# ==============================================================================
+# LightPress - Bloqueio de Execução de Scripts em Uploads (Apache / LiteSpeed)
+# Impede expressamente a execução de qualquer interpretador de script no diretório de mídia
+# ==============================================================================
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    <FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
+        Order Allow,Deny
+        Deny from all
+    </FilesMatch>
+</IfModule>

@@ -526,14 +526,18 @@ class ImageProcessor
         }
         $cleanSlug = rtrim(mb_substr($cleanSlug, 0, 100), '-');
 
-        // Se já existir arquivo com o mesmo nome na pasta de destino, incrementa sufixo numérico (-1, -2, etc.)
+        // Se já existir qualquer variante com o mesmo nome na pasta de destino, incrementa sufixo numérico (-1, -2, etc.)
         $fileBase = $cleanSlug;
         $counter = 1;
         while (
             file_exists("{$targetDir}/{$fileBase}.webp") || 
             file_exists("{$targetDir}/{$fileBase}.avif") || 
+            file_exists("{$targetDir}/{$fileBase}-1024.webp") || 
+            file_exists("{$targetDir}/{$fileBase}-1024.avif") || 
+            file_exists("{$targetDir}/{$fileBase}-thumb.webp") || 
+            file_exists("{$targetDir}/{$fileBase}-thumb.avif") || 
             file_exists("{$targetDir}/{$fileBase}-1920.webp") || 
-            file_exists("{$targetDir}/{$fileBase}-1024.webp")
+            file_exists("{$targetDir}/{$fileBase}-1920.avif")
         ) {
             $fileBase = "{$cleanSlug}-{$counter}";
             $counter++;
@@ -590,6 +594,10 @@ class ImageProcessor
 
                 if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
                     $webpSize = filesize($webpStaging);
+                    if (file_exists($webpTarget)) {
+                        @unlink($webpStaging);
+                        throw new RuntimeException("Conflito de destino detectado ao salvar variante WebP ({$webpFilename}).", 409);
+                    }
                     rename($webpStaging, $webpTarget);
                     @chmod($webpTarget, 0664);
                     $manifest['variants'][$key]['webp'] = [
@@ -620,6 +628,10 @@ class ImageProcessor
 
                         if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
                             $avifSize = filesize($avifStaging);
+                            if (file_exists($avifTarget)) {
+                                @unlink($avifStaging);
+                                throw new RuntimeException("Conflito de destino detectado ao salvar variante AVIF ({$avifFilename}).", 409);
+                            }
                             rename($avifStaging, $avifTarget);
                             @chmod($avifTarget, 0664);
                             $manifest['variants'][$key]['avif'] = [

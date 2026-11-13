@@ -13,6 +13,7 @@ use LightPress\Core\BlockCompiler;
 use LightPress\Core\CacheManager;
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\PostService;
 use LightPress\Core\Security;
 
@@ -423,6 +424,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($wasPublished) {
                         try {
+                            ObjectCache::delete("post_slug:{$prevSlug}", 'posts');
+                            if (!empty($cleanSlug) && $cleanSlug !== $prevSlug) {
+                                ObjectCache::delete("post_slug:{$cleanSlug}", 'posts');
+                            }
+                            ObjectCache::flushGroup('posts');
+
                             $cacheManager = new CacheManager();
                             $cacheManager->purgeUrls([
                                 '/',

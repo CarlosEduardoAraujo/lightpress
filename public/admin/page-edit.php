@@ -14,6 +14,7 @@ use LightPress\Core\Security;
 use LightPress\Core\Schema;
 use LightPress\Core\BlockCompiler;
 use LightPress\Core\CacheManager;
+use LightPress\Core\ObjectCache;
 
 $currentUser = Security::requireAuth(null, ['admin', 'editor'], $config);
 
@@ -92,7 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                         $newId = (int)Database::lastInsertId();
 
-                        // Purga de Cache no Nginx
+                        // Invalidação de Cache de Objetos e Purga no Nginx
+                        ObjectCache::delete("page_slug:{$slug}", 'pages');
+                        ObjectCache::flushGroup('pages');
                         try {
                             $cacheMgr = new CacheManager($config);
                             $cacheMgr->purgeUrls(["/{$slug}/", "/sitemap.xml"]);
@@ -109,7 +112,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             [$slug, $title, $contentHtml, $featuredImage ?: null, $seoTitle ?: null, $seoDesc ?: null, $status, $pageId]
                         );
 
-                        // Purga de Cache no Nginx
+                        // Invalidação de Cache de Objetos e Purga no Nginx
+                        ObjectCache::delete("page_slug:{$slug}", 'pages');
+                        if (!empty($page['slug']) && $page['slug'] !== $slug) {
+                            ObjectCache::delete("page_slug:{$page['slug']}", 'pages');
+                        }
+                        ObjectCache::flushGroup('pages');
+
                         try {
                             $cacheMgr = new CacheManager($config);
                             $purgeUrls = ["/{$slug}/", "/sitemap.xml"];
