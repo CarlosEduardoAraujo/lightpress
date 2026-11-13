@@ -782,6 +782,22 @@ Para maximizar a visibilidade editorial no Google Notícias, Google Discover e g
   - **Miniatura AVIF de Próxima Geração (`<meta name="thumbnail">`):** Aponta diretamente para a variante `.avif` de alta compressão (`ImageProcessor::toAvifUrl()`).
 * **Home, Categorias e Tags:** As tags `<meta property="og:image">` e `<meta name="twitter:image">` consomem dinamicamente o Favicon configurado no portal em WebP.
 
+#### 8.9.1. Feeds RSS 2.0 Enriquecidos e Google News XML Sitemap (`/feed.xml`, `/categoria/{slug}/feed.xml`, `/sitemap-news.xml`)
+
+Para indexação em tempo real pelo Googlebot-News e integração direta com a Central do Editor (Google Publisher Center), o sistema fornece um pipeline completo de feeds e sitemaps:
+* **Feed RSS Geral (`/feed.xml`, `/feed/`):**
+  - Namespaces XML completos: `xmlns:content`, `xmlns:media`, `xmlns:dc` e `xmlns:atom`.
+  - Imagem de destaque vinculada via `<enclosure url="..." length="0" type="image/webp" />` e `<media:content>` para cartões ricos no app do Google Notícias.
+  - Metadados estruturados: autor em `<dc:creator>`, categoria em `<category>`, resumo em `<description>` e HTML editorial completo compilado em `<content:encoded><![CDATA[...]]></content:encoded>`.
+* **Feeds por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed/`):**
+  - Feeds setoriais independentes para criação de seções e abas temáticas no Google Publisher Center (ex: Fórmula 1, Endurance, MotoGP).
+  - Autodescoberta em navegadores e leitores de RSS via `<link rel="alternate" type="application/rss+xml" ...>` injetado no `<head>` das páginas de categoria.
+* **Google News XML Sitemap (`/sitemap-news.xml`):**
+  - Janela estrita de 48 horas (`published_at >= NOW() - 48h`), atendendo aos requisitos obrigatórios do Googlebot-News.
+  - Tags dedicadas `<news:news>`, `<news:publication>` (com idioma `pt-br`), `<news:publication_date>` no formato W3C (`date('c')`), `<news:title>` e imagens associadas em `<image:image>`.
+  - Inclusão prioritária no topo do índice mestre `/sitemap.xml`.
+* **Desempenho e Cache:** Todos os endpoints XML operam com cabeçalho de cache FastCGI de 5 minutos (`X-Accel-Expires: 300`).
+
 ### 8.10. Módulo de Páginas Institucionais (`/admin/pages.php`, `/admin/page-edit.php`, `templates/page.php`)
 
 Páginas estáticas corporativas (ex: *Nossa Equipe Editorial*, *Contato / Fale Conosco*, *Termos de Uso*, *Política de Privacidade*, *Código de Ética*) são gerenciadas isoladamente na tabela `pages`:
@@ -1266,11 +1282,17 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Precedência de IP Compatível com Cloudflare Tunnel (SEC-06):** Priorização segura de `X-Real-IP` com preservação transparente de `CF-Connecting-IP` originado de Cloudflare Tunnel.
   - [x] **Mutações Administrativas via POST:** Migração de exclusões e alternâncias para formulários `POST` estritos com CSRF em `pages.php`, `categories.php`, `dashboard.php`, `media.php` e `users.php`.
 
-* **FASE ATUAL (Em Andamento) — Opção 3: Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
-  - [ ] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
-  - [ ] **Processamento de Mídia em Lote:** Download/leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.
-  - [ ] **Preservação de SEO e Redirecionamentos 301:** Mapeamento de todos os permalinks antigos para a tabela `redirects` garantindo integridade de ranqueamento no Google.
-  - [ ] **Modo Simulação (`--dry-run`):** Execução com validação prévia e relatório de homologação antes da confirmação da migração.
+* **FASE CONCLUÍDA — Migração de Acervo do WordPress (`bin/migrate-wp.php`):**
+  - [x] **Importador CLI Transacional em Lotes:** Extração segura de posts, páginas, categorias, tags e autores de instalações legadas do WordPress.
+  - [x] **Processamento de Mídia em Lote:** Leitura local de `wp-content/uploads/` e conversão automática para o pipeline WebP/AVIF com substituição de links no conteúdo.
+  - [x] **Preservação de SEO e Redirecionamentos 301:** Mapeamento de todos os permalinks antigos para a tabela `redirects` garantindo integridade de ranqueamento no Google.
+  - [x] **Modo Simulação (`--dry-run`):** Execução com validação prévia e relatório de homologação antes da confirmação da migração.
+
+* **FASE CONCLUÍDA — Feeds RSS Google News & News XML Sitemap:**
+  - [x] **Feed RSS Geral Enriquecido (`/feed.xml`, `/feed/`):** Compatível com o Google Publisher Center, com namespaces `content`, `media`, `dc`, imagens em `<enclosure>` WebP e corpo editorial em `<content:encoded>`.
+  - [x] **Feeds por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed/`):** Feeds temáticos por categoria para seções no Google Notícias, com autodescoberta no `<head>`.
+  - [x] **Google News XML Sitemap (`/sitemap-news.xml`):** Janela estrita de 48h, namespaces oficiais (`xmlns:news`, `xmlns:image`) e inclusão no índice `/sitemap.xml`.
+  - [x] **Suíte de Testes Automatizados (`bin/test-feeds-news.php`):** 26 asserções com 100% de aprovação.
 
 ---
 

@@ -7,7 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
-### Hardening de Segurança de Produção: Anti-SSRF Centralizado, CSP Estrita, Timing Constant-Time e Fail-Fast — 2026-11-12
+### Google News: Feeds RSS Enriquecidos, Feeds por Categoria e News XML Sitemap — 2026-11-12
+
+- **Feed RSS Geral Enriquecido para o Google Publisher Center (`public/index.php`):**
+  - Modernização da rota `/feed.xml` e suporte às rotas canônicas `/feed` e `/feed/`.
+  - Suporte completo aos namespaces `xmlns:content`, `xmlns:media`, `xmlns:dc` e `xmlns:atom`.
+  - Imagem de destaque vinculada com compressão WebP em `<enclosure url="..." length="0" type="image/webp" />` e `<media:content>`.
+  - Metadados semânticos completos por item: autor em `<dc:creator>`, categoria editorial em `<category>`, resumo protegido em CDATA em `<description>` e corpo editorial compilado em `<content:encoded><![CDATA[...]]></content:encoded>`.
+  - Cache FastCGI configurado com TTL de 5 minutos (`X-Accel-Expires: 300`).
+- **Feeds Específicos por Categoria Editorial (`public/index.php`, `templates/header.php`):**
+  - Implementação das rotas `/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed` e `/categoria/{slug}/feed/`.
+  - Validação estrita de existência da categoria no banco com resposta 404 em caso de categoria inativa ou inexistente.
+  - Personalização de metadados do canal: título contextualizado (`{Categoria} - {Portal}`), URL canônica da categoria e últimas 50 matérias ordenadas cronologicamente (`published_at DESC`).
+  - Autodescoberta de feed no cabeçalho HTML (`templates/header.php`) com injeção automática de `<link rel="alternate" type="application/rss+xml" ...>` ao navegar nas páginas de categoria.
+- **Sitemap XML Oficial do Google Notícias (`public/index.php`):**
+  - Nova rota dedicada `/sitemap-news.xml` em estrita conformidade com as diretrizes do Googlebot-News.
+  - Janela temporal estrita de 48 horas (`published_at >= NOW() - 48h`), eliminando matérias expiradas automaticamente do rastreador de notícias.
+  - Implementação das tags oficiais `<news:news>`, `<news:publication>` (nome e idioma `pt-br`), `<news:publication_date>` em formato W3C/ISO 8601 (`date('c')`) e `<news:title>`.
+  - Inclusão de imagens associadas via namespace `xmlns:image` com URL absoluta da variante WebP em `<image:image>`.
+  - Inclusão prioritária do `/sitemap-news.xml` no topo do índice mestre `/sitemap.xml`.
+- **Cobertura de Testes Automatizados (`bin/test-feeds-news.php`):**
+  - Criação de nova suíte com 26 asserções cobrindo validação sintática XML via SimpleXML, integridade dos namespaces, enclosures de imagem, filtros de 48h no sitemap de notícias, isolamento por categoria e resposta 404. 100% de aprovação.
 
 - **Serviço Centralizado Anti-SSRF com DNS Pinning (`core/SafeHttpClient.php`):**
   - Implementação de cliente HTTP defensivo unificado com 4 perfis estritos de segurança: `PROFILE_STRICT_PUBLIC`, `PROFILE_LAN`, `PROFILE_LOCAL_AI` e `PROFILE_LOCAL_ORIGIN_ONLY`.

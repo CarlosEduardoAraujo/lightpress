@@ -81,6 +81,9 @@ if (empty($trendingTags)) {
         <?php endif; ?>
     <?php endif; ?>
     <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($config['app']['name'] ?? 'SpeedRacing') ?>" href="/feed.xml">
+    <?php if (!empty($category['slug'])): ?>
+    <link rel="alternate" type="application/rss+xml" title="Feed RSS - <?= Security::e($category['name']) ?> - <?= Security::e($config['app']['name'] ?? 'SpeedRacing') ?>" href="/categoria/<?= Security::e($category['slug']) ?>/feed.xml">
+    <?php endif; ?>
 
     <!-- Favicon do Site Dinâmico -->
     <?php 

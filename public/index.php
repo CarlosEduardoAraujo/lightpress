@@ -544,52 +544,197 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     require $config['paths']['templates'] . '/post.php';
 });
 
-// Rota 6: RSS Feed (/feed.xml)
-$router->get('/feed.xml', function () use ($config): void {
+// Helper para renderização padronizada de Feeds RSS 2.0 com suporte nativo ao Google News
+$renderRssFeed = function (
+    string $title,
+    string $channelLink,
+    string $feedSelfUrl,
+    string $description,
+    array $posts
+) use ($config): void {
     header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Feed RSS (LP-09)
     header('Content-Type: application/rss+xml; charset=utf-8');
-    $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $posts = Database::fetchAll(
-        "SELECT slug, title, summary, published_at 
-         FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
-         ORDER BY published_at DESC LIMIT 50",
-        [$nowUtc]
-    );
+    $escapeCdata = function (string $text): string {
+        return str_replace(']]>', ']]]]><![CDATA[>', $text);
+    };
 
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" 
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:media="http://search.yahoo.com/mrss/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title><?= Security::e($config['app']['name']) ?></title>
-    <link><?= Security::e($canonicalOrigin) ?>/</link>
-    <description><?= Security::e(!empty($config['app']['description']) ? $config['app']['description'] : 'Feed de notícias do ' . $config['app']['name']) ?></description>
+    <title><?= Security::e($title) ?></title>
+    <link><?= Security::e($channelLink) ?></link>
+    <description><?= Security::e($description) ?></description>
     <language>pt-BR</language>
     <?php if (!empty($config['app']['favicon'])): ?>
     <image>
       <url><?= Security::e(str_starts_with($config['app']['favicon'], 'http') ? $config['app']['favicon'] : "{$canonicalOrigin}{$config['app']['favicon']}") ?></url>
-      <title><?= Security::e($config['app']['name']) ?></title>
-      <link><?= Security::e($canonicalOrigin) ?>/</link>
+      <title><?= Security::e($title) ?></title>
+      <link><?= Security::e($channelLink) ?></link>
     </image>
     <?php endif; ?>
-    <atom:link href="<?= Security::e($canonicalOrigin) ?>/feed.xml" rel="self" type="application/rss+xml" />
-    <?php foreach ($posts as $item): ?>
+    <atom:link href="<?= Security::e($feedSelfUrl) ?>" rel="self" type="application/rss+xml" />
+    <?php foreach ($posts as $item): 
+        $itemUrl = "{$canonicalOrigin}/" . Security::e($item['slug']) . "/";
+        $imgUrl = '';
+        if (!empty($item['featured_image'])) {
+            $rawImg = ImageProcessor::toWebpUrl($item['featured_image']);
+            $imgUrl = str_starts_with($rawImg, 'http') ? $rawImg : "{$canonicalOrigin}{$rawImg}";
+        }
+        $authorName = !empty($item['author_name']) ? $item['author_name'] : $config['app']['name'];
+    ?>
       <item>
-        <title><?= Security::e($item['title']) ?></title>
-        <link><?= Security::e($canonicalOrigin) ?>/<?= Security::e($item['slug']) ?>/</link>
-        <description><?= Security::e($item['summary'] ?? '') ?></description>
+        <title><![CDATA[<?= $escapeCdata($item['title']) ?>]]></title>
+        <link><?= $itemUrl ?></link>
+        <guid isPermaLink="true"><?= $itemUrl ?></guid>
         <pubDate><?= date(DATE_RSS, strtotime($item['published_at'])) ?></pubDate>
-        <guid isPermaLink="true"><?= Security::e($canonicalOrigin) ?>/<?= Security::e($item['slug']) ?>/</guid>
+        <dc:creator><![CDATA[<?= $escapeCdata($authorName) ?>]]></dc:creator>
+        <?php if (!empty($item['category'])): ?>
+        <category><![CDATA[<?= $escapeCdata($item['category']) ?>]]></category>
+        <?php endif; ?>
+        <description><![CDATA[<?= $escapeCdata($item['summary'] ?? '') ?>]]></description>
+        <?php if (!empty($imgUrl)): ?>
+        <enclosure url="<?= Security::e($imgUrl) ?>" length="0" type="image/webp" />
+        <media:content url="<?= Security::e($imgUrl) ?>" medium="image" type="image/webp">
+          <media:title><![CDATA[<?= $escapeCdata($item['title']) ?>]]></media:title>
+        </media:content>
+        <?php endif; ?>
+        <?php if (!empty($item['content_html'])): ?>
+        <content:encoded><![CDATA[<?= $escapeCdata($item['content_html']) ?>]]></content:encoded>
+        <?php endif; ?>
       </item>
     <?php endforeach; ?>
   </channel>
 </rss>
     <?php
+};
+
+// Rota 6: RSS Feed Geral (/feed.xml e /feed/)
+$generalFeedHandler = function () use ($config, $renderRssFeed): void {
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
+
+    $posts = Database::fetchAll(
+        "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+         ORDER BY p.published_at DESC LIMIT 50",
+        [$nowUtc]
+    );
+
+    $desc = !empty($config['app']['description']) ? $config['app']['description'] : 'Feed de notícias do ' . $config['app']['name'];
+    $renderRssFeed($config['app']['name'], "{$canonicalOrigin}/", "{$canonicalOrigin}/feed.xml", $desc, $posts);
+};
+
+$router->get('/feed.xml', $generalFeedHandler);
+$router->get('/feed', $generalFeedHandler);
+$router->get('/feed/', $generalFeedHandler);
+
+// Rota 6b: RSS Feed Específico por Categoria (/categoria/{slug}/feed.xml e /categoria/{slug}/feed/)
+$categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): void {
+    $slug = Security::getSafeString($params, 'slug');
+    if ($slug === '') {
+        http_response_code(404);
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $category = Database::fetchOne(
+        "SELECT id, name, slug FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
+        [$slug]
+    );
+
+    if (!$category) {
+        http_response_code(404);
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
+
+    $posts = Database::fetchAll(
+        "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+         ORDER BY p.published_at DESC LIMIT 50",
+        [$slug, $nowUtc]
+    );
+
+    $title = "{$category['name']} - {$config['app']['name']}";
+    $channelLink = "{$canonicalOrigin}/categoria/{$category['slug']}/";
+    $feedSelfUrl = "{$canonicalOrigin}/categoria/{$category['slug']}/feed.xml";
+    $desc = "Últimas notícias de {$category['name']} no " . $config['app']['name'];
+
+    $renderRssFeed($title, $channelLink, $feedSelfUrl, $desc, $posts);
+};
+
+$router->get('/categoria/{slug}/feed.xml', $categoryFeedHandler);
+$router->get('/categoria/{slug}/feed', $categoryFeedHandler);
+$router->get('/categoria/{slug}/feed/', $categoryFeedHandler);
+
+// Rota 6c: Google News XML Sitemap (/sitemap-news.xml - Janela estrita de 48 horas)
+$router->get('/sitemap-news.xml', function () use ($config): void {
+    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI
+    header('Content-Type: application/xml; charset=utf-8');
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $twoDaysAgoUtc = gmdate('Y-m-d H:i:s', time() - 172800); // 48 horas obrigatórias pelo Googlebot-News
+    $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
+
+    $posts = Database::fetchAll(
+        "SELECT slug, title, featured_image, published_at 
+         FROM posts 
+         WHERE status IN ('published', 'scheduled') 
+           AND published_at <= ? 
+           AND published_at >= ? 
+         ORDER BY published_at DESC LIMIT 1000",
+        [$nowUtc, $twoDaysAgoUtc]
+    );
+
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <?php foreach ($posts as $p): 
+      $postUrl = "{$canonicalOrigin}/" . Security::e($p['slug']) . "/";
+      $imgUrl = '';
+      if (!empty($p['featured_image'])) {
+          $rawImg = ImageProcessor::toWebpUrl($p['featured_image']);
+          $imgUrl = str_starts_with($rawImg, 'http') ? $rawImg : "{$canonicalOrigin}{$rawImg}";
+      }
+  ?>
+  <url>
+    <loc><?= $postUrl ?></loc>
+    <news:news>
+      <news:publication>
+        <news:name><?= Security::e($config['app']['name']) ?></news:name>
+        <news:language>pt-br</news:language>
+      </news:publication>
+      <news:publication_date><?= date('c', strtotime($p['published_at'])) ?></news:publication_date>
+      <news:title><?= Security::e($p['title']) ?></news:title>
+    </news:news>
+    <?php if (!empty($imgUrl)): ?>
+    <image:image>
+      <image:loc><?= Security::e($imgUrl) ?></image:loc>
+      <image:title><?= Security::e($p['title']) ?></image:title>
+    </image:image>
+    <?php endif; ?>
+  </url>
+  <?php endforeach; ?>
+</urlset>
+    <?php
 });
 
-// Rota 6: Sitemap XML (Sitemap Index & Partições Paginadas)
+// Rota 6d: Sitemap XML Principal (Sitemap Index com inclusão prioritária do News Sitemap)
 $router->get('/sitemap.xml', function () use ($config): void {
     header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Sitemap XML (LP-09)
     header('Content-Type: application/xml; charset=utf-8');
@@ -616,6 +761,10 @@ $router->get('/sitemap.xml', function () use ($config): void {
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc><?= Security::e($canonicalOrigin) ?>/sitemap-news.xml</loc>
+    <lastmod><?= $latestIso ?></lastmod>
+  </sitemap>
   <sitemap>
     <loc><?= Security::e($canonicalOrigin) ?>/sitemap-main.xml</loc>
     <lastmod><?= $latestIso ?></lastmod>
