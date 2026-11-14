@@ -7,4 +7,9 @@
         document.documentElement.classList.add('dark');
         document.documentElement.setAttribute('data-theme', 'dark');
     }
+    var gf = document.getElementById('gf-async');
+    if (gf) {
+        gf.addEventListener('load', function() { this.media = 'all'; });
+        if (gf.sheet) { gf.media = 'all'; }
+    }
 })();

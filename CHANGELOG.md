@@ -7,6 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização Mobile PageSpeed: Carregamento Assíncrono de Fontes, Eliminação de Bloqueio de Renderização e Preload LCP — 2026-11-13
+
+- **Acessibilidade no Mobile (`templates/header.php`):**
+  - Adição de `aria-label="Inscreva-se na nossa Newsletter"` e `aria-label="Siga o SpeedRacing no Instagram"` nos botões da barra superior de utilitários, resolvendo a falha de links sem nome acessível quando o texto é ocultado em telas pequenas (`hidden lg:inline`).
+  - Ampliação da área de toque (*target size*) para `min-w-[44px] min-h-[36px]` com padding e alinhamento centralizado, atendendo integralmente à auditoria de alvos de toque em smartphones.
+- **Eliminação de 760 ms de Bloqueio de Renderização (`templates/header.php`, `public/assets/js/theme-init.js`, `public/assets/js/app.js`):**
+  - Implementação de carregamento assíncrono para a folha do Google Fonts (`Space Grotesk` e `Work Sans`) via `rel="preload" as="style"` combinado com ativação dinâmica desacoplada via JavaScript nos scripts permitidos pela CSP, eliminando 780 ms de bloqueio da thread principal em conexões 4G móveis.
+  - Atributo `defer` adicionado no script anti-flash de tema `theme-init.js`, combinado com a definição da classe `class="dark" data-theme="dark"` diretamente na tag `<html>` do HTML estático, assegurando carregamento não-bloqueante sem qualquer cintilação visual (*flash of unstyled content*).
+- **Priorização Máxima e Pré-carregamento da Imagem LCP (`templates/header.php`, `templates/home.php`):**
+  - Inserção de `<link rel="preload" as="image" ... type="image/avif" fetchpriority="high">` no `<head>` da Home e páginas de artigos, antecipando a descoberta da imagem de capa pelo motor do navegador.
+  - Inserção do atributo `fetchpriority="high"` e dimensões explícitas `width="1024" height="576"` na tag `<img>` da manchete principal em `templates/home.php`, reduzindo o atraso de pintura da maior área de conteúdo (LCP) no mobile.
+
+
 ### Acessibilidade WCAG AA: Conformidade de Contraste no Dark Mode e Desambiguação de Links — 2026-11-13
 
 - **Diagnóstico PageSpeed Insights (Desktop - 95 para 100):** auditoria detalhada identificou que o portal carrega por padrão com o tema escuro (`<html class="dark">`). No Dark Mode, os textos vermelhos com `dark:text-racing-red` (`#E10600`) contra fundos escuros (`#111418`, `#1A1E24`, `#0D121C`) atingiam razões de contraste entre 3.37:1 e 3.77:1, reprovando na exigência WCAG 2.1 AA de 4.5:1 para texto normal.

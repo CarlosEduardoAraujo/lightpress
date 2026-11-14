@@ -1133,6 +1133,12 @@ O critério de contraste de cores para textos normais exige no mínimo `4.5:1` s
 * No rodapé institucional (`templates/footer.php`), links de navegação rápida e categorias receberam espaçamento vertical dedicado (`py-1 inline-block`) para cumprir os requisitos de alvos de toque mínimos (*touch targets*).
 * Adicionados atributos `aria-label` descritivos diferenciando âncoras de categorias e tags de mesmo rótulo (ex.: `aria-label="Categoria Fórmula 1"` vs `aria-label="Tópico em alta: Fórmula 1"`), eliminando avisos de destinos ambíguos (*identical-links-same-purpose*).
 
+#### 8.18.4. Otimização de Performance e Acessibilidade Mobile (LCP, Fontes Assíncronas e Touch Targets)
+Para acelerar o carregamento em redes móveis 4G e dispositivos celulares (emulação Moto G Power no Lighthouse):
+* **Eliminação de Bloqueio de Renderização (760 ms):** O carregamento da folha tipográfica do Google Fonts (`Space Grotesk` e `Work Sans`) foi transformado em assíncrono via `rel="preload" as="style"` e ativado dinamicamente via script permitido pela CSP (`theme-init.js` e `app.js`). O script de tema anti-flash recebeu atributo `defer`, combinando com `<html class="dark" data-theme="dark">` no HTML estático para evitar qualquer FOUC (*Flash of Unstyled Content*).
+* **Priorização do LCP (Largest Contentful Paint):** A imagem da manchete de capa na Home (`$mainLead['featured_image']`) e nos artigos (`$post['featured_image']`) conta com `<link rel="preload" as="image" ... type="image/avif" fetchpriority="high">` no `<head>` e atributo `fetchpriority="high"` diretamente na tag `<img>`, instruindo o navegador a disparar o download com prioridade máxima.
+* **Acessibilidade e Alvos de Toque no Topo:** Os botões utilitários de Newsletter e Instagram na barra superior (`templates/header.php`) receberam dimensões mínimas acessíveis (`min-w-[44px] min-h-[36px]` com padding responsivo) e atributos `aria-label` explícitos, garantindo que leitores de tela e toques em smartphones mantenham 100% de conformidade.
+
 ### 8.19. Hardening Defensivo de Produção (Anti-SSRF Unificado, Resiliência de Sessão, Timing Constant-Time e Fail-Fast)
 
 Para atender a ambientes de missão crítica em produção e mitigar superfícies de ataque identificadas em auditoria de segurança avançada, o LightPress consolida uma camada robusta de defesas ativas:

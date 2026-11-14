@@ -80,7 +80,10 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
                     <img class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out opacity-85" 
                          src="<?= Security::e(ImageProcessor::toAvifUrl($mainLead['featured_image'])) ?>" 
                          alt="<?= Security::e($mainLeadImgDesc) ?>"
-                         title="<?= Security::e($mainLeadImgDesc) ?>">
+                         title="<?= Security::e($mainLeadImgDesc) ?>"
+                         fetchpriority="high"
+                         width="1024"
+                         height="576">
                 </figure>
             <?php else: ?>
                 <div class="w-full h-full bg-carbon-surface flex items-center justify-center text-secondary">Sem imagem</div>

@@ -70,7 +70,7 @@ if (empty($trendingTags)) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark" data-theme="dark">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
@@ -102,13 +102,24 @@ if (empty($trendingTags)) {
     <!-- Schema.org JSON-LD para Google Notícias -->
     <?= Seo::renderJsonLd($post ?? null, $config) ?>
 
-    <!-- Script Anti-Flash de Tema: MODO ESCURO É O PADRÃO (Externo para conformidade estrita com CSP) -->
-    <script src="/assets/js/theme-init.js"></script>
+    <!-- Pré-carregamento Prioritário da Imagem LCP (Elimina atraso de descoberta) -->
+    <?php if (!empty($post['featured_image'])): ?>
+        <link rel="preload" as="image" href="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" type="image/avif" fetchpriority="high">
+    <?php elseif (!empty($featuredPosts[0]['featured_image']) && ($currentPage ?? 1) === 1): ?>
+        <link rel="preload" as="image" href="<?= Security::e(ImageProcessor::toAvifUrl($featuredPosts[0]['featured_image'])) ?>" type="image/avif" fetchpriority="high">
+    <?php endif; ?>
 
-    <!-- Tipografia do Design System SpeedRacing (Kinetic Apex Editorial) -->
+    <!-- Script Anti-Flash de Tema (deferido para eliminar bloqueio de renderização) -->
+    <script src="/assets/js/theme-init.js" defer></script>
+
+    <!-- Tipografia do Design System SpeedRacing (Kinetic Apex Editorial) - Carregamento Não-Bloqueante -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap">
+    <link id="gf-async" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" media="print">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap">
+    </noscript>
 
     <!-- CSS do Portal: Estático Compilado para Máxima Performance (100/100 PageSpeed) com Fallback Seguro -->
     <?php 
@@ -242,16 +253,16 @@ if (empty($trendingTags)) {
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">
         <!-- 1. Top Strip -->
         <div class="w-full bg-carbon-black text-on-tertiary">
-            <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between h-9 text-label-meta font-label-meta">
+            <div class="max-w-[1900px] mx-auto px-margin-mobile md:px-margin flex items-center justify-between min-h-[38px] text-label-meta font-label-meta py-0.5">
                 <div class="flex items-center gap-space-md">
                     <span class="text-secondary-fixed-dim">Credibilidade no automobilismo desde 2002</span>
                 </div>
                 <div class="flex items-center gap-space-sm">
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1.5" href="#newsletter">
-                        <?= Icon::svg('mail', 'text-surface-container-lowest', 15) ?><span class="hidden lg:inline">Newsletter</span>
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="#newsletter" aria-label="Inscreva-se na nossa Newsletter">
+                        <?= Icon::svg('mail', 'text-surface-container-lowest', 16) ?><span class="hidden lg:inline">Newsletter</span>
                     </a>
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center gap-1.5" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer">
-                        <?= Icon::svg('share', 'text-surface-container-lowest', 15) ?><span class="hidden lg:inline">Social</span>
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="https://www.instagram.com/speedracing.com.br/" target="_blank" rel="noopener noreferrer" aria-label="Siga o SpeedRacing no Instagram">
+                        <?= Icon::svg('share', 'text-surface-container-lowest', 16) ?><span class="hidden lg:inline">Social</span>
                     </a>
                 </div>
             </div>

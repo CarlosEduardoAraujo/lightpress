@@ -49,6 +49,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Ativação não-bloqueante de fontes caso ainda pendente
+    var gf = document.getElementById('gf-async');
+    if (gf && gf.media !== 'all') {
+        gf.media = 'all';
+    }
+
     // 3. Botão de Copiar Link da Matéria
     var copyBtn = document.getElementById('copy-btn');
     if (copyBtn) {
