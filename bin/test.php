@@ -69,6 +69,37 @@ $maliciousBlock = [
 $maliciousCompiled = BlockCompiler::compile($maliciousBlock);
 assertTest("Neutralização de link com javascript:", !str_contains($maliciousCompiled, 'javascript:'));
 
+// Testes de Poda de Parágrafos Vazios e Sanitização de Blocos
+assertTest("Poda de parágrafos vazios contendo &nbsp; e <br>", BlockCompiler::sanitizeHtml('<p>&nbsp;</p><p>Conteúdo real</p><p><br></p>') === '<p>Conteúdo real</p>');
+assertTest("Remoção de <br> final útil em parágrafo", BlockCompiler::sanitizeHtml('<p>Texto<br></p>') === '<p>Texto</p>');
+assertTest("Preservação de <br> intermediário entre linhas", BlockCompiler::sanitizeHtml('<p>Linha 1<br>Linha 2</p>') === '<p>Linha 1<br>Linha 2</p>');
+assertTest("Poda bottom-up de lista com itens vazios", BlockCompiler::sanitizeHtml('<ul><li>&nbsp;</li></ul>') === '');
+
+// Testes de Preservação e Sanitização de Tabelas
+assertTest("Preservação de célula individual vazia em linha válida", BlockCompiler::sanitizeHtml('<table><tr><td>Piloto</td><td></td></tr></table>') === '<table><tr><td>Piloto</td><td></td></tr></table>');
+assertTest("Poda de tabela com linhas totalmente vazias", BlockCompiler::sanitizeHtml('<table><tr><td>&nbsp;</td><td></td></tr></table>') === '');
+assertTest("Poda de linha vazia mantendo linha preenchida", BlockCompiler::sanitizeHtml('<table><tr><td>Piloto</td><td>1</td></tr><tr><td>&nbsp;</td><td></td></tr></table>') === '<table><tr><td>Piloto</td><td>1</td></tr></table>');
+assertTest("Remoção de onclick e style em table/tr/td mantendo dados", BlockCompiler::sanitizeHtml('<table onclick="alert(1)"><tr onclick="alert(2)"><td style="color:red">A</td></tr></table>') === '<table><tr><td>A</td></tr></table>');
+assertTest("Validação de colspan numérico válido e descarte de inválido", 
+    str_contains(BlockCompiler::sanitizeHtml('<table><tr><td colspan="2">Largo</td></tr></table>'), 'colspan="2"') &&
+    !str_contains(BlockCompiler::sanitizeHtml('<table><tr><td colspan="abc">Largo</td></tr></table>'), 'colspan')
+);
+assertTest("Validação de atributo scope em th", str_contains(BlockCompiler::sanitizeHtml('<table><tr><th scope="col">Header</th></tr></table>'), 'scope="col"'));
+assertTest("Remoção de tags colgroup e col de planilhas", !str_contains(BlockCompiler::sanitizeHtml('<table><colgroup><col width="100"></colgroup><tr><td>A</td></tr></table>'), 'col'));
+
+// Testes de Conversão e Compilação Bidirecional (htmlToBlocks <-> compile)
+$tableSourceHtml = '<p>Intro</p><table><thead><tr><th>Pos</th><th>Piloto</th></tr></thead><tbody><tr><td>1</td><td>Verstappen</td></tr></tbody></table>';
+$tableBlocksJson = BlockCompiler::htmlToBlocks($tableSourceHtml);
+assertTest("htmlToBlocks gera bloco do tipo 'table'", str_contains($tableBlocksJson, '"type":"table"'));
+$tableRecompiled = BlockCompiler::compile($tableBlocksJson);
+assertTest("compile renderiza bloco 'table' sanitizado", str_contains($tableRecompiled, '<th>Pos</th>') && str_contains($tableRecompiled, '<td>Verstappen</td>'));
+
+$headlessTable = [
+    ['type' => 'table', 'headers' => ['Pos', 'Piloto'], 'rows' => [['1', 'Verstappen']]]
+];
+$headlessCompiled = BlockCompiler::compile($headlessTable);
+assertTest("compile suporta tabela estruturada de API headless", str_contains($headlessCompiled, '<th>Pos</th>') && str_contains($headlessCompiled, '<td>Verstappen</td>'));
+
 // -------------------------------------------------------------
 // 3. Testes da Matriz de Controle de Acesso (RBAC - Authorization)
 // -------------------------------------------------------------

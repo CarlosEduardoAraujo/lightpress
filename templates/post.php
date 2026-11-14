@@ -180,6 +180,76 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
     html.dark .article-body hr {
         border-top: 1px solid #2a303c;
     }
+    /* Estilos semânticos e responsivos para tabelas */
+    .article-body table {
+        display: table;
+        width: 100%;
+        border-collapse: collapse;
+        margin: 2rem 0;
+        border: 1px solid #E5E7EB;
+        font-size: 0.95rem;
+    }
+    html.dark .article-body table {
+        border-color: #2a303c;
+    }
+    @media (max-width: 768px) {
+        .article-body table {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+    .article-body th {
+        background: #f8fafc;
+        color: #111418;
+        font-weight: 700;
+        text-align: left;
+        padding: 0.75rem 1rem;
+        border-bottom: 2px solid #E10600;
+        border-right: 1px solid #E5E7EB;
+        white-space: nowrap;
+    }
+    html.dark .article-body th {
+        background: #1a233a;
+        color: #FFFFFF;
+        border-bottom-color: #E10600;
+        border-right-color: #2a303c;
+    }
+    .article-body td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #E5E7EB;
+        border-right: 1px solid #E5E7EB;
+        color: inherit;
+    }
+    html.dark .article-body td {
+        border-bottom-color: #2a303c;
+        border-right-color: #2a303c;
+    }
+    .article-body tr:nth-child(even) {
+        background: #F9FAFB;
+    }
+    html.dark .article-body tr:nth-child(even) {
+        background: #151d30;
+    }
+    .article-body tr:hover {
+        background: #f1f5f9;
+    }
+    html.dark .article-body tr:hover {
+        background: #1e293b;
+    }
+    .article-body caption {
+        caption-side: bottom;
+        padding: 0.5rem;
+        font-size: 0.825rem;
+        color: #64748b;
+        font-style: italic;
+        text-align: left;
+    }
+    html.dark .article-body caption {
+        color: #94a3b8;
+    }
 </style>
 
 <div class="flex flex-col w-full">

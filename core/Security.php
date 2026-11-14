@@ -668,7 +668,14 @@ class Security
      */
     public static function slugify(string $text): string
     {
-        // Translitera caracteres acentuados
+        // Translitera caracteres acentuados comuns (português e latinos) antes do iconv para compatibilidade cross-platform
+        $text = str_replace(
+            ['á','à','â','ã','ä','é','è','ê','ë','í','ì','î','ï','ó','ò','ô','õ','ö','ú','ù','û','ü','ç','ñ',
+             'Á','À','Â','Ã','Ä','É','È','Ê','Ë','Í','Ì','Î','Ï','Ó','Ò','Ô','Õ','Ö','Ú','Ù','Û','Ü','Ç','Ñ'],
+            ['a','a','a','a','a','e','e','e','e','i','i','i','i','o','o','o','o','o','u','u','u','u','c','n',
+             'a','a','a','a','a','e','e','e','e','i','i','i','i','o','o','o','o','o','u','u','u','u','c','n'],
+            $text
+        );
         $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text) ?: $text;
         // Substitui caracteres não alfanuméricos por hífen
         $text = preg_replace('~[^\pL\d]+~u', '-', $text) ?? '';

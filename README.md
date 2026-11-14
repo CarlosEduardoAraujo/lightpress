@@ -417,13 +417,17 @@ lightpress/
 
 ### 6.1. Ciclo de Vida do Conteúdo e Editor Visual de Notícias
 
-1. **Redação e Editor de Redação Contínua (`public/admin/editor.php`):**
-   - **Canvas Visual Direto:** Elimina o atrito de blocos manuais rígidos. Jornalistas escrevem de forma contínua em um canvas visual rico (`contenteditable`), formatando títulos, parágrafos, listas e citações com atalhos e barra de ferramentas sticky.
-   - **Limpador Inteligente de Ctrl+V (Google Docs e Microsoft Word):** Ao colar matérias prontas redigidas externamente, o sistema intercepta o evento `paste` e sanitiza instantaneamente o HTML:
-     - Remove estilos sujos (`style="..."`), classes proprietárias do Office (`MsoNormal`), metadados, scripts, comentários condicionais (`<!--[if ...]>`) e tags legadas (`<o:p>`, `<xml>`).
-     - Desembrulha automaticamente os wrappers do Google Docs (`<b id="docs-internal-guid-...">`) evitando que a matéria inteira fique em negrito.
-     - Converte e preserva apenas tags semânticas limpas: `<h2>`, `<h3>`, `<p>`, `<strong>`, `<em>`, `<u>`, `<blockquote>`, `<ul>`, `<ol>`, `<li>` e `<a>` (com `rel="noopener noreferrer"`).
-   - **Barra de Ferramentas Rica e Leve (< 20 KiB Vanilla JS):** Formatação rápida (H2, H3, P, B, I, U, Listas, Citação, Link, Inserir Foto e alternância de código-fonte `</> HTML`).
+1. **Redação e Editor de Redação Contínua (`public/admin/editor.php` e `public/admin/page-edit.php`):**
+   - **Canvas Visual Direto:** Elimina o atrito de blocos manuais rígidos. Jornalistas escrevem de forma contínua em um canvas visual rico (`contenteditable`), formatando títulos, parágrafos, listas, tabelas e citações com atalhos e barra de ferramentas sticky.
+   - **Limpador Inteligente de Ctrl+V (Poda de Parágrafos Vazios, Tabelas e Planilhas):** Ao colar matérias redigidas externamente (Google Docs, Microsoft Word, Excel ou web), o sistema intercepta o evento `paste` e sanitiza instantaneamente o HTML:
+     - Remove estilos sujos (`style="..."`), classes proprietárias do Office (`MsoNormal`), metadados, scripts, comentários condicionais (`<!--[if ...]>`), tags legadas (`<o:p>`, `<xml>`) e quebras proprietárias (`<br class="Apple-interchange-newline">`).
+     - Desembrulha automaticamente os wrappers do Google Docs (`<b id="docs-internal-guid-...">`) com suporte a tabelas, evitando que a matéria inteira fique em negrito.
+     - **Poda Definitiva de Parágrafos Vazios e `<br>` Finais:** Limpa automaticamente o canvas ao colar em editor vazio (eliminando `<p><br></p>` residual no topo da matéria), remove parágrafos e blocos vazios contendo apenas espaços ou `&nbsp;` (`\u00A0`), e poda quebras `<br>` no final de parágrafos mantendo apenas quebras intermediárias entre linhas.
+     - **Preservação e Normalização de Tabelas (Excel e Google Sheets):** Whitelist autorizada para `<table>`, `<thead>`, `<tbody>`, `<tfoot>`, `<tr>`, `<th>`, `<td>` e `<caption>`. Atributos sujos (`bgcolor`, `border`, `cellpadding`, `width`, `height`, `style`) são removidos, preservando apenas `colspan`, `rowspan` (validados entre 2 e 50) e `scope`. Desembrulha múltiplos `<p>` dentro de células injetando `<br>` para manter espaçamento, e promove automaticamente a primeira linha de planilhas coladas para `<thead><tr><th>`.
+     - **Prevenção de Cursor Preso:** Ao colar ou inserir uma tabela no final do canvas, injeta um `<p><br></p>` auxiliar garantindo que o redator consiga clicar abaixo da tabela para continuar a redação (parágrafos vazios não utilizados são expurgados no salvamento pelo backend).
+     - Converte e preserva apenas tags semânticas limpas: `<h2>`, `<h3>`, `<p>`, `<strong>`, `<em>`, `<u>`, `<blockquote>`, `<ul>`, `<ol>`, `<li>`, `<a>` (com `rel="noopener noreferrer"`) e elementos de tabela estruturados.
+   - **Barra de Ferramentas Rica e Leve (< 25 KiB Vanilla JS):** Formatação rápida (H2, H3, P, B, I, U, Listas, Citação, Link, Inserir Foto, botão dedicado **`⊞ Tabela`** para criação rápida de grades com prompt de linhas/colunas, e alternância de código-fonte `</> HTML`).
+   - **CSS Híbrido e Responsivo para Tabelas:** No desktop (> 768px), as tabelas utilizam `display: table; width: 100%; border-collapse: collapse;` preenchendo toda a largura visual sem distorção; em dispositivos móveis (<= 768px), ativam `display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;`, permitindo rolagem horizontal suave no celular sem quebrar a largura da página.
 
 2. **Seletor de Mídias em Modal (Estilo WordPress):**
    - **Imagem de Destaque:** Botão `[📷 Selecionar da Biblioteca]` abre um modal overlay completo. Exibe miniaturas, dimensões, peso e busca em tempo real por nome.
@@ -1411,6 +1415,16 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Feeds por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed/`):** Feeds temáticos por categoria para seções no Google Notícias, com autodescoberta no `<head>`.
   - [x] **Google News XML Sitemap (`/sitemap-news.xml`):** Janela estrita de 48h, namespaces oficiais (`xmlns:news`, `xmlns:image`) e inclusão no índice `/sitemap.xml`.
   - [x] **Suíte de Testes Automatizados (`bin/test-feeds-news.php`):** 26 asserções com 100% de aprovação.
+
+* **FASE CONCLUÍDA — Sanitização de Paste (Poda de Parágrafos Vazios) e Suporte Completo a Tabelas:**
+  - [x] **Poda de Parágrafos Vazios e `<br>` Espúrios:** Limpeza de placeholders `<p><br></p>` ao colar em editor vazio, eliminação de nós vazios (`<p>`, `<h2>`, `<h3>`, `<h4>`, `<blockquote>`, `<li>`) com `&nbsp;` ou quebras soltas, remoção de `<br class="Apple-interchange-newline">` e poda de `<br>` residuais no final de parágrafos.
+  - [x] **Poda Bottom-Up no Backend (`BlockCompiler.php`):** Varredura pós-sanitização no DOMDocument que remove contêineres vazios de baixo para cima validando por contagem de elementos filhos (`getElementsByTagName`), expurga `<br>` órfãos na raiz e preserva células vazias isoladas em linhas válidas com dados.
+  - [x] **Preservação e Normalização de Tabelas (`editor.php` e `page-edit.php`):** Whitelist ampliada para `table, thead, tbody, tfoot, tr, th, td, caption`; descarte sumário de `<colgroup>` e `<col>`; validação de `colspan`/`rowspan` (2 a 50) e `scope`; tratamento de múltiplos `<p>` em células com `<br>`; e promoção automática da 1ª linha de planilhas Excel/Google Sheets para `<thead><tr><th>`.
+  - [x] **Prevenção de Cursor Preso e Botão Nativo:** Injeção de parágrafo auxiliar `<p><br></p>` após tabelas no final do canvas visual e inclusão do botão `⊞ Tabela` na barra rica de ferramentas.
+  - [x] **CSS Híbrido Responsivo (`post.php` e `page.php`):** Desktop com `display: table; width: 100%; border-collapse: collapse;` e mobile com `display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;`, com borda vermelha `#E10600` no cabeçalho e suporte a Dark Mode.
+  - [x] **JSON Estruturado e Suporte Headless:** Suporte ao bloco `'table'` em `BlockCompiler::htmlToBlocks()` e `BlockCompiler::compile()`.
+  - [x] **Transliteração Cross-Platform (`Security::slugify`):** Mapeamento direto de acentos antes de `iconv` garantindo paridade entre Windows e Linux.
+  - [x] **100% de Aprovação nos Testes Unitários:** 64 asserções aprovadas com zero falhas em `bin/test.php`.
 
 ---
 

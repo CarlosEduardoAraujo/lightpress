@@ -55,6 +55,7 @@ class BlockCompiler
                 'paragraph' => self::compileParagraph($block),
                 'list' => self::compileList($block),
                 'quote' => self::compileQuote($block),
+                'table' => self::compileTable($block),
                 'image' => self::compileImage($block, $isFirstImage),
                 default => '', // Blocos desconhecidos são sumariamente ignorados
             };
@@ -86,14 +87,14 @@ class BlockCompiler
         $allowedTags = [
             'h2', 'h3', 'h4', 'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'u', 's',
             'blockquote', 'cite', 'ul', 'ol', 'li', 'a', 'figure', 'picture', 'source',
-            'img', 'figcaption', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+            'img', 'figcaption', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption'
         ];
 
         // Tags ativas/perigosas cujo nó e todo o conteúdo interno devem ser eliminados
         $dangerousTags = [
             'script', 'style', 'iframe', 'object', 'embed', 'applet', 'meta',
             'link', 'form', 'input', 'textarea', 'button', 'select', 'option',
-            'svg', 'math', 'base'
+            'svg', 'math', 'base', 'colgroup', 'col'
         ];
 
         // Whitelist estrita de atributos autorizados por tag
@@ -118,6 +119,7 @@ class BlockCompiler
         }
 
         self::cleanDomNode($root, $allowedTags, $dangerousTags, $allowedAttributes);
+        self::pruneEmptyDomNodes($root);
 
         $cleanHtml = '';
         foreach ($root->childNodes as $child) {
@@ -242,6 +244,20 @@ class BlockCompiler
                         } else {
                             $child->setAttribute('rel', implode(' ', $safeRel));
                         }
+                    } elseif (in_array($attrName, ['colspan', 'rowspan'], true)) {
+                        $num = (int)$val;
+                        if ($num > 1 && $num <= 50) {
+                            $child->setAttribute($attrName, (string)$num);
+                        } else {
+                            $attrsToRemove[] = $attrName;
+                        }
+                    } elseif ($attrName === 'scope') {
+                        $val = strtolower($val);
+                        if (in_array($val, ['col', 'row', 'colgroup', 'rowgroup'], true)) {
+                            $child->setAttribute('scope', $val);
+                        } else {
+                            $attrsToRemove[] = $attrName;
+                        }
                     }
                 }
 
@@ -282,6 +298,122 @@ class BlockCompiler
     }
 
     /**
+     * Remove nós e quebras residuais vazios do DOM de baixo para cima (bottom-up),
+     * garantindo a integridade semântica de parágrafos, listas e tabelas.
+     */
+    private static function pruneEmptyDomNodes(\DOMElement $root): void
+    {
+        // 1. Remover <br> que seja o último filho útil de blocos de texto ou células
+        foreach (['p', 'h2', 'h3', 'h4', 'li', 'td', 'th'] as $tag) {
+            $elements = iterator_to_array($root->getElementsByTagName($tag));
+            foreach ($elements as $el) {
+                while ($el->lastChild && $el->lastChild->nodeType === XML_TEXT_NODE && trim(str_replace(["\xc2\xa0", "\u{00A0}", "\u{200B}", '&nbsp;'], ' ', $el->lastChild->textContent)) === '') {
+                    $el->removeChild($el->lastChild);
+                }
+                if ($el->lastChild && $el->lastChild->nodeType === XML_ELEMENT_NODE && strtolower($el->lastChild->nodeName) === 'br') {
+                    $el->removeChild($el->lastChild);
+                }
+            }
+        }
+
+        // 2. Podar itens de lista (li) vazios
+        $lis = iterator_to_array($root->getElementsByTagName('li'));
+        foreach (array_reverse($lis) as $li) {
+            if (self::isElementEmptyOfContentAndMedia($li)) {
+                $li->parentNode?->removeChild($li);
+            }
+        }
+
+        // 3. Podar listas vazias (ul, ol) - validando contagem de <li> (ignora nós de texto/quebras de indentação)
+        foreach (['ul', 'ol'] as $listTag) {
+            $lists = iterator_to_array($root->getElementsByTagName($listTag));
+            foreach (array_reverse($lists) as $list) {
+                if ($list->getElementsByTagName('li')->length === 0) {
+                    $list->parentNode?->removeChild($list);
+                }
+            }
+        }
+
+        // 4. Podar linhas de tabela (tr) onde TODAS as células sejam vazias
+        // (preservando células vazias isoladas em linhas válidas com outros dados)
+        $trs = iterator_to_array($root->getElementsByTagName('tr'));
+        foreach (array_reverse($trs) as $tr) {
+            $cells = [];
+            foreach ($tr->childNodes as $child) {
+                if ($child->nodeType === XML_ELEMENT_NODE && in_array(strtolower($child->nodeName), ['th', 'td'], true)) {
+                    $cells[] = $child;
+                }
+            }
+            if (empty($cells)) {
+                $tr->parentNode?->removeChild($tr);
+                continue;
+            }
+            $allCellsEmpty = true;
+            foreach ($cells as $cell) {
+                if (!self::isElementEmptyOfContentAndMedia($cell)) {
+                    $allCellsEmpty = false;
+                    break;
+                }
+            }
+            if ($allCellsEmpty) {
+                $tr->parentNode?->removeChild($tr);
+            }
+        }
+
+        // 5. Podar seções de tabela (thead, tbody, tfoot) vazias - validando contagem de <tr>
+        foreach (['thead', 'tbody', 'tfoot'] as $secTag) {
+            $sections = iterator_to_array($root->getElementsByTagName($secTag));
+            foreach (array_reverse($sections) as $sec) {
+                if ($sec->getElementsByTagName('tr')->length === 0) {
+                    $sec->parentNode?->removeChild($sec);
+                }
+            }
+        }
+
+        // 6. Podar tabelas vazias (table) - validando contagem de <tr>
+        $tables = iterator_to_array($root->getElementsByTagName('table'));
+        foreach (array_reverse($tables) as $table) {
+            if ($table->getElementsByTagName('tr')->length === 0) {
+                $table->parentNode?->removeChild($table);
+            }
+        }
+
+        // 7. Podar elementos de bloco de texto vazios (p, h2, h3, h4, blockquote, caption)
+        foreach (['p', 'h2', 'h3', 'h4', 'blockquote', 'caption'] as $tag) {
+            $blocks = iterator_to_array($root->getElementsByTagName($tag));
+            foreach (array_reverse($blocks) as $block) {
+                if (self::isElementEmptyOfContentAndMedia($block)) {
+                    $block->parentNode?->removeChild($block);
+                }
+            }
+        }
+
+        // 8. Remover <br> soltos que sejam filhos diretos da raiz
+        $directChildren = iterator_to_array($root->childNodes);
+        foreach ($directChildren as $child) {
+            if ($child->nodeType === XML_ELEMENT_NODE && strtolower($child->nodeName) === 'br') {
+                $root->removeChild($child);
+            }
+        }
+    }
+
+    /**
+     * Verifica se um elemento DOM está desprovido de texto significativo e elementos multimídia.
+     */
+    private static function isElementEmptyOfContentAndMedia(\DOMElement $element): bool
+    {
+        foreach (['img', 'picture', 'figure', 'table', 'hr', 'iframe', 'video', 'audio', 'source'] as $mTag) {
+            if ($element->getElementsByTagName($mTag)->length > 0) {
+                return false;
+            }
+        }
+
+        $text = $element->textContent;
+        $normalized = str_replace(["\xc2\xa0", "\u{00A0}", "\u{200B}", '&nbsp;', "\t", "\n", "\r"], ' ', $text);
+        return trim($normalized) === '';
+    }
+
+    /**
      * Converte HTML rico em blocos estruturados JSON para preservação de integridade em APIs headless.
      */
     public static function htmlToBlocks(string $html): string
@@ -293,12 +425,17 @@ class BlockCompiler
 
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="UTF-8">' . $sanitized, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $dom->loadHTML('<?xml encoding="UTF-8"><div id="lp-blocks-root">' . $sanitized . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
 
+        $root = $dom->getElementById('lp-blocks-root');
+        if (!$root) {
+            return '[]';
+        }
+
         $blocks = [];
-        if ($dom->childNodes) {
-            foreach ($dom->childNodes as $node) {
+        if ($root->childNodes) {
+            foreach ($root->childNodes as $node) {
                 if ($node->nodeType !== XML_ELEMENT_NODE) {
                     continue;
                 }
@@ -329,6 +466,9 @@ class BlockCompiler
                     if (!empty($items)) {
                         $blocks[] = ['type' => 'list', 'style' => $tag === 'ol' ? 'ordered' : 'bullet', 'items' => $items];
                     }
+                } elseif ($tag === 'table') {
+                    $tableHtml = $node->ownerDocument->saveHTML($node);
+                    $blocks[] = ['type' => 'table', 'content' => trim($tableHtml)];
                 } elseif ($tag === 'figure') {
                     $imgs = $node->getElementsByTagName('img');
                     if ($imgs->length > 0) {
@@ -417,6 +557,53 @@ class BlockCompiler
         $html .= "</blockquote>";
 
         return $html;
+    }
+
+    /**
+     * Compila tabelas estruturadas ou HTML sanitizado.
+     */
+    private static function compileTable(array $block): string
+    {
+        // 1. Se possuir conteúdo HTML direto
+        if (!empty($block['content']) || !empty($block['html'])) {
+            $rawHtml = (string)($block['content'] ?? $block['html']);
+            return self::sanitizeHtml($rawHtml);
+        }
+
+        // 2. Se for estrutura de linhas / cabeçalhos de API headless
+        $rows = $block['rows'] ?? [];
+        if (!is_array($rows) || empty($rows)) {
+            return '';
+        }
+
+        $headers = $block['headers'] ?? [];
+        $tableHtml = ["<table>"];
+
+        if (is_array($headers) && !empty($headers)) {
+            $tableHtml[] = "  <thead>\n    <tr>";
+            foreach ($headers as $h) {
+                $safeH = self::sanitizeInline((string)$h);
+                $tableHtml[] = "      <th>{$safeH}</th>";
+            }
+            $tableHtml[] = "    </tr>\n  </thead>";
+        }
+
+        $tableHtml[] = "  <tbody>";
+        foreach ($rows as $row) {
+            if (!is_array($row) || empty($row)) {
+                continue;
+            }
+            $tableHtml[] = "    <tr>";
+            foreach ($row as $cell) {
+                $safeCell = self::sanitizeInline((string)$cell);
+                $tableHtml[] = "      <td>{$safeCell}</td>";
+            }
+            $tableHtml[] = "    </tr>";
+        }
+        $tableHtml[] = "  </tbody>";
+        $tableHtml[] = "</table>";
+
+        return self::sanitizeHtml(implode("\n", $tableHtml));
     }
 
     /**

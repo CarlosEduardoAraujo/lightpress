@@ -155,6 +155,10 @@ require __DIR__ . '/header.php';
     [data-theme="dark"] .editor-canvas { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
     [data-theme="dark"] .editor-canvas h2, [data-theme="dark"] .editor-canvas h3 { color: #f1f5f9; }
     [data-theme="dark"] .editor-canvas blockquote { background: #1a233a; color: #cbd5e1; }
+    [data-theme="dark"] .editor-canvas table { border-color: #1e293b; }
+    [data-theme="dark"] .editor-canvas th { background: #1a233a; color: #f1f5f9; border-bottom-color: var(--primary-accent); border-right-color: #1e293b; }
+    [data-theme="dark"] .editor-canvas td { border-bottom-color: #1e293b; border-right-color: #1e293b; }
+    [data-theme="dark"] .editor-canvas tr:nth-child(even) { background: #151d30; }
     [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
     [data-theme="dark"] label { color: #f1f5f9; }
     [data-theme="dark"] .btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; }
@@ -238,6 +242,11 @@ require __DIR__ . '/header.php';
     .editor-canvas img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 1rem 0; display: block; }
     .editor-canvas figure { margin: 1.5rem 0; }
     .editor-canvas figcaption { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 0.4rem; font-style: italic; }
+    .editor-canvas table { display: table; width: 100%; border-collapse: collapse; margin: 1.5rem 0; border: 1px solid var(--border); font-size: 0.95rem; }
+    .editor-canvas th { background: #f8fafc; color: #0f172a; font-weight: 700; text-align: left; padding: 0.65rem 0.85rem; border-bottom: 2px solid var(--primary-accent); border-right: 1px solid var(--border); }
+    .editor-canvas td { padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); color: inherit; }
+    .editor-canvas tr:nth-child(even) { background: #f8fafc; }
+    .editor-canvas caption { caption-side: bottom; padding: 0.5rem; font-size: 0.825rem; color: var(--text-muted); font-style: italic; text-align: left; }
 
     /* Modal de Mídias (WordPress-Style) */
     .media-modal { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; }
@@ -351,6 +360,7 @@ require __DIR__ . '/header.php';
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="promptLink()" title="Inserir Link">🔗 Link</button>
                             <button type="button" class="tool-btn" onclick="openMediaModal('content')" style="background: #e0f2fe; color: #0369a1;" title="Inserir Foto da Biblioteca">📷 Inserir Foto</button>
+                            <button type="button" class="tool-btn" onclick="insertTableDialog()" title="Inserir Tabela">⊞ Tabela</button>
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Limpar Formatação">✕ Limpar</button>
                             <button type="button" class="tool-btn" onclick="toggleHtmlSource()" id="btnToggleSource" style="margin-left: auto;" title="Alternar entre Visual e Código HTML">&lt;/&gt; HTML</button>
@@ -564,6 +574,21 @@ require __DIR__ . '/header.php';
             }
         }
 
+        function isCanvasEmpty(el) {
+            if (!el) return true;
+            var text = (el.textContent || el.innerText || '').replace(/[\s\u00A0\u200B]+/g, '');
+            var hasMedia = el.querySelector('img, table, figure, picture, hr, iframe, video, audio');
+            return text === '' && !hasMedia;
+        }
+
+        function ensureCursorAfterTable(el) {
+            if (el && el.lastElementChild && el.lastElementChild.tagName === 'TABLE') {
+                var p = document.createElement('p');
+                p.innerHTML = '<br>';
+                el.appendChild(p);
+            }
+        }
+
         // -------------------------------------------------------------
         // Limpador Inteligente de Ctrl+V (Google Docs / MS Word)
         // -------------------------------------------------------------
@@ -575,11 +600,17 @@ require __DIR__ . '/header.php';
             var html = clipboardData.getData('text/html');
             var text = clipboardData.getData('text/plain');
 
+            // Se o canvas estiver vazio (apenas <p><br></p> ou espaços), limpa para evitar parágrafo vazio no topo
+            if (isCanvasEmpty(editorCanvas)) {
+                editorCanvas.innerHTML = '';
+            }
+
             if (html && html.trim() !== '') {
                 try {
                     var cleanHtml = cleanWordOrDocsHtml(html);
                     if (cleanHtml && cleanHtml.trim() !== '') {
                         document.execCommand('insertHTML', false, cleanHtml);
+                        ensureCursorAfterTable(editorCanvas);
                         return;
                     }
                 } catch (err) {
@@ -588,13 +619,54 @@ require __DIR__ . '/header.php';
             }
             
             if (text && text.trim() !== '') {
-                var paragraphs = text.split(/\r?\n\r?\n/).map(function(p) {
-                    var trimmed = p.trim();
-                    return trimmed ? '<p>' + escapeHtml(trimmed) + '</p>' : '';
-                }).join('');
-                document.execCommand('insertHTML', false, paragraphs || escapeHtml(text));
+                var lines = text.split(/\r?\n/).map(function(l) { return l.trim(); });
+                var paragraphs = [];
+                var cur = [];
+                for (var i = 0; i < lines.length; i++) {
+                    if (lines[i] === '') {
+                        if (cur.length > 0) {
+                            paragraphs.push('<p>' + escapeHtml(cur.join(' ')) + '</p>');
+                            cur = [];
+                        }
+                    } else {
+                        cur.push(lines[i]);
+                    }
+                }
+                if (cur.length > 0) {
+                    paragraphs.push('<p>' + escapeHtml(cur.join(' ')) + '</p>');
+                }
+                document.execCommand('insertHTML', false, paragraphs.join('') || escapeHtml(text));
+                ensureCursorAfterTable(editorCanvas);
             }
         });
+
+        function insertTableDialog() {
+            var rows = parseInt(prompt("Número de linhas (incluindo cabeçalho):", "3"), 10);
+            var cols = parseInt(prompt("Número de colunas:", "3"), 10);
+            if (!rows || rows < 1 || !cols || cols < 1) return;
+            if (rows > 50) rows = 50;
+            if (cols > 20) cols = 20;
+
+            var html = '<table class="content-table"><thead><tr>';
+            for (var c = 1; c <= cols; c++) {
+                html += '<th>Cabeçalho ' + c + '</th>';
+            }
+            html += '</tr></thead><tbody>';
+            for (var r = 1; r < rows; r++) {
+                html += '<tr>';
+                for (var c = 1; c <= cols; c++) {
+                    html += '<td>Item ' + r + '.' + c + '</td>';
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+
+            if (isCanvasEmpty(editorCanvas)) {
+                editorCanvas.innerHTML = '';
+            }
+            document.execCommand('insertHTML', false, html);
+            ensureCursorAfterTable(editorCanvas);
+        }
 
         function cleanWordOrDocsHtml(html) {
             if (!html || typeof html !== 'string') return '';
@@ -604,15 +676,20 @@ require __DIR__ . '/header.php';
             html = html.replace(/<xml[\s\S]*?<\/xml>/gi, '');
             html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
             html = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+            html = html.replace(/<br class="Apple-interchange-newline">/gi, '');
 
             var doc = new DOMParser().parseFromString(html, 'text/html');
             if (!doc || !doc.body) return '';
 
-            // 2. Remover tags indesejadas remanescentes
-            var badTags = doc.querySelectorAll('script, style, meta, link, o\\:p, xml, font');
+            // 2. Remover tags indesejadas remanescentes (incluindo colgroup e col de planilhas)
+            var badTags = doc.querySelectorAll('script, style, meta, link, o\\:p, xml, font, colgroup, col');
             badTags.forEach(function(el) { el.remove(); });
 
-            var allowedTags = ['P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'IMG', 'FIGURE', 'FIGCAPTION', 'BR', 'HR'];
+            var allowedTags = [
+                'P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'S',
+                'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'IMG', 'FIGURE', 'FIGCAPTION',
+                'BR', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'CAPTION'
+            ];
 
             function cleanNode(node) {
                 if (!node) return;
@@ -647,9 +724,9 @@ require __DIR__ . '/header.php';
                         tag = 'H3';
                     }
 
-                    // Se for DIV, SECTION, ARTICLE ou MAIN
+                    // Se for DIV, SECTION, ARTICLE ou MAIN fora de células de tabela
                     if (tag === 'DIV' || tag === 'SECTION' || tag === 'ARTICLE' || tag === 'MAIN') {
-                        var hasBlock = node.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, div');
+                        var hasBlock = node.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, div, table');
                         if (hasBlock) {
                             var parentDiv = node.parentNode;
                             if (parentDiv) {
@@ -671,7 +748,7 @@ require __DIR__ . '/header.php';
                     }
 
                     // Wrapper padrão do Google Docs (<b id="docs-internal-guid-...">)
-                    if ((tag === 'B' || tag === 'STRONG') && (node.querySelector('p, h1, h2, h3, h4, ul, ol, div') || (node.id && node.id.indexOf('docs-internal-guid') !== -1))) {
+                    if ((tag === 'B' || tag === 'STRONG') && (node.querySelector('p, h1, h2, h3, h4, ul, ol, div, table') || (node.id && node.id.indexOf('docs-internal-guid') !== -1))) {
                         var parentB = node.parentNode;
                         if (parentB) {
                             while (node.firstChild) {
@@ -682,6 +759,52 @@ require __DIR__ . '/header.php';
                             parentB.removeChild(node);
                         }
                         return;
+                    }
+
+                    // Células de tabela (TD e TH): lidar com múltiplos parágrafos internos e preservar spans
+                    if (tag === 'TD' || tag === 'TH') {
+                        var innerBlocks = Array.from(node.querySelectorAll(':scope > p, :scope > div'));
+                        if (innerBlocks.length > 1) {
+                            for (var b = 0; b < innerBlocks.length; b++) {
+                                if (b > 0) {
+                                    node.insertBefore(doc.createElement('br'), innerBlocks[b]);
+                                }
+                                while (innerBlocks[b].firstChild) {
+                                    node.insertBefore(innerBlocks[b].firstChild, innerBlocks[b]);
+                                }
+                                node.removeChild(innerBlocks[b]);
+                            }
+                        } else if (innerBlocks.length === 1) {
+                            var singleBlock = innerBlocks[0];
+                            while (singleBlock.firstChild) {
+                                node.insertBefore(singleBlock.firstChild, singleBlock);
+                            }
+                            node.removeChild(singleBlock);
+                        }
+
+                        // Preservar apenas colspan, rowspan e scope válidos
+                        var cSpan = node.getAttribute('colspan');
+                        var rSpan = node.getAttribute('rowspan');
+                        var scope = node.getAttribute('scope');
+
+                        var cellAttrs = Array.from(node.attributes);
+                        cellAttrs.forEach(function(attr) {
+                            node.removeAttribute(attr.name);
+                        });
+
+                        var cVal = parseInt(cSpan, 10);
+                        if (cVal > 1 && cVal <= 50) node.setAttribute('colspan', String(cVal));
+                        var rVal = parseInt(rSpan, 10);
+                        if (rVal > 1 && rVal <= 50) node.setAttribute('rowspan', String(rVal));
+                        if (tag === 'TH' && scope && ['col', 'row', 'colgroup', 'rowgroup'].includes(scope.toLowerCase())) {
+                            node.setAttribute('scope', scope.toLowerCase());
+                        }
+                    } else if (['TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'CAPTION'].includes(tag)) {
+                        // Remover todos os atributos de formatação sujos de tabelas
+                        var tblAttrs = Array.from(node.attributes);
+                        tblAttrs.forEach(function(attr) {
+                            node.removeAttribute(attr.name);
+                        });
                     }
 
                     // Mapeamento semântico
@@ -700,6 +823,7 @@ require __DIR__ . '/header.php';
                     }
 
                     if (!allowedTags.includes(tag)) {
+                        // Desembrulhar elemento não permitido (ex: <span>, <font>) preservando conteúdo
                         var parent = node.parentNode;
                         if (parent) {
                             while (node.firstChild) {
@@ -713,13 +837,15 @@ require __DIR__ . '/header.php';
                     }
 
                     // Remover estilos sujos, classes de Word, IDs e eventos on*
-                    var attrs = Array.from(node.attributes);
-                    attrs.forEach(function(attr) {
-                        var name = attr.name.toLowerCase();
-                        if (name.startsWith('on') || name === 'style' || name === 'class' || name === 'id' || name === 'dir' || name === 'lang') {
-                            node.removeAttribute(attr.name);
-                        }
-                    });
+                    if (tag !== 'TD' && tag !== 'TH') {
+                        var attrs = Array.from(node.attributes);
+                        attrs.forEach(function(attr) {
+                            var name = attr.name.toLowerCase();
+                            if (name.startsWith('on') || name === 'style' || name === 'class' || name === 'id' || name === 'dir' || name === 'lang' || name === 'width' || name === 'height' || name === 'border') {
+                                node.removeAttribute(attr.name);
+                            }
+                        });
+                    }
 
                     // Limpar e blindar links
                     if (tag === 'A') {
@@ -733,6 +859,92 @@ require __DIR__ . '/header.php';
             }
 
             cleanNode(doc.body);
+
+            // 3. Promoção automática de cabeçalho para planilhas (Excel / Google Sheets)
+            var tables = Array.from(doc.querySelectorAll('table'));
+            tables.forEach(function(table) {
+                var rows = Array.from(table.querySelectorAll('tr'));
+                var ths = table.querySelectorAll('th');
+                if (ths.length === 0 && rows.length >= 2) {
+                    var firstRow = rows[0];
+                    var thead = doc.createElement('thead');
+                    var newTr = doc.createElement('tr');
+                    Array.from(firstRow.children).forEach(function(cell) {
+                        var th = doc.createElement('th');
+                        if (cell.hasAttribute('colspan')) th.setAttribute('colspan', cell.getAttribute('colspan'));
+                        if (cell.hasAttribute('rowspan')) th.setAttribute('rowspan', cell.getAttribute('rowspan'));
+                        if (cell.hasAttribute('scope')) th.setAttribute('scope', cell.getAttribute('scope'));
+                        while (cell.firstChild) th.appendChild(cell.firstChild);
+                        newTr.appendChild(th);
+                    });
+                    thead.appendChild(newTr);
+                    firstRow.remove();
+
+                    var tbody = table.querySelector('tbody');
+                    if (!tbody) {
+                        tbody = doc.createElement('tbody');
+                        rows.slice(1).forEach(function(r) { tbody.appendChild(r); });
+                        table.appendChild(tbody);
+                    }
+                    table.insertBefore(thead, table.firstChild);
+                }
+            });
+
+            // 4. Poda de <br> finais úteis em blocos de texto e células
+            doc.querySelectorAll('p, h2, h3, h4, li, td, th').forEach(function(el) {
+                while (el.lastChild && el.lastChild.nodeType === Node.TEXT_NODE && el.lastChild.textContent.trim().replace(/[\s\u00A0\u200B]+/g, '') === '') {
+                    el.removeChild(el.lastChild);
+                }
+                if (el.lastChild && el.lastChild.nodeName === 'BR') {
+                    el.removeChild(el.lastChild);
+                }
+            });
+
+            // 5. Poda de blocos vazios de baixo para cima
+            doc.querySelectorAll('li').forEach(function(li) {
+                var text = (li.textContent || '').replace(/[\s\u00A0\u200B]+/g, '');
+                var hasMedia = li.querySelector('img, table, figure, picture, hr, iframe, video, audio');
+                if (text === '' && !hasMedia) li.remove();
+            });
+
+            doc.querySelectorAll('ul, ol').forEach(function(list) {
+                if (list.querySelectorAll('li').length === 0) list.remove();
+            });
+
+            doc.querySelectorAll('tr').forEach(function(tr) {
+                var cells = Array.from(tr.querySelectorAll('td, th'));
+                if (cells.length === 0) {
+                    tr.remove();
+                    return;
+                }
+                var allEmpty = cells.every(function(c) {
+                    var t = (c.textContent || '').replace(/[\s\u00A0\u200B]+/g, '');
+                    return t === '' && !c.querySelector('img, table, figure, hr');
+                });
+                if (allEmpty) tr.remove();
+            });
+
+            doc.querySelectorAll('thead, tbody, tfoot').forEach(function(sec) {
+                if (sec.querySelectorAll('tr').length === 0) sec.remove();
+            });
+
+            doc.querySelectorAll('table').forEach(function(tbl) {
+                if (tbl.querySelectorAll('tr').length === 0) tbl.remove();
+            });
+
+            doc.querySelectorAll('p, h2, h3, h4, blockquote, caption').forEach(function(el) {
+                var text = (el.textContent || '').replace(/[\s\u00A0\u200B]+/g, '');
+                var hasMedia = el.querySelector('img, table, figure, picture, hr, iframe, video, audio');
+                if (text === '' && !hasMedia) {
+                    el.remove();
+                }
+            });
+
+            // 6. Remover <br> soltos que sejam filhos diretos de doc.body
+            Array.from(doc.body.childNodes).forEach(function(child) {
+                if (child.nodeName === 'BR') child.remove();
+            });
+
             return doc.body ? doc.body.innerHTML : '';
         }
 

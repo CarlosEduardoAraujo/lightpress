@@ -7,6 +7,33 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Sanitização Inteligente de Colagem (Poda de Parágrafos Vazios), Suporte a Tabelas e Transliteração Cross-Platform — 2026-11-13
+
+- **Poda Definitiva de Parágrafos Vazios e `<br>` Espúrios (`public/admin/editor.php`, `public/admin/page-edit.php`, `core/BlockCompiler.php`):**
+  - **Frontend:** Ao colar textos no `#editorCanvas` (via Ctrl+V de Word, Google Docs ou Web), o placeholder residual `<p><br></p>` é limpo antes da inserção, evitando quebras no topo da matéria. Nós de bloco (`<p>`, `<h2>`, `<h3>`, `<h4>`, `<blockquote>`, `<li>`) contendo apenas espaços, `&nbsp;` (`\u00A0`), quebras `<br>` ou tags vazias são expurgados no DOM virtual, juntamente com `<br class="Apple-interchange-newline">` e quebras residuais no final de parágrafos (`<p>Texto<br></p>` -> `<p>Texto</p>`).
+  - **Backend (`BlockCompiler::pruneEmptyDomNodes`):** Implementada varredura pós-sanitização no DOMDocument que poda nós de nível de bloco vazios de baixo para cima (bottom-up), expurga `<br>` órfãos na raiz e preserva apenas elementos estruturais ou com conteúdo/mídia real, impedindo a persistência de nós vazios mesmo se inseridos via modo de código (`</> HTML`).
+- **Preservação, Normalização e Sanitização Completa de Tabelas (`public/admin/editor.php`, `public/admin/page-edit.php`, `core/BlockCompiler.php`):**
+  - **Whitelist Completa de Tabelas:** Inclusão das tags `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` e `caption` em `allowedTags` tanto no JavaScript do editor quanto no `BlockCompiler.php`.
+  - **Eliminação Sumária de Colunas Poluentes:** Tags `<colgroup>` e `<col>` geradas pelo Excel são descartadas sumariamente (`dangerousTags`) sem processamento desnecessário de nós filhos.
+  - **Limpeza de Formatação Suja:** Remoção de atributos inline legados (`style`, `class`, `id`, `width`, `height`, `bgcolor`, `align`, `valign`, `border`, `cellpadding`, `cellspacing`, `onclick`), preservando apenas `colspan`, `rowspan` (validados estritamente como inteiros positivos entre 2 e 50) e `scope` em `<th>` (`col`, `row`, `colgroup`, `rowgroup`).
+  - **Tratamento de Múltiplos `<p>` em Células:** Injeção de `<br>` antes de desembrulhar múltiplos parágrafos dentro de uma mesma célula (`<td>`/`<th>`), evitando fusão indevida de linhas sem espaçamento.
+  - **Preservação de Células Vazias Individuais:** Células isoladas sem conteúdo dentro de uma linha com dados (ex.: linha do líder sem diferença de tempo) são mantidas intactas; apenas linhas `<tr>` com 100% das células vazias são podadas.
+  - **Promoção Automática de Cabeçalho:** Tabelas coladas do Excel/Google Sheets com 2 ou mais linhas e sem `<th>` têm a primeira linha convertida automaticamente em `<thead><tr><th>` com cópia segura dos atributos `colspan`/`rowspan`.
+- **Prevenção de Cursor Preso e Botão Nativo na Barra de Ferramentas (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - Injeção automática de parágrafo auxiliar `<p><br></p>` ao colar ou inserir tabela no final do canvas visual, garantindo que o redator possa clicar abaixo da tabela e continuar digitando (parágrafo auxiliar não utilizado é expurgado automaticamente pelo backend no salvamento).
+  - Adição do botão **`⊞ Tabela`** na barra rica de ferramentas para inserção rápida de tabelas estruturadas (padrão 3x3 com prompt configurável de linhas e colunas).
+- **CSS Híbrido e Responsivo para Tabelas (`templates/post.php`, `templates/page.php`, `public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - **Desktop (> 768px):** `display: table; width: 100%; border-collapse: collapse;` garantindo que tabelas preencham integralmente a largura visual da matéria sem colunas espremidas à esquerda e sem corte de bordas por `overflow: hidden`.
+  - **Mobile (<= 768px):** `@media (max-width: 768px)` aplica `display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;`, permitindo rolagem horizontal suave com o polegar em tabelas extensas (classificação e tempos de treinos).
+  - Estilização completa na identidade visual SpeedRacing com borda marcante `#E10600` no cabeçalho `<th>`, padding generoso, zebra striping e suporte integrado a temas Claro e Escuro.
+- **Suporte a Tabelas em JSON e Compilação Bidirecional (`core/BlockCompiler.php`):**
+  - Envolvimento do HTML em contêiner `<?xml encoding="UTF-8"><div id="lp-blocks-root">` no `BlockCompiler::htmlToBlocks()`, prevenindo que o libxml2 reorganize indevidamente nós irmãos.
+  - Reconhecimento de blocos `table` em `htmlToBlocks()` para gravação consistente no `content_json` e compilação em `BlockCompiler::compileTable()` com suporte a arrays estruturados (`headers` e `rows`) para APIs headless.
+- **Transliteração Cross-Platform Determinística em Slugs (`core/Security.php`):**
+  - Mapeamento explícito de caracteres acentuados comuns antes da chamada a `iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE')`, eliminando a geração de apóstrofos/hífens espúrios em ambientes Windows e garantindo paridade 100% com servidores Linux de produção.
+- **Ampliação da Suíte de Testes Automatizados (`bin/test.php`):**
+  - 14 novas asserções cobrindo poda de parágrafos vazios, `<br>` finais e intermediários, integridade de tabelas, remoção de atributos perigosos (`onclick`, `style`), validação de `colspan`/`scope`, remoção de `colgroup` e conversão bidirecional de blocos JSON. Total de testes expandido para **64 asserções com 100% de aprovação (64/64)**.
+
 ### Hardening Integral de Segurança e Remediação de Vulnerabilidades (OWASP, DoS, Nginx, Libsodium e Sessão) — 2026-11-13
 
 - **Infraestrutura Nginx e Content Security Policy / SEC-A01 (`nginx/lightpress.conf`):**
