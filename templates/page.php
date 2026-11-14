@@ -273,28 +273,28 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
                 </a>
             </div>
 
-            <!-- Grid SpeedRacing Newsletter -->
+            <!-- CANAL OFICIAL WHATSAPP -->
             <div id="newsletter" class="bg-carbon-black text-pure-white rounded-xl p-space-lg shadow-md relative overflow-hidden flex flex-col gap-space-sm border border-subtle-border/30 dark:border-[#2a303c]">
                 <div class="w-24 h-24 rounded-full bg-racing-red/20 blur-2xl absolute -top-8 -right-8 pointer-events-none"></div>
                 <div class="flex items-center gap-2">
-                    <?= Icon::svg('mail', 'text-racing-red-text-dark', 24) ?>
-                    <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Grid SpeedRacing</span>
+                    <?= Icon::svg('chat', 'text-flag-green', 24) ?>
+                    <span class="font-label-category text-label-category uppercase tracking-wider text-pure-white font-bold">Canal Oficial</span>
                 </div>
                 <h4 class="font-headline-sm text-headline-sm text-pure-white leading-tight font-bold">
-                    Receba as análises técnicas e telemetria antes de todo mundo
+                    Receba notícias e resultados direto no WhatsApp
                 </h4>
                 <p class="font-body-sm text-body-sm text-surface-container">
-                    Toda manhã direto na sua caixa de entrada, com rigor editorial e sem enrolação.
+                    Siga o canal oficial do SpeedRacing para acompanhar bastidores, classificações e matérias em tempo real.
                 </p>
-                <form class="form-newsletter flex flex-col gap-space-xs mt-1">
-                    <input class="w-full px-space-sm py-2.5 rounded-lg bg-carbon-surface text-pure-white text-body-sm placeholder:text-secondary-fixed focus:outline-none focus:ring-1 focus:ring-racing-red border border-[#2a303c]" placeholder="Seu melhor e-mail" required="" type="email"/>
-                    <button class="w-full py-2.5 bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-sm" type="submit">
-                        <span>Garantir Vaga no Grid</span>
-                        <?= Icon::svg('chevron_right', 'text-pure-white', 16) ?>
-                    </button>
-                </form>
+                <a href="https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="w-full py-2.5 px-3 bg-flag-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-opacity flex items-center justify-center gap-2 shadow-sm mt-1">
+                    <span>Entrar no Canal do WhatsApp</span>
+                    <?= Icon::svg('open_in_new', 'text-pure-white', 16) ?>
+                </a>
                 <span class="text-[10px] font-label-meta text-surface-container-high/60 text-center">
-                    Zero spam. Desinscreva-se a qualquer momento com 1 clique.
+                    Sem spam. Seu número permanece oculto para todos.
                 </span>
             </div>
 

@@ -1141,7 +1141,7 @@ O critério de contraste de cores para textos normais exige no mínimo `4.5:1` s
 Para acelerar o carregamento em redes móveis 4G e dispositivos celulares (emulação Moto G Power no Lighthouse):
 * **Eliminação de Bloqueio de Renderização (760 ms):** O carregamento da folha tipográfica do Google Fonts (`Space Grotesk` e `Work Sans`) foi transformado em assíncrono via `rel="preload" as="style"` e ativado dinamicamente via script permitido pela CSP (`theme-init.js` e `app.js`). O script de tema anti-flash recebeu atributo `defer`, combinando com `<html class="dark" data-theme="dark">` no HTML estático para evitar qualquer FOUC (*Flash of Unstyled Content*).
 * **Priorização do LCP (Largest Contentful Paint):** A imagem da manchete de capa na Home (`$mainLead['featured_image']`) e nos artigos (`$post['featured_image']`) conta com `<link rel="preload" as="image" ... type="image/avif" fetchpriority="high">` no `<head>` e atributo `fetchpriority="high"` diretamente na tag `<img>`, instruindo o navegador a disparar o download com prioridade máxima.
-* **Acessibilidade e Alvos de Toque no Topo:** Os botões utilitários de Newsletter e Instagram na barra superior (`templates/header.php`) receberam dimensões mínimas acessíveis (`min-w-[44px] min-h-[36px]` com padding responsivo) e atributos `aria-label` explícitos, garantindo que leitores de tela e toques em smartphones mantenham 100% de conformidade.
+* **Acessibilidade e Alvos de Toque no Topo:** Os botões utilitários de Canal WhatsApp e Instagram na barra superior (`templates/header.php`) possuem dimensões mínimas acessíveis (`min-w-[44px] min-h-[36px]` com padding responsivo) e atributos `aria-label` explícitos, garantindo que leitores de tela e toques em smartphones mantenham 100% de conformidade.
 
 ### 8.19. Hardening Defensivo de Produção (Anti-SSRF Unificado, Resiliência de Sessão, Timing Constant-Time e Fail-Fast)
 
@@ -1174,7 +1174,7 @@ O sistema unifica a validação de destinos e requisições HTTP externas atrav�
 * **Compatibilidade com Nginx FastCGI Full-Page Cache (60m):**
   * Para manter as páginas estáticas em cache no Nginx sem necessidade de nonces dinâmicos (que quebrariam o cache HTTP completo para visitantes anônimos), todo JavaScript inline foi desacoplado para bibliotecas estáticas versionadas:
     * `public/assets/js/theme-init.js`: Carregado no `<head>` para inicialização do tema claro/escuro sem flash de layout (Zero FOUC).
-    * `public/assets/js/app.js`: Gerenciamento do seletor de tema, formulários de newsletter, cópia de links para a área de transferência e envio assíncrono de telemetria de visualizações via `navigator.sendBeacon` (com fallback para `fetch` com `keepalive: true`).
+    * `public/assets/js/app.js`: Gerenciamento do seletor de tema, cópia de links para a área de transferência e envio assíncrono de telemetria de visualizações via `navigator.sendBeacon` (com fallback para `fetch` com `keepalive: true`).
   * Removido `'unsafe-inline'` da diretiva `script-src` tanto no cabeçalho emitido pelo PHP (`public/index.php`) quanto na configuração do Nginx (`nginx/lightpress.conf`).
 * **Sanitização de Canvas:** `public/admin/editor.php` e `public/admin/page-edit.php` aplicam `BlockCompiler::sanitizeHtml()` antes de injetar o conteúdo em atributos `contenteditable`, neutralizando XSS de persistência. Endpoints AJAX administrativos passam a exigir `Accept: application/json`.
 
@@ -1278,6 +1278,19 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 
 #### 8.21.15. Sanitização de Favicon sem Duplo Escape (SEC-B04)
 * **Validação Semântica de Favicon (`public/admin/settings.php`):** A URL do favicon enviada nas configurações é validada e armazenada no banco como string pura (sem aplicação redundante de `htmlspecialchars()`). Os templates de renderização (`templates/header.php` e `public/admin/header.php`) continuam utilizando `Security::e()` no ponto de saída, eliminando problemas de duplo escape visual em URLs contendo caracteres especiais.
+
+### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
+
+Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
+* **Canal Oficial no WhatsApp (`templates/header.php`, `templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/post.php`, `templates/page.php`):**
+  * Substituição dos formulários de e-mail por cards modernos e responsivos convidando os leitores para o canal oficial (`https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c`).
+  * Estilização com a cor temática `bg-flag-green` (`#00A859`), ícones SVG nativos `chat` e `open_in_new`, atributos de segurança `target="_blank"` e `rel="noopener noreferrer"`.
+  * Versão clara para a Home e listagens e versão escura em `bg-carbon-black` com gradiente sutil para artigos e páginas institucionais.
+  * Atualização da barra superior de utilitários no cabeçalho global (`templates/header.php`) com link direto e atributo `aria-label` acessível.
+* **Limpeza de Scripts (`public/assets/js/app.js`):**
+  * Eliminação completa de manipuladores de evento de formulários `.form-newsletter`, reduzindo peso e eliminando código morto no bundle JavaScript do cliente.
+* **Alinhamento da Política de Privacidade (`core/Schema.php` e Banco de Dados):**
+  * Atualização da Política de Privacidade padrão para remover a menção à coleta de e-mails de newsletter, reforçando que o portal não realiza coleta involuntária de dados pessoais.
 
 ---
 

@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Migração de Inscrição: Substituição da Newsletter pelo Canal Oficial do SpeedRacing no WhatsApp — 2026-11-14
+
+- **Substituição da Newsletter pelo Canal Oficial no WhatsApp (`templates/header.php`, `templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/post.php`, `templates/page.php`):**
+  - **Barra Superior (`templates/header.php`):** Atualizado o botão de utilitários no topo substituindo "Newsletter" por "Canal WhatsApp", com link direto para `https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c`, ícone nativo `chat`, target `_blank`, `rel="noopener noreferrer"` e atributo `aria-label="Receba notícias e atualizações do SpeedRacing pelo WhatsApp"`.
+  - **Sidebar na Home e Listagens (`templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`):** Substituição do formulário de captura de e-mails da newsletter pelo card do Canal no WhatsApp com ícone `chat` em `text-flag-green`, texto explicativo, botão CTA destacado "Seguir Canal Grátis" (`bg-flag-green`, `#00A859`) com ícone `open_in_new`, e aviso de gratuidade e privacidade total do número.
+  - **Sidebar em Artigos e Páginas Institucionais (`templates/post.php`, `templates/page.php`):** Substituição do formulário escuro pelo card escuro oficial do WhatsApp (`bg-carbon-black`) com efeito radial, tipografia de alto contraste e botão CTA "Entrar no Canal do WhatsApp".
+- **Remoção de Código Morto no Frontend (`public/assets/js/app.js`):**
+  - Removido o event listener de `.form-newsletter` e o alert associado, eliminando código legado do bundle JavaScript público.
+- **Conformidade de Privacidade e Seed Institucional (`core/Schema.php` e Banco de Dados):**
+  - Atualização do texto da Política de Privacidade padrão (`politica-de-privacidade`) em `core/Schema.php` para remover a menção à coleta de e-mails para newsletter, alinhando a documentação com a arquitetura *Privacy by Design*.
+  - Atualização do registro correspondente no banco de dados com expurgo atômico do cache de páginas.
+
 ### Sanitização Inteligente de Colagem (Poda de Parágrafos Vazios), Suporte a Tabelas e Transliteração Cross-Platform — 2026-11-13
 
 - **Poda Definitiva de Parágrafos Vazios e `<br>` Espúrios (`public/admin/editor.php`, `public/admin/page-edit.php`, `core/BlockCompiler.php`):**

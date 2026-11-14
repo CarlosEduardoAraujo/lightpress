@@ -76,18 +76,4 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-
-    // 4. Formulários de Newsletter (Interação Segura)
-    var newsletterForms = document.querySelectorAll('.form-newsletter');
-    newsletterForms.forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var input = form.querySelector('input[type="email"]');
-            var emailVal = input ? input.value : '';
-            if (emailVal) {
-                alert('Inscrição confirmada no Grid SpeedRacing!');
-                if (input) input.value = '';
-            }
-        });
-    });
 });

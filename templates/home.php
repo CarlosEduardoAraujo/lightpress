@@ -320,22 +320,23 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
             </a>
         </div>
 
-        <!-- WIDGET 4: FAST NEWSLETTER -->
+        <!-- CANAL OFICIAL WHATSAPP -->
         <div id="newsletter" class="bg-surface-container-low dark:bg-carbon-surface rounded-xl p-space-md space-y-space-sm border border-subtle-border dark:border-[#2a303c]">
             <div class="flex items-center gap-2 text-carbon-black dark:text-pure-white font-headline-sm text-headline-sm font-bold">
-                <?= Icon::svg('mail', 'text-racing-red-text dark:text-racing-red-text-dark', 20) ?>
-                <span>Grid SpeedRacing</span>
+                <?= Icon::svg('chat', 'text-flag-green', 20) ?>
+                <span>Canal no WhatsApp</span>
             </div>
             <p class="font-body-sm text-body-sm text-secondary dark:text-[#a0a5b1]">
-                O resumo técnico e os bastidores das principais categorias do automobilismo todo dia às 7h no seu e-mail.
+                Receba as principais notícias, resultados e bastidores do automobilismo direto no nosso Canal oficial do WhatsApp.
             </p>
-            <form class="form-newsletter flex flex-col gap-2">
-                <input class="w-full px-space-sm py-2 rounded-lg bg-pure-white dark:bg-[#151920] text-carbon-black dark:text-pure-white placeholder:text-secondary dark:placeholder:text-secondary-fixed-dim font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-racing-red border border-subtle-border dark:border-[#2a303c]" placeholder="Seu melhor e-mail" type="email" required/>
-                <button class="w-full py-2 rounded-lg bg-racing-red hover:bg-tertiary text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold transition-colors" type="submit">
-                    Inscrever-se Grátis
-                </button>
-            </form>
-            <span class="block text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta text-center">Sem spam. Desinscreva-se a qualquer momento.</span>
+            <a href="https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="w-full py-2.5 px-3 rounded-lg bg-flag-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold flex items-center justify-center gap-2 transition-opacity shadow-sm">
+                <span>Seguir Canal Grátis</span>
+                <?= Icon::svg('open_in_new', 'text-pure-white', 16) ?>
+            </a>
+            <span class="block text-[11px] text-secondary dark:text-secondary-fixed-dim font-label-meta text-center">100% gratuito • Privacidade total do seu número.</span>
         </div>
     </aside>
 </div>
