@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo "Acesso proibido via web.\n";
+    exit(1);
+}
+
 /**
  * Ferramenta CLI de Diagnóstico de Ambiente - LightPress
  * Execução: php bin/diagnose.php

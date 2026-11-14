@@ -189,7 +189,8 @@ final class AiClient
             $userPrompt,
             $imageBase64,
             $imageMime,
-            $timeout
+            $timeout,
+            \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_AI
         );
     }
 
@@ -227,7 +228,7 @@ final class AiClient
                 $endpoint = !empty($overrideConfig['custom_endpoint']) ? (string)$overrideConfig['custom_endpoint'] : self::getCustomEndpoint();
                 self::validateEndpointUrl($endpoint);
                 $apiKey = !empty($overrideConfig['custom_key']) ? (string)$overrideConfig['custom_key'] : self::getApiKey(self::PROVIDER_CUSTOM);
-                $res = self::callOpenAi($endpoint, $apiKey, $model, $systemPrompt, $userPrompt, null, null, $timeout);
+                $res = self::callOpenAi($endpoint, $apiKey, $model, $systemPrompt, $userPrompt, null, null, $timeout, \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_AI);
             }
 
             $durationMs = (int)round((microtime(true) - $start) * 1000);
@@ -268,7 +269,7 @@ final class AiClient
             throw new RuntimeException('Chave de API do Google Gemini não está configurada.');
         }
 
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . urlencode($model) . ':generateContent?key=' . urlencode($apiKey);
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . urlencode($model) . ':generateContent';
 
         $parts = [];
         // Instrução de sistema + prompt do usuário
@@ -302,7 +303,8 @@ final class AiClient
 
         $response = self::executeCurl($url, [
             'Content-Type: application/json',
-        ], $jsonPayload, $timeout);
+            'x-goog-api-key: ' . $apiKey,
+        ], $jsonPayload, $timeout, \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC);
 
         $data = json_decode($response, true);
         if (!is_array($data)) {
@@ -333,7 +335,8 @@ final class AiClient
         string $userPrompt,
         ?string $imageBase64,
         ?string $imageMime,
-        int $timeout
+        int $timeout,
+        string $profile = \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC
     ): array {
         $url = rtrim($baseUrl, '/') . '/chat/completions';
 
@@ -378,7 +381,7 @@ final class AiClient
 
         $jsonPayload = json_encode($payload, JSON_THROW_ON_ERROR);
 
-        $response = self::executeCurl($url, $headers, $jsonPayload, $timeout);
+        $response = self::executeCurl($url, $headers, $jsonPayload, $timeout, $profile);
 
         $data = json_decode($response, true);
         if (!is_array($data)) {
@@ -399,63 +402,34 @@ final class AiClient
     }
 
     /**
-     * Executa a requisição cURL com opções seguras e tratamento de exceção.
+     * Executa a requisição cURL delegando para o SafeHttpClient (DNS pinning, mitigação SSRF e TLS).
      *
      * @param list<string> $headers
      */
-    private static function executeCurl(string $url, array $headers, string $payload, int $timeout): string
-    {
-        $target = \LightPress\Core\SafeHttpClient::resolveSafeTarget($url, \LightPress\Core\SafeHttpClient::PROFILE_LOCAL_AI);
-        if ($target === null) {
-            throw new RuntimeException('Destino bloqueado por políticas defensivas de segurança (SSRF).');
-        }
-
-        $ch = curl_init($target['url']);
-        if ($ch === false) {
-            throw new RuntimeException('Falha ao inicializar cURL.');
-        }
-
+    private static function executeCurl(
+        string $url,
+        array $headers,
+        string $payload,
+        int $timeout,
+        string $profile = \LightPress\Core\SafeHttpClient::PROFILE_STRICT_PUBLIC
+    ): string {
         $curlOpts = [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_TIMEOUT        => $timeout,
             CURLOPT_CONNECTTIMEOUT => min(5, $timeout),
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_USERAGENT => 'LightPress-AiCopilot/1.0',
+            CURLOPT_USERAGENT      => 'LightPress-AiCopilot/1.0',
         ];
 
-        if (!empty($target['pinned_ip'])) {
-            $pinnedIp = $target['pinned_ip'];
-            $formattedIp = str_contains($pinnedIp, ':') ? "[{$pinnedIp}]" : $pinnedIp;
-            $curlOpts[CURLOPT_RESOLVE] = ["{$target['host']}:{$target['port']}:{$formattedIp}"];
+        $res = \LightPress\Core\SafeHttpClient::request($url, $curlOpts, $profile);
+
+        if (!$res['ok']) {
+            $err = !empty($res['error']) ? $res['error'] : sprintf('API retornou código HTTP %d: %s', $res['status'], substr($res['body'], 0, 300));
+            throw new RuntimeException($err);
         }
 
-        curl_setopt_array($ch, $curlOpts);
-
-        $response = curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr = curl_error($ch);
-        $curlErrNo = curl_errno($ch);
-        curl_close($ch);
-
-        if ($curlErrNo !== 0) {
-            if ($curlErrNo === CURLE_OPERATION_TIMEDOUT) {
-                throw new RuntimeException(sprintf('Tempo limite esgotado (%ds) aguardando resposta da IA.', $timeout));
-            }
-            throw new RuntimeException(sprintf('Erro de conexão cURL (%d): %s', $curlErrNo, $curlErr));
-        }
-
-        if ($httpCode >= 400) {
-            $msg = sprintf('API retornou código HTTP %d: %s', $httpCode, substr((string)$response, 0, 300));
-            throw new RuntimeException($msg);
-        }
-
-        return (string)$response;
+        return $res['body'];
     }
 
     /**

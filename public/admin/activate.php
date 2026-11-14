@@ -46,7 +46,7 @@ if ((int)$tokenRecord['password_reset_required'] !== 1) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $csrfToken = $_POST['_csrf_token'] ?? '';
+    $csrfToken = Security::getSafeString($_POST, '_csrf_token');
     if (!Security::verifyCsrfToken($csrfToken)) {
         $error = "Token CSRF inválido ou expirado. Recarregue a página e tente novamente.";
     } else {

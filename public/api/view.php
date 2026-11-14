@@ -72,11 +72,6 @@ if (empty($secret)) {
 }
 $ipHash = Security::hashIp($ip, $secret);
 
-// Para páginas institucionais, garantir o esquema de view_dedupe antes de iniciar a transação (evita commit implícito no MySQL)
-if ($type === 'page') {
-    Schema::ensureViewDedupeSchema(Database::getConnection(), Database::getDriver());
-}
-
 try {
     $recorded = Database::transaction(function (\PDO $pdo) use ($type, $targetId, $ipHash, $expiresAt, $nowUtc): bool {
         // IDs negativos no view_dedupe são reservados para páginas institucionais para evitar colisões com IDs de posts

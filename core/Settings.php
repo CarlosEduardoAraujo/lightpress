@@ -15,6 +15,29 @@ class Settings
     private static ?array $cache = null;
 
     /**
+     * Lista de chaves cujos valores contêm credenciais ou dados confidenciais e devem ser cifrados em repouso.
+     */
+    public const SENSITIVE_KEYS = [
+        'ai_copilot_gemini_key',
+        'ai_copilot_openai_key',
+        'ai_copilot_custom_key',
+        'plugin_webhook_sender_urls',
+        'redis_cache_pro_settings',
+    ];
+
+    /**
+     * Deriva a chave binária de 32 bytes (SODIUM_CRYPTO_SECRETBOX_KEYBYTES) a partir de security.encryption_key.
+     */
+    public static function getEncryptionKey(): ?string
+    {
+        $rawKey = $GLOBALS['config']['security']['encryption_key'] ?? null;
+        if (empty($rawKey) || !is_string($rawKey)) {
+            return null;
+        }
+        return hash('sha256', $rawKey, true);
+    }
+
+    /**
      * Garante a existência da tabela `settings` no banco e faz seed com valores padrão.
      */
     public static function ensureTable(): void
@@ -84,25 +107,113 @@ class Settings
     }
 
     /**
-     * Obtém uma configuração específica por chave.
+     * Cifra um valor sensível usando libsodium (se disponível) ou OpenSSL AES-256-GCM.
+     */
+    public static function encryptValue(string $plaintext): string
+    {
+        $encKey = self::getEncryptionKey();
+        if ($encKey === null) {
+            return $plaintext;
+        }
+
+        if (function_exists('sodium_crypto_secretbox')) {
+            $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+            $ciphertext = sodium_crypto_secretbox($plaintext, $nonce, $encKey);
+            return 'enc:' . base64_encode($nonce . $ciphertext);
+        }
+
+        if (function_exists('openssl_encrypt')) {
+            $iv = random_bytes(12);
+            $tag = '';
+            $ciphertext = openssl_encrypt($plaintext, 'aes-256-gcm', $encKey, OPENSSL_RAW_DATA, $iv, $tag);
+            if ($ciphertext !== false) {
+                return 'enc:gcm:' . base64_encode($iv . $tag . $ciphertext);
+            }
+        }
+
+        return $plaintext;
+    }
+
+    /**
+     * Decifra um valor caso possua o prefixo 'enc:'. Suporta libsodium e OpenSSL AES-256-GCM com fallback suave.
+     */
+    public static function decryptValue(string $raw): string
+    {
+        if (!str_starts_with($raw, 'enc:')) {
+            return $raw;
+        }
+
+        $encKey = self::getEncryptionKey();
+        if ($encKey === null) {
+            return $raw;
+        }
+
+        // Formato OpenSSL AES-256-GCM
+        if (str_starts_with($raw, 'enc:gcm:')) {
+            if (!function_exists('openssl_decrypt')) {
+                return $raw;
+            }
+            $payload = base64_decode(substr($raw, 8), true);
+            if ($payload === false || strlen($payload) < 28) {
+                return $raw;
+            }
+            $iv = substr($payload, 0, 12);
+            $tag = substr($payload, 12, 16);
+            $ciphertext = substr($payload, 28);
+            $decrypted = openssl_decrypt($ciphertext, 'aes-256-gcm', $encKey, OPENSSL_RAW_DATA, $iv, $tag);
+            return ($decrypted !== false) ? $decrypted : $raw;
+        }
+
+        // Formato Libsodium secretbox
+        if (function_exists('sodium_crypto_secretbox_open')) {
+            $payload = base64_decode(substr($raw, 4), true);
+            if ($payload !== false && strlen($payload) > SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+                $nonce = substr($payload, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+                $ciphertext = substr($payload, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+                $decrypted = sodium_crypto_secretbox_open($ciphertext, $nonce, $encKey);
+                if ($decrypted !== false) {
+                    return $decrypted;
+                }
+            }
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Limpa o cache estático e o cache de objeto de settings.
+     */
+    public static function flushCache(): void
+    {
+        self::$cache = null;
+        ObjectCache::flushGroup('settings');
+    }
+
+    /**
+     * Obtém uma configuração específica por chave com decifragem automática se estiver cifrada.
      */
     public static function get(string $key, ?string $default = null): ?string
     {
         $all = self::getAll();
         if (array_key_exists($key, $all) && $all[$key] !== '') {
-            return $all[$key];
+            return self::decryptValue((string)$all[$key]);
         }
         return $default;
     }
 
     /**
-     * Define ou atualiza uma configuração.
+     * Define ou atualiza uma configuração com cifragem transparente para chaves sensíveis.
      */
     public static function set(string $key, ?string $value): void
     {
         self::ensureTable();
         $driver = Database::getDriver();
         $val = $value !== null ? trim($value) : null;
+
+        // Cifragem em repouso de credenciais se a chave estiver configurada
+        if ($val !== null && $val !== '' && in_array($key, self::SENSITIVE_KEYS, true)) {
+            $val = self::encryptValue($val);
+        }
 
         if ($driver === 'sqlite') {
             Database::query(

@@ -52,13 +52,15 @@ final class WarmupService
         // 2. Aquecer Posts Mais Recentes
         if ($postsLimit > 0) {
             try {
+                $nowUtc = gmdate('Y-m-d H:i:s');
                 $posts = Database::fetchAll(
-                    "SELECT id, slug, title, summary, category, status, published_at, featured_image, views_count 
-                     FROM posts 
-                     WHERE status = 'published' 
-                     ORDER BY published_at DESC 
+                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.status, p.published_at, p.featured_image, COALESCE(s.views, 0) AS views_count 
+                     FROM posts p
+                     LEFT JOIN post_stats s ON s.post_id = p.id
+                     WHERE p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= ?)
+                     ORDER BY p.published_at DESC 
                      LIMIT ?",
-                    [$postsLimit]
+                    [$nowUtc, $postsLimit]
                 );
 
                 foreach ($posts as $post) {

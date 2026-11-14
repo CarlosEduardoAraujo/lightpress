@@ -108,6 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                          WHERE id = ?",
                                         [$name, $username, $email, $role, $bio, $avatar, $targetId]
                                     );
+                                    Database::query(
+                                        "UPDATE user_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL",
+                                        [$targetId]
+                                    );
                                 }
                             });
 

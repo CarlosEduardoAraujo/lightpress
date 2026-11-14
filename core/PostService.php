@@ -68,6 +68,15 @@ class PostService
     {
         $nowUtc = gmdate('Y-m-d H:i:s');
         try {
+            // Verificação prévia leve sem transação para evitar locks desnecessários sob alta concorrência
+            $hasDue = (int)Database::fetchValue(
+                "SELECT 1 FROM posts WHERE status = 'scheduled' AND published_at <= ? LIMIT 1",
+                [$nowUtc]
+            );
+            if ($hasDue === 0) {
+                return 0;
+            }
+
             // Transação atômica com FOR UPDATE para bloquear e promover exclusivamente os artigos vencidos
             // evitando qualquer duplicidade em acessos concorrentes ou crons simultâneos
             $duePosts = Database::transaction(function (\PDO $pdo) use ($nowUtc): array {

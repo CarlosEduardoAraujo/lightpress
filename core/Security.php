@@ -77,12 +77,13 @@ class Security
 
     /**
      * Valida um token CSRF usando comparação em tempo constante para evitar timing attacks.
+     * Aceita tipo mixed para prevenir TypeError quando parâmetros em formato de array são recebidos.
      */
-    public static function verifyCsrfToken(?string $token): bool
+    public static function verifyCsrfToken(mixed $token): bool
     {
         self::ensureSession();
 
-        if (empty($token) || empty($_SESSION['_csrf_token'])) {
+        if (!is_string($token) || $token === '' || empty($_SESSION['_csrf_token'])) {
             return false;
         }
 
@@ -92,7 +93,7 @@ class Security
     /**
      * Alias para verifyCsrfToken para compatibilidade de nomenclatura.
      */
-    public static function validateCsrfToken(?string $token): bool
+    public static function validateCsrfToken(mixed $token): bool
     {
         return self::verifyCsrfToken($token);
     }
@@ -458,14 +459,25 @@ class Security
      * 4. Validade da versão de sessão (session_version coincide com o registro no banco)
      * 5. Restrição opcional por papéis ($requiredRoles)
      * 6. Restrição opcional por ação RBAC ($requiredAction via Authorization::can)
+     * 7. Imposição de troca de senha pendente ($allowDuringPasswordReset)
      *
      * @param string|null $requiredAction
      * @param string[]|null $requiredRoles
      * @param array|null $config
+     * @param bool $allowDuringPasswordReset Se true, autoriza acesso temporário exclusivo à tela de troca de senha
      * @return array<string, mixed>
      */
-    public static function requireAuth(?string $requiredAction = null, ?array $requiredRoles = null, ?array $config = null): array
-    {
+    public static function requireAuth(
+        ?string $requiredAction = null,
+        ?array $requiredRoles = null,
+        ?array $config = null,
+        bool $allowDuringPasswordReset = false
+    ): array {
+        if (!headers_sent()) {
+            header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+        }
+
         if (session_status() !== PHP_SESSION_ACTIVE) {
             self::startSecureSession($config ?? []);
         }
@@ -529,7 +541,7 @@ class Security
         }
 
         $user = Database::fetchOne(
-            "SELECT id, name, username, email, role, bio, password_hash, is_active, session_version 
+            "SELECT id, name, username, email, role, bio, password_hash, is_active, password_reset_required, session_version 
              FROM users WHERE id = ? LIMIT 1",
             [$userId]
         );
@@ -552,6 +564,22 @@ class Security
                 exit;
             }
             header('Location: /admin/login.php?revoked=1');
+            exit;
+        }
+
+        // Imposição defensiva de troca de senha pendente
+        if ((int)($user['password_reset_required'] ?? 0) === 1 && !$allowDuringPasswordReset) {
+            if ($isAjax) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'ok' => false,
+                    'error' => 'Redefinição de senha obrigatória.',
+                    'redirect' => '/admin/profile.php?force_reset=1'
+                ]);
+                exit;
+            }
+            header('Location: /admin/profile.php?force_reset=1');
             exit;
         }
 

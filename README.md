@@ -226,7 +226,7 @@ Na classe `ImageProcessor.php`, a leitura AVIF verifica `function_exists('imagec
 
 * **WebP:** Qualidade 82% (`imagewebp($resource, $path, 82)`).
 * **AVIF:** Qualidade 65 com velocidade 8 (`imageavif($resource, $path, 65, 8)`). Essa calibração representa o *sweet spot* da indústria: reduz o tempo de codificação na CPU em até 70% frente à velocidade 6, mantendo arquivos 30% a 50% menores que o WebP com fidelidade visual quase sem perdas.
-* **Pass-Through de Formatos Pré-Comprimidos:** Se o usuário envia uma imagem que já está no formato WebP ou AVIF (ex: gerada por IA ou comprimida pelo Squoosh) e a recodificação em qualidade fixa gerar um arquivo mais pesado que a origem, o arquivo original otimizado é preservado diretamente para a variante Full HD, evitando inchaço desnecessário de armazenamento e banda.
+* **Re-encoding Obrigatório de Imagens (SEC-M01):** Toda imagem enviada ao sistema passa obrigatoriamente por decodificação completa e recodificação em novo recurso GD, sem qualquer bypass por cópia direta de arquivo (`copy()`). Mesmo que um arquivo WebP ou AVIF de entrada já esteja pré-comprimido, ele é obrigatoriamente redesenhado pixel a pixel na memória. Isso neutraliza vetores de ataque baseados em poliglota (imagens contendo código malicioso embutido em metadados EXIF/comentários ou no final do arquivo) e impede que payloads maliciosos alcancem o disco intactos.
 * **Elevação Dinâmica de Limites para Alta Resolução:** Durante a manipulação de imagens grandes pelo `ImageProcessor.php`, o sistema eleva temporariamente o `memory_limit` para 512M e o `max_execution_time` para 120s, permitindo processar bitmaps de alta fidelidade sem esgotamento de memória no servidor.
 
 ### 4.4. Segurança e Nomenclatura Semântica para SEO
@@ -1036,7 +1036,7 @@ A restauração distingue três valores: a versão pública conhecida, o identif
 #### 8.17.9. Contabilização Canônica de Views em Páginas Institucionais e Auto-migração de `view_dedupe`
 
 * **Desacoplamento e Suporte a Páginas Institucionais:** A tabela `view_dedupe` utiliza `post_id BIGINT NOT NULL` sem chave estrangeira estrita (`FOREIGN KEY`) com a tabela `posts`. Esse arranjo permite o registro de identificadores negativos para páginas institucionais (`$dedupeId = -$targetId`), prevenindo colisões de ID com posts e eliminando erros de restrição relacional em MySQL e SQLite.
-* **Auto-migração Idempotente e Proteção contra Cache Nginx:** `Schema::ensureViewDedupeSchema()` executa a verificação e adequação da tabela `view_dedupe` sem causar commits implícitos indesejados. O endpoint `public/api/view.php` chama o método fora de transações abertas antes de processar beacons de páginas institucionais, assegurando a migração mesmo quando o conteúdo HTML da página tiver sido servido diretamente a partir do FastCGI Cache do Nginx.
+* **Isolamento de DDL e Proteção contra Contenção Concorrente (SEC-M05):** A verificação estrutural `Schema::ensureViewDedupeSchema()` é executada exclusivamente na inicialização da aplicação, scripts CLI e rotinas de manutenção. O endpoint público de alta concorrência `public/api/view.php` não executa chamadas DDL síncronas em tempo de execução, prevenindo contenção de locks de metadados no banco e sobrecarga sob tráfego massivo.
 
 #### 8.17.10. Fluxo Editorial de Revisão (`pending_review`) para Autores e Padronização Visual do Admin
 
@@ -1209,6 +1209,71 @@ Com base na auditoria técnica detalhada registrada em `AUDITORIAS/20261113-ch-s
 #### 8.20.4. Isolamento da Proteção contra Execução de Scripts em Uploads para Apache (CH-04)
 * **Liberação da Raiz Pública:** A regra `FilesMatch` que negava acesso a arquivos `.php` foi removida da raiz `public/.htaccess`, garantindo que o front-controller `index.php` e os painéis administrativos funcionem sem erro 403 Forbidden em servidores Apache e LiteSpeed.
 * **Proteção Dedicada em Uploads:** Criado o arquivo `public/uploads/.htaccess` com a diretiva `FilesMatch` restrita exclusivamente à pasta de mídia, bloqueando a execução direta de qualquer script malicioso enviado ao diretório de uploads.
+
+---
+
+### 8.21. Hardening Integral de Segurança e Remediação de Vulnerabilidades (Auditoria SEC-A01 a SEC-B04)
+
+Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2026 (`AUDITORIAS/20261113-gh-seguranca.md`), foram remediados 14 vetores de vulnerabilidade cobrindo infraestrutura Nginx, controle de sessões, criptografia em repouso, blindagem SSRF, concorrência e mitigação de DoS:
+
+#### 8.21.1. Arquitetura Nginx para `/admin/`, Despacho PHP-FPM e CSP Diferenciada (SEC-A01)
+* **Prevenção de Exposição de Código-Fonte PHP:** O modificador prefixo `^~` em `location ^~ /admin/` interrompe a avaliação de regex posteriores no Nginx. Para impedir que arquivos `.php` administrativos fossem entregues como downloads estáticos em vez de executados, foi aninhado o bloco `location ~ \.php$` interno, despachando as requisições dinâmicas diretamente ao socket do PHP-FPM (`fastcgi_pass`) com `try_files $uri =404;` e sem ativação de cache FastCGI.
+* **Re-declaração de Cabeçalhos de Segurança (Herança do Nginx):** Como qualquer diretiva `add_header` em um bloco `location` anula a herança dos cabeçalhos do bloco `server {}`, todos os cabeçalhos de segurança (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `Strict-Transport-Security`) e anti-cache (`Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0`) foram explicitamente re-declarados em `location ^~ /admin/`, no bloco `.php` aninhado, em `location = /admin/login.php` e em `location = /admin/activate.php`.
+* **Content Security Policy (CSP) Administrativa:** Definição de política CSP dedicada para a área administrativa com autorização de scripts e estilos inline (`script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;`), preservando a compatibilidade total com event handlers e componentes visuais do painel, enquanto o portal público permanece sob CSP estrita sem `'unsafe-inline'`.
+
+#### 8.21.2. Tolerância a Tipos na Verificação de Tokens CSRF (SEC-A02)
+* **Mitigação de Exceções Fatais por Injeção de Arrays:** O método `Security::verifyCsrfToken(mixed $token)` foi atualizado para receber o tipo `mixed`. Caso o token recebido não seja do tipo `string` (como em requisições maliciosas enviando `_csrf_token[]`), o método retorna `false` imediatamente em vez de disparar uma exceção fatal `TypeError` (HTTP 500).
+* **Sanitização Prévia de Entradas:** Os endpoints `public/admin/login.php`, `public/admin/activate.php` e `public/admin/plugins.php` utilizam `Security::getSafeString($_POST['_csrf_token'] ?? null)` antes de despachar a validação de autenticidade.
+
+#### 8.21.3. Resiliência Contra DoS em Paginação e Retorno 404 Estrito (SEC-A03)
+* **Proteção contra Integer Overflow no Banco de Dados:** Aplicação de delimitador rígido `$page = min(100000, max(1, (int)$_GET['page']))` em `public/index.php`, `public/api/posts.php` e `public/admin/dashboard.php`, impedindo que valores inteiros gigantescos próximos a `PHP_INT_MAX` causem overflow de 64 bits no cálculo do `OFFSET` e disparem erros `SQLSTATE[42000]`.
+* **Retorno Estrito de HTTP 404 em Páginas Inexistentes:** O total de páginas `$totalPages = max(1, (int)ceil($totalPosts / $limit))` é calculado previamente ao `$offset`. Se a página solicitada for superior ao total existente (`$page > $totalPages`), o sistema emite imediatamente cabeçalho HTTP 404 e renderiza o template de erro, cessando o processamento. Aplicado a rotas `/page/{n}/`, `/categoria/{slug}/page/{n}/`, `/tag/{slug}/page/{n}/` e aos sitemaps particionados (`/sitemap-posts-{part}.xml`), protegendo o SEO contra indexação infinita de páginas vazias e mitigando varreduras DoS.
+* **Comportamento Semântico na Busca:** A rota `/busca/` retorna HTTP 200 informativo na página 1 caso não existam resultados encontrados, e retorna HTTP 404 caso o usuário solicite páginas além do limite (`$page > max(1, $totalPages)`).
+
+#### 8.21.4. Criptografia em Repouso de Segredos de Configuração (SEC-A04)
+* **Cifragem Automática de Chaves de API (`core/Settings.php`):** Valores persistidos na tabela `settings` categorizados na constante `SENSITIVE_KEYS` (`gemini_api_key`, `custom_api_key`, `cf_api_token`) são automaticamente encriptados antes da gravação no banco de dados.
+* **Criptografia Autenticada Libsodium com Fallback OpenSSL AES-256-GCM:** O sistema utiliza prioritariamente a extensão nativa Libsodium (`sodium_crypto_secretbox`, prefixo `enc:sodium:nonce:ciphertext`). Em ambientes onde a extensão sodium não estiver disponível, adota automaticamente fallback para OpenSSL AES-256-GCM (`enc:gcm:iv:tag:ciphertext`). Ambas as implementações derivam chave simétrica de 32 bytes (`hash('sha256', $salt . $appKey, true)`) a partir dos segredos mestres da instalação.
+* **Descriptografia Transparente e Invalidação de Cache:** A leitura em `Settings::get()` decifra os dados em tempo de execução de forma invisível para os chamadores. O método `Settings::flushCache()` garante a limpeza atômica do cache estático em memória e do cache Redis.
+
+#### 8.21.5. Blindagem Anti-SSRF em Nível de Transporte (`core/SafeHttpClient.php`) (SEC-A05)
+* **Rejeição de Credenciais e Caracteres Especiais em URLs:** O método `SafeHttpClient::resolveSafeTarget()` valida a ausência de componentes de autenticação (`user:pass@`) e rejeita estritamente qualquer caractere de contrabarra (`\`) na URL antes de executar o parsing, eliminando vetores de confusão semântica de parser entre PHP e libcurl.
+* **Expansão Abrangente de Blocos Reservados IPv6:** Ampliada a lista binária de faixas IPv6 rejeitadas para incluir Multicast (`ff00::/8`), Site-local (`fec0::/10`), 6to4 relay (`2002::/16`), Teredo (`2001:0000::/32`) e blocos de tradução IPv4/IPv6 (`64:ff9b:1::/48`), além dos blocos já previamente cobertos (`::1`, `fe80::/10`, `fc00::/7`).
+* **Proteção de Opções Críticas de cURL:** O método central `SafeHttpClient::request()` aplica as opções fundamentais de segurança (`CURLOPT_FOLLOWLOCATION = false`, `CURLOPT_RESOLVE`, `CURLOPT_TIMEOUT`, `CURLOPT_CONNECTTIMEOUT`) após a mesclagem com opções adicionais fornecidas pelo chamador, prevenindo que configurações externas contornem o isolamento defensivo.
+
+#### 8.21.6. Autenticação Segura na API Gemini e Perfil de Transporte de IA (SEC-A06)
+* **Eliminação de Chaves em Query Strings (`plugins/ai-copilot/src/AiClient.php`):** A comunicação com a API do Google Gemini migrou da transmissão de token via URL (`?key=...`) para o cabeçalho seguro `x-goog-api-key: ...`, eliminando a exposição de credenciais em logs de acesso HTTP, proxies intermediários e histórico de conexões do servidor.
+* **Delegação Unificada ao SafeHttpClient com Perfil Dinâmico:** As requisições HTTP do AI Copilot agora utilizam `SafeHttpClient::request()`, aplicando dinamicamente o perfil `PROFILE_LOCAL_AI` para endpoints locais/LAN (Ollama, vLLM) e `PROFILE_STRICT_PUBLIC` para provedores públicos de nuvem (Google Gemini e OpenAI).
+
+#### 8.21.7. Re-encoding Obrigatório de Imagens (SEC-M01)
+* **Eliminação de Bypass Binário (`core/ImageProcessor.php`):** Removido qualquer atalho de cópia direta via `copy()` para arquivos WebP ou AVIF pré-comprimidos. Toda mídia submetida ao portal é obrigatoriamente decodificada e reconstruída pixel a pixel em novo recurso de imagem pelo PHP GD nativo.
+* **Neutralização de Imagens Poliglotas e Metadados Ocultos:** A reconstrução gráfica integral destrói qualquer payload malicioso inserido em blocos de metadados EXIF, comentários binários ou anexado ao final do arquivo (*image polyglots*), assegurando que apenas pixels puros alcancem o armazenamento físico.
+
+#### 8.21.8. Fluxo Seguro de Troca Forçada de Senha sem Loop de Redirecionamento (SEC-M02)
+* **Exceção Controlada em `Security::requireAuth()`:** Implementado o parâmetro defensivo `$allowDuringPasswordReset = true`. Usuários com flag `password_reset_required = 1` autenticados são redirecionados pelo `login.php` exclusivamente para `/admin/profile.php?force_reset=1`.
+* **Bloqueio de Mutações Cadastrais:** Na tela de perfil, a ação de atualização cadastral (`update_profile`) é bloqueada enquanto a flag estiver ativa, permitindo apenas a alteração de credencial (`change_password`). Ao salvar a nova senha, a flag `password_reset_required` é atomicamente zerada no banco de dados. Todas as outras páginas e APIs administrativas continuam bloqueadas pelo `requireAuth()`, prevenindo navegação não autorizada e evitando loops infinitos de redirecionamento.
+
+#### 8.21.9. Revogação Preventiva de Tokens ao Editar Usuário (SEC-M03)
+* **Invalidação de Tokens Pendentes (`public/admin/users.php`):** Ao editar os dados cadastrais ou perfil de um usuário sem realizar a troca imediata de sua senha (`$hash === null`), o sistema remove proativamente quaisquer convites de ativação ou links de redefinição pendentes na tabela `user_reset_tokens` (`DELETE FROM user_reset_tokens WHERE user_id = ?`). Essa postura impede que tokens emitidos anteriormente permaneçam válidos para contas cujos privilégios ou dados foram modificados.
+
+#### 8.21.10. Proteção de Execução em Scripts CLI e Permissões de Backup (SEC-M04)
+* **Barreira Contra Acesso Web em Scripts de Manutenção:** Os utilitários `bin/backup.php`, `bin/restore.php`, `bin/setup.php` e `bin/diagnose.php` receberam a verificação estrita `if (PHP_SAPI !== 'cli') { http_response_code(403); exit(1); }`, neutralizando qualquer tentativa de execução via requisições HTTP caso a pasta `bin/` seja acidentalmente exposta.
+* **Permissões Mínimas em Arquivos de Backup:** O utilitário `bin/backup.php` impõe a máscara octal restrita `0600` (`chmod 0600`) em arquivos `.zip` e `.sql` gerados, assegurando que dumps do banco de dados e arquivos de configuração contenham acesso exclusivo de leitura e escrita para o usuário proprietário do sistema.
+
+#### 8.21.11. Prevenção de DDL Concorrente em Visualizações (SEC-M05)
+* **Isolamento de DDL em Alta Frequência (`public/api/view.php`):** A chamada síncrona `Schema::ensureViewDedupeSchema()` foi removida do endpoint público de registro de leituras. O esquema da tabela `view_dedupe` é garantido estritamente na instalação e nas rotinas de manutenção via CLI, eliminando overhead de metadados, locks de tabela e contenção de banco de dados sob acessos concorrentes massivos.
+
+#### 8.21.12. Rate Limiting Específico para Ativação de Contas (SEC-B01)
+* **Proteção contra Força Bruta em Tokens de Convite:** Configurado o bloco `location = /admin/activate.php` no Nginx com limitação de taxa `limit_req zone=login burst=5 nodelay;`, FastCGI direto para o socket do PHP-FPM, cabeçalhos de controle anti-cache e herança completa dos cabeçalhos de segurança, blindando o fluxo de ativação de usuários contra ataques de adivinhação e força bruta.
+
+#### 8.21.13. Sanitização de Parâmetro de Busca no Cabeçalho (SEC-B02)
+* **Defesa contra Injeção de Arrays (`templates/header.php`):** O parâmetro de busca `$_GET['q']` consumido pelo campo de pesquisa do cabeçalho passa pela sanitização tipada `Security::getSafeString($_GET['q'] ?? '')` antes de ser renderizado no atributo `value`, prevenindo avisos e exceções de renderização por arrays aninhados.
+
+#### 8.21.14. Concorrência Editorial e Aquecimento Otimizado (SEC-B03)
+* **Verificação Otimizada Pré-Lock em Agendamentos (`core/PostService.php`):** O método `PostService::publishScheduled()` executa consulta preliminar ultra rápida `SELECT 1 FROM posts WHERE status = 'scheduled' AND published_at <= ? LIMIT 1` antes de instanciar transações no banco e adquirir locks pessimistas, eliminando contenção de escrita desnecessária quando não existem notícias agendadas pendentes de publicação.
+* **Otimização no Aquecimento do Redis (`WarmupService.php`):** A seleção de matérias para pré-aquecimento de cache junta diretamente a tabela `post_stats` em uma única consulta e filtra estritamente por matérias já publicadas no passado (`p.published_at <= ?`), eliminando o carregamento indevido de rascunhos ou notícias futuras.
+
+#### 8.21.15. Sanitização de Favicon sem Duplo Escape (SEC-B04)
+* **Validação Semântica de Favicon (`public/admin/settings.php`):** A URL do favicon enviada nas configurações é validada e armazenada no banco como string pura (sem aplicação redundante de `htmlspecialchars()`). Os templates de renderização (`templates/header.php` e `public/admin/header.php`) continuam utilizando `Security::e()` no ponto de saída, eliminando problemas de duplo escape visual em URLs contendo caracteres especiais.
 
 ---
 

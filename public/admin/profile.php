@@ -10,33 +10,38 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
-$currentUser = Security::requireAuth(null, null, $config);
+$currentUser = Security::requireAuth(null, null, $config, true);
 
 $message = '';
 $error = '';
+$isPasswordResetRequired = ((int)($currentUser['password_reset_required'] ?? 0) === 1);
 
 // Atualizar Perfil ou Trocar Senha
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? '')) {
+    if (!Security::verifyCsrfToken(Security::getSafeString($_POST, '_csrf_token'))) {
         $error = "Token CSRF inválido ou expirado.";
     } else {
-        $action = $_POST['form_action'] ?? 'update_profile';
+        $action = Security::getSafeString($_POST, 'form_action', 'update_profile');
 
         if ($action === 'update_profile') {
-            $name = trim(strip_tags((string)($_POST['name'] ?? '')));
-            $bio = trim(strip_tags((string)($_POST['bio'] ?? '')));
-
-            if (empty($name)) {
-                $error = "O nome não pode ficar em branco.";
+            if ($isPasswordResetRequired) {
+                $error = "Redefinição de senha obrigatória: você deve alterar sua senha antes de atualizar as informações de perfil.";
             } else {
-                Database::query(
-                    "UPDATE users SET name = ?, bio = ? WHERE id = ?",
-                    [$name, $bio, (int)$currentUser['id']]
-                );
-                $_SESSION['user_name'] = $name;
-                $message = "Perfil atualizado com sucesso!";
-                $currentUser['name'] = $name;
-                $currentUser['bio'] = $bio;
+                $name = trim(strip_tags((string)($_POST['name'] ?? '')));
+                $bio = trim(strip_tags((string)($_POST['bio'] ?? '')));
+
+                if (empty($name)) {
+                    $error = "O nome não pode ficar em branco.";
+                } else {
+                    Database::query(
+                        "UPDATE users SET name = ?, bio = ? WHERE id = ?",
+                        [$name, $bio, (int)$currentUser['id']]
+                    );
+                    $_SESSION['user_name'] = $name;
+                    $message = "Perfil atualizado com sucesso!";
+                    $currentUser['name'] = $name;
+                    $currentUser['bio'] = $bio;
+                }
             }
         } elseif ($action === 'change_password') {
             $currentPass = (string)($_POST['current_password'] ?? '');
@@ -56,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 Database::transaction(function () use ($newHash, $newVersion, $userId): void {
                     Database::query(
-                        "UPDATE users SET password_hash = ?, session_version = ? WHERE id = ?",
+                        "UPDATE users SET password_hash = ?, session_version = ?, password_reset_required = 0 WHERE id = ?",
                         [$newHash, $newVersion, $userId]
                     );
                     Database::query(
@@ -69,6 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = "Senha alterada com sucesso! Suas outras sessões ativas foram desconectadas por segurança.";
                 $currentUser['password_hash'] = $newHash;
                 $currentUser['session_version'] = $newVersion;
+                $currentUser['password_reset_required'] = 0;
+                $isPasswordResetRequired = false;
             }
         }
     }
@@ -96,6 +103,12 @@ require __DIR__ . '/header.php';
 
     <div class="container">
         <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1.5rem;">Configurações de Perfil</h1>
+
+        <?php if (!empty($isPasswordResetRequired)): ?>
+            <div class="alert-error" style="border-left: 4px solid #b91c1c; font-weight: 600; margin-bottom: 1.5rem;">
+                🔒 <strong>Ação Obrigatória:</strong> Sua conta requer a definição de uma nova senha antes de liberar o acesso às demais áreas do painel.
+            </div>
+        <?php endif; ?>
 
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>

@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo "Acesso proibido via web.\n";
+    exit(1);
+}
+
 /**
  * Script CLI de Instalação e Migração do Banco de Dados - LightPress
  * Execução: php bin/setup.php [--fresh]

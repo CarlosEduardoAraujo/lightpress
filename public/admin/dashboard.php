@@ -183,15 +183,18 @@ if ($filterFeatured === 1) {
 $whereSql = implode(" AND ", $whereClauses);
 
 // Paginação
-$page = max(1, (int)($_GET['page'] ?? 1));
+$page = min(10000, max(1, (int)($_GET['page'] ?? 1)));
 $perPage = 25;
-$offset = ($page - 1) * $perPage;
 
 $filteredCount = (int)Database::fetchValue(
     "SELECT COUNT(*) FROM posts p WHERE {$whereSql}",
     $params
 );
 $totalPages = max(1, (int)ceil($filteredCount / $perPage));
+if ($page > $totalPages && $filteredCount > 0) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
 
 $querySql = "SELECT p.id, p.user_id, p.title, p.slug, p.category, p.tags, p.featured_image, p.status, p.is_featured, p.updated_at, p.published_at,
                     u.name as author_name, COALESCE(s.views, 0) as views

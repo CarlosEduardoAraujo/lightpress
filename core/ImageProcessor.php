@@ -588,10 +588,6 @@ class ImageProcessor
                 $webpTarget = "{$targetDir}/{$webpFilename}";
 
                 imagewebp($resized, $webpStaging, $this->webpQuality);
-                // Se a imagem original já for WebP, tiver resolução Full e menor peso que a recodificação, preserva a original
-                if ($mime === 'image/webp' && $key === 'full' && $origWidth <= 1920 && filesize($tmpFilePath) < filesize($webpStaging)) {
-                    copy($tmpFilePath, $webpStaging);
-                }
 
                 if (file_exists($webpStaging) && filesize($webpStaging) > 0) {
                     $webpSize = filesize($webpStaging);
@@ -627,11 +623,6 @@ class ImageProcessor
 
                     try {
                         $avifSuccess = @imageavif($resized, $avifStaging, $this->avifQuality, $this->avifSpeed);
-                        // Se a imagem original já for AVIF, tiver resolução Full e menor peso que a recodificação, preserva a original
-                        if ($mime === 'image/avif' && $key === 'full' && $origWidth <= 1920 && filesize($tmpFilePath) < filesize($avifStaging)) {
-                            copy($tmpFilePath, $avifStaging);
-                            $avifSuccess = true;
-                        }
 
                         if ($avifSuccess && file_exists($avifStaging) && filesize($avifStaging) > 0) {
                             $avifSize = filesize($avifStaging);

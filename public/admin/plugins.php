@@ -20,7 +20,7 @@ $error = null;
 
 // Processar ações de ativação e desativação
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $submittedToken = $_POST['_csrf_token'] ?? '';
+    $submittedToken = Security::getSafeString($_POST, '_csrf_token');
     if (!Security::validateCsrfToken($submittedToken)) {
         $error = 'Token de segurança CSRF inválido ou expirado.';
     } else {

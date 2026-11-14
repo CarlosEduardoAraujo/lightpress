@@ -10,6 +10,11 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 
+if (!headers_sent()) {
+    header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+}
+
 Security::startSecureSession($config);
 
 // Se já estiver autenticado, redireciona para o dashboard
@@ -35,7 +40,7 @@ if ($lockRemaining !== null) {
     $min = (int)ceil($lockRemaining / 60);
     $error = "Muitas tentativas incorretas a partir deste IP. Bloqueio ativo por mais {$min} minuto(s).";
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['_csrf_token'] ?? '';
+    $token = Security::getSafeString($_POST, '_csrf_token');
     if (!Security::verifyCsrfToken($token)) {
         $error = 'Sessão expirada ou requisição inválida. Tente novamente.';
     } else {
@@ -70,6 +75,11 @@ if ($lockRemaining !== null) {
                 $_SESSION['session_version'] = (int)$user['session_version'];
                 $_SESSION['auth_created_at'] = time();
                 $_SESSION['last_activity_at'] = time();
+
+                if ((int)($user['password_reset_required'] ?? 0) === 1) {
+                    header('Location: /admin/profile.php?force_reset=1');
+                    exit;
+                }
 
                 header('Location: /admin/dashboard.php');
                 exit;

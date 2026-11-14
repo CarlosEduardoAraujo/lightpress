@@ -78,6 +78,31 @@ final class SafeHttpClient
                 return false;
             }
 
+            // Multicast: ff00::/8 (ff00 a ffff)
+            if (str_starts_with(strtolower($hex), 'ff')) {
+                return false;
+            }
+
+            // Site-Local obsoleto: fec0::/10 (fec0 a feff)
+            if (preg_match('/^fe[c-f]/i', $hex)) {
+                return false;
+            }
+
+            // 6to4: 2002::/16
+            if (str_starts_with(strtolower($hex), '2002')) {
+                return false;
+            }
+
+            // Teredo: 2001:0000::/32
+            if (str_starts_with(strtolower($hex), '20010000')) {
+                return false;
+            }
+
+            // Local-Use IPv6 / NAT64: 64:ff9b:1::/48
+            if (str_starts_with(strtolower($hex), '0064ff9b0001')) {
+                return false;
+            }
+
             // Unique local: fc00::/7 (fc00 a fdff)
             if ($profile === self::PROFILE_STRICT_PUBLIC && preg_match('/^f[cd]/i', $hex)) {
                 return false;
@@ -205,17 +230,23 @@ final class SafeHttpClient
             return null;
         }
 
-        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['host'])) {
+            return null;
+        }
+
+        // Rejeitar credenciais na URL (user:pass@host) ou barra invertida (\)
+        if (isset($parts['user']) || isset($parts['pass']) || str_contains($url, '\\')) {
+            return null;
+        }
+
+        $scheme = strtolower((string)($parts['scheme'] ?? ''));
         if ($scheme !== 'http' && $scheme !== 'https') {
             return null;
         }
 
-        $host = (string)parse_url($url, PHP_URL_HOST);
-        if (empty($host)) {
-            return null;
-        }
-
-        $parsedPort = parse_url($url, PHP_URL_PORT);
+        $host = (string)$parts['host'];
+        $parsedPort = $parts['port'] ?? null;
         if ($parsedPort !== null && ($parsedPort < 1 || $parsedPort > 65535)) {
             return null;
         }
@@ -361,8 +392,21 @@ final class SafeHttpClient
             $defaultOpts[CURLOPT_RESOLVE] = ["{$resolved['host']}:{$resolved['port']}:{$formattedIp}"];
         }
 
-        // Mesclar opções adicionais passadas pelo chamador
-        $finalOpts = $curlOptions + $defaultOpts;
+        // Mesclar opções adicionais passadas pelo chamador, protegendo travas defensivas
+        $protectedOpts = [
+            CURLOPT_FOLLOWLOCATION,
+            CURLOPT_PROTOCOLS,
+            CURLOPT_REDIR_PROTOCOLS,
+            CURLOPT_SSL_VERIFYPEER,
+            CURLOPT_SSL_VERIFYHOST,
+            CURLOPT_RESOLVE,
+        ];
+        $finalOpts = $defaultOpts;
+        foreach ($curlOptions as $opt => $val) {
+            if (!in_array($opt, $protectedOpts, true)) {
+                $finalOpts[$opt] = $val;
+            }
+        }
         curl_setopt_array($ch, $finalOpts);
 
         $body = curl_exec($ch);

@@ -35,7 +35,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $siteDescription = trim($_POST['site_description'] ?? '');
-            $siteFavicon = !empty($_POST['site_favicon']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['site_favicon'])) : '';
+            $rawFavicon = trim($_POST['site_favicon'] ?? '');
+            $siteFavicon = '';
+            if ($rawFavicon !== '') {
+                // Remove qualquer escape prévio e bloqueia caracteres de controle ou caminhos protocol-relative maliciosos
+                $rawFavicon = htmlspecialchars_decode($rawFavicon, ENT_QUOTES | ENT_SUBSTITUTE);
+                if (!preg_match('/[\x00-\x1f\x7f]/', $rawFavicon) && !str_starts_with($rawFavicon, '//') && !str_starts_with($rawFavicon, '/\\')) {
+                    if (str_starts_with($rawFavicon, '/')) {
+                        $siteFavicon = $rawFavicon;
+                    } elseif (filter_var($rawFavicon, FILTER_VALIDATE_URL)) {
+                        $scheme = strtolower((string)parse_url($rawFavicon, PHP_URL_SCHEME));
+                        if (in_array($scheme, ['http', 'https'], true)) {
+                            $siteFavicon = $rawFavicon;
+                        }
+                    }
+                }
+            }
             $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
 
             // Validação estrita do Fuso Horário informado

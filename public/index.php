@@ -107,16 +107,24 @@ $router->get('/', function () use ($config, $router): void {
 // Rota 2: Home Paginada (/page/{page}/)
 $router->get('/page/{page}/', function (array $params) use ($config): void {
     header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
-    $page = max(2, (int)($params['page'] ?? 2));
+    $page = min(100000, max(2, (int)($params['page'] ?? 2)));
     $perPage = 12;
-    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $totalPosts = (int)Database::fetchValue(
         "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
         [$nowUtc]
     );
-    $totalPages = (int)ceil($totalPosts / $perPage);
+    $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+
+    if ($page > $totalPages) {
+        http_response_code(404);
+        $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
     $posts = Database::fetchAll(
@@ -188,9 +196,8 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
 $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($config): void {
     header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $categorySlug = $params['slug'] ?? '';
-    $page = max(2, (int)($params['page'] ?? 2));
+    $page = min(100000, max(2, (int)($params['page'] ?? 2)));
     $perPage = 12;
-    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $category = ObjectCache::remember("category:{$categorySlug}", 86400, function () use ($categorySlug): ?array {
@@ -211,7 +218,16 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
         "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
         [$categorySlug, $nowUtc]
     );
-    $totalPages = (int)ceil($totalPosts / $perPage);
+    $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+
+    if ($page > $totalPages) {
+        http_response_code(404);
+        $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
     $posts = Database::fetchAll(
@@ -237,9 +253,8 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 $router->get('/busca/', function () use ($config): void {
     header('X-Accel-Expires: 60'); // TTL 1m FastCGI Cache para buscas (LP-09)
     $query = Security::getSafeString($_GET, 'q');
-    $page = max(1, (int)($_GET['page'] ?? 1));
+    $page = min(10000, max(1, (int)($_GET['page'] ?? 1)));
     $perPage = 12;
-    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
     $safeQuery = Security::escapeLike($query);
     $searchTerm = "%{$safeQuery}%";
@@ -250,10 +265,10 @@ $router->get('/busca/', function () use ($config): void {
     if (strlen($query) >= 2) {
         // 1. Tenta busca FULLTEXT booleana de alta performance (InnoDB MySQL/MariaDB)
         $driver = $config['database']['driver'] ?? 'mysql';
+        $boolQuery = '';
         if ($driver === 'mysql') {
             try {
                 $words = array_filter(preg_split('/\s+/', $query));
-                $boolQuery = '';
                 foreach ($words as $w) {
                     $cleanW = preg_replace('/[+\-><()~*\"@]+/', '', $w);
                     if (strlen($cleanW) >= 2) {
@@ -270,27 +285,15 @@ $router->get('/busca/', function () use ($config): void {
                            AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)",
                         [$nowUtc, $boolQuery]
                     );
-
-                    if ($totalPosts > 0) {
-                        $posts = Database::fetchAll(
-                            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-                             FROM posts p
-                             LEFT JOIN users u ON u.id = p.user_id
-                             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
-                               AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-                             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-                            [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
-                        );
-                    }
                 }
             } catch (\Throwable) {
-                $posts = [];
                 $totalPosts = 0;
             }
         }
 
         // 2. Fallback via LIKE caso o FULLTEXT não retorne resultados ou o driver seja SQLite
-        if (empty($posts) && $totalPosts === 0) {
+        $useLike = false;
+        if ($totalPosts === 0) {
             $totalPosts = (int)Database::fetchValue(
                 "SELECT COUNT(*)
                  FROM posts p
@@ -298,8 +301,31 @@ $router->get('/busca/', function () use ($config): void {
                    AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)",
                 [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
             );
+            $useLike = true;
+        }
 
-            if ($totalPosts > 0) {
+        $totalPages = (int)ceil($totalPosts / $perPage);
+        if ($page > max(1, $totalPages)) {
+            http_response_code(404);
+            $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+            require $config['paths']['templates'] . '/404.php';
+            return;
+        }
+
+        $offset = ($page - 1) * $perPage;
+
+        if ($totalPosts > 0) {
+            if (!$useLike && !empty($boolQuery)) {
+                $posts = Database::fetchAll(
+                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+                     FROM posts p
+                     LEFT JOIN users u ON u.id = p.user_id
+                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                       AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                     ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                    [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
+                );
+            } else {
                 $posts = Database::fetchAll(
                     "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
                      FROM posts p
@@ -310,6 +336,14 @@ $router->get('/busca/', function () use ($config): void {
                     [$nowUtc, $searchTerm, $searchTerm, $searchTerm, (int)$perPage, (int)$offset]
                 );
             }
+        }
+    } else {
+        $totalPages = 0;
+        if ($page > 1) {
+            http_response_code(404);
+            $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+            require $config['paths']['templates'] . '/404.php';
+            return;
         }
     }
 
@@ -385,9 +419,8 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
 $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): void {
     header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache (LP-09)
     $tagRaw = $params['tag'] ?? '';
-    $page = max(2, (int)($params['page'] ?? 2));
+    $page = min(100000, max(2, (int)($params['page'] ?? 2)));
     $perPage = 12;
-    $offset = ($page - 1) * $perPage;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $tagClean = trim(str_replace('-', ' ', $tagRaw));
@@ -405,7 +438,16 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
         array_merge([$nowUtc], $tagCriteria)
     );
 
-    $totalPages = (int)ceil($totalPosts / $perPage);
+    $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+
+    if ($page > $totalPages) {
+        http_response_code(404);
+        $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+        require $config['paths']['templates'] . '/404.php';
+        return;
+    }
+
+    $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
     $posts = Database::fetchAll(
@@ -822,8 +864,20 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $part = max(1, (int)($params['part'] ?? 1));
+    $part = min(10000, max(1, (int)($params['part'] ?? 1)));
     $limit = 5000;
+
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+        [$nowUtc]
+    );
+    $totalParts = max(1, (int)ceil($totalPosts / $limit));
+
+    if ($part > $totalParts) {
+        http_response_code(404);
+        return;
+    }
+
     $offset = ($part - 1) * $limit;
 
     $posts = Database::fetchAll(

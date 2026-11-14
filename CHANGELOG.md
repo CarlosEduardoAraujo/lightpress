@@ -7,6 +7,56 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Hardening Integral de Segurança e Remediação de Vulnerabilidades (OWASP, DoS, Nginx, Libsodium e Sessão) — 2026-11-13
+
+- **Infraestrutura Nginx e Content Security Policy / SEC-A01 (`nginx/lightpress.conf`):**
+  - Criação de bloco dedicado `location ^~ /admin/` com aninhamento interno de `location ~ \.php$` encaminhando requisições dinâmicas para o PHP-FPM (`fastcgi_pass unix:/run/php/php8.4-fpm.sock;`) com `try_files $uri =404;` e sem cache FastCGI, prevenindo a exposição ou download de código-fonte PHP bruto resultante da interrupção de regex do prefixo `^~`.
+  - Re-declaração explícita de todos os cabeçalhos de segurança (`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `Strict-Transport-Security`) e anti-cache (`Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0`) nos blocos `location ^~ /admin/`, `location ~ \.php$`, `location = /admin/login.php` e `location = /admin/activate.php`, corrigindo a supressão de herança do bloco `server {}` imposta pela diretiva `add_header` no Nginx.
+  - Aplicação de Content Security Policy (CSP) diferenciada para o `/admin/` autorizando `'unsafe-inline'` para scripts e estilos (`script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;`), garantindo compatibilidade integral com manipuladores de eventos e formulários da administração, mantendo a CSP estrita sem `'unsafe-inline'` no portal público.
+- **Resiliência a Tipagem na Verificação CSRF / SEC-A02 (`core/Security.php`, `public/admin/login.php`, `public/admin/activate.php`, `public/admin/plugins.php`):**
+  - Atualização da assinatura de `Security::verifyCsrfToken(mixed $token)` para tolerar qualquer tipo de dado, retornando `false` com segurança caso a entrada não seja string e eliminando exceções não capturadas `TypeError` (HTTP 500) geradas por arrays aninhados em `$_POST['_csrf_token']`.
+  - Sanitização de strings em formulários administrativos através de `Security::getSafeString($_POST['_csrf_token'] ?? null)` em `login.php`, `activate.php` e `plugins.php`.
+- **Mitigação de DoS por Paginação e Resposta HTTP 404 Estrita / SEC-A03 (`public/index.php`, `public/api/posts.php`, `public/admin/dashboard.php`):**
+  - Imposição de teto rígido `$page = min(100000, max(1, (int)$_GET['page']))` nas rotas públicas, na API e no painel administrativo, eliminando vulnerabilidades de integer overflow de 64 bits (`PHP_INT_MAX`) que resultavam em erros SQL `SQLSTATE[42000]` ou alto consumo de CPU no cálculo de `OFFSET`.
+  - Cálculo prévio de `$totalPages` antes de determinar o `$offset`. Se a página requisitada for estritamente superior ao total (`$page > $totalPages`), o sistema emite cabeçalho HTTP 404 imediato e renderiza o template de erro nas rotas `/page/{n}/`, `/categoria/{slug}/page/{n}/`, `/tag/{slug}/page/{n}/` e nos sitemaps paginados (`/sitemap-posts-{part}.xml`).
+  - Ajuste semântico na rota de busca (`/busca/`), garantindo retorno de HTTP 200 com mensagem explicativa na página 1 caso a busca não retorne registros, e retorno 404 caso `$page > max(1, $totalPages)`.
+- **Criptografia em Repouso de Chaves de API e Segredos / SEC-A04 (`core/Settings.php`):**
+  - Implementação de cifragem transparente para configurações confidenciais definidas na constante `SENSITIVE_KEYS` (`gemini_api_key`, `custom_api_key`, `cf_api_token`).
+  - Criptografia autenticada prioritária via Libsodium (`sodium_crypto_secretbox`, formato `enc:sodium:...`) com fallback automático para OpenSSL AES-256-GCM (`enc:gcm:...`) em ambientes onde a extensão sodium não estiver habilitada.
+  - Derivação determinística de chave de 32 bytes via `hash('sha256', $salt . $appKey, true)`. Leitura com descriptografia transparente em `Settings::get()` e adição do método `Settings::flushCache()` para expurgo atômico do cache estático em memória e do Redis.
+- **Hardening de Transporte Anti-SSRF em URLs e IPv6 / SEC-A05 (`core/SafeHttpClient.php`):**
+  - Rejeição estrita de URLs contendo credenciais embutidas (`user:pass@`) ou caracteres de barra invertida (`\`) antes do parsing em `resolveSafeTarget()`, impedindo discrepâncias de interpretação sintática entre PHP e cURL.
+  - Ampliação da matriz de blocos binários IPv6 proibidos, incluindo Multicast (`ff00::/8`), Site-local (`fec0::/10`), 6to4 relay (`2002::/16`), Teredo (`2001:0000::/32`) e faixas de tradução IPv4/IPv6 (`64:ff9b:1::/48`).
+  - Travamento final de opções críticas de transporte no cURL (`CURLOPT_FOLLOWLOCATION = false`, `CURLOPT_RESOLVE`, `CURLOPT_TIMEOUT`), impossibilitando que parâmetros de chamadas externas relaxem as diretivas de isolamento.
+- **Comunicação Segura de IA e Isolamento de Chave Gemini / SEC-A06 (`plugins/ai-copilot/src/AiClient.php`):**
+  - Remoção da chave de API da query string da URL (`?key=...`) nas requisições ao Google Gemini, adotando o cabeçalho seguro `x-goog-api-key: ...` para impedir que tokens de IA vazem em logs de acesso HTTP, proxies reversos e rastros de rede.
+  - Migração da rotina cURL para `SafeHttpClient::request()`, aplicando dinamicamente o perfil `PROFILE_LOCAL_AI` para endpoints locais/LAN (Ollama, vLLM) e `PROFILE_STRICT_PUBLIC` para APIs de nuvem.
+- **Re-encoding Completo de Mídia e Eliminação de Bypass de Cópia / SEC-M01 (`core/ImageProcessor.php`):**
+  - Remoção de qualquer atalho de cópia direta via `copy()` para arquivos WebP e AVIF de entrada.
+  - Obrigatoriedade de decodificação completa e reconstrução gráfica pixel a pixel no GD para todas as variantes geradas (`full`, `1024`, `thumb`), eliminando riscos de esteganografia, vetores poliglotas e código malicioso camuflado em metadados binários.
+- **Fluxo Defensivo de Redefinição Forçada de Senha / SEC-M02 (`core/Security.php`, `public/admin/login.php`, `public/admin/profile.php`):**
+  - Consulta de `password_reset_required` incorporada ao `Security::requireAuth()` e suporte ao parâmetro defensivo `$allowDuringPasswordReset: true` em `profile.php`.
+  - Redirecionamento forçado em `login.php` para `/admin/profile.php?force_reset=1` quando a flag estiver ativa.
+  - Bloqueio de mutações de cadastro (`update_profile`) no perfil enquanto a flag for 1, permitindo exclusivamente a ação `change_password`.
+  - Limpeza automática de `password_reset_required = 0` na alteração com sucesso da credencial, liberando o acesso ao restante do painel e eliminando loops de redirecionamento.
+- **Revogação Preventiva de Tokens de Redefinição ao Editar Usuário / SEC-M03 (`public/admin/users.php`):**
+  - Deleção proativa de convites de ativação e tokens de redefinição pendentes em `user_reset_tokens` (`DELETE FROM user_reset_tokens WHERE user_id = ?`) quando um administrador edita os dados de um usuário sem alterar sua senha (`$hash === null`), assegurando que links prévios não permaneçam ativos após mudanças de papel ou perfil.
+- **Proteção Contra Acesso Web em Scripts CLI e Permissões de Backup / SEC-M04 (`bin/backup.php`, `bin/restore.php`, `bin/setup.php`, `bin/diagnose.php`):**
+  - Inserção de guarda estrita `if (PHP_SAPI !== 'cli') { http_response_code(403); exit(1); }` em todos os utilitários de manutenção CLI, impedindo invocação direta via navegador em caso de exposição inadvertida do diretório `bin/`.
+  - Aplicação de permissão `chmod($backupPath, 0600)` nos arquivos `.zip` e `.sql` gerados por `bin/backup.php`, restringindo a leitura e escrita exclusivamente ao usuário de execução do sistema operacional.
+- **Eliminação de DDL Concorrente no Contador de Visualizações / SEC-M05 (`public/api/view.php`):**
+  - Remoção da verificação síncrona `Schema::ensureViewDedupeSchema()` do endpoint público de registro de leituras, eliminando contenção de escrita de metadados, locks de catálogo e sobrecarga de banco de dados sob tráfego massivo.
+- **Rate Limiting Dedicado para Ativação de Contas / SEC-B01 (`nginx/lightpress.conf`):**
+  - Configuração do bloco `location = /admin/activate.php` com limitação de taxa `limit_req zone=login burst=5 nodelay;`, FastCGI direto e cabeçalhos anti-cache, mitigando ataques de força bruta sobre tokens de ativação e convites.
+- **Sanitização de Parâmetro de Busca no Cabeçalho / SEC-B02 (`templates/header.php`):**
+  - Higienização do parâmetro `$_GET['q']` via `Security::getSafeString($_GET['q'] ?? '')` antes da renderização no atributo `value` do input de busca, prevenindo avisos e exceções de conversão de tipos por arrays aninhados.
+- **Concorrência Editorial Otimizada e Warmup de Cache Seguro / SEC-B03 (`core/PostService.php`, `plugins/redis-cache-pro/src/WarmupService.php`):**
+  - Pré-checagem de baixo custo `SELECT 1 FROM posts WHERE status = 'scheduled' AND published_at <= ? LIMIT 1` em `PostService::publishScheduled()` antes de iniciar transações e locks de escrita, otimizando o ciclo de agendamentos.
+  - Junção direta em `post_stats` e filtro `p.published_at <= ?` no serviço de aquecimento de cache Redis (`WarmupService.php`), prevenindo consultas excessivas e hidratação de matérias futuras ou rascunhos.
+- **Correção de Duplo Escape em Favicon / SEC-B04 (`public/admin/settings.php`):**
+  - Armazenamento de favicon como URL pura e limpa no banco de dados sem aplicação redundante de `htmlspecialchars()`, preservando o escape seguro no ponto de saída (`templates/header.php` e `admin/header.php`) via `Security::e()`.
+
+
 ### Otimização Mobile PageSpeed: Carregamento Assíncrono de Fontes, Eliminação de Bloqueio de Renderização e Preload LCP — 2026-11-13
 
 - **Acessibilidade no Mobile (`templates/header.php`):**

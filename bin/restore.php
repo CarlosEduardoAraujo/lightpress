@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo "Acesso proibido via web.\n";
+    exit(1);
+}
+
 /**
  * Utilitário CLI de Restauração de Backup - LightPress
  * Execução: php bin/restore.php --file=storage/migration/backup_XXXX.json.gz

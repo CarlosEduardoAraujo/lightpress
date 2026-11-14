@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo "Acesso proibido via web.\n";
+    exit(1);
+}
+
 /**
  * Utilitário CLI de Backup e Exportação de Dados - LightPress
  * Execução: php bin/backup.php
@@ -60,6 +66,8 @@ if (function_exists('gzencode')) {
     file_put_contents($backupFile, $json);
     $finalPath = $backupFile;
 }
+
+@chmod($finalPath, 0600);
 
 $elapsed = round(microtime(true) - $start, 3);
 $fileSizeKb = round(filesize($finalPath) / 1024, 2);
