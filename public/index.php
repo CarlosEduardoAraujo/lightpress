@@ -22,6 +22,7 @@ use LightPress\Core\ObjectCache;
 use LightPress\Core\PostService;
 use LightPress\Core\Router;
 use LightPress\Core\Security;
+use LightPress\Core\ThemeManager;
 
 // Auto-promoção de matérias agendadas cujo horário já foi atingido
 PostService::promoteScheduledPosts();
@@ -29,12 +30,52 @@ PostService::promoteScheduledPosts();
 $basePath = $config['app']['base_path'] ?? (parse_url($config['app']['canonical_origin'] ?? '', PHP_URL_PATH) ?: '');
 $router = new Router($basePath);
 
-// Rota 1: Home Grid (Últimas notícias e 4 destaques principais)
+// Rota 1: Home Grid (Últimas notícias ou Home Institucional conforme o tema ativo)
 $router->get('/', function () use ($config, $router): void {
     header('X-Accel-Expires: 300'); // TTL reduzido de 5m no FastCGI Cache para listagens dinâmicas (LP-09)
     $query = Security::getSafeString($_GET, 'q');
     if (!empty($query)) {
         $router->redirect('/busca/?q=' . urlencode($query), 302);
+        return;
+    }
+
+    // Se o tema ativo for corporativo, renderiza a Home institucional empresarial
+    if (ThemeManager::getActiveThemeType() === 'corporate') {
+        $nowUtc = gmdate('Y-m-d H:i:s');
+        
+        // Página estática opcional vinculada à Home
+        $staticPageId = (int)ThemeManager::option('home_static_page_id', 0);
+        $staticPage = null;
+        if ($staticPageId > 0) {
+            $staticPage = ObjectCache::remember("theme_home_static_page:{$staticPageId}", 86400, function () use ($staticPageId): ?array {
+                $pg = Database::fetchOne("SELECT * FROM pages WHERE id = ? AND status = 'published' LIMIT 1", [$staticPageId]);
+                return $pg ?: null;
+            }, 'pages');
+        }
+
+        // Posts recentes opcionais para a seção de notícias do tema corporativo
+        $showRecent = ThemeManager::option('show_recent_posts', true);
+        $recentPosts = [];
+        if (!empty($showRecent)) {
+            $recentPosts = ObjectCache::remember('corporate_home_recent_posts', 300, function () use ($nowUtc): array {
+                return Database::fetchAll(
+                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.featured_image, p.published_at, u.name AS author_name
+                     FROM posts p
+                     LEFT JOIN users u ON u.id = p.user_id
+                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                     ORDER BY p.published_at DESC LIMIT 3",
+                    [$nowUtc]
+                );
+            }, 'posts');
+
+            $recentImages = array_filter(array_column($recentPosts, 'featured_image'));
+            if (!empty($recentImages)) {
+                ImageProcessor::preloadDescriptions($recentImages);
+            }
+        }
+
+        $pageTitle = $config['app']['name'] . ' - ' . ThemeManager::option('hero_title', (!empty($config['app']['description']) ? $config['app']['description'] : 'Inovação & Excelência'));
+        require ThemeManager::getTemplateFile('home.php');
         return;
     }
 
@@ -44,7 +85,7 @@ $router->get('/', function () use ($config, $router): void {
     // Buscar até 4 artigos em destaque principal com cache seguro em memória (Redis/ObjectCache)
     $featuredPosts = ObjectCache::remember('home_featured_posts', 300, function () use ($nowUtc): array {
         $featured = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, LENGTH(p.content_html) AS content_len, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
              WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
@@ -58,7 +99,7 @@ $router->get('/', function () use ($config, $router): void {
             $needed = 4 - count($featured);
             $excludeSql = !empty($featuredIds) ? "AND p.id NOT IN (" . implode(',', $featuredIds) . ")" : "";
             $extraPosts = Database::fetchAll(
-                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, CHAR_LENGTH(p.content_html) AS content_len, u.name AS author_name
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, LENGTH(p.content_html) AS content_len, u.name AS author_name
                  FROM posts p
                  LEFT JOIN users u ON u.id = p.user_id
                  WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
@@ -102,7 +143,7 @@ $router->get('/', function () use ($config, $router): void {
     }
 
     $pageTitle = $config['app']['name'] . ' - ' . (!empty($config['app']['description']) ? $config['app']['description'] : 'Portal de Notícias');
-    require $config['paths']['templates'] . '/home.php';
+    require ThemeManager::getTemplateFile('home.php');
 });
 
 // Rota 2: Home Paginada (/page/{page}/)
@@ -121,7 +162,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     if ($page > $totalPages) {
         http_response_code(404);
         $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -144,7 +185,83 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de 4 destaques
     $pageTitle = "Página {$page} - " . $config['app']['name'];
-    require $config['paths']['templates'] . '/home.php';
+    require ThemeManager::getTemplateFile('home.php');
+});
+
+// Rota Nova: Listagem de Artigos do Blog (/blog/)
+$router->get('/blog/', function () use ($config, $router): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache
+    $nowUtc = gmdate('Y-m-d H:i:s');
+    $perPage = 12;
+
+    $totalPosts = (int)ObjectCache::remember('blog_total_posts_count', 300, function () use ($nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+            [$nowUtc]
+        );
+    }, 'posts');
+    $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+    $currentPage = 1;
+
+    $posts = ObjectCache::remember('blog_feed_posts_p1', 300, function () use ($nowUtc, $perPage): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ?",
+            [$nowUtc, $perPage]
+        );
+    }, 'posts');
+
+    $allImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($allImages)) {
+        ImageProcessor::preloadDescriptions($allImages);
+    }
+
+    $pageTitle = 'Blog & Artigos - ' . $config['app']['name'];
+    require ThemeManager::getTemplateFile('blog.php');
+});
+
+// Rota Nova: Listagem Paginada do Blog (/blog/page/{page}/)
+$router->get('/blog/page/{page}/', function (array $params) use ($config, $router): void {
+    header('X-Accel-Expires: 300'); // TTL 5m FastCGI Cache
+    $page = min(100000, max(2, (int)($params['page'] ?? 2)));
+    $perPage = 12;
+    $nowUtc = gmdate('Y-m-d H:i:s');
+
+    $totalPosts = (int)Database::fetchValue(
+        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+        [$nowUtc]
+    );
+    $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+
+    if ($page > $totalPages) {
+        http_response_code(404);
+        $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
+        require ThemeManager::getTemplateFile('404.php');
+        return;
+    }
+
+    $offset = ($page - 1) * $perPage;
+    $currentPage = $page;
+
+    $posts = Database::fetchAll(
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+         FROM posts p
+         LEFT JOIN users u ON u.id = p.user_id
+         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+        [$nowUtc, (int)$perPage, (int)$offset]
+    );
+
+    $pageImages = array_filter(array_column($posts, 'featured_image'));
+    if (!empty($pageImages)) {
+        ImageProcessor::preloadDescriptions($pageImages);
+    }
+
+    $pageTitle = "Blog & Artigos - Página {$page} - " . $config['app']['name'];
+    require ThemeManager::getTemplateFile('blog.php');
 });
 
 // Rota 3: Listagem por Categoria (/categoria/{slug}/)
@@ -164,7 +281,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
 
     if (!$category) {
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -190,7 +307,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     }
 
     $pageTitle = $category['name'] . ' - ' . $config['app']['name'];
-    require $config['paths']['templates'] . '/category.php';
+    require ThemeManager::getTemplateFile('category.php');
 });
 
 // Rota 4: Listagem Paginada de Categoria (/categoria/{slug}/page/{page}/)
@@ -211,7 +328,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 
     if (!$category) {
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -224,7 +341,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     if ($page > $totalPages) {
         http_response_code(404);
         $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -247,7 +364,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de destaques
     $pageTitle = $category['name'] . " - Página {$page} - " . $config['app']['name'];
-    require $config['paths']['templates'] . '/category.php';
+    require ThemeManager::getTemplateFile('category.php');
 });
 
 // Rota 5: Busca Pública de Notícias (/busca/)
@@ -309,7 +426,7 @@ $router->get('/busca/', function () use ($config): void {
         if ($page > max(1, $totalPages)) {
             http_response_code(404);
             $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
-            require $config['paths']['templates'] . '/404.php';
+            require ThemeManager::getTemplateFile('404.php');
             return;
         }
 
@@ -343,7 +460,7 @@ $router->get('/busca/', function () use ($config): void {
         if ($page > 1) {
             http_response_code(404);
             $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
-            require $config['paths']['templates'] . '/404.php';
+            require ThemeManager::getTemplateFile('404.php');
             return;
         }
     }
@@ -359,7 +476,7 @@ $router->get('/busca/', function () use ($config): void {
         ImageProcessor::preloadDescriptions($searchImages);
     }
 
-    require $config['paths']['templates'] . '/search.php';
+    require ThemeManager::getTemplateFile('search.php');
 });
 
 // Rota 5-Paginada: Redirecionamento canônico de compatibilidade para /busca/page/{page}/
@@ -413,7 +530,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
         ImageProcessor::preloadDescriptions($tagImages);
     }
 
-    require $config['paths']['templates'] . '/tag.php';
+    require ThemeManager::getTemplateFile('tag.php');
 });
 
 // Rota 5c: Listagem Paginada de Tag (/tag/{tag}/page/{page}/)
@@ -444,7 +561,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     if ($page > $totalPages) {
         http_response_code(404);
         $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -468,7 +585,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     $featuredPosts = []; // Apenas na primeira página há o mosaico de destaques
     $tagName = ucwords($tagClean);
     $pageTitle = "Tópico: #{$tagName} - Página {$page} - " . $config['app']['name'];
-    require $config['paths']['templates'] . '/tag.php';
+    require ThemeManager::getTemplateFile('tag.php');
 });
 
 // Registro de rotas adicionais disponibilizadas por plugins ativos
@@ -480,10 +597,10 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     // Palavras reservadas que não devem ser tratadas como slug de notícia
-    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag'];
+    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag', 'noticia', 'blog'];
     if (in_array(strtolower($slug), $reserved, true)) {
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -536,12 +653,12 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         if ($page) {
             header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
             $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
-            require $config['paths']['templates'] . '/page.php';
+            require ThemeManager::getTemplateFile('page.php');
             return;
         }
 
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -587,7 +704,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $cacheTtl = (time() - $lastActionTime <= 86400) ? 86400 : 864000;
     header("X-Accel-Expires: {$cacheTtl}");
     $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
-    require $config['paths']['templates'] . '/post.php';
+    require ThemeManager::getTemplateFile('post.php');
 });
 
 // Helper para renderização padronizada de Feeds RSS 2.0 com suporte nativo ao Google News
@@ -688,7 +805,7 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
     $slug = Security::getSafeString($params, 'slug');
     if ($slug === '') {
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -699,7 +816,7 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
 
     if (!$category) {
         http_response_code(404);
-        require $config['paths']['templates'] . '/404.php';
+        require ThemeManager::getTemplateFile('404.php');
         return;
     }
 
@@ -842,6 +959,11 @@ $router->get('/sitemap-main.xml', function () use ($config): void {
     <changefreq>hourly</changefreq>
     <priority>1.0</priority>
   </url>
+  <url>
+    <loc><?= Security::e($canonicalOrigin) ?>/blog/</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
   <?php foreach ($categories as $cat): ?>
     <url>
       <loc><?= Security::e($canonicalOrigin) ?>/categoria/<?= Security::e($cat['slug']) ?>/</loc>
@@ -938,8 +1060,9 @@ $router->get('/admin/', function () use ($router): void {
 // Configurar manipulador 404
 $router->setNotFound(function () use ($config): void {
     http_response_code(404);
-    if (file_exists($config['paths']['templates'] . '/404.php')) {
-        require $config['paths']['templates'] . '/404.php';
+    $template404 = ThemeManager::getTemplateFile('404.php');
+    if (file_exists($template404)) {
+        require $template404;
     } else {
         echo "404 - Página não encontrada.";
     }
@@ -961,8 +1084,9 @@ try {
         echo "<h3>Stack Trace:</h3><pre style='background: white; padding: 1.5rem; border: 1px solid #fecdd3; border-radius: 8px; overflow-x: auto;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
         echo "</body></html>";
     } else {
-        if (file_exists($config['paths']['templates'] . '/500.php')) {
-            require $config['paths']['templates'] . '/500.php';
+        $template500 = ThemeManager::getTemplateFile('500.php');
+        if (file_exists($template500)) {
+            require $template500;
         } else {
             echo "500 - Erro interno do servidor. Os detalhes foram registrados nos logs.";
         }

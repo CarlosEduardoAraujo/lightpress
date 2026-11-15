@@ -355,6 +355,7 @@ lightpress/
 │   ├── Security.php           # Utilitários de CSRF, sanitização e rate-limiting
 │   ├── Seo.php                # Metatags Open Graph, Twitter Cards e Schema.org JSON-LD
 │   ├── Settings.php           # Gerenciador central de configurações dinâmicas do portal
+│   ├── ThemeManager.php       # Gerenciador central de temas, manifesto, opções e assets
 │   ├── Icon.php               # Biblioteca estática de ícones vetoriais SVG inline ultra-leves
 │   ├── Hook.php               # Sistema ultraleve de Actions e Filters (Zero Dependências)
 │   ├── ObjectCache.php        # Camada defensiva de cache de objetos em memória com fallback transparente
@@ -365,11 +366,14 @@ lightpress/
 │   ├── api-publisher/         # Plugin oficial de ingestão REST API com Senhas de Aplicação
 │   ├── redis-cache-pro/       # Plugin empresarial de cache persistente em memória RAM com PhpRedis
 │   └── webhook-sender/        # Plugin nativo para envio de webhooks em publicações
+├── themes/                    # Temas isolados com templates, assets e manifesto theme.json
+│   ├── portal-noticias/       # Tema editorial esportivo/portal com suporte nativo ao SpeedRacing
+│   └── empresa/               # Tema corporativo/institucional com landing page e blog separado
 ├── storage/                   # Dados privados; acesso web proibido
 │   ├── staging/               # Originais temporários e conversões em andamento
 │   ├── migration/             # Backups de origem, checkpoints e relatórios
 │   └── logs/                  # Logs técnicos sem senhas ou tokens em claro
-├── templates/                 # Views em PHP nativo com escape contextual explícito
+├── templates/                 # Views globais de fallback em PHP nativo (reserva de segurança)
 │   ├── header.php             # Cabeçalho global, navegação e metatags
 │   ├── footer.php             # Rodapé institucional com links dinâmicos e copyright
 │   ├── home.php               # Grid inicial (Destaques + Feed de notícias)
@@ -397,6 +401,7 @@ lightpress/
     │   ├── editor.php         # Editor visual de blocos com suporte a copiar/colar Word/Docs
     │   ├── pages.php          # Módulo de Páginas Institucionais (Equipe, Contato, etc.)
     │   ├── page-edit.php      # Editor de Páginas Institucionais
+    │   ├── themes.php         # Galeria de temas, ativação e customizador visual de opções
     │   ├── settings.php       # Configurações do Site (Título, Tagline, Favicon, Timezone)
     │   ├── media.php          # Catálogo e upload de imagens (AVIF/WebP)
     │   ├── categories.php     # Gestão completa de categorias
@@ -408,7 +413,7 @@ lightpress/
     │   ├── view.php           # Incremento assíncrono de visualizações
     │   ├── search.php         # Autocomplete e busca instantânea
     │   └── posts.php          # Leitura pública de matérias (Headless)
-    ├── assets/                # JS puro do editor e folhas de estilo CSS
+    ├── assets/                # JS puro do editor, CSS base e espelhamento público de temas (themes/)
     └── uploads/               # Diretório estático público (execução de scripts bloqueada)
 ```
 
@@ -1322,6 +1327,47 @@ Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos lei
 * **Alinhamento da Política de Privacidade (`core/Schema.php` e Banco de Dados):**
   * Atualização da Política de Privacidade padrão para remover a menção à coleta de e-mails de newsletter, reforçando que o portal não realiza coleta involuntária de dados pessoais.
 
+### 8.23. Sistema Nativo de Temas, Customizador Visual e Roteamento Híbrido (Zero Dependências)
+
+Para possibilitar a total customização visual e a alternância instantânea entre modelos de sites (como portais de notícias e sites corporativos/institucionais) sem qualquer acoplamento a bibliotecas externas, o LightPress conta com um subsistema nativo de temas:
+
+* **Gerenciador de Temas (`core/ThemeManager.php`):**
+  - **Descoberta Declarativa e Desempenho:** Varredura leve do diretório `/themes/` lendo exclusivamente arquivos `theme.json` sem executar código PHP durante a descoberta.
+  - **Classificação por Tipo de Tema (`type`):**
+    - `news`: Portais jornalísticos e editoriais com feed dinâmico de notícias e destaques na página inicial (`/`).
+    - `corporate`: Empresas e landing pages institucionais com seções de apresentação na raiz (`/`) e blog/notícias isolados na rota dedicada `/blog/`.
+  - **Resolução Hierárquica de Templates (`ThemeManager::getTemplateFile`):**
+    - Busca prioritária dentro do tema ativo: `themes/{active-theme}/{template}.php`.
+    - Fallback contextual: caso o tema ativo não possua `blog.php`, o sistema recorre de forma inteligente a `home.php`.
+    - Fallback global robusto: caso o template não exista no tema, o arquivo correspondente em `templates/{template}.php` é carregado como reserva segura de integridade.
+  - **Opções Tipadas e Customizador Visual:** Suporte declarativo no `theme.json` para campos dos tipos `text`, `textarea`, `url`, `image`, `color`, `select` e `boolean`. As opções configuradas são gravadas atomicamente na tabela `settings` sob a chave `theme_options_{slug}` e cacheadas em memória estática e via `ObjectCache`.
+  - **Helpers Estáticos:**
+    - `ThemeManager::option(string $key, mixed $default = null)`: Recupera uma opção do tema ativo com retorno defensivo do valor padrão informado no manifesto.
+    - `ThemeManager::asset(string $path)`: Resolve a URL pública do asset (`/assets/themes/{slug}/{path}`) com versionamento por timestamp de modificação (`?v={timestamp}`) para cache-busting automático no Nginx.
+  - **Preservação Absoluta do Legado (Zero Regressão):** Fallback automático para os assets originais em `/public/assets/` caso o arquivo específico não seja encontrado no diretório do tema, garantindo 100% de estabilidade para sites legados em produção como o SpeedRacing.
+
+* **Roteamento Híbrido e SEO Corporativo (`core/Router.php`, `public/index.php`):**
+  - **Rotas de Blog Desacopladas:** Nos temas corporativos, as rotas `/blog/` e `/blog/page/{page}/` fornecem paginação e consumo independente do acervo editorial.
+  - **Canonicalização SEO:** Redirecionamento 301 automático no roteador para normalizar requisições de `/blog/page/1` e `/blog/page/1/` para a URL limpa `/blog/`.
+  - **Inclusão em Sitemaps:** A rota `/blog/` é automaticamente indexada e entregue no `sitemap-main.xml`.
+  - **Invalidação Abrangente de Cache:** Inclusão de `/blog/` e `/blog/page/2/` nas rotinas de purga de cache Nginx e Cloudflare após publicação, agendamento (`PostService::promoteScheduledPosts`) ou exclusão de artigos (`dashboard.php`), além da atualização de metadados de mídias (`core/ImageProcessor.php`).
+  - **Reserva de Palavras-Chave:** O slug `'blog'` é protegido em `PostService::RESERVED_SLUGS` e no validador do editor de páginas institucionais (`public/admin/page-edit.php`), impedindo a criação de páginas com URLs conflitantes.
+
+* **Temas Oficiais Fornecidos:**
+  - **`portal-noticias` (Padrão Ativo):** Tema editorial esportivo e jornalístico de alto impacto visual. Mantém total paridade com o SpeedRacing, incluindo:
+    - Ordenação editorial de categorias no menu superior através da opção `menu_categories` com cache em memória via `ObjectCache`.
+    - Branding dinâmico adaptativo: destaca a primeira palavra em branco e a segunda em vermelho oficial para marcas compostas (ex: `SPEED` + `RACING`) ou renderiza tipografia elegante para marcas simples.
+    - Top strip dinâmico, links sociais (WhatsApp, Instagram, YouTube, X), banners de parceiros e links de comunidade configuráveis.
+    - Template dedicado `blog.php` para consumo do feed.
+  - **`empresa`:** Tema corporativo contemporâneo para empresas, consultorias e agências:
+    - Landing page modular na raiz (`/`) com seções de Hero (headline, subtítulo e CTA duplo), Serviços em grid de 3 colunas, Métricas de impacto em 4 colunas, Bloco CTA com gradiente e Rodapé comercial com dados de contato e mapa.
+    - Blog integrado na rota `/blog/` e folha de estilos limpa com suporte total a Dark Mode em `assets/css/style.css`.
+
+* **Interface Administrativa (`public/admin/themes.php`):**
+  - Nova aba **"Temas"** no menu unificado da administração (`core/AdminNav.php`) restrita a administradores.
+  - Galeria de temas com cartões visuais informativos, indicação de tema ativo e botão de ativação instantânea com proteção CSRF e purga de cache.
+  - Customizador visual dinâmico com formulários divididos por seções, integração direta com o modal da Biblioteca de Mídias para seleção ágil de fotos e upload em 1 clique.
+
 ---
 
 ## 9. Script de Migração do WordPress (`migrate-wp.php`)
@@ -1469,6 +1515,14 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **JSON Estruturado e Suporte Headless:** Suporte ao bloco `'table'` em `BlockCompiler::htmlToBlocks()` e `BlockCompiler::compile()`.
   - [x] **Transliteração Cross-Platform (`Security::slugify`):** Mapeamento direto de acentos antes de `iconv` garantindo paridade entre Windows e Linux.
   - [x] **100% de Aprovação nos Testes Unitários:** 64 asserções aprovadas com zero falhas em `bin/test.php`.
+
+* **FASE CONCLUÍDA — Sistema Nativo de Temas, Customizador Visual e Roteamento Híbrido (Zero Dependências):**
+  - [x] **Gerenciador de Temas (`core/ThemeManager.php`):** Descoberta declarativa via `theme.json`, resolução hierárquica de templates com fallback transparente, helpers `option()` e `asset()`, e sincronização atômica de assets com cache-busting.
+  - [x] **Painel de Temas e Customizador (`/admin/themes.php`):** Galeria visual com ativação em 1 clique, formulários dinâmicos de customização com suporte a imagens via modal de biblioteca, cores, textos e selects.
+  - [x] **Tema Oficial Portal de Notícias (`themes/portal-noticias/`):** Compatibilidade 100% com o SpeedRacing em produção, menu com categorias ordenadas editorialmente, branding adaptativo e feed de notícias.
+  - [x] **Tema Oficial Empresa (`themes/empresa/`):** Tema corporativo/institucional moderno com landing page (`/`) com Hero, Serviços, Métricas, CTA e feed de blog dedicado em `/blog/`.
+  - [x] **Roteamento Híbrido e SEO:** Canonicalização 301 de `/blog/page/1/` para `/blog/`, inclusão no sitemap XML, purga de cache em publicações e exclusões, e reserva de slug `'blog'`.
+  - [x] **100% de Aprovação na Suíte de Testes:** 82 asserções aprovadas com zero falhas em `bin/test.php`.
 
 ---
 

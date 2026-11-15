@@ -1,0 +1,58 @@
+{
+  "id": "portal-noticias",
+  "name": "Portal de Notícias",
+  "description": "Layout editorial com mosaico de destaques, feed contínuo, ticker de notícias e barra lateral patrocinada.",
+  "version": "1.0.0",
+  "author": "SpeedRacing / LightPress Team",
+  "type": "news",
+  "options": {
+    "menu_categories": {
+      "type": "text",
+      "label": "Ordem das Categorias no Menu (Slugs separados por vírgula)",
+      "default": "formula-1, formula-2, formula-e, indycar, stockcar, nascar, endurance, motovelocidade",
+      "description": "Defina os slugs na ordem exata de exibição. Se vazio, exibe as categorias ativas do banco."
+    },
+    "top_strip_text": {
+      "type": "text",
+      "label": "Subtítulo de Credibilidade (Topo)",
+      "default": "Credibilidade no automobilismo desde 2002",
+      "description": "Texto exibido na barra preta superior ao lado da data."
+    },
+    "whatsapp_url": {
+      "type": "url",
+      "label": "Link do Canal no WhatsApp",
+      "default": "https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c",
+      "description": "URL para o canal oficial de notícias no WhatsApp."
+    },
+    "instagram_url": {
+      "type": "url",
+      "label": "Link do Instagram",
+      "default": "https://www.instagram.com/speedracing.com.br/",
+      "description": "URL da conta oficial no Instagram."
+    },
+    "partner_banner_image": {
+      "type": "image",
+      "label": "Imagem do Banner Lateral de Parceiro",
+      "default": "/uploads/2026/10/banner-vertical-qr-site.avif",
+      "description": "Banner vertical exibido na barra lateral da Home (ex: 400x716 px)."
+    },
+    "partner_banner_link": {
+      "type": "url",
+      "label": "Link do Banner de Parceiro",
+      "default": "/contato/",
+      "description": "Destino ao clicar no banner do parceiro."
+    },
+    "footer_badge_text": {
+      "type": "text",
+      "label": "Texto do Selo do Rodapé",
+      "default": "Cobertura FIA • CBA • IMSA • ACO",
+      "description": "Texto ao lado do ícone de verificado no rodapé."
+    },
+    "footer_copyright_company": {
+      "type": "text",
+      "label": "Razão Social do Copyright",
+      "default": "SpeedRacing Comunicação Ltda.",
+      "description": "Nome da empresa no aviso de direitos autorais."
+    }
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "id": "empresa",
+  "name": "Empresa / Institucional",
+  "description": "Layout corporativo moderno com Hero de negócios, blocos de serviços, sobre nós, métricas, seção de novidades e área /blog/.",
+  "version": "1.0.0",
+  "author": "LightPress Team",
+  "type": "corporate",
+  "options": {
+    "header_cta_text": {
+      "type": "text",
+      "label": "Texto do Botão CTA (Topo)",
+      "default": "Fale Conosco",
+      "description": "Texto do botão em destaque no cabeçalho."
+    },
+    "header_cta_link": {
+      "type": "url",
+      "label": "Link do Botão CTA (Topo)",
+      "default": "/contato/",
+      "description": "Destino do botão CTA no cabeçalho."
+    },
+    "hero_badge": {
+      "type": "text",
+      "label": "Badge Superior do Hero",
+      "default": "Inovação & Excelência Corporativa",
+      "description": "Pequena etiqueta destacada acima do título da Home."
+    },
+    "hero_title": {
+      "type": "text",
+      "label": "Título Principal (Hero)",
+      "default": "Transforme seu Negócio com Soluções de Alta Performance",
+      "description": "Título de impacto exibido no topo da página inicial."
+    },
+    "hero_subtitle": {
+      "type": "textarea",
+      "label": "Subtítulo Explicativo (Hero)",
+      "default": "Oferecemos consultoria estratégica, tecnologia de ponta e soluções sob medida para acelerar os resultados da sua empresa com máxima eficiência e segurança.",
+      "description": "Parágrafo descritivo logo abaixo do título do Hero."
+    },
+    "hero_primary_cta_text": {
+      "type": "text",
+      "label": "Texto do Botão Primário (Hero)",
+      "default": "Solicitar Proposta",
+      "description": "Texto do botão principal de conversão."
+    },
+    "hero_primary_cta_link": {
+      "type": "url",
+      "label": "Link do Botão Primário (Hero)",
+      "default": "/contato/",
+      "description": "Destino do botão primário."
+    },
+    "hero_secondary_cta_text": {
+      "type": "text",
+      "label": "Texto do Botão Secundário (Hero)",
+      "default": "Nossos Serviços",
+      "description": "Texto do botão secundário."
+    },
+    "hero_secondary_cta_link": {
+      "type": "url",
+      "label": "Link do Botão Secundário (Hero)",
+      "default": "#servicos",
+      "description": "Destino do botão secundário."
+    },
+    "home_static_page_id": {
+      "type": "select",
+      "label": "Página Institucional Vinculada ao Bloco Sobre",
+      "default": "",
+      "description": "Selecione uma página institucional criada no painel para exibir seu conteúdo na Home corporativa."
+    },
+    "services_title": {
+      "type": "text",
+      "label": "Título da Seção de Serviços",
+      "default": "Nossas Soluções Especializadas",
+      "description": "Título principal da seção de pilares/serviços."
+    },
+    "services_subtitle": {
+      "type": "textarea",
+      "label": "Subtítulo dos Serviços",
+      "default": "Desenvolvemos produtos e consultorias com rigor técnico, garantindo resultados mensuráveis.",
+      "description": "Breve introdução da seção de serviços."
+    },
+    "service_1_icon": {
+      "type": "text",
+      "label": "Ícone do Serviço 1",
+      "default": "speed",
+      "description": "Nome do ícone SVG (ex: speed, verified, trending_up, code, settings)."
+    },
+    "service_1_title": {
+      "type": "text",
+      "label": "Título do Serviço 1",
+      "default": "Performance Extrema",
+      "description": "Título do primeiro card."
+    },
+    "service_1_desc": {
+      "type": "textarea",
+      "label": "Descrição do Serviço 1",
+      "default": "Sistemas e arquiteturas otimizadas para entregar tempo de resposta ultrarrápido e pontuação máxima em testes de velocidade.",
+      "description": "Texto do primeiro card."
+    },
+    "service_2_icon": {
+      "type": "text",
+      "label": "Ícone do Serviço 2",
+      "default": "verified",
+      "description": "Nome do ícone SVG."
+    },
+    "service_2_title": {
+      "type": "text",
+      "label": "Título do Serviço 2",
+      "default": "Segurança & Confiabilidade",
+      "description": "Título do segundo card."
+    },
+    "service_2_desc": {
+      "type": "textarea",
+      "label": "Descrição do Serviço 2",
+      "default": "Blindagem de dados em repouso e em trânsito com auditoria estrita, defesas contra injeção e conformidade com privacidade.",
+      "description": "Texto do segundo card."
+    },
+    "service_3_icon": {
+      "type": "text",
+      "label": "Ícone do Serviço 3",
+      "default": "trending_up",
+      "description": "Nome do ícone SVG."
+    },
+    "service_3_title": {
+      "type": "text",
+      "label": "Título do Serviço 3",
+      "default": "Escalabilidade Contínua",
+      "description": "Título do terceiro card."
+    },
+    "service_3_desc": {
+      "type": "textarea",
+      "label": "Descrição do Serviço 3",
+      "default": "Estrutura modular e gerenciada para expandir sem atrito, suportando crescimento de tráfego sem degradação operacional.",
+      "description": "Texto do terceiro card."
+    },
+    "metrics_1_number": {
+      "type": "text",
+      "label": "Métrica 1 (Número)",
+      "default": "+10",
+      "description": "Destaque numérico 1."
+    },
+    "metrics_1_label": {
+      "type": "text",
+      "label": "Métrica 1 (Rótulo)",
+      "default": "Anos de Experiência",
+      "description": "Descrição da métrica 1."
+    },
+    "metrics_2_number": {
+      "type": "text",
+      "label": "Métrica 2 (Número)",
+      "default": "99.9%",
+      "description": "Destaque numérico 2."
+    },
+    "metrics_2_label": {
+      "type": "text",
+      "label": "Métrica 2 (Rótulo)",
+      "default": "Disponibilidade de SLA",
+      "description": "Descrição da métrica 2."
+    },
+    "metrics_3_number": {
+      "type": "text",
+      "label": "Métrica 3 (Número)",
+      "default": "+500",
+      "description": "Destaque numérico 3."
+    },
+    "metrics_3_label": {
+      "type": "text",
+      "label": "Métrica 3 (Rótulo)",
+      "default": "Projetos Concluídos",
+      "description": "Descrição da métrica 3."
+    },
+    "metrics_4_number": {
+      "type": "text",
+      "label": "Métrica 4 (Número)",
+      "default": "100/100",
+      "description": "Destaque numérico 4."
+    },
+    "metrics_4_label": {
+      "type": "text",
+      "label": "Métrica 4 (Rótulo)",
+      "default": "PageSpeed Score",
+      "description": "Descrição da métrica 4."
+    },
+    "show_recent_posts": {
+      "type": "boolean",
+      "label": "Exibir Seção de Artigos Recentes na Home",
+      "default": "1",
+      "description": "Se ativado, exibe os 3 artigos mais recentes com link para o Blog."
+    },
+    "cta_banner_title": {
+      "type": "text",
+      "label": "Título da Faixa CTA Final",
+      "default": "Pronto para elevar o nível da sua operação?",
+      "description": "Chamada em destaque antes do rodapé."
+    },
+    "cta_banner_subtitle": {
+      "type": "textarea",
+      "label": "Subtítulo da Faixa CTA Final",
+      "default": "Fale hoje mesmo com nossos especialistas e receba um diagnóstico técnico sem compromisso.",
+      "description": "Texto da faixa final."
+    },
+    "cta_banner_btn_text": {
+      "type": "text",
+      "label": "Texto do Botão da Faixa CTA",
+      "default": "Falar com um Consultor",
+      "description": "Botão da faixa final."
+    },
+    "cta_banner_btn_link": {
+      "type": "url",
+      "label": "Link do Botão da Faixa CTA",
+      "default": "/contato/",
+      "description": "Destino do botão da faixa final."
+    },
+    "contact_whatsapp": {
+      "type": "url",
+      "label": "WhatsApp Comercial",
+      "default": "https://wa.me/5511999999999",
+      "description": "Link direto para atendimento no WhatsApp."
+    },
+    "contact_email": {
+      "type": "text",
+      "label": "E-mail Comercial",
+      "default": "contato@empresa.com.br",
+      "description": "E-mail de contato corporativo."
+    },
+    "contact_phone": {
+      "type": "text",
+      "label": "Telefone Comercial",
+      "default": "(11) 3000-0000",
+      "description": "Telefone para contato direto."
+    },
+    "footer_copyright_company": {
+      "type": "text",
+      "label": "Razão Social do Rodapé",
+      "default": "LightPress Corporativo Ltda.",
+      "description": "Nome da empresa exibido no copyright do rodapé."
+    }
+  }
+}

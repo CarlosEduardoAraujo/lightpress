@@ -303,6 +303,61 @@ if (isset($available['webhook-sender'])) {
 }
 
 // -------------------------------------------------------------
+// 8. Testes do Sistema de Temas (core/ThemeManager.php)
+// -------------------------------------------------------------
+echo "\n[8] Testando Sistema de Temas (core/ThemeManager.php)\n";
+
+use LightPress\Core\ThemeManager;
+use LightPress\Core\PostService;
+
+$availableThemes = ThemeManager::getAvailableThemes();
+assertTest("Descoberta de temas instalados", isset($availableThemes['portal-noticias']) && isset($availableThemes['empresa']));
+assertTest("Manifesto de portal-noticias possui tipo 'news'", ($availableThemes['portal-noticias']['type'] ?? '') === 'news');
+assertTest("Manifesto de empresa possui tipo 'corporate'", ($availableThemes['empresa']['type'] ?? '') === 'corporate');
+
+// Garantir que portal-noticias está ativo para os testes de opções
+ThemeManager::activate('portal-noticias');
+assertTest("Tema ativo padrão é portal-noticias", ThemeManager::getActiveTheme() === 'portal-noticias');
+assertTest("Tipo do tema ativo é 'news'", ThemeManager::getActiveThemeType() === 'news');
+
+// Testes de opções padrão do SpeedRacing no portal-noticias
+assertTest("Opção default 'partner_banner_image' preserva SpeedRacing", ThemeManager::option('partner_banner_image') === '/uploads/2026/10/banner-vertical-qr-site.avif');
+assertTest("Opção default 'top_strip_text' preserva SpeedRacing", ThemeManager::option('top_strip_text') === 'Credibilidade no automobilismo desde 2002');
+assertTest("Opção default 'menu_categories' contém categorias editoriais", str_contains((string)ThemeManager::option('menu_categories'), 'formula-1'));
+
+// Teste de cálculo de URL de assets e cache-busting
+$assetUrl = ThemeManager::asset('css/style.css');
+assertTest("Asset URL aponta para tema com cache-busting", str_starts_with($assetUrl, '/assets/themes/portal-noticias/css/style.css?v='));
+
+// Teste de resolução de templates
+$homeTemplate = ThemeManager::getTemplateFile('home.php');
+assertTest("Resolução de template home.php no tema ativo", file_exists($homeTemplate));
+
+// Teste de palavras reservadas e canonização de rota /blog/
+assertTest("Slug 'blog' está em PostService::RESERVED_SLUGS", in_array('blog', PostService::RESERVED_SLUGS, true));
+
+$routerTest = new Router();
+$routerTest->setTestingMode(true);
+$routerTest->dispatch('GET', '/blog/page/1');
+$lastRedirect = $routerTest->getLastRedirect();
+assertTest("Redirecionamento canônico 301 de /blog/page/1 para /blog/", ($lastRedirect['url'] ?? '') === '/blog/' && ($lastRedirect['status'] ?? 0) === 301);
+
+$routerTest->dispatch('GET', '/blog/page/1/');
+$lastRedirect2 = $routerTest->getLastRedirect();
+assertTest("Redirecionamento canônico 301 de /blog/page/1/ para /blog/", ($lastRedirect2['url'] ?? '') === '/blog/' && ($lastRedirect2['status'] ?? 0) === 301);
+
+// Teste de alternância dinâmica para tema corporativo
+ThemeManager::activate('empresa');
+assertTest("Ativação do tema corporativo 'empresa'", ThemeManager::getActiveTheme() === 'empresa');
+assertTest("Tipo do tema ativo é 'corporate'", ThemeManager::getActiveThemeType() === 'corporate');
+assertTest("Hero title default do tema empresa", ThemeManager::option('hero_title') === 'Transforme seu Negócio com Soluções de Alta Performance');
+assertTest("Asset URL aponta para tema empresa", str_starts_with(ThemeManager::asset('css/style.css'), '/assets/themes/empresa/css/style.css?v='));
+
+// Reativação do tema base portal-noticias (para deixar o SpeedRacing ativo)
+ThemeManager::activate('portal-noticias');
+assertTest("Reativação segura do tema portal-noticias", ThemeManager::getActiveTheme() === 'portal-noticias');
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

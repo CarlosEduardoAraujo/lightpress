@@ -3,6 +3,7 @@ module.exports = {
   darkMode: 'class',
   content: [
     './templates/**/*.php',
+    './themes/**/*.php',
     './public/**/*.php',
     './core/**/*.php'
   ],

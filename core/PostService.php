@@ -16,7 +16,7 @@ class PostService
 {
     public const RESERVED_SLUGS = [
         'admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed',
-        'feed.xml', 'sitemap', 'sitemap.xml', 'sitemap-main.xml', 'page', 'categoria', 'tag', 'noticia'
+        'feed.xml', 'sitemap', 'sitemap.xml', 'sitemap-main.xml', 'page', 'categoria', 'tag', 'noticia', 'blog'
     ];
 
     private CacheManager $cacheManager;
@@ -109,6 +109,7 @@ class PostService
                 try {
                     $cacheManager->purgeUrls([
                         '/',
+                        '/blog/',
                         "/{$p['slug']}/",
                         "/categoria/{$p['category']}/",
                         '/feed',
@@ -451,6 +452,7 @@ class PostService
             // Invalidação e registro de purga de cache (LP-09)
             $affectedUrls = [
                 '/',
+                '/blog/',
                 "/{$slug}/",
                 "/{$current['slug']}/",
                 "/noticia/{$slug}/",
@@ -461,6 +463,7 @@ class PostService
                 '/feed',
                 '/sitemap.xml',
                 '/page/2/',
+                '/blog/page/2/',
                 "/categoria/{$category}/page/2/",
             ];
 

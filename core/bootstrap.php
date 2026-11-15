@@ -79,6 +79,16 @@ if (PHP_SAPI !== 'cli' && ($config['app']['env'] ?? '') === 'production') {
 // Aplicar Configurações Dinâmicas do Banco de Dados
 \LightPress\Core\Settings::applyToConfig($config);
 
+// Configuração do Tema Ativo
+$config['paths']['themes'] = dirname(__DIR__) . '/themes';
+$activeTheme = \LightPress\Core\ThemeManager::getActiveTheme();
+$config['theme'] = [
+    'active' => $activeTheme,
+    'dir' => \LightPress\Core\ThemeManager::getActiveThemeDir(),
+    'type' => \LightPress\Core\ThemeManager::getActiveThemeType(),
+];
+$config['paths']['templates'] = \LightPress\Core\ThemeManager::getActiveThemeDir();
+
 // Disponibilizar globalmente para helpers de infraestrutura
 $GLOBALS['config'] = $config;
 

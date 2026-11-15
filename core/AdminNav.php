@@ -84,6 +84,7 @@ final class AdminNav
                     <a href="/admin/stats.php" class="<?= $activePage === 'stats' ? 'active' : '' ?>">Mais Lidas 📈</a>
                     <?php if ($isAdmin): ?>
                         <a href="/admin/users.php" class="<?= $activePage === 'users' ? 'active' : '' ?>">Usuários & Autores</a>
+                        <a href="/admin/themes.php" class="<?= $activePage === 'themes' ? 'active' : '' ?>">Temas</a>
                         
                         <!-- Submenu Dropdown de Plugins -->
                         <div class="nav-dropdown">

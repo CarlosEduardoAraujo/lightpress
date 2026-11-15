@@ -15,10 +15,16 @@ class Router
     private array $routes = [];
     private $notFoundHandler = null;
     private bool $isTesting = false;
+    private ?array $lastRedirect = null;
 
     public function __construct(string $basePath = '')
     {
         $this->setBasePath($basePath);
+    }
+
+    public function getLastRedirect(): ?array
+    {
+        return $this->lastRedirect;
     }
 
     /**
@@ -52,10 +58,6 @@ class Router
      */
     public function redirect(string $url, int $statusCode = 301): void
     {
-        if ($this->isTesting) {
-            return;
-        }
-
         $target = $url;
         // Prevenir bypasses de Open Redirect via backslash (\), protocolo relativo (//) ou misto (/\)
         if (str_starts_with($target, '//') || str_starts_with($target, '/\\') || str_starts_with($target, '\\')) {
@@ -69,6 +71,12 @@ class Router
             } elseif (!str_starts_with($target, $this->basePath . '/') && $target !== $this->basePath) {
                 $target = $this->basePath . $target;
             }
+        }
+
+        $this->lastRedirect = ['url' => $target, 'status' => $statusCode];
+
+        if ($this->isTesting) {
+            return;
         }
 
         header("Location: {$target}", true, $statusCode);
@@ -194,6 +202,12 @@ class Router
         // Redirecionamento Canônico de Paginação: /page/1/ ou /page/1 -> / (301)
         if ($path === '/page/1' || $path === '/page/1/') {
             $this->redirect('/', 301);
+            return null;
+        }
+
+        // Canonicalização de Blog: /blog/page/1 ou /blog/page/1/ -> /blog/ (301)
+        if ($path === '/blog/page/1' || $path === '/blog/page/1/') {
+            $this->redirect('/blog/', 301);
             return null;
         }
 

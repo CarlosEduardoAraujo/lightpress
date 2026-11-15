@@ -90,6 +90,6 @@ $isPreview = true;
     </div>
 
     <!-- Renderização do Post usando o template oficial -->
-    <?php require $config['paths']['templates'] . '/post.php'; ?>
+    <?php require \LightPress\Core\ThemeManager::getTemplateFile('post.php'); ?>
 </body>
 </html>

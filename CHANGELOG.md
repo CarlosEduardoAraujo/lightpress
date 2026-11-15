@@ -7,6 +7,44 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Sistema Nativo de Temas, Customizador Visual e Roteamento Híbrido (Portal vs. Empresa) — 2026-11-15
+
+- **Novo Sistema Nativo de Temas (`core/ThemeManager.php`, `themes/`):**
+  - **Descoberta Declarativa e Zero Dependências:** Leitura declarativa de manifestos `theme.json` sem execução de código PHP na fase de descoberta. Metadados estruturados: `id`, `name`, `version`, `type` (`news` ou `corporate`), `author`, `description`, `supports` e `options`.
+  - **Resolução Hierárquica de Templates:** `ThemeManager::getTemplateFile(string $template)` resolve templates com busca prioritária no tema ativo (`themes/{theme}/`). Se ausente, recorre contextualmente para `home.php` (no caso de `blog.php`) ou para o diretório raiz `templates/` como fallback global robusto.
+  - **Persistência Atômica de Configurações:** As opções do tema ativo são armazenadas na tabela `settings` sob a chave `theme_options_{slug}` e cacheadas em memória estática e no `ObjectCache`, acessadas via `ThemeManager::option($key, $default)`.
+  - **Entrega Estática de Assets de Alta Performance:** Mapeamento de `themes/{slug}/assets/` para a raiz pública `public/assets/themes/{slug}/` com sincronização automática na ativação e helper `ThemeManager::asset($path)` com versionamento por timestamp (`filemtime`) para cache-busting automático no Nginx.
+  - **Zero Regressão para o SpeedRacing:** Fallback transparente para os assets originais existentes em `/public/assets/` caso o arquivo específico não seja encontrado no diretório do tema, garantindo 100% de integridade para a produção.
+- **Roteamento Híbrido e SEO Corporativo (`core/Router.php`, `public/index.php`):**
+  - **Roteamento Condicional por Tipo de Tema:**
+    - Temas do tipo `news`: A raiz `/` renderiza o feed de notícias tradicional do portal (`home.php`).
+    - Temas do tipo `corporate`: A raiz `/` renderiza a landing page institucional (`home.php`), enquanto `/blog/` e `/blog/page/{page}/` renderizam o feed de artigos jornalísticos (`blog.php`).
+  - **Canonicalização SEO:** Redirecionamento canônico HTTP 301 automático de `/blog/page/1` e `/blog/page/1/` para `/blog/`, eliminando riscos de conteúdo duplicado nos mecanismos de busca.
+  - **Sitemap XML:** Inclusão automática da URL canônica `/blog/` no índice principal `sitemap-main.xml`.
+  - **Purga de Cache Abrangente:** Inclusão de `/blog/` e `/blog/page/2/` na lista de invalidação de cache Nginx e Cloudflare ao publicar ou agendar matérias (`PostService::publishOrUpdate`, `PostService::promoteScheduledPosts`), ao excluir artigos (`public/admin/dashboard.php`) e na atualização de metadados de mídias (`core/ImageProcessor.php`).
+  - **Proteção de Slugs Reservados:** Adição de `'blog'` na lista estática `PostService::RESERVED_SLUGS` e no array de validação do editor de páginas institucionais (`public/admin/page-edit.php`).
+- **Dois Temas Oficiais Prontos para Uso:**
+  - **Tema Oficial `portal-noticias` (`themes/portal-noticias/`):**
+    - Tema padrão ativo mantendo 100% de fidelidade visual e funcional ao SpeedRacing em produção.
+    - Suporte a ordenação editorial de categorias no menu superior através da opção `menu_categories` com cache em memória via `ObjectCache`.
+    - Branding inteligente adaptativo: formatação automática em duas cores para marcas compostas (ex.: `SPEED` + `RACING`) ou tipografia unificada para marcas personalizadas.
+    - Opções configuráveis no `theme.json` para texto do top strip, redes sociais (WhatsApp, Instagram, YouTube, X), banners de parceiros e links de comunidade.
+    - Template dedicado `blog.php` como arquivo de notícias.
+  - **Tema Oficial `empresa` (`themes/empresa/`):**
+    - Tema corporativo moderno projetado para agências, consultorias, startups e prestadores de serviços.
+    - Landing page com seções modulares: Hero com headline, subtítulo e CTA duplo; Grid de Serviços/Soluções em 3 colunas; Faixa de Métricas de Impacto em 4 colunas; Seção de Chamada para Ação com gradiente; e Bloco de Contato/Localização com mapa interativo.
+    - Blog integrado na rota `/blog/` com layout limpo e responsivo.
+    - Folha de estilo dedicada `assets/css/style.css` com variáveis CSS semânticas e suporte nativo a Dark Mode.
+- **Painel Administrativo de Temas e Customizador Visual (`public/admin/themes.php`, `core/AdminNav.php`):**
+  - **Aba de Navegação "Temas":** Inserida no menu administrativo superior (`AdminNav.php`) para perfis administradores com ícone nativo `palette`.
+  - **Galeria Visual de Temas:** Exibição de cards responsivos com badge de status "Ativo", versão, tipo, autor, descrição e botão de ativação instantânea com proteção CSRF.
+  - **Customizador Visual Dinâmico:** Formulário gerado automaticamente a partir das definições de `options` do `theme.json`, suportando campos `text`, `textarea`, `url`, `image` (com botão de integração ao modal da Biblioteca de Mídias), `color`, `select` e `boolean`.
+- **Expansão da Suíte de Testes Automatizados (`bin/test.php`):**
+  - 18 novas asserções unitárias e de integração no grupo `[8] Testando Sistema de Temas (core/ThemeManager.php)`: descoberta de manifestos, validação de tipos (`news` e `corporate`), integridade de opções padrão do SpeedRacing, resolução hierárquica de templates, URLs de assets com cache-busting, reserva do slug `blog`, redirecionamento canônico 301 de `/blog/page/1/`, e ativação/reativação segura entre temas.
+  - Total da suíte expandido para **82 testes com 100% de aprovação (82/82)**.
+
+
+
 ### Ingestão Segura via REST API com Senhas de Aplicação e Suporte a Automações n8n (Plugin API Publisher) — 2026-11-15
 
 - **Novo Plugin Oficial `api-publisher` (`plugins/api-publisher/`):**

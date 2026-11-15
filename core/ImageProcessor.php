@@ -382,10 +382,11 @@ class ImageProcessor
                 $params = array_merge($params, $paths);
             }
             $posts = Database::fetchAll("SELECT slug, category, tags FROM posts WHERE {$condition}", $params);
-            $urls = ['/'];
+            $urls = ['/', '/blog/'];
             $count = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?", [gmdate('Y-m-d H:i:s')]);
             for ($page = 2; $page <= (int)ceil($count / 12); $page++) {
                 $urls[] = '/page/' . $page . '/';
+                $urls[] = '/blog/page/' . $page . '/';
             }
             foreach (array_unique(array_column($posts, 'category')) as $category) {
                 // Outras notícias da categoria podem exibir a foto nos relacionados.

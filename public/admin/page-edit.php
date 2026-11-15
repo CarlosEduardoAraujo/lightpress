@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "O slug '{$slug}' já está em uso por outra página.";
             } else {
                 // Verificar palavras reservadas do sistema
-                $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag'];
+                $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag', 'blog'];
                 if (in_array(strtolower($slug), $reserved, true)) {
                     $error = "O slug '{$slug}' é reservado pelo sistema. Por favor, escolha outro.";
                 } else {

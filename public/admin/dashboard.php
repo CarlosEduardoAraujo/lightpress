@@ -60,6 +60,7 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
         if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $targetPost)) {
             $affectedUrls = [
                 '/',
+                '/blog/',
                 '/' . $targetPost['slug'] . '/',
                 '/noticia/' . $targetPost['slug'] . '/',
                 '/categoria/' . $targetPost['category'] . '/',
@@ -67,6 +68,7 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
                 '/feed',
                 '/sitemap.xml',
                 '/page/2/',
+                '/blog/page/2/',
                 '/categoria/' . $targetPost['category'] . '/page/2/',
             ];
 
