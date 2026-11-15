@@ -362,6 +362,7 @@ lightpress/
 │   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
 ├── plugins/                   # Plugins isolados fora da raiz pública
 │   ├── ai-copilot/            # Plugin oficial de IA para linkagem interna e visão computacional
+│   ├── api-publisher/         # Plugin oficial de ingestão REST API com Senhas de Aplicação
 │   ├── redis-cache-pro/       # Plugin empresarial de cache persistente em memória RAM com PhpRedis
 │   └── webhook-sender/        # Plugin nativo para envio de webhooks em publicações
 ├── storage/                   # Dados privados; acesso web proibido
@@ -972,6 +973,35 @@ O terceiro módulo corporativo do ecossistema LightPress introduz um motor de ca
   - Interface estática de alto nível: `get()`, `set()`, `delete()`, `remember()`, `flushGroup()`, `flush()` e `isConnected()`.
   - Invalidação automática vinculada aos hooks de ciclo de vida do LightPress (`post_saved`, `post_deleted`, `settings_updated`).
 
+#### 8.13.4. Quarto Plugin Oficial: API Publisher & Application Passwords (`plugins/api-publisher/`)
+
+O quarto módulo oficial do ecossistema LightPress viabiliza a ingestão contínua e automatizada de matérias geradas por IA ou esteiras externas (como o workflow **n8n** do Reddit/RSS) diretamente no banco de dados como **rascunhos (`draft`) para revisão editorial humana**:
+
+* **Ingestão Exclusiva em Modo Rascunho:**
+  - O endpoint força estritamente `status = 'draft'`, `is_featured = 0` e `published_at = NULL`.
+  - Artigos ingeridos nunca impactam o FastCGI Cache do Nginx/Cloudflare, não entram em sitemaps/feeds e não acionam webhooks externos até que um editor humano revise e publique o conteúdo no painel.
+* **Autenticação via Senhas de Aplicação (Application Passwords):**
+  - **Isolamento de Segurança:** Senhas de aplicação funcionam exclusivamente na API REST (`/api/v1/posts`) e são sumariamente rejeitadas no formulário web tradicional (`/admin/login.php`).
+  - **Formato Canônico e Lookup O(1):** Tokens estruturados no formato `lp_app_{8hex}_{32hex}` com prefixo indexado (`key_prefix`), eliminando DoS de CPU ao evitar cálculo massivo de hashes Argon2id sob concorrência.
+  - **Proteção contra Timing Attacks:** Execução de verificação de hash em tempo constante contra `Security::DUMMY_ARGON2ID_HASH` caso a chave não seja encontrada no banco.
+  - **Exibição Única (One-Time Flash Secret):** O segredo puro nunca é armazenado no banco; após a emissão, ele é exibido uma única vez no painel administrativo e apenas seu hash Argon2id é persistido.
+  - **Allowlist Opcional de IPs e Rate Limiting:** Restrição granular por IP/rede cadastrado na chave e bloqueio defensivo de força bruta por IP (HTTP 429) via `Security::checkLoginRateLimit()`.
+  - **Validação Estrita de RBAC:** A autoria é vinculada de forma imutável ao usuário titular da chave, exigindo conta ativa (`is_active = 1`) e permissão `Authorization::can($user, Authorization::ACTION_CREATE_POST)`.
+* **Idempotência Atômica Anti-Duplicidade (`plugin_api_ingest_log`):**
+  - Chave externa indexada e única (`external_key` recebendo `external_id`, `reddit_id` ou cabeçalho `Idempotency-Key`).
+  - Execução atômica em transação unificada `Database::transaction()` com `PostService::createPost()`. Reenvios concorrentes devolvem HTTP `200 OK` com os dados do rascunho existente sem duplicar registros no CMS.
+  - Cascata relacional (`ON DELETE CASCADE`): ao excluir um rascunho no painel administrativo, o registro de idempotência é limpo automaticamente, permitindo novo envio da pauta caso necessário.
+* **Parser de Markdown Semântico & Sanitização XSS:**
+  - Conversão de Markdown jornalístico com normalização editorial: `#` e `##` mapeados para `<h2>` (preservando o H1 da página exclusivo para o título da publicação), `###` para `<h3>`, `####` para `<h4>`, listas, blockquotes e links.
+  - Submissão obrigatória a `BlockCompiler::sanitizeHtml()` e `BlockCompiler::htmlToBlocks()`, blindando o sistema contra XSS e gerando os blocos estruturados nativos do editor visual.
+* **Compatibilidade Nativa com n8n (`Reddit - IA.json`):**
+  - Aliases nativos no payload JSON para os campos `titulo`, `resumo`, `texto_completo`, `primary_focus_keyword` e `reddit_id`.
+  - Retorno HTTP 201/200 com `edit_url` (`https://dominio/admin/editor.php?id={id}`) para que nós de chat da redação (WhatsApp/Discord) entreguem ao editor um link de revisão em 1 clique.
+* **Painel Administrativo Completo (`/admin/plugin-settings.php?plugin=api-publisher`):**
+  - Gerador de senhas com seleção de autor e allowlist de IP.
+  - Tabela de senhas emitidas com dados de último uso, último IP registrado, status e revogação imediata via POST protegido por CSRF.
+  - Auditoria dos últimos 15 rascunhos ingeridos via API.
+
 ---
 
 ### 8.14. Prevenção Contra Redirecionamentos Abertos (Open Redirect / CWE-601)
@@ -1386,6 +1416,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Primeiro Plugin Oficial (`webhook-sender`):** Disparo de webhooks para múltiplos servidores (Discord, Slack, n8n, Zapier) na publicação de matérias, com tabela relacional própria (`plugin_webhook_sender_logs`), integração atômica com agendamento de posts, resolução canônica em CLI/cron e painel de controle com testes e reenvio.
   - [x] **Segundo Plugin Oficial (`ai-copilot`):** Assistente de IA generativa e multimodal com zero dependências externas (cURL nativo), suporte a Google Gemini, OpenAI e Ollama local, módulo de linkagem interna com busca FULLTEXT e ancoragem semântica estrita, visão computacional com variantes WebP 1024px e auto-migração de metadados (`alt_text`, `caption`, `ai_tags`) na tabela `media`.
   - [x] **Terceiro Plugin Oficial (`redis-cache-pro`):** Motor corporativo de cache persistente com PhpRedis, Circuit Breaker, versionamento atômico O(1), UNLINK não-bloqueante, telemetria 24h, Big Key Hunter, proteção contra Cache Stampede (Dogpile Lock), alertas via Webhooks e painel administrativo interativo com gráficos SVG.
+  - [x] **Quarto Plugin Oficial (`api-publisher`):** Ingestão contínua de matérias automatizadas (n8n / IA) via REST API (`/api/v1/posts`) como rascunhos para triagem editorial humana, autenticação revogável por Senhas de Aplicação (`plugin_app_passwords`) com prefixo indexado O(1), Argon2id, allowlist de IP, transação atômica única com idempotência (`plugin_api_ingest_log`), parser de Markdown semântico seguro e painel administrativo completo.
 
 * **FASE CONCLUÍDA — Polimento & Padronização da Área Administrativa (/admin):**
   - [x] **Header e Footer Unificados (`header.php` e `footer.php`):** Centralização da estrutura HTML, `<head>`, metatags, script anti-flash de tema claro/escuro e navegação completa com submenu de plugins em todas as páginas do `/admin`.

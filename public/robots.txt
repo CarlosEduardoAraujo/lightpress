@@ -1,0 +1,89 @@
+# SpeedRacing / LightPress
+# https://www.speedracing.com.br/robots.txt
+
+# ----------------------------------------------------------------------
+# 1. Diretivas de bloqueio para scrapers de IA, bots de SEO e crawlers
+# (Diretiva declarativa; a contencao efetiva ocorre no WAF da Cloudflare)
+# ----------------------------------------------------------------------
+User-agent: GPTBot
+User-agent: OAI-AdsBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Amazonbot
+User-agent: Amzn-SearchBot
+User-agent: Bytespider
+User-agent: CCBot
+User-agent: PerplexityBot
+User-agent: GrokBot
+User-agent: DeepSeekBot
+User-agent: Qwenbot
+User-agent: MoonshotBot
+User-agent: KimiBot
+User-agent: ChatGLM
+User-agent: Hunyuan
+User-agent: cohere-ai
+User-agent: AIWebIndex
+User-agent: ShapBot
+User-agent: SperidLabsResearchCrawler
+User-agent: ElevenlabsCrawler
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: MJ12bot
+User-agent: DotBot
+User-agent: DataForSeoBot
+User-agent: SEOJuice-SearchBot
+User-agent: SEPRanking
+User-agent: SERankingBacklinksBot
+User-agent: BacklinksExtendedBot
+User-agent: Pinterestbot
+User-agent: Baiduspider
+User-agent: YandexBot
+User-agent: PetalBot
+User-agent: TikTokSpider
+User-agent: Brightbot
+User-agent: br-crawler
+User-agent: NVIDIABOT
+Disallow: /
+
+# ----------------------------------------------------------------------
+# 2. Regras gerais (aplicadas ao Googlebot, Bingbot, Applebot,
+#    buscadores de IA em tempo real e previas sociais)
+# ----------------------------------------------------------------------
+User-agent: *
+
+# Painel, APIs e previas internas (com ancora exata para nao afetar slugs)
+Disallow: /admin$
+Disallow: /admin/
+Disallow: /api$
+Disallow: /api/
+Disallow: /preview$
+Disallow: /preview/
+
+# Resultados de busca interna e parametros de rastreamento
+Disallow: /busca$
+Disallow: /busca/
+Disallow: /*?q=
+Disallow: /*&q=
+Disallow: /*?s=
+Disallow: /*&s=
+Disallow: /*?replytocom=
+Disallow: /*&replytocom=
+Disallow: /*?utm_
+Disallow: /*&utm_
+
+# Rotas legadas do WordPress (economiza crawl budget dos buscadores)
+Disallow: /wp-admin/
+Disallow: /wp-includes/
+Disallow: /wp-json/
+Disallow: /xmlrpc.php
+Disallow: /wp-login.php
+Disallow: /attachment/
+Disallow: /trackback/
+
+# Recursos necessarios a renderizacao e imagens atuais/legadas
+Allow: /assets/
+Allow: /uploads/
+Allow: /wp-content/uploads/
+
+# Indice com paginas, artigos e sitemap do Google News
+Sitemap: https://www.speedracing.com.br/sitemap.xml

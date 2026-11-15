@@ -7,6 +7,36 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Ingestão Segura via REST API com Senhas de Aplicação e Suporte a Automações n8n (Plugin API Publisher) — 2026-11-15
+
+- **Novo Plugin Oficial `api-publisher` (`plugins/api-publisher/`):**
+  - **Módulo de Ingestão de Rascunhos para Triagem Editorial:** Permite que automações externas (como workflows n8n integrando RSS/Reddit com IA) enviem matérias redigidas diretamente para o banco de dados como rascunhos (`draft`) para revisão humana, sem impacto no cache público e sem disparar webhooks prematuramente.
+  - **Autenticação Segura via Senhas de Aplicação Revogáveis (`plugin_app_passwords`):**
+    - Geração criptograficamente segura de senhas no formato `lp_app_{8hex}_{32hex}`, armazenando hash Argon2id (`secret_hash`) e prefixo indexado (`key_prefix`) para lookup $O(1)$ sem DoS de CPU.
+    - Extração de credenciais HTTP Basic Auth em cascata inspecionando `PHP_AUTH_USER`/`PHP_AUTH_PW`, `HTTP_AUTHORIZATION` e `REDIRECT_HTTP_AUTHORIZATION`, com validação estrita de titularidade do `username`.
+    - Mitigação de timing attacks em senhas inválidas ou inexistentes através de hash dummy estático (`Security::DUMMY_ARGON2ID_HASH`).
+    - Validação em tempo real de revogação (`is_revoked == 0`), conta ativa (`is_active == 1`), allowlist de IPs e avaliação RBAC (`Authorization::can(ACTION_CREATE_POST)`).
+  - **Transação Atômica e Idempotência Anti-Duplicidade (`plugin_api_ingest_log`):**
+    - Ingestão atômica unificada com `PostService::createPost()`, garantindo inserção em `posts` (`status = 'draft'`, `is_featured = 0`, `published_at = NULL`), `post_stats` (views zeradas) e snapshot inicial em `post_revisions`.
+    - Prevenção rigorosa de duplicação em concorrência via chave única `external_key` indexada (`external_id` / `reddit_id` / `Idempotency-Key`), devolvendo HTTP `200 OK` com dados do rascunho existente em reenvios.
+    - Integridade referencial com `ON DELETE CASCADE`: a exclusão de rascunhos no painel limpa o registro de log de idempotência, permitindo o reenvio da notícia caso necessário.
+  - **Parser Semântico de Markdown e Blindagem XSS (`MarkdownParser.php`):**
+    - Conversão semântica de Markdown para HTML sem dependências externas, mapeando títulos `#` e `##` para `<h2>` (preservando a regra editorial do LightPress que reserva o H1 para o título da página), `###` para `<h3>`, `####` para `<h4>`, além de listas, citações, formatação inline e links.
+    - Submissão obrigatória do HTML resultante ao `BlockCompiler::sanitizeHtml()` e `BlockCompiler::htmlToBlocks()`, eliminando qualquer vetor malicioso (`<script>`, `<iframe>`, `javascript:`, manipuladores de eventos inline) e estruturando o conteúdo em blocos nativos para o editor visual.
+  - **Suporte Nativo aos Campos do Workflow n8n (`Reddit - IA.json`):**
+    - Aliases automáticos no controller REST para `title` (`titulo`), `summary` (`resumo`), `content` (`texto_completo`), `focus_keyword` (`primary_focus_keyword`) e `external_id` (`reddit_id`), com fallback padrão para `content_format = 'markdown'`, permitindo consumo imediato sem necessidade de reconfiguração de payloads no n8n.
+    - Devolução da URL canônica de edição (`edit_url`), permitindo aos nós de chat da redação (WhatsApp/Discord) receberem link direto para abrir a matéria em 1 clique.
+  - **Interface Administrativa no Painel (`/admin/plugin-settings.php?plugin=api-publisher`):**
+    - Gerador de Senhas de Aplicação com caixa de exibição única (One-Time Flash Secret) e botão para cópia imediata.
+    - Tabela de senhas emitidas com dados de último uso, último IP registrado, status ativo/revogado e revogação imediata via formulário POST protegido por token CSRF.
+    - Auditoria em tempo real dos últimos 15 rascunhos recebidos via API com link direto para o editor.
+- **Roteamento Dinâmico de Plugins e Servidor Web (`public/index.php`, `public/.htaccess`, `public/api/v1/posts.php`):**
+  - **Hook `register_routes` em `public/index.php`:** Adicionado antes da Rota 6 (`/{slug}/`) para assegurar que endpoints REST registrados por plugins ativos tenham precedência absoluta sobre a rota genérica de artigos.
+  - **Micro-Endpoint Físico de Fallback (`public/api/v1/posts.php`):** Ponto de acesso direto compatível com qualquer servidor web com guarda estrita de isolamento (`PluginManager::isActive('api-publisher')`), retornando HTTP 404 quando o plugin for desativado.
+  - **Repasse HTTP Basic Auth no Apache (`public/.htaccess`):** Diretivas `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]` garantindo trânsito intacto do cabeçalho de autorização.
+- **Bateria de Testes Automatizados (`plugins/api-publisher/tests/`):**
+  - Criação de `test-api-publisher.php` e `test-api-e2e.php` cobrindo 15 cenários de teste com 100% de aprovação (DDL, Argon2id, timing attack, allowlist, revogação, RBAC, Markdown, idempotência, aliases e guarda 404).
+
 ### Migração de Inscrição: Substituição da Newsletter pelo Canal Oficial do SpeedRacing no WhatsApp — 2026-11-14
 
 - **Substituição da Newsletter pelo Canal Oficial no WhatsApp (`templates/header.php`, `templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/post.php`, `templates/page.php`):**

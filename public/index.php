@@ -16,6 +16,7 @@ header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:
 $config = require dirname(__DIR__) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\Hook;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\ObjectCache;
 use LightPress\Core\PostService;
@@ -469,6 +470,9 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     $pageTitle = "Tópico: #{$tagName} - Página {$page} - " . $config['app']['name'];
     require $config['paths']['templates'] . '/tag.php';
 });
+
+// Registro de rotas adicionais disponibilizadas por plugins ativos
+Hook::doAction('register_routes', $router);
 
 // Rota 6: Artigo Individual na Raiz (/{slug}/)
 $router->get('/{slug}/', function (array $params) use ($config): void {

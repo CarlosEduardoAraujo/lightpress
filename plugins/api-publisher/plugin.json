@@ -1,0 +1,12 @@
+{
+  "id": "api-publisher",
+  "name": "API Publisher & Application Passwords",
+  "version": "1.0.0",
+  "description": "Permite a ingestão segura de matérias automatizadas via REST API como rascunhos para revisão editorial, com autenticação por Senhas de Aplicação revogáveis e idempotência.",
+  "author": "Carlos Eduardo de Araújo / LightPress",
+  "author_url": "https://lightpress.org",
+  "min_lp_version": "1.0.0",
+  "admin_settings": true,
+  "admin_title": "API Publisher",
+  "requires_db": true
+}
