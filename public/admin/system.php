@@ -26,9 +26,42 @@ $gdInfo = extension_loaded('gd') ? gd_info() : [];
 $hasWebp = !empty($gdInfo['WebP Support']);
 $hasAvif = !empty($gdInfo['AVIF Support']) || function_exists('imageavif');
 
-// 3. Status do OPcache
-$opcacheEnabled = function_exists('opcache_get_status') && @opcache_get_status() !== false;
-$opcacheData = $opcacheEnabled ? opcache_get_status(false) : null;
+// 3. Status do OPcache e Hardening do Runtime PHP
+$opcacheData = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+$opcacheEnabled = is_array($opcacheData) && !empty($opcacheData['opcache_enabled']);
+$opcacheHitRate = null;
+$opcacheUsedMb = null;
+$opcacheTotalMb = null;
+if ($opcacheEnabled) {
+    if (isset($opcacheData['opcache_statistics']['opcache_hit_rate'])) {
+        $opcacheHitRate = (float)$opcacheData['opcache_statistics']['opcache_hit_rate'];
+    }
+    if (isset($opcacheData['memory_usage']['used_memory'], $opcacheData['memory_usage']['free_memory'])) {
+        $usedBytes = (float)$opcacheData['memory_usage']['used_memory'];
+        $freeBytes = (float)$opcacheData['memory_usage']['free_memory'];
+        $wastedBytes = (float)($opcacheData['memory_usage']['wasted_memory'] ?? 0);
+        $opcacheUsedMb = round($usedBytes / 1048576, 1);
+        $opcacheTotalMb = round(($usedBytes + $freeBytes + $wastedBytes) / 1048576, 1);
+    }
+}
+
+$strictSessionMode = in_array(
+    strtolower(trim((string)ini_get('session.use_strict_mode'))),
+    ['1', 'on', 'true'],
+    true
+);
+$sessionGcMaxLifetime = (int)ini_get('session.gc_maxlifetime');
+$sessionIdleTimeout = (int)($config['security']['session_idle_timeout'] ?? 7200);
+$sessionGcAligned = $sessionGcMaxLifetime >= $sessionIdleTimeout;
+
+$shellFunctions = ['exec', 'passthru', 'shell_exec', 'system', 'proc_open', 'popen'];
+$disabledRaw = (string)ini_get('disable_functions');
+$disabledList = array_filter(array_map(
+    static fn(string $fn): string => strtolower(trim($fn)),
+    explode(',', $disabledRaw)
+));
+$blockedShellCount = count(array_intersect($shellFunctions, $disabledList));
+$allShellBlocked = ($blockedShellCount === count($shellFunctions));
 
 // 4. Armazenamento e Cache
 $cachePath = $config['cache']['cache_path'] ?? '';
@@ -138,7 +171,18 @@ require __DIR__ . '/header.php';
                 </div>
                 <div class="info-row">
                     <span>OPcache Ativo</span>
-                    <span><?= $opcacheEnabled ? '<span class="badge-ok">Sim</span>' : '<span class="badge-warn">Desativado</span>' ?></span>
+                    <span>
+                        <?php if ($opcacheEnabled): ?>
+                            <span class="badge-ok">Sim</span>
+                            <?php if ($opcacheUsedMb !== null && $opcacheTotalMb !== null): ?>
+                                <small style="color: var(--text-muted); margin-left: 0.35rem;">
+                                    <?= number_format($opcacheUsedMb, 1, ',', '.') ?>/<?= number_format($opcacheTotalMb, 0, ',', '.') ?> MB<?= $opcacheHitRate !== null ? ' · ' . number_format($opcacheHitRate, 1, ',', '.') . '% hit' : '' ?>
+                                </small>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span class="badge-warn">Desativado</span>
+                        <?php endif; ?>
+                    </span>
                 </div>
                 <div class="info-row">
                     <span>Driver de Banco</span>
@@ -239,6 +283,26 @@ require __DIR__ . '/header.php';
                 <div class="info-row">
                     <span>Nome da Sessão</span>
                     <span><code>LIGHTPRESSSESSID</code></span>
+                </div>
+                <div class="info-row">
+                    <span>Sessão Strict Mode (php.ini)</span>
+                    <span><?= $strictSessionMode ? '<span class="badge-ok">Ativo</span>' : '<span class="badge-warn">Inativo</span>' ?></span>
+                </div>
+                <div class="info-row">
+                    <span>GC de Sessão (gc_maxlifetime)</span>
+                    <span><?= $sessionGcAligned
+                        ? '<span class="badge-ok">' . $sessionGcMaxLifetime . 's</span>'
+                        : '<span class="badge-warn">' . $sessionGcMaxLifetime . 's (&lt; ' . $sessionIdleTimeout . 's)</span>'
+                    ?></span>
+                </div>
+                <div class="info-row">
+                    <span>Funções de Shell (disable_functions)</span>
+                    <span><?= $allShellBlocked
+                        ? '<span class="badge-ok">' . $blockedShellCount . '/' . count($shellFunctions) . ' Bloqueadas</span>'
+                        : ($blockedShellCount > 0
+                            ? '<span class="badge-warn">' . $blockedShellCount . '/' . count($shellFunctions) . ' Bloqueadas</span>'
+                            : '<span class="badge-warn">Não restritas</span>')
+                    ?></span>
                 </div>
             </div>
         </div>
