@@ -1,0 +1,643 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method LightPress\\Core\\AdminNav\:\:renderHeader\(\) has parameter \$currentUser with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/AdminNav.php
+
+		-
+			message: '#^Offset ''id'' on array\{id\: int\|string, role\: string, is_active\: int\<min, \-1\>\|int\<1, max\>\|non\-falsy\-string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/Authorization.php
+
+		-
+			message: '#^Offset ''role'' on array\{id\: int\|string, role\: string, is_active\: int\<min, \-1\>\|int\<1, max\>\|non\-falsy\-string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/Authorization.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compile\(\) has parameter \$input with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileHeading\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileImage\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileList\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileParagraph\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileQuote\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileTable\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Variable \$webpSrcset in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Method LightPress\\Core\\CacheManager\:\:__construct\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/CacheManager.php
+
+		-
+			message: '#^Property LightPress\\Core\\CacheManager\:\:\$config type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/CacheManager.php
+
+		-
+			message: '#^Method LightPress\\Core\\CloudflareCache\:\:getConfig\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/CloudflareCache.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:fetchAll\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:fetchAll\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:fetchOne\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:fetchOne\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:fetchValue\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:init\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\Database\:\:query\(\) has parameter \$params with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Property LightPress\\Core\\Database\:\:\$config type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Database.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:__construct\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:loadDescriptions\(\) has parameter \$requests with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:manifestMatches\(\) has parameter \$media with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:mediaDescription\(\) has parameter \$media with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:preloadDescriptions\(\) has parameter \$imageUrls with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:processUpload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:registerVariants\(\) has parameter \$variants with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Offset ''filename'' on array\{dirname\?\: string, basename\: string, extension\?\: string, filename\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and false will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:error\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:info\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:log\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:sanitize\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:sanitize\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:security\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Method LightPress\\Core\\Logger\:\:warning\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^Property LightPress\\Core\\Logger\:\:\$sensitiveKeys type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Logger.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Method LightPress\\Core\\PostService\:\:publishOrUpdate\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Method LightPress\\Core\\Router\:\:getLastRedirect\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Router.php
+
+		-
+			message: '#^Property LightPress\\Core\\Router\:\:\$lastRedirect type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Router.php
+
+		-
+			message: '#^Property LightPress\\Core\\Router\:\:\$routes type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Router.php
+
+		-
+			message: '#^Comparison operation "\>" between int\<1, 65535\> and 65535 is always false\.$#'
+			identifier: greater.alwaysFalse
+			count: 1
+			path: core/SafeHttpClient.php
+
+		-
+			message: '#^Cannot call method fetch\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 11
+			path: core/Schema.php
+
+		-
+			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: core/Schema.php
+
+		-
+			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: core/Schema.php
+
+		-
+			message: '#^Parameter \#2 \$string of function explode expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: core/Schema.php
+
+		-
+			message: '#^Method LightPress\\Core\\Security\:\:getCurrentUser\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Security.php
+
+		-
+			message: '#^Method LightPress\\Core\\Security\:\:requireAuth\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Security.php
+
+		-
+			message: '#^Method LightPress\\Core\\Security\:\:startSecureSession\(\) has parameter \$appConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Security.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: core/Security.php
+
+		-
+			message: '#^Method LightPress\\Core\\Seo\:\:renderJsonLd\(\) has parameter \$appConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Seo.php
+
+		-
+			message: '#^Method LightPress\\Core\\Seo\:\:renderJsonLd\(\) has parameter \$post with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Seo.php
+
+		-
+			message: '#^Method LightPress\\Core\\Seo\:\:renderMetaTags\(\) has parameter \$appConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Seo.php
+
+		-
+			message: '#^Method LightPress\\Core\\Settings\:\:applyToConfig\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Settings.php
+
+		-
+			message: '#^Property LightPress\\Core\\Settings\:\:\$cache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/Settings.php
+
+		-
+			message: '#^Property LightPress\\Core\\ThemeManager\:\:\$availableThemes type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ThemeManager.php
+
+		-
+			message: '#^Property LightPress\\Core\\ThemeManager\:\:\$cachedOptions type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ThemeManager.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\AiCopilot\\AiClient\:\:callGemini\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/ai-copilot/src/AiClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\AiCopilot\\AiClient\:\:callOpenAi\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/ai-copilot/src/AiClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\AiCopilot\\AiClient\:\:extractAndDecodeJson\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/ai-copilot/src/AiClient.php
+
+		-
+			message: '#^Parameter \#1 \$rows of static method LightPress\\Plugin\\AiCopilot\\InternalLinker\:\:normalizeCandidates\(\) expects list\<array\<string, mixed\>\>, array given\.$#'
+			identifier: argument.type
+			count: 2
+			path: plugins/ai-copilot/src/InternalLinker.php
+
+		-
+			message: '#^Parameter \#1 \$rows of static method LightPress\\Plugin\\AiCopilot\\InternalLinker\:\:normalizeCandidates\(\) expects list\<array\<string, mixed\>\>, non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: plugins/ai-copilot/src/InternalLinker.php
+
+		-
+			message: '#^Variable \$subConds in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: plugins/ai-copilot/src/InternalLinker.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\AiCopilot\\MediaVision\:\:resolveLocalFilePath\(\) has parameter \$variants with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/ai-copilot/src/MediaVision.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\ApiPublisher\\ApiPublisherService\:\:authenticate\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherService.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\ApiPublisher\\ApiPublisherService\:\:createIngestedPost\(\) has parameter \$postData with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherService.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\ApiPublisher\\ApiPublisherService\:\:getRecentLogs\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherService.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\ApiPublisher\\ApiPublisherService\:\:listPasswords\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherService.php
+
+		-
+			message: '#^Parameter \#1 \$data of method LightPress\\Core\\PostService\:\:createPost\(\) expects array\{title\: string, slug\?\: string, summary\?\: string, category\?\: string, tags\?\: string, featured_image\?\: string\|null, featured_media_id\?\: string\|null, content_html\?\: string\|null, \.\.\.\}, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherService.php
+
+		-
+			message: '#^Match arm comparison between 4 and 4 is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: plugins/api-publisher/src/MarkdownParser.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\AlertService\:\:dispatch\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/AlertService.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\AlertService\:\:notifyCircuitBreaker\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/AlertService.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\AlertService\:\:notifyMemorySpike\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/AlertService.php
+
+		-
+			message: '#^Call to an undefined method object\:\:del\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: plugins/redis-cache-pro/src/CacheMaintenance.php
+
+		-
+			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: plugins/redis-cache-pro/src/CacheMaintenance.php
+
+		-
+			message: '#^Cannot call method get\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: plugins/redis-cache-pro/src/CacheMaintenance.php
+
+		-
+			message: '#^Parameter \#1 \$object_or_class of function method_exists expects object\|string, object\|null given\.$#'
+			identifier: argument.type
+			count: 5
+			path: plugins/redis-cache-pro/src/CacheMaintenance.php
+
+		-
+			message: '#^Property LightPress\\Plugin\\RedisCachePro\\CacheMaintenance\:\:\$config type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/CacheMaintenance.php
+
+		-
+			message: '#^Call to an undefined method object\:\:lTrim\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: plugins/redis-cache-pro/src/QueryProfiler.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\QueryProfiler\:\:getLogs\(\) should return array\<int, array\{command\: string, key\: string, caller\: string, duration\: float, status\: string, time\: float\}\> but returns non\-empty\-list\<array\<mixed, mixed\>\>\.$#'
+			identifier: return.type
+			count: 1
+			path: plugins/redis-cache-pro/src/QueryProfiler.php
+
+		-
+			message: '#^Offset ''function'' on array\{function\: string, line\?\: int, file\?\: string, class\?\: class\-string, type\?\: ''\-\>''\|''\:\:'', args\?\: list\<mixed\>, object\?\: object\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: plugins/redis-cache-pro/src/QueryProfiler.php
+
+		-
+			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Call to an undefined method object\:\:ping\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Call to an undefined method object\:\:set\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method del\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method get\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method hGetAll\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method hIncrBy\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 9
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method ping\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method set\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method setex\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\RedisClient\:\:__construct\(\) has parameter \$customConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\RedisClient\:\:getConfig\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\RedisClient\:\:getInstance\(\) has parameter \$customConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\RedisClient\:\:initConfig\(\) has parameter \$customConfig with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Parameter \#1 \$object_or_class of function method_exists expects object\|string, object\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Method WebhookSenderService\:\:buildPayload\(\) has parameter \$config with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/webhook-sender/webhook-sender.php
+
+		-
+			message: '#^Method WebhookSenderService\:\:buildPayload\(\) has parameter \$post with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/webhook-sender/webhook-sender.php
+
+		-
+			message: '#^Method WebhookSenderService\:\:buildPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/webhook-sender/webhook-sender.php
+
+		-
+			message: '#^Method WebhookSenderService\:\:dispatch\(\) has parameter \$payload with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: plugins/webhook-sender/webhook-sender.php
+
+		-
+			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 47\: bool, 10015\: array\|string, 10023\: array\<int, string\>, 19913\: bool, 78\: int, 13\: int, 64\: bool, \.\.\.\}, array\{10002\: string, 47\: true, 10015\: non\-empty\-string, 10023\: array\{''Content\-Type\:…'', ''User\-Agent\:…'', ''Accept\: application…''\}, 19913\: true, 78\: 3, 13\: 4, 64\: true, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: plugins/webhook-sender/webhook-sender.php

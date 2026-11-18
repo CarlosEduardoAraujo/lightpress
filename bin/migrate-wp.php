@@ -242,9 +242,9 @@ $userMap = []; // [wp_user_id => lp_user_id]
 
 foreach ($wpUsers as $u) {
     $wpUid = (int)$u['ID'];
-    $login = trim($u['user_login']);
-    $email = trim($u['user_email']);
-    $name = !empty($u['display_name']) ? trim($u['display_name']) : $login;
+    $login = trim((string)($u['user_login'] ?? ''));
+    $email = trim((string)($u['user_email'] ?? ''));
+    $name = !empty($u['display_name']) ? trim((string)$u['display_name']) : $login;
     $registered = !empty($u['user_registered']) ? $u['user_registered'] : date('Y-m-d H:i:s');
     $passHash = (string)$u['user_pass'];
 
@@ -473,14 +473,14 @@ while ($processed < $totalTarget) {
             }
         }
 
-        $title = trim($p['post_title']);
+        $title = trim((string)($p['post_title'] ?? ''));
         if (empty($title)) {
             $title = "Publicação #{$wpPostId}";
         }
 
-        $slug = !empty($p['post_name']) ? Security::slugify($p['post_name']) : Security::slugify($title);
-        $rawContent = (string)$p['post_content'];
-        $summary = !empty($p['post_excerpt']) ? trim($p['post_excerpt']) : null;
+        $slug = !empty($p['post_name']) ? Security::slugify((string)$p['post_name']) : Security::slugify($title);
+        $rawContent = (string)($p['post_content'] ?? '');
+        $summary = !empty($p['post_excerpt']) ? trim((string)$p['post_excerpt']) : null;
         $wpAuthorId = (int)$p['post_author'];
         $targetUserId = $userMap[$wpAuthorId] ?? (reset($userMap) ?: 1);
 
@@ -525,11 +525,11 @@ while ($processed < $totalTarget) {
                 if (!empty($catSlug) && !in_array($catSlug, ['sem-categoria', 'uncategorized'], true)) {
                     $categoriesList[] = [
                         'slug' => $catSlug,
-                        'name' => trim($tRow['name']),
+                        'name' => trim((string)($tRow['name'] ?? '')),
                     ];
                 }
             } elseif ($tRow['taxonomy'] === 'post_tag') {
-                $tagName = trim($tRow['name']);
+                $tagName = trim((string)($tRow['name'] ?? ''));
                 if (!empty($tagName)) {
                     $tagsList[] = $tagName;
                 }

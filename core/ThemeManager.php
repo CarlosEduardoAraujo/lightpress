@@ -99,7 +99,7 @@ final class ThemeManager
 
         try {
             $slug = Settings::get('active_theme', 'portal-noticias');
-            $slug = trim($slug);
+            $slug = trim((string)$slug);
             if (empty($slug)) {
                 $slug = 'portal-noticias';
             }

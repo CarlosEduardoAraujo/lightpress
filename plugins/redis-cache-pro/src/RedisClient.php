@@ -77,7 +77,7 @@ class RedisClient
         $savedSettings = [];
         try {
             $raw = Settings::get('redis_cache_pro_settings', '[]');
-            $savedSettings = json_decode($raw, true) ?: [];
+            $savedSettings = json_decode((string)($raw ?? '[]'), true) ?: [];
         } catch (Throwable) {
             $savedSettings = [];
         }

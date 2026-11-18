@@ -68,11 +68,14 @@ class Database
                 $username = self::$config['username'] ?? 'root';
                 $password = self::$config['password'] ?? '';
 
+                $mysqlInitCommandAttr = defined('Pdo\\Mysql::ATTR_INIT_COMMAND')
+                    ? \Pdo\Mysql::ATTR_INIT_COMMAND
+                    : 1002;
                 $options = [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
-                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci, time_zone = '+00:00'",
+                    $mysqlInitCommandAttr => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci, time_zone = '+00:00'",
                 ];
 
                 if (!empty(self::$config['options']) && is_array(self::$config['options'])) {
@@ -195,6 +198,6 @@ class Database
      */
     public static function lastInsertId(): string
     {
-        return self::getConnection()->lastInsertId();
+        return (string)self::getConnection()->lastInsertId();
     }
 }

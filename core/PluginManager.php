@@ -235,7 +235,7 @@ final class PluginManager
 
         // Persistir novo estado
         $active[] = $slug;
-        Settings::set('active_plugins', json_encode(array_values(array_unique($active)), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        Settings::set('active_plugins', json_encode(array_values(array_unique($active)), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]');
     }
 
     /**
@@ -271,7 +271,7 @@ final class PluginManager
 
         // Atualizar lista de ativos
         $active = array_values(array_filter($active, fn($s) => $s !== $slug));
-        Settings::set('active_plugins', json_encode($active, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        Settings::set('active_plugins', json_encode($active, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]');
     }
 
     /**

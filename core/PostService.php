@@ -146,16 +146,19 @@ class PostService
      *   summary?: string,
      *   category?: string,
      *   tags?: string,
-     *   featured_image?: string,
-     *   content_json: string|array,
-     *   seo_title?: string,
-     *   seo_description?: string,
-     *   focus_keyword?: string
+     *   featured_image?: ?string,
+     *   featured_media_id?: ?string,
+     *   content_html?: ?string,
+     *   content_json?: string|array<mixed>,
+     *   seo_title?: ?string,
+     *   seo_description?: ?string,
+     *   focus_keyword?: ?string
      * } $data
      * @param int $userId ID do autor
+     * @param int|null $createdRevId ID da revisão inicial criada (retorno por referência)
      * @return int ID do artigo criado
      */
-    public function createPost(array $data, int $userId, &$createdRevId = null): int
+    public function createPost(array $data, int $userId, ?int &$createdRevId = null): int
     {
         $this->ensureScheduledEnumSupported();
         $title = trim($data['title']);
@@ -171,7 +174,8 @@ class PostService
         $featuredImage = $data['featured_image'] ?? null;
         $featuredMediaId = $data['featured_media_id'] ?? null;
         if (empty($featuredMediaId) && !empty($featuredImage)) {
-            $cleanImg = ltrim(parse_url((string)$featuredImage, PHP_URL_PATH) ?? (string)$featuredImage, '/');
+            $parsedImg = parse_url((string)$featuredImage, PHP_URL_PATH);
+            $cleanImg = ltrim(is_string($parsedImg) ? $parsedImg : (string)$featuredImage, '/');
             try {
                 $featuredMediaId = Database::fetchValue(
                     "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",
@@ -182,11 +186,15 @@ class PostService
 
         if (!empty($data['content_html'])) {
             $contentHtml = BlockCompiler::sanitizeHtml($data['content_html']);
-            $contentJson = !empty($data['content_json']) && $data['content_json'] !== '[]'
-                ? (is_array($data['content_json']) ? json_encode($data['content_json']) : $data['content_json'])
+            $rawContentJson = $data['content_json'] ?? null;
+            $contentJson = !empty($rawContentJson) && $rawContentJson !== '[]'
+                ? (is_array($rawContentJson) ? (json_encode($rawContentJson) ?: '[]') : (string)$rawContentJson)
                 : BlockCompiler::htmlToBlocks($contentHtml);
         } else {
-            $contentJson = is_array($data['content_json']) ? json_encode($data['content_json']) : ($data['content_json'] ?? '[]');
+            $rawContentJson = $data['content_json'] ?? '[]';
+            $contentJson = is_array($rawContentJson)
+                ? (json_encode($rawContentJson) ?: '[]')
+                : (string)$rawContentJson;
             $contentHtml = BlockCompiler::compile($contentJson);
         }
 
@@ -272,8 +280,9 @@ class PostService
         $affectedUrls = [];
         $isNowPublished = false;
         $isFirstPublish = false;
+        $current = null;
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
@@ -328,7 +337,8 @@ class PostService
             $featuredImage = $data['featured_image'] ?? null;
             $featuredMediaId = $data['featured_media_id'] ?? null;
             if (empty($featuredMediaId) && !empty($featuredImage)) {
-                $cleanImg = ltrim(parse_url((string)$featuredImage, PHP_URL_PATH) ?? (string)$featuredImage, '/');
+                $parsedImg = parse_url((string)$featuredImage, PHP_URL_PATH);
+                $cleanImg = ltrim(is_string($parsedImg) ? $parsedImg : (string)$featuredImage, '/');
                 try {
                     $featuredMediaId = Database::fetchValue(
                         "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",

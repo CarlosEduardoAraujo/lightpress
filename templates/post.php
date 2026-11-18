@@ -370,7 +370,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                              decoding="async">
                         <div class="absolute top-space-sm left-space-sm bg-carbon-black/85 backdrop-blur-md px-2.5 py-1 rounded text-label-category font-data-telemetry text-pure-white flex items-center gap-1.5 shadow-sm">
                             <span class="w-2 h-2 rounded-full bg-flag-green"></span>
-                            <span>SPEEDRACING • <?= Security::e(strtoupper($post['category'])) ?></span>
+                            <span>SPEEDRACING • <?= Security::e(strtoupper((string)($post['category'] ?? ''))) ?></span>
                         </div>
                     </div>
                 </figure>

@@ -57,7 +57,7 @@ PluginManager::registerActivationHook('redis-cache-pro', function (): void {
             'notify_circuit_breaker' => true,
             'notify_memory_spike'    => true,
         ];
-        Settings::set('redis_cache_pro_settings', json_encode($defaults, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        Settings::set('redis_cache_pro_settings', json_encode($defaults, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}');
     }
 });
 

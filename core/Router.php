@@ -13,6 +13,7 @@ class Router
 {
     private string $basePath = '';
     private array $routes = [];
+    /** @var callable|null */
     private $notFoundHandler = null;
     private bool $isTesting = false;
     private ?array $lastRedirect = null;
