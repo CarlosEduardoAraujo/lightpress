@@ -332,7 +332,7 @@ final class WebhookSenderService
             $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $primaryIp = (string)curl_getinfo($ch, CURLINFO_PRIMARY_IP);
             $curlError = curl_error($ch);
-            curl_close($ch);
+            unset($ch);
 
             // Validação em profundidade do IP de destino conectado
             if (!empty($primaryIp) && !self::isSafeIp($primaryIp, $allowPrivate)) {

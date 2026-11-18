@@ -80,7 +80,7 @@ final class CacheMaintenance
                 }
             }
 
-        } while ($cursor !== '0' && $cursor !== 0 && $cursor !== '');
+        } while ($cursor !== '0' && $cursor !== '');
 
         // Ordenar decrescente por tamanho em bytes
         usort($items, fn($a, $b) => $b['size_bytes'] <=> $a['size_bytes']);
@@ -206,7 +206,7 @@ final class CacheMaintenance
                 }
             }
 
-            if ($state['cursor'] === '0' || $state['cursor'] === 0 || $state['cursor'] === '') {
+            if ($state['cursor'] === '0' || $state['cursor'] === '') {
                 $state['complete'] = true;
                 break;
             }

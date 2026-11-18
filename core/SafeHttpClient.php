@@ -414,7 +414,7 @@ final class SafeHttpClient
         $curlError = curl_error($ch);
         $primaryIp = (string)curl_getinfo($ch, CURLINFO_PRIMARY_IP);
         $info = (array)curl_getinfo($ch);
-        curl_close($ch);
+        unset($ch);
 
         // Verificação defensiva em profundidade do IP efetivamente conectado
         if (!empty($primaryIp) && $profile !== self::PROFILE_LOCAL_ORIGIN_ONLY) {

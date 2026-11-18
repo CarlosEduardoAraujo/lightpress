@@ -1,6 +1,6 @@
 # Guia de Implantação em Produção (Deployment Guide) - LightPress
 
-Este guia descreve o passo a passo para colocar o **LightPress** em produção em um servidor Linux (Ubuntu 24.04 LTS ou Debian 12) com **Nginx**, **PHP 8.4-FPM**, **MariaDB 10.6+ / MySQL 8.0+** e **FastCGI Cache em SSD**.
+Este guia descreve o passo a passo para colocar o **LightPress** em produção em um servidor Linux (Ubuntu 24.04 LTS ou Debian 12) com **Nginx**, **PHP 8.4-FPM ou PHP 8.5-FPM**, **MariaDB 10.6+ / MySQL 8.0+** e **FastCGI Cache em SSD**.
 
 ---
 
@@ -8,27 +8,35 @@ Este guia descreve o passo a passo para colocar o **LightPress** em produção e
 
 * **SO:** Ubuntu 22.04 / 24.04 LTS ou Debian 12.
 * **Hardware Mínimo Recomendado:** 2 vCPU, 4 GiB RAM, SSD/NVMe.
-* **Serviços:** Nginx 1.2x+, PHP 8.4-FPM, MariaDB 10.6+ ou MySQL 8.0+.
+* **Serviços:** Nginx 1.2x+, PHP 8.4-FPM ou PHP 8.5-FPM, MariaDB 10.6+ ou MySQL 8.0+.
 
 ---
 
 ## 2. Instalação dos Pacotes Essenciais
 
-Atualize o sistema e adicione o repositório oficial do PHP 8.4 (Ondřej Surý):
+Atualize o sistema e adicione o repositório oficial do PHP (Ondřej Surý):
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y software-properties-common curl git unzip
 
-# Repositório PHP 8.4
+# Repositório PHP (8.4 / 8.5)
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt update
 
-# Instalar Nginx, MariaDB e PHP 8.4 com extensões obrigatórias
+# Opção A — PHP 8.4 com extensões obrigatórias
 sudo apt install -y nginx mariadb-server \
     php8.4-fpm php8.4-cli php8.4-mysql php8.4-gd \
-    php8.4-mbstring php8.4-common php8.4-opcache
+    php8.4-mbstring php8.4-curl php8.4-xml php8.4-common php8.4-opcache
+
+# Opção B — PHP 8.5 com extensões obrigatórias
+# (No PHP 8.5 o OPcache já é embutido no núcleo; não existe pacote php8.5-opcache nem zend_extension=opcache)
+sudo apt install -y nginx mariadb-server \
+    php8.5-fpm php8.5-cli php8.5-mysql php8.5-gd \
+    php8.5-mbstring php8.5-curl php8.5-xml php8.5-common
 ```
+
+*(Caso utilize o plugin `redis-cache-pro`, instale também `php8.4-redis` ou `php8.5-redis` conforme a versão ativa.)*
 
 ---
 

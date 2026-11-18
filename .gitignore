@@ -24,5 +24,6 @@ storage/*.sqlite*
 Thumbs.db
 Desktop.ini
 
-# Auditoria de segurança
+# Auditoria de segurança e análise estática local
 AUDITORIAS/*
+phpstan.phar

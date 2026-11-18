@@ -177,13 +177,13 @@ class Security
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
             setcookie(
-                session_name(),
+                session_name() ?: 'LIGHTPRESSSESSID',
                 '',
                 time() - 42000,
-                $params['path'] ?? '/',
-                $params['domain'] ?? '',
-                (bool)($params['secure'] ?? false),
-                (bool)($params['httponly'] ?? true)
+                $params['path'],
+                $params['domain'],
+                (bool)$params['secure'],
+                (bool)$params['httponly']
             );
         }
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -253,11 +253,8 @@ class Security
 
         // Normalização canônica via inet_pton
         $packed = @inet_pton($ip);
-        if ($packed !== false) {
-            $normalizedIp = inet_ntop($packed);
-        } else {
-            $normalizedIp = $ip;
-        }
+        $ntop = ($packed !== false) ? @inet_ntop($packed) : false;
+        $normalizedIp = is_string($ntop) ? $ntop : $ip;
 
         return hash_hmac('sha256', $normalizedIp, $secret);
     }
@@ -430,7 +427,7 @@ class Security
 
             ftruncate($fp, 0);
             rewind($fp);
-            fwrite($fp, json_encode($data, JSON_UNESCAPED_SLASHES));
+            fwrite($fp, json_encode($data, JSON_UNESCAPED_SLASHES) ?: '{}');
             fflush($fp);
             flock($fp, LOCK_UN);
         } finally {
@@ -523,7 +520,7 @@ class Security
             $_SESSION = [];
             if (ini_get("session.use_cookies")) {
                 $params = session_get_cookie_params();
-                setcookie(session_name(), '', time() - 42000,
+                setcookie(session_name() ?: 'LIGHTPRESSSESSID', '', time() - 42000,
                     $params["path"], $params["domain"],
                     $params["secure"], $params["httponly"]
                 );
@@ -550,7 +547,7 @@ class Security
             $_SESSION = [];
             if (ini_get("session.use_cookies")) {
                 $params = session_get_cookie_params();
-                setcookie(session_name(), '', time() - 42000,
+                setcookie(session_name() ?: 'LIGHTPRESSSESSID', '', time() - 42000,
                     $params["path"], $params["domain"],
                     $params["secure"], $params["httponly"]
                 );

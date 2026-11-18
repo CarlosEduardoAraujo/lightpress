@@ -63,7 +63,7 @@ class Seo
                 $webpFavicon = '/favicon.webp';
             }
             if (!str_ends_with(strtolower($webpFavicon), '.webp')) {
-                $webpFavicon = preg_replace('~\.[a-z0-9]+$~i', '.webp', $webpFavicon);
+                $webpFavicon = preg_replace('~\.[a-z0-9]+$~i', '.webp', $webpFavicon) ?? $webpFavicon;
             }
             $image = str_starts_with($webpFavicon, 'http') ? $webpFavicon : "{$canonicalOrigin}{$webpFavicon}";
             $type = 'website';
@@ -122,8 +122,14 @@ class Seo
 
         // Metadados específicos de Artigo
         if ($post !== null && !empty($post['published_at'])) {
-            $html[] = '<meta property="article:published_time" content="' . date('c', strtotime($post['published_at'])) . '">';
-            $html[] = '<meta property="article:modified_time" content="' . date('c', strtotime($post['updated_at'] ?? $post['published_at'])) . '">';
+            $pubTs = strtotime((string)$post['published_at']);
+            $modTs = strtotime((string)($post['updated_at'] ?? $post['published_at']));
+            if ($pubTs !== false) {
+                $html[] = '<meta property="article:published_time" content="' . date('c', $pubTs) . '">';
+            }
+            if ($modTs !== false) {
+                $html[] = '<meta property="article:modified_time" content="' . date('c', $modTs) . '">';
+            }
             if (!empty($post['author_name'])) {
                 $html[] = '<meta property="article:author" content="' . Security::e($post['author_name']) . '">';
             }

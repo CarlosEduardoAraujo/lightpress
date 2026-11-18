@@ -2,31 +2,45 @@ name: CI - Testes e Validação do LightPress
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feat/php-85-compatibility" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
   test:
-    name: PHP 8.4 Lint e Testes Unitários
+    name: PHP ${{ matrix.php-version }} — Lint, PHPStan e Suítes
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.4', '8.5']
+
+    env:
+      LP_LOG_DEPRECATIONS: '1'
 
     steps:
     - name: Checkout do Repositório
       uses: actions/checkout@v4
 
-    - name: Configurar PHP 8.4
+    - name: Configurar PHP ${{ matrix.php-version }}
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.4'
-        extensions: pdo, pdo_mysql, pdo_sqlite, gd, mbstring, fileinfo
-        ini-values: memory_limit=256M, date.timezone=UTC
+        php-version: ${{ matrix.php-version }}
+        extensions: pdo, pdo_mysql, pdo_sqlite, gd, mbstring, fileinfo, curl, dom, xml
+        ini-values: memory_limit=256M, date.timezone=UTC, error_reporting=E_ALL, display_errors=On
 
     - name: Configurar ambiente de testes (SQLite)
       run: |
         cat << 'EOF' > config.local.php
         <?php
+        declare(strict_types=1);
+
         return [
+          'app' => [
+            'env' => 'development',
+            'debug' => false,
+            'log_deprecations' => true,
+          ],
           'database' => [
             'driver' => 'sqlite',
             'sqlite_path' => __DIR__ . '/storage/test.sqlite',
@@ -34,21 +48,74 @@ jobs:
         ];
         EOF
 
+    - name: Verificar cabeçalho declare(strict_types=1) em 100% dos arquivos PHP
+      run: |
+        php -r '
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator("."));
+        $missing = [];
+        foreach ($it as $f) {
+            if (!$f->isFile() || $f->getExtension() !== "php") continue;
+            $p = str_replace("\\", "/", $f->getPathname());
+            if (preg_match("#/(node_modules|vendor|storage|\.git)/#", $p)) continue;
+            $head = implode("", array_slice(file($p) ?: [], 0, 10));
+            if (!preg_match("/declare\s*\(\s*strict_types\s*=\s*1\s*\)/", $head)) {
+                $missing[] = $p;
+            }
+        }
+        if ($missing) {
+            fwrite(STDERR, "Arquivos sem declare(strict_types=1):\n - " . implode("\n - ", $missing) . "\n");
+            exit(1);
+        }
+        echo "OK: 100% dos arquivos PHP declaram strict_types=1.\n";
+        '
+
     - name: Verificação de Sintaxe (PHP Lint)
       run: |
-        find . -name "*.php" ! -path "./storage/*" -exec php -l {} +
+        find . -name "*.php" ! -path "./storage/*" ! -path "./node_modules/*" ! -path "./vendor/*" -print0 | xargs -0 -n1 php -l
 
-    - name: Executar Diagnóstico de Ambiente
-      run: php bin/diagnose.php
+    - name: Análise Estática (PHPStan Nível 8 — PHAR isolado sem Composer)
+      run: |
+        curl -fSL -o /tmp/phpstan.phar https://github.com/phpstan/phpstan/releases/latest/download/phpstan.phar
+        php /tmp/phpstan.phar analyse -c phpstan.neon --no-progress --memory-limit=512M
 
-    - name: Executar Suíte de Testes Automatizados
-      run: php bin/test.php
+    - name: Executar Diagnóstico e Todas as Suítes PHP (Zero E_DEPRECATED)
+      run: |
+        set -o pipefail
+        run_strict() {
+          local script="$1"
+          shift || true
+          echo "=== Executando: php $script $* ==="
+          local out
+          out=$(php -d error_reporting=E_ALL -d display_errors=On "$script" "$@" 2>&1)
+          local status=$?
+          echo "$out"
+          if [ $status -ne 0 ]; then
+            echo "::error::Falha em $script (exit $status)"
+            exit $status
+          fi
+          if echo "$out" | grep -qE "(PHP )?Deprecated:"; then
+            echo "::error::E_DEPRECATED detectado em $script no PHP ${{ matrix.php-version }}"
+            exit 1
+          fi
+        }
 
-    - name: Testar migrações e restauração de revisões em bancos isolados
-      run: php bin/test-revision-safety.php
+        run_strict bin/diagnose.php
+        run_strict bin/setup.php
+        run_strict bin/test.php
+        run_strict bin/test-revision-safety.php
+        run_strict bin/test-ai-copilot.php
+        run_strict bin/test-cache-purge-results.php
+        run_strict bin/test-feeds-news.php
+        run_strict bin/test-image-descriptions.php
+        run_strict bin/test-plugins.php
+        run_strict bin/test-ssrf.php
+        run_strict plugins/api-publisher/tests/test-api-publisher.php
+        run_strict plugins/api-publisher/tests/test-api-e2e.php
+        run_strict plugins/redis-cache-pro/tests/test-redis-cache-pro.php
+        run_strict bin/seed.php --count=25
 
-    - name: Testar Setup de Banco de Dados (SQLite)
-      run: php bin/setup.php
-
-    - name: Testar Seeder de Demonstração
-      run: php bin/seed.php --count=25
+        if [ -s storage/logs/error.log ] && grep -qE "(PHP )?Deprecated:" storage/logs/error.log; then
+          echo "::error::E_DEPRECATED registrado em storage/logs/error.log:"
+          cat storage/logs/error.log
+          exit 1
+        fi

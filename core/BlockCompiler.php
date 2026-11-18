@@ -350,7 +350,7 @@ class BlockCompiler
             }
             $allCellsEmpty = true;
             foreach ($cells as $cell) {
-                if (!self::isElementEmptyOfContentAndMedia($cell)) {
+                if ($cell instanceof \DOMElement && !self::isElementEmptyOfContentAndMedia($cell)) {
                     $allCellsEmpty = false;
                     break;
                 }
@@ -434,56 +434,57 @@ class BlockCompiler
         }
 
         $blocks = [];
-        if ($root->childNodes) {
-            foreach ($root->childNodes as $node) {
-                if ($node->nodeType !== XML_ELEMENT_NODE) {
-                    continue;
-                }
+        foreach ($root->childNodes as $node) {
+            if (!$node instanceof \DOMElement) {
+                continue;
+            }
 
-                $tag = strtolower($node->nodeName);
-                if ($tag === 'h2') {
-                    $blocks[] = ['type' => 'heading', 'level' => 2, 'content' => trim($node->textContent)];
-                } elseif ($tag === 'h3') {
-                    $blocks[] = ['type' => 'heading', 'level' => 3, 'content' => trim($node->textContent)];
-                } elseif ($tag === 'p') {
-                    $innerHtml = '';
-                    foreach ($node->childNodes as $child) {
-                        $innerHtml .= $node->ownerDocument->saveHTML($child);
+            $tag = strtolower($node->nodeName);
+            if ($tag === 'h2') {
+                $blocks[] = ['type' => 'heading', 'level' => 2, 'content' => trim($node->textContent)];
+            } elseif ($tag === 'h3') {
+                $blocks[] = ['type' => 'heading', 'level' => 3, 'content' => trim($node->textContent)];
+            } elseif ($tag === 'p') {
+                $innerHtml = '';
+                foreach ($node->childNodes as $child) {
+                    $innerHtml .= (string)$dom->saveHTML($child);
+                }
+                $trimmed = trim($innerHtml);
+                if ($trimmed !== '') {
+                    $blocks[] = ['type' => 'paragraph', 'content' => $trimmed];
+                }
+            } elseif ($tag === 'blockquote') {
+                $blocks[] = ['type' => 'quote', 'content' => trim($node->textContent)];
+            } elseif ($tag === 'ul' || $tag === 'ol') {
+                $items = [];
+                foreach ($node->childNodes as $li) {
+                    if ($li->nodeName === 'li') {
+                        $items[] = trim($li->textContent);
                     }
-                    $trimmed = trim($innerHtml);
-                    if ($trimmed !== '') {
-                        $blocks[] = ['type' => 'paragraph', 'content' => $trimmed];
-                    }
-                } elseif ($tag === 'blockquote') {
-                    $blocks[] = ['type' => 'quote', 'content' => trim($node->textContent)];
-                } elseif ($tag === 'ul' || $tag === 'ol') {
-                    $items = [];
-                    foreach ($node->childNodes as $li) {
-                        if ($li->nodeName === 'li') {
-                            $items[] = trim($li->textContent);
-                        }
-                    }
-                    if (!empty($items)) {
-                        $blocks[] = ['type' => 'list', 'style' => $tag === 'ol' ? 'ordered' : 'bullet', 'items' => $items];
-                    }
-                } elseif ($tag === 'table') {
-                    $tableHtml = $node->ownerDocument->saveHTML($node);
-                    $blocks[] = ['type' => 'table', 'content' => trim($tableHtml)];
-                } elseif ($tag === 'figure') {
-                    $imgs = $node->getElementsByTagName('img');
-                    if ($imgs->length > 0) {
-                        $img = $imgs->item(0);
+                }
+                if (!empty($items)) {
+                    $blocks[] = ['type' => 'list', 'style' => $tag === 'ol' ? 'ordered' : 'bullet', 'items' => $items];
+                }
+            } elseif ($tag === 'table') {
+                $tableHtml = (string)$dom->saveHTML($node);
+                $blocks[] = ['type' => 'table', 'content' => trim($tableHtml)];
+            } elseif ($tag === 'figure') {
+                $imgs = $node->getElementsByTagName('img');
+                if ($imgs->length > 0) {
+                    $img = $imgs->item(0);
+                    if ($img instanceof \DOMElement) {
                         $url = $img->getAttribute('src');
                         $alt = $img->getAttribute('alt');
                         $captionNode = $node->getElementsByTagName('figcaption');
-                        $caption = $captionNode->length > 0 ? trim($captionNode->item(0)->textContent) : '';
+                        $captionEl = $captionNode->length > 0 ? $captionNode->item(0) : null;
+                        $caption = $captionEl !== null ? trim($captionEl->textContent) : '';
                         $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $caption, 'alt' => $alt];
                     }
-                } elseif ($tag === 'img') {
-                    $url = $node->getAttribute('src');
-                    $alt = $node->getAttribute('alt');
-                    $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $alt];
                 }
+            } elseif ($tag === 'img') {
+                $url = $node->getAttribute('src');
+                $alt = $node->getAttribute('alt');
+                $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $alt];
             }
         }
 
@@ -491,7 +492,7 @@ class BlockCompiler
             $blocks[] = ['type' => 'paragraph', 'content' => $sanitized];
         }
 
-        return json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
     }
 
     /**

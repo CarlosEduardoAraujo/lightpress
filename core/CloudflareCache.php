@@ -89,7 +89,7 @@ class CloudflareCache
         $allSuccess = true;
 
         foreach ($chunks as $chunk) {
-            $payload = json_encode(['files' => $chunk], JSON_UNESCAPED_SLASHES);
+            $payload = json_encode(['files' => $chunk], JSON_UNESCAPED_SLASHES) ?: '{"files":[]}';
 
             $ch = curl_init($endpoint);
             if ($ch === false) {
@@ -114,7 +114,7 @@ class CloudflareCache
             $response = curl_exec($ch);
             $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlError = curl_error($ch);
-            curl_close($ch);
+            unset($ch);
 
             if ($response === false || !empty($curlError)) {
                 error_log("[CloudflareCache] Erro de rede cURL ({$httpCode}): {$curlError}");
@@ -122,7 +122,7 @@ class CloudflareCache
                 continue;
             }
 
-            $data = json_decode($response, true);
+            $data = json_decode((string)$response, true);
             $isSuccess = ($httpCode === 200 && !empty($data['success']));
 
             if (!$isSuccess) {
@@ -206,7 +206,7 @@ class CloudflareCache
         $timeout = (int)($config['cloudflare']['timeout'] ?? 10);
 
         $endpoint = "https://api.cloudflare.com/client/v4/zones/{$zoneId}/purge_cache";
-        $payload = json_encode(['purge_everything' => true]);
+        $payload = json_encode(['purge_everything' => true]) ?: '{"purge_everything":true}';
 
         $ch = curl_init($endpoint);
         if ($ch === false) {
@@ -229,7 +229,7 @@ class CloudflareCache
 
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        unset($ch);
 
         if ($httpCode === 200) {
             $data = json_decode((string)$response, true);
@@ -275,7 +275,7 @@ class CloudflareCache
         // O teste direto no endpoint de purga com URL fictícia valida a permissão real de execução sem afetar o cache do site.
         $probeUrl = "{$canonicalOrigin}/cf-probe-check-" . time();
         $endpoint = "https://api.cloudflare.com/client/v4/zones/{$zoneId}/purge_cache";
-        $payload = json_encode(['files' => [$probeUrl]], JSON_UNESCAPED_SLASHES);
+        $payload = json_encode(['files' => [$probeUrl]], JSON_UNESCAPED_SLASHES) ?: '{"files":[]}';
 
         $ch = curl_init($endpoint);
         curl_setopt_array($ch, [
@@ -295,7 +295,7 @@ class CloudflareCache
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
-        curl_close($ch);
+        unset($ch);
 
         if ($response === false || !empty($curlError)) {
             return [

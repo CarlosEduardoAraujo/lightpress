@@ -40,6 +40,8 @@ $requiredExtensions = [
     'gd' => 'Processamento de imagens',
     'fileinfo' => 'Validação segura de MIME types reais',
     'mbstring' => 'Manipulação de strings UTF-8 / multi-byte',
+    'dom' => 'Sanitização HTML e compilação de blocos (DOMDocument)',
+    'curl' => 'Integrações HTTP seguras (Cloudflare, Webhooks, IA)',
     'session' => 'Gestão de sessões administrativas',
     'json' => 'Manipulação e validação do esquema de blocos',
 ];

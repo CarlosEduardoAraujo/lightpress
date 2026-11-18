@@ -60,7 +60,7 @@ class ImageProcessor
             return substr($url, 0, -5) . '.avif';
         }
         if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg')) {
-            return preg_replace('~\.(jpe?g|png)$~i', '.avif', $url);
+            return preg_replace('~\.(jpe?g|png)$~i', '.avif', $url) ?? $url;
         }
         return $url;
     }
@@ -77,7 +77,7 @@ class ImageProcessor
             return substr($url, 0, -5) . '.webp';
         }
         if (str_ends_with($url, '.jpg') || str_ends_with($url, '.png') || str_ends_with($url, '.jpeg') || str_ends_with($url, '.ico')) {
-            return preg_replace('~\.(jpe?g|png|ico)$~i', '.webp', $url);
+            return preg_replace('~\.(jpe?g|png|ico)$~i', '.webp', $url) ?? $url;
         }
         return $url;
     }
@@ -193,8 +193,9 @@ class ImageProcessor
     /** Resolve os metadados atuais; o segundo argumento preserva a API existente. */
     public static function getImageDescription(string $imageUrl, ?string $fallbackAlt = null, ?string $mediaId = null): string
     {
-        if (trim((string)$fallbackAlt) !== '') {
-            return trim($fallbackAlt);
+        $trimmedFallback = trim((string)$fallbackAlt);
+        if ($trimmedFallback !== '') {
+            return $trimmedFallback;
         }
         $path = self::descriptionPath($imageUrl);
         if ($path === '') {
@@ -469,8 +470,11 @@ class ImageProcessor
 
         // 2. Validação Real do MIME Type via finfo
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            throw new RuntimeException("Falha ao inicializar extensão fileinfo para validação de MIME.", 500);
+        }
         $mime = finfo_file($finfo, $tmpFilePath);
-        finfo_close($finfo);
+        unset($finfo);
 
         $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
         if (!in_array($mime, $allowedMimes, true)) {
@@ -599,6 +603,12 @@ class ImageProcessor
                         throw new RuntimeException("Conflito de destino detectado ao salvar variante WebP ({$webpFilename}).", 409);
                     }
                     $stagingFh = fopen($webpStaging, 'rb');
+                    if ($stagingFh === false) {
+                        fclose($targetFh);
+                        @unlink($webpTarget);
+                        @unlink($webpStaging);
+                        throw new RuntimeException("Falha ao abrir arquivo temporário WebP ({$webpFilename}).", 500);
+                    }
                     stream_copy_to_stream($stagingFh, $targetFh);
                     fclose($stagingFh);
                     fclose($targetFh);
@@ -634,6 +644,12 @@ class ImageProcessor
                                 throw new RuntimeException("Conflito de destino detectado ao salvar variante AVIF ({$avifFilename}).", 409);
                             }
                             $stagingFh = fopen($avifStaging, 'rb');
+                            if ($stagingFh === false) {
+                                fclose($targetFh);
+                                @unlink($avifTarget);
+                                @unlink($avifStaging);
+                                throw new RuntimeException("Falha ao abrir arquivo temporário AVIF ({$avifFilename}).", 500);
+                            }
                             stream_copy_to_stream($stagingFh, $targetFh);
                             fclose($stagingFh);
                             fclose($targetFh);
@@ -655,10 +671,10 @@ class ImageProcessor
                     }
                 }
 
-                imagedestroy($resized);
+                unset($resized);
             }
 
-            imagedestroy($source);
+            unset($source);
 
             // Remover arquivo temporário de origem
             @unlink($tmpFilePath);
@@ -666,9 +682,7 @@ class ImageProcessor
             return $manifest;
 
         } catch (Throwable $e) {
-            if (isset($source) && ($source instanceof \GdImage || is_resource($source))) {
-                imagedestroy($source);
-            }
+            unset($resized, $source);
             throw new RuntimeException("Erro durante a conversão das imagens: " . $e->getMessage(), 500, $e);
         }
     }
@@ -695,7 +709,7 @@ class ImageProcessor
     /**
      * Carrega a imagem original com base no MIME type real.
      */
-    private function loadSourceImage(string $path, string $mime)
+    private function loadSourceImage(string $path, string $mime): \GdImage|false|null
     {
         return match ($mime) {
             'image/jpeg' => @imagecreatefromjpeg($path),
@@ -709,7 +723,7 @@ class ImageProcessor
     /**
      * Redimensiona proporcionalmente sem ampliação.
      */
-    private function scaleProportional($source, int $origW, int $origH, int $maxW)
+    private function scaleProportional(\GdImage $source, int $origW, int $origH, int $maxW): \GdImage
     {
         if ($origW <= $maxW) {
             $newW = $origW;
@@ -719,7 +733,7 @@ class ImageProcessor
             $newH = (int)round(($origH * $maxW) / $origW);
         }
 
-        $dest = imagecreatetruecolor($newW, $newH);
+        $dest = imagecreatetruecolor(max(1, $newW), max(1, $newH));
         imagealphablending($dest, false);
         imagesavealpha($dest, true);
 
@@ -730,9 +744,9 @@ class ImageProcessor
     /**
      * Realiza corte centralizado fixo 16:9 sem distorção.
      */
-    private function cropThumbnail($source, int $origW, int $origH, int $targetW, int $targetH)
+    private function cropThumbnail(\GdImage $source, int $origW, int $origH, int $targetW, int $targetH): \GdImage
     {
-        $dest = imagecreatetruecolor($targetW, $targetH);
+        $dest = imagecreatetruecolor(max(1, $targetW), max(1, $targetH));
         imagealphablending($dest, false);
         imagesavealpha($dest, true);
 
@@ -775,7 +789,8 @@ class ImageProcessor
         $urls = [];
         array_walk_recursive($variants, function ($val) use (&$urls) {
             if (is_string($val) && str_contains($val, 'uploads/')) {
-                $clean = ltrim(parse_url($val, PHP_URL_PATH) ?? $val, '/');
+                $parsed = parse_url($val, PHP_URL_PATH);
+                $clean = ltrim(is_string($parsed) ? $parsed : $val, '/');
                 if (!empty($clean)) {
                     $urls[$clean] = true;
                 }
@@ -806,7 +821,8 @@ class ImageProcessor
             $urls = array_unique($matches[0]);
             foreach ($urls as $url) {
                 try {
-                    $clean = ltrim(parse_url($url, PHP_URL_PATH) ?? $url, '/');
+                    $parsed = parse_url($url, PHP_URL_PATH);
+                    $clean = ltrim(is_string($parsed) ? $parsed : $url, '/');
                     $mediaId = Database::fetchValue(
                         "SELECT media_id FROM media_variants WHERE url_path = ? LIMIT 1",
                         [$clean]

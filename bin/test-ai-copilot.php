@@ -95,7 +95,6 @@ assertTest("Timeout padrão respeita limites (>=3s e <=30s)", AiClient::getTimeo
 // Validação de SSRF em endpoints customizados
 $reflection = new ReflectionClass(AiClient::class);
 $methodValidate = $reflection->getMethod('validateEndpointUrl');
-$methodValidate->setAccessible(true);
 
 $blockedMeta = false;
 try {
@@ -115,7 +114,6 @@ assertTest("AiClient bloqueia protocolos não-HTTP(S)", $blockedFtp);
 
 // Teste de decodificação JSON com markdown
 $methodDecode = $reflection->getMethod('extractAndDecodeJson');
-$methodDecode->setAccessible(true);
 
 $rawAiOutput = "```json\n{\"alt_text\": \"Carro de corrida\", \"caption\": \"GP do Brasil\"}\n```";
 $decoded = $methodDecode->invoke(null, $rawAiOutput);

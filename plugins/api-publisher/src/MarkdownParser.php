@@ -64,7 +64,7 @@ final class MarkdownParser
                 $quoteLines = [];
                 $lines = explode("\n", $block);
                 foreach ($lines as $line) {
-                    $quoteLines[] = trim(preg_replace('/^>\s?/', '', $line));
+                    $quoteLines[] = trim(preg_replace('/^>\s?/', '', $line) ?? $line);
                 }
                 $quoteContent = self::parseInline(implode(' ', $quoteLines));
                 $htmlBlocks[] = "<blockquote><p>{$quoteContent}</p></blockquote>";

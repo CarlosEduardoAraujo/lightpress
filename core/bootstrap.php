@@ -96,13 +96,17 @@ $GLOBALS['config'] = $config;
 \LightPress\Core\PluginManager::loadActivePlugins();
 
 // Configuração de Erros
+// Em homologação/CI, defina app.log_deprecations = true (ou LP_LOG_DEPRECATIONS=1) para registrar E_DEPRECATED sem exibir erros na tela.
+$logDeprecations = !empty($config['app']['log_deprecations'])
+    || in_array(strtolower((string)(getenv('LP_LOG_DEPRECATIONS') ?: '')), ['1', 'true', 'yes', 'on'], true);
+
 if (!empty($config['app']['debug'])) {
     ini_set('display_errors', '1');
     ini_set('display_startup_errors', '1');
     error_reporting(E_ALL);
 } else {
     ini_set('display_errors', '0');
-    error_reporting(E_ALL & ~E_DEPRECATED);
+    error_reporting($logDeprecations ? E_ALL : (E_ALL & ~E_DEPRECATED));
 }
 
 ini_set('log_errors', '1');
@@ -110,6 +114,10 @@ $logDir = $config['paths']['storage'] . '/logs';
 if (!is_dir($logDir)) {
     @mkdir($logDir, 0775, true);
 }
-ini_set('error_log', $logDir . '/error.log');
+if (!empty($config['app']['error_log']) && is_string($config['app']['error_log'])) {
+    ini_set('error_log', $config['app']['error_log']);
+} else {
+    ini_set('error_log', $logDir . '/error.log');
+}
 
 return $config;

@@ -1,0 +1,19 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 8
+    parallel:
+        maximumNumberOfProcesses: 1
+    paths:
+        - core
+        - plugins/ai-copilot/src
+        - plugins/api-publisher/src
+        - plugins/redis-cache-pro/src
+        - plugins/redis-cache-pro/redis-cache-pro.php
+        - plugins/webhook-sender/webhook-sender.php
+    scanDirectories:
+        - core
+        - plugins
+    excludePaths:
+        - plugins/*/tests/*

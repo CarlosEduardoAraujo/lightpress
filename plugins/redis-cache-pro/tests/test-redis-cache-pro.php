@@ -164,6 +164,7 @@ it('Circuit Breaker desarma para estado OPEN em 3 falhas consecutivas', function
     expectEqual('salva_em_memoria', $val, 'deve operar com transparência via fallback');
 
     $fake->shouldFailPing = false;
+    $client->setClient($fake);
 });
 
 echo "\n4. Scanner de Big Keys e Coletor de Gerações Obsoletas (CacheMaintenance)\n";
