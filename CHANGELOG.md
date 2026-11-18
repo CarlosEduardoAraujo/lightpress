@@ -7,6 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Hardening de Sessão, Diagnóstico de Runtime PHP-FPM e Guia de Tuning PHP 8.5 — 2026-11-18
+
+- **Hardening de Expiração de Cookie de Sessão (`core/Security.php`):**
+  - Extração do helper privado `Security::clearSessionCookie()` utilizando a assinatura de opções por array do `setcookie()` com preservação explícita de `path`, `domain`, `secure`, `httponly` e `samesite` (normalizado para `Strict`, `Lax` ou `None`, com fallback `Strict`).
+  - Substituição das 3 chamadas legadas posicionais de remoção de cookie em `destroySession()` e nos fluxos de expiração de timeout e revogação de conta/versão em `requireAuth()`.
+- **Diagnóstico de Hardening e OPcache no Painel Administrativo (`public/admin/system.php`):**
+  - Otimização da consulta do OPcache para chamada única a `opcache_get_status(false)`, exibindo uso de memória (`MB`) e taxa de acerto (*hit rate*) ao lado do indicador ativo.
+  - Adição de 3 novos indicadores de runtime no card **Segurança Ativa** (sem expor caminhos do servidor nem listas cruas de diretivas): status de `session.use_strict_mode`, alinhamento entre `session.gc_maxlifetime` e `session_idle_timeout` (`7200s`), e contagem de bloqueio das 6 funções de shell (`exec`, `passthru`, `shell_exec`, `system`, `proc_open`, `popen`) em `disable_functions`.
+- **Guia de Hardening e Tuning PHP 8.5 / 8.4-FPM (`docs/DEPLOYMENT.md`):**
+  - Nova **Seção 10** documentando o perfil validado para `/etc/php/8.5/fpm/php.ini` (`session.use_strict_mode`, `session.cookie_httponly`, `session.cookie_samesite`, `session.gc_maxlifetime = 7200`, `session.cookie_secure`, `disable_functions`, `max_memory_limit = 512M`, `[opcache]`, `realpath_cache_ttl = 600` e justificativa técnica para manter `open_basedir` desativado por conta do `CacheManager` e `realpath_cache`) e para `/etc/php/8.5/fpm/pool.d/www.conf` (`security.limit_extensions = .php`, `request_terminate_timeout = 305s`, `slowlog`, `request_slowlog_timeout = 5s`, `pm.max_children` e `pm.max_requests`).
+- **Validação sob Flags Endurecidas:**
+  - Suíte `bin/test.php` aprovada com **82/82 PASS** sob `session.use_strict_mode=1`, `session.cookie_httponly=1`, `session.cookie_samesite=Lax`, `session.gc_maxlifetime=7200`, `disable_functions=exec,passthru,shell_exec,system,proc_open,popen` e `realpath_cache_ttl=600`, além de verificação direta do ciclo `startSecureSession()` + `destroySession()`.
+
 ### Compatibilidade Integral com PHP 8.5 (Paridade PHP 8.4), PHPStan Nível 8, Nginx Upstream e CI em Matriz Dual — 2026-11-18
 
 - **Eliminação de 13 Depreciações Reais do PHP 8.5 (100% Retrocompatível com PHP 8.4):**

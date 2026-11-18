@@ -1546,6 +1546,12 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Nginx Upstream com Rollback Instantâneo (`nginx/lightpress.conf`, `nginx/speedracing-tunnel.conf`):** Centralização em `upstream lightpress_php` e `upstream speedracing_php` com alternância em 1 linha entre `php8.4-fpm.sock` e `php8.5-fpm.sock`, e `docs/DEPLOYMENT.md` atualizado (OPcache embutido no PHP 8.5).
   - [x] **CI em Matriz Dual (`8.4` + `8.5`) e Validação em Produção:** GitHub Actions rodando todas as 11 suítes PHP + PHPStan Nível 8 + trava de zero `E_DEPRECATED` (100% verde), e produção validada em **PHP 8.5.12 FPM** (`X-FastCGI-Cache: HIT` em `0.74 ms` TTFB, Redis `0.57 ms` RTT e zero avisos nos logs).
 
+* **FASE CONCLUÍDA — Hardening PHP 8.5-FPM, Remoção de Cookie com `SameSite` e Diagnóstico de Runtime:**
+  - [x] **Auditoria de Compatibilidade PHP 8.5-FPM:** Validação de toda a base (131 arquivos PHP, `public/`, plugins e Nginx) confirmando 100% de compatibilidade com `disable_functions` (`exec,passthru,shell_exec,system,proc_open,popen`), `security.limit_extensions = .php`, `max_memory_limit = 512M`, OPcache (`memory_consumption`, `interned_strings_buffer`, `max_accelerated_files`), `realpath_cache_ttl = 600`, `request_terminate_timeout = 305s` e `slowlog` (`5s`), mantendo `open_basedir` desativado para preservar o `CacheManager` e o `realpath_cache`.
+  - [x] **Paridade de Cookie na Expiração de Sessão (`core/Security.php`):** Criação de `Security::clearSessionCookie()` com assinatura de array no `setcookie()` preservando `Secure`, `HttpOnly` e `SameSite` em logout, expiração e revogação de sessão.
+  - [x] **Observabilidade de Runtime no Admin (`/admin/system.php`):** Exibição de memória/hit-rate do OPcache, status de `session.use_strict_mode`, alinhamento `session.gc_maxlifetime` vs `session_idle_timeout` (`7200s`) e contagem de funções de shell bloqueadas em `disable_functions`.
+  - [x] **Documentação de Produção (`docs/DEPLOYMENT.md` — Seção 10):** Guia completo de hardening e tuning para `/etc/php/8.5/fpm/php.ini` e `/etc/php/8.5/fpm/pool.d/www.conf` validado com **82/82 PASS** em `bin/test.php` sob as flags endurecidas.
+
 ---
 
 ## 11. Metas Mensuráveis e Critérios de Aceitação

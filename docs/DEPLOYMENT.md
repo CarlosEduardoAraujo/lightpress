@@ -189,4 +189,96 @@ Adicione as linhas:
 0 3 * * * php /var/www/lightpress/bin/cleanup.php >> /dev/null 2>&1
 ```
 
+---
+
+## 10. Hardening e Tuning do PHP-FPM (PHP 8.5 / 8.4)
+
+O LightPress não executa binários externos do sistema operacional via web (imagens usam PHP GD nativo e requisições externas usam cURL) e não grava arquivos `.php` em tempo de execução. Por isso, é totalmente compatível com configurações restritivas no pool FPM.
+
+Antes de editar `php.ini`, verifique se não há diretivas duplicadas em `conf.d`:
+
+```bash
+grep -rn "opcache\." /etc/php/8.5/fpm/conf.d/ 2>/dev/null
+# (No PHP 8.4, cheque também /etc/php/8.4/fpm/conf.d/)
+```
+
+### 10.1. Ajustes em `/etc/php/8.5/fpm/php.ini` (ou `8.4/fpm/php.ini`)
+
+```ini
+; --- Sessões e Cookies ---
+; O LightPress já impõe HttpOnly, Strict Mode e SameSite=Strict em core/Security.php.
+; Manter esses padrões no php.ini protege também o runtime global do pool.
+session.use_strict_mode = 1
+session.cookie_httponly = 1
+session.cookie_samesite = "Lax"
+; Alinha o garbage collector do PHP ao session_idle_timeout (7200s = 2h) do LightPress:
+session.gc_maxlifetime = 7200
+; Ative a linha abaixo APENAS se TODOS os sites desse pool FPM operarem exclusivamente em HTTPS:
+; session.cookie_secure = 1
+
+; --- Hardening de Execução ---
+; O CLI usa /etc/php/8.x/cli/php.ini separado, então scripts bin/*.php não são afetados.
+disable_functions = exec,passthru,shell_exec,system,proc_open,popen
+
+; Teto global de memória (recurso nativo do PHP 8.5):
+; Impede qualquer script de ultrapassar 512M via ini_set().
+; Dica: usando memory_limit = 256M + max_memory_limit = 512M (sem php_admin_value),
+; rotas comuns ficam limitadas a 256M enquanto ImageProcessor::processUpload() sobe até 512M sob demanda.
+max_memory_limit = 512M
+
+; NÃO ative open_basedir restrito à raiz do projeto:
+; 1) Ele desativa o realpath_cache (reduzindo desempenho).
+; 2) O CacheManager remove arquivos diretamente em /var/cache/nginx/... fora da pasta do app.
+
+; --- OPcache e Path Cache ---
+; No PHP 8.5 o OPcache já é embutido no núcleo (não use zend_extension=opcache).
+; Use memory_consumption=128 em servidores com 4 GiB RAM (especialmente se 8.4 e 8.5 rodarem juntos).
+opcache.enable = 1
+opcache.memory_consumption = 256
+opcache.interned_strings_buffer = 16
+opcache.max_accelerated_files = 20000
+opcache.validate_timestamps = 1
+opcache.revalidate_freq = 2
+; (Em produção com deploy controlado, revalidate_freq=60 ou validate_timestamps=0 dão máximo ganho,
+;  exigindo `sudo systemctl reload php8.5-fpm` após `git pull` ou edição de config.local.php.)
+
+realpath_cache_ttl = 600
+```
+
+### 10.2. Ajustes em `/etc/php/8.5/fpm/pool.d/www.conf` (ou `8.4/fpm/pool.d/www.conf`)
+
+```ini
+; Restringe explicitamente a execução pelo FPM apenas a arquivos .php (100% compatível com public/)
+security.limit_extensions = .php
+
+; Proteção contra sockets/requisições travadas (acima do max_execution_time=300 e do limite de 120s do ImageProcessor)
+request_terminate_timeout = 305s
+
+; Slowlog para diagnosticar gargalos (apenas registra stack trace, sem encerrar a requisição).
+; Nota: uploads com codificação AVIF, chamadas ao AI Copilot ou Warmup manual podem superar 5s legitimamente.
+slowlog = /var/log/php8.5-fpm-slow.log
+request_slowlog_timeout = 5s
+
+; Dimensionamento seguro de workers conforme a RAM dedicada ao PHP:
+; pm.max_children ≈ (RAM livre para PHP) / (uso médio por worker: ~60-100 MB)
+; Em máquinas de 4–8 GiB RAM (ou quando 8.4 e 8.5 coexistem), 10 workers evitam OOM.
+; Nota: ImageProcessor::processUpload() eleva memory_limit para 512M sob demanda apenas durante uploads.
+pm.max_children = 10
+pm.max_requests = 500
+```
+
+### 10.3. Criação do Slowlog, Validação e Reload
+
+```bash
+sudo touch /var/log/php8.5-fpm-slow.log
+sudo chown www-data:www-data /var/log/php8.5-fpm-slow.log
+sudo chmod 640 /var/log/php8.5-fpm-slow.log
+
+sudo php-fpm8.5 -t && sudo systemctl reload php8.5-fpm
+```
+
+*(Recomenda-se incluir `/var/log/php8.5-fpm-slow.log` no `/etc/logrotate.d/php8.5-fpm` para evitar crescimento indefinido do arquivo de log.)*
+
+Após o reload, acesse `/admin/system.php` para confirmar os indicadores de **OPcache Ativo**, **Sessão Strict Mode**, **GC de Sessão** e **Funções de Shell**.
+
 Pronto! Seu portal **LightPress** estará no ar com altíssimo desempenho, tempo de resposta inferior a 50 ms no cache HIT e segurança completa.
