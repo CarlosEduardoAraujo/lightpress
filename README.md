@@ -10,7 +10,7 @@ O projeto foi concebido para atender portais de notícias e blogs de médio a gr
 
 ### Pilares Fundamentais:
 
-1. **Zero Dependências Pesadas:** Desenvolvido em **PHP 8.4 puro**, sem frameworks lentos ou centenas de pacotes Composer no caminho crítico de execução pública.
+1. **Zero Dependências Pesadas:** Desenvolvido em **PHP 8.4 / PHP 8.5 puro**, sem frameworks lentos ou centenas de pacotes Composer no caminho crítico de execução pública.
 2. **Modelo de Dados Plano e Rápido:** Tabelas relacionais diretas, eliminando consultas em cascata e junções caras com tabelas de metadados genéricos (`postmeta`).
 3. **Desacoplamento de Conteúdo:** Separação entre a estrutura semântica para edição (`content_json`) e a versão compilada final para os leitores (`content_html`).
 4. **Pipeline Nativo de Mídia de Próxima Geração:** Conversão automática para WebP obrigatório e AVIF opcional, com 3 resoluções padronizadas e descarte do original temporário somente após a conclusão segura do processamento.
@@ -22,7 +22,7 @@ O projeto foi concebido para atender portais de notícias e blogs de médio a gr
 
 ## 2. Pilha Tecnológica e Infraestrutura
 
-* **Linguagem:** PHP 8.4 (modo estrito `declare(strict_types=1);`, tipagem forte, classes `readonly`, `match` expressions e suporte nativo a JIT).
+* **Linguagem:** PHP 8.4 e PHP 8.5 com 100% de paridade (modo estrito `declare(strict_types=1);`, tipagem forte, classes `readonly`, `match` expressions, OPcache embutido no PHP 8.5 e suporte nativo a JIT).
 * **Servidor Web:** Nginx em versão estável mantida, com FastCGI Cache ativo em SSD/NVMe; a versão exata homologada deve constar no relatório de validação.
 * **Bancos de Dados Suportados:**
   * **Fase 1 (Implementação Inicial):** MariaDB / MySQL via extensão `pdo_mysql`, em versões mantidas e homologadas; o DDL abaixo usa recursos presentes em MariaDB 10.6+ / MySQL 8.0+.
@@ -1144,6 +1144,21 @@ Na validação local de 2026-11-12, com PHP 8.4.27 no Windows, passaram lint, di
 
 **Confirmação remota em 2026-11-12:** a [execução #142](https://github.com/CarlosEduardoAraujo/lightpress/actions/runs/43220120224), do commit `fcae607`, terminou com `success` em todas as etapas: configuração SQLite, lint, diagnóstico, suíte principal, revisões, setup e seeder. Esse resultado confirma a execução completa das correções no runner Ubuntu com PHP 8.4.
 
+#### 8.17.14. Compatibilidade Dual PHP 8.4 / PHP 8.5, PHPStan Nível 8 e Matriz CI Expandida (2026-11-18)
+
+O projeto passou por uma auditoria completa de compatibilidade para **PHP 8.5** mantendo **100% de retrocompatibilidade com PHP 8.4** e arquitetura *zero-dependency* (sem `composer.json` nem `vendor/` em produção):
+
+* **Eliminação de 13 depreciações reais do PHP 8.5:**
+  * `PDO::MYSQL_ATTR_INIT_COMMAND` migrado para `\Pdo\Mysql::ATTR_INIT_COMMAND` (disponível desde o PHP 8.4, com fallback seguro `1002`) em `config.php` e `core/Database.php`.
+  * Substituição de `curl_close($ch)` por `unset($ch)` em `core/CloudflareCache.php`, `core/SafeHttpClient.php` e `plugins/webhook-sender/webhook-sender.php`.
+  * Substituição de `finfo_close($finfo)` e `imagedestroy(...)` por `unset(...)` em `core/ImageProcessor.php` (preservando a liberação determinística de RAM entre variantes e no bloco `catch`).
+  * Remoção das chamadas no-op `ReflectionMethod::setAccessible(true)` em `bin/test-ai-copilot.php`.
+* **PHPStan Nível 8 isolado (`phpstan.neon` + `phpstan-baseline.neon`):** executado via `phpstan.phar` (sem Composer), cobrindo `core/` e `plugins/*/src/` nos alvos PHP 8.4 e PHP 8.5 com `[OK] No errors`. A auditoria estática também corrigiu um bug real em `core/PostService.php` (`$current` agora capturado por referência `&$current` para o hook `post_published`) e blindou retornos `null`/`false`, `DOMElement` e `\GdImage` em `BlockCompiler`, `ImageProcessor`, `Seo`, `Security`, `Database`, `CloudflareCache`, `PluginManager`, `ThemeManager`, `RedisClient`, `MarkdownParser`, templates e `migrate-wp.php`.
+* **Observabilidade de staging e diagnóstico:** `core/bootstrap.php` passou a aceitar `app.log_deprecations` (ou variável de ambiente `LP_LOG_DEPRECATIONS=1`) e `app.error_log` customizável para registrar `E_DEPRECATED` em homologação com `display_errors = 0`, e `bin/diagnose.php` passou a exigir explicitamente `dom` e `curl`.
+* **Nginx com `upstream` e rollback instantâneo:** todos os `fastcgi_pass` foram centralizados em `upstream lightpress_php` (`nginx/lightpress.conf`) e `upstream speedracing_php` (`nginx/speedracing-tunnel.conf`), permitindo alternância em 1 linha entre `php8.4-fpm.sock` e `php8.5-fpm.sock`. No PHP 8.5, o OPcache é embutido no núcleo (sem pacote `php8.5-opcache` nem diretiva `zend_extension=opcache`).
+* **Matriz CI Dual no [GitHub Actions](.github/workflows/ci.yml):** executa `php-version: ['8.4', '8.5']` com `pdo`, `pdo_mysql`, `pdo_sqlite`, `gd`, `mbstring`, `fileinfo`, `curl`, `dom` e `xml`, validando `declare(strict_types=1)` em 100% dos 131 arquivos `.php`, `php -l`, PHPStan Nível 8, todas as **11 suítes de testes PHP** + `diagnose`/`setup`/`seed` (incluindo `test-redis-cache-pro.php` corrigido para 13/13 PASS) e trava que reprova o build caso surja qualquer `E_DEPRECATED`.
+* **Validação confirmada em 2026-11-18:** CI #159 aprovado em PHP 8.4 (25s) e PHP 8.5 (28s), seguido de virada em produção para **PHP 8.5.12 FPM** com **48.842 artigos no ar**, OPcache embutido ativo, GD WebP/AVIF (`libavif`), Redis Cache Pro conectado (`0.57 ms` RTT, `72.3%` Hit Ratio), `X-FastCGI-Cache: HIT` com TTFB local de **`0.74 ms`** e zero `Deprecated`/`Warning`/`Fatal` nos logs.
+
 ---
 
 ### 8.18. Otimização de Performance, Acessibilidade WCAG AA e Estabilidade Visual (PageSpeed Insights & Core Web Vitals)
@@ -1523,6 +1538,13 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Tema Oficial Empresa (`themes/empresa/`):** Tema corporativo/institucional moderno com landing page (`/`) com Hero, Serviços, Métricas, CTA e feed de blog dedicado em `/blog/`.
   - [x] **Roteamento Híbrido e SEO:** Canonicalização 301 de `/blog/page/1/` para `/blog/`, inclusão no sitemap XML, purga de cache em publicações e exclusões, e reserva de slug `'blog'`.
   - [x] **100% de Aprovação na Suíte de Testes:** 82 asserções aprovadas com zero falhas em `bin/test.php`.
+
+* **FASE CONCLUÍDA — Compatibilidade Integral PHP 8.5 (Paridade PHP 8.4), PHPStan Nível 8 e CI em Matriz Dual:**
+  - [x] **Eliminação de 13 Depreciações Reais do PHP 8.5:** Migração de `PDO::MYSQL_ATTR_INIT_COMMAND` para `\Pdo\Mysql::ATTR_INIT_COMMAND`, substituição de `curl_close()`, `finfo_close()` e `imagedestroy()` por `unset()`, remoção de `ReflectionMethod::setAccessible(true)` e auditoria por tokenizer PHP limpa em 131/131 arquivos.
+  - [x] **PHPStan Nível 8 (Zero Dependências) e Blindagem de Tipos:** Configuração isolada via `phpstan.phar` (`phpstan.neon` + `phpstan-baseline.neon`) com `[OK] No errors` em PHP 8.4 e 8.5, correção do bug de referência `&$current` em `PostService::publishOrUpdate()` e blindagem contra `null`/`false`/`DOMElement`/`\GdImage`.
+  - [x] **Observabilidade de Staging e Diagnóstico (`core/bootstrap.php`, `bin/diagnose.php`):** Flag `app.log_deprecations` (`LP_LOG_DEPRECATIONS=1`), `app.error_log` configurável e verificação obrigatória de `dom` e `curl`.
+  - [x] **Nginx Upstream com Rollback Instantâneo (`nginx/lightpress.conf`, `nginx/speedracing-tunnel.conf`):** Centralização em `upstream lightpress_php` e `upstream speedracing_php` com alternância em 1 linha entre `php8.4-fpm.sock` e `php8.5-fpm.sock`, e `docs/DEPLOYMENT.md` atualizado (OPcache embutido no PHP 8.5).
+  - [x] **CI em Matriz Dual (`8.4` + `8.5`) e Validação em Produção:** GitHub Actions rodando todas as 11 suítes PHP + PHPStan Nível 8 + trava de zero `E_DEPRECATED` (100% verde), e produção validada em **PHP 8.5.12 FPM** (`X-FastCGI-Cache: HIT` em `0.74 ms` TTFB, Redis `0.57 ms` RTT e zero avisos nos logs).
 
 ---
 

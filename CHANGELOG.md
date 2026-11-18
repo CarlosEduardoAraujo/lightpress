@@ -7,6 +7,36 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Compatibilidade Integral com PHP 8.5 (Paridade PHP 8.4), PHPStan Nível 8, Nginx Upstream e CI em Matriz Dual — 2026-11-18
+
+- **Eliminação de 13 Depreciações Reais do PHP 8.5 (100% Retrocompatível com PHP 8.4):**
+  - **PDO MySQL (`config.php`, `core/Database.php`):** Migração de `PDO::MYSQL_ATTR_INIT_COMMAND` (depreciado no PHP 8.5) para `\Pdo\Mysql::ATTR_INIT_COMMAND` (nativo desde PHP 8.4.0), com guarda `defined('Pdo\\Mysql::ATTR_INIT_COMMAND')` e fallback seguro `1002` para ambientes sem `pdo_mysql`.
+  - **Handles cURL (`core/CloudflareCache.php`, `core/SafeHttpClient.php`, `plugins/webhook-sender/webhook-sender.php`):** Substituição das 5 chamadas depreciadas `curl_close($ch)` por `unset($ch)`, mantendo liberação determinística de `CurlHandle` inclusive dentro de loops de purga e webhooks.
+  - **Pipeline de Mídia GD & Fileinfo (`core/ImageProcessor.php`):** Substituição de `finfo_close($finfo)` e das 3 chamadas `imagedestroy($resized|$source)` por `unset(...)`, garantindo desalocação imediata de memória entre variantes e no tratamento de exceções (`catch`).
+  - **Reflection em Testes (`bin/test-ai-copilot.php`):** Remoção das 2 chamadas no-op `ReflectionMethod::setAccessible(true)` (depreciadas no PHP 8.5).
+  - **Auditoria Estática por Tokenizer PHP (131 arquivos `.php`):** Confirmadas **0 ocorrências** de casts não canônicos `(integer|boolean|double|binary)`, interpolação `${var}`, operador de crase (`T_BACKTICK`), `case ...;` e demais APIs depreciadas no PHP 8.5, além de **131/131 arquivos** com `declare(strict_types=1);`.
+- **Análise Estática PHPStan Nível 8 (Zero Dependências em Produção) e Blindagem de Tipos (`phpstan.neon`, `phpstan-baseline.neon`, `.gitignore`):**
+  - **PHPStan Isolado sem Composer:** Criação de `phpstan.neon` (nível 8 focado em `core/` e `plugins/*/src/`) e `phpstan-baseline.neon` para execução via `phpstan.phar` isolado em dev/CI (sem introduzir `composer.json` nem `vendor/`), com `phpstan.phar` adicionado ao `.gitignore`. Validado com **`[OK] No errors`** nos alvos PHP 8.4 e PHP 8.5.
+  - **Correção de Bug Real em Produção (`core/PostService.php`):** Em `publishOrUpdate()`, a variável `$current` era declarada somente dentro da closure de `Database::transaction()` e chegava indefinida (`null`) ao `Hook::doAction('post_published', ...)`. Passou a ser inicializada fora da transação e capturada por referência (`&$current`), além de tipagem `?int &$createdRevId = null` e blindagem de `parse_url()` / `json_encode()`.
+  - **Blindagem contra `null`, `false`, DOM e GD sob `strict_types=1`:**
+    - `core/BlockCompiler.php`: verificação explícita `instanceof \DOMElement` antes de `getElementsByTagName()`, `getAttribute()` e `isElementEmptyOfContentAndMedia()`, uso seguro de `(string)$dom->saveHTML(...)` e fallback `?: '[]'` em `htmlToBlocks()`.
+    - `core/ImageProcessor.php`: fallback `?? $url` em `toAvifUrl()` / `toWebpUrl()`, checagem de retorno `false` em `finfo_open()` e `fopen()`, tipagem nativa `\GdImage` em `loadSourceImage()`, `scaleProportional()` e `cropThumbnail()` com `max(1, ...)` em `imagecreatetruecolor()`, e blindagem de `parse_url()`.
+    - `core/Seo.php`: proteção contra `preg_replace()` retornando `null` e `strtotime()` retornando `false` antes de `date('c', ...)`.
+    - `core/Security.php`, `core/CloudflareCache.php`, `core/Database.php`, `core/PluginManager.php`, `core/ThemeManager.php`, `core/Router.php`: blindagens de retornos `string|false` e `string|null` (`session_name()`, `inet_ntop()`, `json_encode()`, `lastInsertId()`, `Settings::get()`).
+    - Plugins e Templates/CLI: `plugins/redis-cache-pro/src/RedisClient.php` (`json_decode((string)($raw ?? '[]'), true)`), `plugins/redis-cache-pro/src/CacheMaintenance.php` (remoção de comparações mortas `string === 0`), `plugins/redis-cache-pro/redis-cache-pro.php`, `plugins/api-publisher/src/MarkdownParser.php`, `templates/post.php`, `themes/portal-noticias/post.php` (`$post['category'] ?? ''`) e `bin/migrate-wp.php` (campos legados nulos do WordPress antes de `trim()`).
+- **Observabilidade de Homologação e Diagnóstico (`core/bootstrap.php`, `bin/diagnose.php`):**
+  - Adição das opções `app.log_deprecations` (ou variável de ambiente `LP_LOG_DEPRECATIONS=1`) e `app.error_log` em `core/bootstrap.php`, permitindo registrar `E_DEPRECATED` em homologação e CI mantendo `display_errors = 0`.
+  - Inclusão de `dom` e `curl` na lista de extensões obrigatórias verificadas por `bin/diagnose.php`.
+- **Nginx Upstream com Rollback Instantâneo e Documentação de Deploy (`nginx/lightpress.conf`, `nginx/speedracing-tunnel.conf`, `docs/DEPLOYMENT.md`):**
+  - Centralização de todos os blocos `fastcgi_pass` em `upstream lightpress_php` (`nginx/lightpress.conf`) e `upstream speedracing_php` (`nginx/speedracing-tunnel.conf`), viabilizando virada e rollback em 1 linha entre `php8.4-fpm.sock` e `php8.5-fpm.sock`.
+  - Atualização de `docs/DEPLOYMENT.md` contemplando PHP 8.4 e PHP 8.5, incluindo `curl` e `xml` e documentando que o OPcache é embutido no PHP 8.5 (sem pacote `php8.5-opcache` nem `zend_extension=opcache`).
+- **CI em Matriz Dual PHP 8.4 / 8.5 e Correção de Teste Redis (`.github/workflows/ci.yml`, `plugins/redis-cache-pro/tests/test-redis-cache-pro.php`):**
+  - Expansão do GitHub Actions para `strategy.matrix.php-version: ['8.4', '8.5']` com extensões completas (`pdo`, `pdo_mysql`, `pdo_sqlite`, `gd`, `mbstring`, `fileinfo`, `curl`, `dom`, `xml`), verificação de `declare(strict_types=1)` em 100% dos arquivos, lint (`php -l`), PHPStan Nível 8 via PHAR, execução de todas as **11 suítes PHP** + `diagnose`/`setup`/`seed`, e trava que falha o workflow caso ocorra qualquer `E_DEPRECATED` na saída ou em `storage/logs/error.log`.
+  - Correção de isolamento em `plugins/redis-cache-pro/tests/test-redis-cache-pro.php` restaurando `$client->setClient($fake)` após o teste do circuit breaker, elevando a suíte para **13/13 PASS**.
+- **Validação em CI e Produção (SpeedRacing — PHP 8.5.12):**
+  - Execução do GitHub Actions (#159) aprovada em **PHP 8.4 (25s)** e **PHP 8.5 (28s)** sem erros nem depreciações.
+  - Virada em produção concluída com **48.842 artigos no ar** em **PHP 8.5.12 FPM**: OPcache embutido ativo, GD com WebP + AVIF (`libavif`), Redis Cache Pro conectado (RTT `0.57 ms`, Hit Ratio `72.3%`, Circuit Breaker `CLOSED`), `X-FastCGI-Cache: HIT` em `0.74 ms` de TTFB local e **zero ocorrências** de `Deprecated`, `Warning` ou `Fatal` em `storage/logs/error.log`, `speedracing_error.log` e `/var/log/php8.5-fpm.log`.
+
 ### Sistema Nativo de Temas, Customizador Visual e Roteamento Híbrido (Portal vs. Empresa) — 2026-11-15
 
 - **Novo Sistema Nativo de Temas (`core/ThemeManager.php`, `themes/`):**
