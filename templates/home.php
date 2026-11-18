@@ -332,7 +332,7 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
             <a href="https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c"
                target="_blank"
                rel="noopener noreferrer"
-               class="w-full py-2.5 px-3 rounded-lg bg-flag-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold flex items-center justify-center gap-2 transition-opacity shadow-sm">
+               class="w-full py-2.5 px-3 rounded-lg bg-whatsapp-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase tracking-wider font-bold flex items-center justify-center gap-2 transition-opacity shadow-sm">
                 <span>Seguir Canal Grátis</span>
                 <?= Icon::svg('open_in_new', 'text-pure-white', 16) ?>
             </a>

@@ -514,7 +514,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <a href="https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c"
                    target="_blank"
                    rel="noopener noreferrer"
-                   class="w-full py-2.5 px-3 bg-flag-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-opacity flex items-center justify-center gap-2 shadow-sm mt-1">
+                   class="w-full py-2.5 px-3 bg-whatsapp-green hover:opacity-90 text-pure-white font-label-category text-label-category uppercase font-bold rounded-lg transition-opacity flex items-center justify-center gap-2 shadow-sm mt-1">
                     <span>Entrar no Canal do WhatsApp</span>
                     <?= Icon::svg('open_in_new', 'text-pure-white', 16) ?>
                 </a>

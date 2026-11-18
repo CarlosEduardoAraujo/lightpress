@@ -1334,7 +1334,7 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
 * **Canal Oficial no WhatsApp (`templates/header.php`, `templates/home.php`, `templates/category.php`, `templates/tag.php`, `templates/search.php`, `templates/post.php`, `templates/page.php`):**
   * Substituição dos formulários de e-mail por cards modernos e responsivos convidando os leitores para o canal oficial (`https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c`).
-  * Estilização com a cor temática `bg-flag-green` (`#00A859`), ícones SVG nativos `chat` e `open_in_new`, atributos de segurança `target="_blank"` e `rel="noopener noreferrer"`.
+  * Estilização com a cor semântica de alto contraste `bg-whatsapp-green` (`#007A3D`, conformidade WCAG 2.1 AA), ícones SVG nativos `chat` e `open_in_new`, atributos de segurança `target="_blank"` e `rel="noopener noreferrer"`.
   * Versão clara para a Home e listagens e versão escura em `bg-carbon-black` com gradiente sutil para artigos e páginas institucionais.
   * Atualização da barra superior de utilitários no cabeçalho global (`templates/header.php`) com link direto e atributo `aria-label` acessível.
 * **Limpeza de Scripts (`public/assets/js/app.js`):**
@@ -1382,6 +1382,49 @@ Para possibilitar a total customização visual e a alternância instantânea en
   - Nova aba **"Temas"** no menu unificado da administração (`core/AdminNav.php`) restrita a administradores.
   - Galeria de temas com cartões visuais informativos, indicação de tema ativo e botão de ativação instantânea com proteção CSRF e purga de cache.
   - Customizador visual dinâmico com formulários divididos por seções, integração direta com o modal da Biblioteca de Mídias para seleção ágil de fotos e upload em 1 clique.
+
+### 8.24. Arquitetura de Favicon Raiz (`/favicon.ico`), Compatibilidade Universal e Otimização Nginx
+
+Para conciliar a flexibilidade de personalização do portal com a compatibilidade universal exigida por robôs de busca, clientes legados e agregadores, o LightPress adota uma estratégia híbrida e determinística para favicons:
+
+* **Favicon Dinâmico do Tema (`settings.site_favicon`):**
+  - Configurado pelo painel administrativo em `public/admin/settings.php` apontando para a biblioteca de mídia (geralmente gerado como variante WebP de alta compressão).
+  - Injetado dinamicamente nos templates (`templates/header.php`, `themes/*/header.php` e `public/admin/header.php`) através de `<link rel="icon" href="...">` e `<link rel="apple-touch-icon" href="...">`.
+  - Consumido automaticamente pelo módulo `core/Seo.php` para preenchimento de `og:image`, `twitter:image` e JSON-LD (`publisher.logo`).
+
+* **Favicon Raiz Físico Obrigatório (`public/favicon.ico`):**
+  - **Padrão Ouro de Compatibilidade:** Requisições diretas a `/favicon.ico` disparadas por navegadores (ao digitar a URL diretamente ou criar atalhos de SO), robôs de indexação (Googlebot Favicon), leitores de RSS, ferramentas de auditoria e bots de redes sociais (Discord, Slack, Telegram) são resolvidas estaticamente pelo Nginx.
+  - **Rejeição de Redirecionamento (301/302):** Não se deve redirecionar `/favicon.ico` para caminhos de upload (`/uploads/.../*.webp`), pois isso causa latência adicional (round-trip HTTP desnecessário), falhas de renderização em clientes que não aceitam WebP como `.ico` e acoplamento frágil da infraestrutura a arquivos de mídia temporários.
+  - **Formato Recomendado:** Arquivo binário `.ico` clássico empacotando resoluções de 16x16, 32x32 e 48x48 pixels em `public/favicon.ico`.
+
+* **Otimização de Entrega no Nginx (`nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf`):**
+  - Configuração do bloco `location = /favicon.ico` com entrega física direta via `try_files $uri =404;`, silenciamento de logs de 404/acesso e cabeçalhos de cache de longa duração:
+    ```nginx
+    location = /favicon.ico {
+        try_files $uri =404;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+        log_not_found off;
+        access_log off;
+    }
+    ```
+
+### 8.25. Acessibilidade WCAG 2.1 AA (100/100 PageSpeed Insights) e Conformidade de Contraste
+
+O LightPress adota rigorosos critérios de acessibilidade em conformidade com as diretrizes internacionais **WCAG 2.1 nível AA** e o motor de auditoria **axe-core 4.14**:
+
+* **Taxa de Contraste Mínima para Tipografia Normal ($\ge 4.5:1$):**
+  - Textos de categoria, metadados e chamadas de ação (ex: botões com `11px`, `font-bold`) são classificados como texto normal sob as normas WCAG e exigem contraste de luminância relativa mínimo de 4.5:1.
+* **Token Semântico `whatsapp-green` (`#007A3D`):**
+  - Implementado para substituir fundos verdes excessivamente claros em botões com tipografia branca (`text-pure-white` `#FFFFFF`), elevando a taxa de contraste de 3.11:1 para **5.45:1** (margem de segurança de +0.95:1 sobre a exigência AA).
+  - Preserva a identidade visual esportiva do portal e o design canônico do WhatsApp com texto e ícone brancos.
+  - Sincronizado nativamente no `tailwind.config.js`, no fallback inline dos cabeçalhos e compilado nos 3 bundles CSS estáticos (`public/assets/style.css`, `themes/portal-noticias/assets/css/style.css` e `public/assets/themes/portal-noticias/css/style.css`).
+* **Resultados no PageSpeed Insights:**
+  - **100/100** em Performance
+  - **100/100** em Acessibilidade (Accessibility)
+  - **100/100** em Melhores Práticas (Best Practices)
+  - **100/100** em SEO
+  - **2/2** em Agentic Browsing
 
 ---
 

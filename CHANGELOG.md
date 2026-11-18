@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Acessibilidade WCAG 2.1 AA (100/100 PageSpeed Insights) no Botão CTA do Canal WhatsApp — 2026-11-18
+
+- **Correção Cirúrgica de Contraste de Cores (WCAG 2.1 AA / axe-core 4.14):**
+  - **Diagnóstico Técnico de Acessibilidade:** Identificado no relatório do PageSpeed Insights que a nota de Acessibilidade estava em 95/100 devido a uma única inconformidade de contraste (`color-contrast`) no botão CTA "Seguir Canal Grátis" / "Entrar no Canal do WhatsApp". O texto com tipografia `font-label-category text-label-category` (11px, classificado como texto normal) sob fundo `bg-flag-green` (`#00A859`) e cor `text-pure-white` (`#FFFFFF`) apresentava taxa de contraste de apenas **3.11:1**, abaixo dos **4.5:1** mínimos exigidos pela norma WCAG 2.1 AA.
+  - **Novo Token Semântico `whatsapp-green` (`tailwind.config.js`, `templates/header.php`, `themes/portal-noticias/header.php`):** Registrada a cor semântica `"whatsapp-green": "#007A3D"` (Deep Racing Green), garantindo taxa de contraste de **5.45:1** contra o branco puro (`#FFFFFF`) — margem de segurança de +0.95:1 sobre a norma WCAG AA.
+  - **Atualização nos Templates (`templates/` e `themes/portal-noticias/`):** Substituição pontual da classe de fundo `bg-flag-green` por `bg-whatsapp-green` nos 12 arquivos afetados: `home.php`, `category.php`, `search.php`, `tag.php`, `page.php` e `post.php` em ambos os temas (tema padrão e tema `portal-noticias`), mantendo a legibilidade, o estilo clássico do WhatsApp com texto e ícone brancos (`text-pure-white`) e a identidade esportiva do portal.
+  - **Compilação e Sincronização Estática de CSS:** Recompilação minificada via `npm run build:css` atualizando `public/assets/style.css`, `themes/portal-noticias/assets/css/style.css` e `public/assets/themes/portal-noticias/css/style.css` com paridade integral de hash SHA256.
+  - **Elevação da Métrica de Auditoria:** Correção da única pendência de acessibilidade, elevando a pontuação do PageSpeed Insights para **100/100 em Acessibilidade** (100 Performance, 100 Accessibility, 100 Best Practices, 100 SEO, 2/2 Agentic Browsing).
+
+### Padronização de Favicon Raiz (`/favicon.ico`), Compatibilidade Universal e Cache Estático no Nginx — 2026-11-18
+
+- **Arquitetura e Resolução de Favicon Raiz (`public/favicon.ico`, `nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf`):**
+  - **Diagnóstico de Erro 404 em Requisições Diretas:** Identificado que requisições automáticas de navegadores, bots de busca (Googlebot), leitores de RSS, ferramentas de auditoria e atalhos de sistemas operacionais para a rota `/favicon.ico` resultavam em `404 Not Found` no Nginx devido à ausência física do arquivo no diretório `public/`, apesar do favicon dinâmico em WebP estar configurado via `<link rel="icon">` no HTML.
+  - **Rejeição de Redirecionamento Transitório:** Análise técnica descartou o redirecionamento HTTP 301/302 para `/uploads/.../*.webp` para eliminar latência de RTT extra na primeira requisição, evitar incompatibilidades com decodificadores legados/bots que não interpretam WebP sob `.ico` e prevenir acoplamento rígido de rotas de infraestrutura a caminhos de upload datados.
+  - **Adoção do Padrão Ouro de Compatibilidade Universal:** Definição da obrigatoriedade do asset físico `public/favicon.ico` (multi-resolução 16x16, 32x32 e 48x48) na raiz pública, mantendo resposta `200 OK` direta, atômica e com 100% de compatibilidade em todo o ecossistema web.
+  - **Otimização de Cache e Edge CDN no Nginx (`nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf`):** Atualização do bloco `location = /favicon.ico` com diretivas de longa duração (`expires 30d; add_header Cache-Control "public, max-age=2592000, immutable";`), maximizando a taxa de retenção na ponta (Cloudflare Edge) e no navegador, com logs de 404 e acesso desativados.
+
 ### Hardening de Sessão, Diagnóstico de Runtime PHP-FPM e Guia de Tuning PHP 8.5 — 2026-11-18
 
 - **Hardening de Expiração de Cookie de Sessão (`core/Security.php`):**

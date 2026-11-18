@@ -157,6 +157,7 @@ if (empty($trendingTags)) {
                             "canvas-cream": "#F9FAFB",
                             "subtle-border": "#E5E7EB",
                             "flag-green": "#00A859",
+                            "whatsapp-green": "#007A3D",
                             "flag-yellow": "#FFB800",
                             "surface": "#f6faff",
                             "on-surface": "#141d23",
