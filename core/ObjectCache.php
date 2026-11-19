@@ -68,6 +68,31 @@ final class ObjectCache
     }
 
     /**
+     * Recupera múltiplos valores do cache em uma única operação em lote.
+     *
+     * @param array<int, string> $keys
+     * @param string $group
+     * @return array<string, mixed> Mapa chave => valor (ou false se não encontrado)
+     */
+    public static function mGet(array $keys, string $group = 'default'): array
+    {
+        if (empty($keys)) {
+            return [];
+        }
+
+        if (!self::isAvailable()) {
+            return array_fill_keys($keys, false);
+        }
+
+        try {
+            return \LightPress\Plugin\RedisCachePro\RedisCache::mGet($keys, $group);
+        } catch (Throwable $e) {
+            error_log('[ObjectCache mGet Fallback] ' . $e->getMessage());
+            return array_fill_keys($keys, false);
+        }
+    }
+
+    /**
      * Armazena um valor no cache.
      */
     public static function set(string $key, mixed $value, string $group = 'default', int $ttl = 0): bool
@@ -80,6 +105,32 @@ final class ObjectCache
             return \LightPress\Plugin\RedisCachePro\RedisCache::set($key, $value, $group, $ttl);
         } catch (Throwable $e) {
             error_log('[ObjectCache Set Fallback] ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Armazena múltiplos valores no cache de uma só vez em lote.
+     *
+     * @param array<string, mixed> $items Mapa chave => valor
+     * @param string $group
+     * @param int $ttl
+     * @return bool
+     */
+    public static function setMultiple(array $items, string $group = 'default', int $ttl = 0): bool
+    {
+        if (empty($items)) {
+            return true;
+        }
+
+        if (!self::isAvailable()) {
+            return true;
+        }
+
+        try {
+            return \LightPress\Plugin\RedisCachePro\RedisCache::setMultiple($items, $group, $ttl);
+        } catch (Throwable $e) {
+            error_log('[ObjectCache setMultiple Fallback] ' . $e->getMessage());
             return false;
         }
     }

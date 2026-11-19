@@ -7,6 +7,38 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Comandos Redis Síncronos, Pipeline de Telemetria e Operações em Lote (PERF-02) — 2026-11-18
+
+- **Eliminação de Amplificação de Comandos e Latência no Plugin Redis Cache Pro (`plugins/redis-cache-pro/src/RedisClient.php`, `plugins/redis-cache-pro/src/QueryProfiler.php`):**
+  - **Diagnóstico da Causa Raiz:** A cada operação de leitura ou escrita no cache de objetos (`ObjectCache::get()` e `set()`), ocorria uma amplificação de 10 a 13 comandos síncronos de rede e sobrecarga de CPU por requisição:
+    1. `isConnected()` executava `$this->redis->ping()` incondicionalmente em todas as operações (`get`, `set`, `delete`, `remember`, `flushGroup`, etc.).
+    2. `recordTelemetry()` executava `isConnected()` (mais 1 ping) + até 6 `hIncrBy()` + 1 `expire()` em conexões separadas sem uso de pipeline.
+    3. `QueryProfiler::log()` chamava `debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 7)` + `lPush()` + `lTrim()` + `expire()` em toda operação — inclusive em leituras de memória local `$localCache` (`GET (MEMORY)`).
+  - **Eliminação de `ping()` Redundante (`RedisClient.php`):** `isConnected()` passa a avaliar o estado em RAM quando em estado `CLOSED` (0 comandos Redis e 0 RTTs). As operações normais de cache capturam `RedisException` / `Throwable` para alimentar os contadores de falha do Circuit Breaker, desarmando-o para `OPEN` após 3 falhas consecutivas. O `ping()` foi restrito a testes de recuperação no estado `HALF_OPEN` e sondagens de diagnóstico administrativo (`isConnected(true)`).
+  - **Agregação de Telemetria em Memória com Pipeline no Shutdown (`RedisClient.php`):**
+    - Métricas (`hits`, `misses`, `commands`, `latency_ms_total`, `latency_count`) agora acumulam no array em memória `$pendingTelemetry` durante o ciclo de vida do script.
+    - Registro de `register_shutdown_function` descarregando todo o acumulador em um único bloco atômico `Redis::PIPELINE` via `RedisClient::flushTelemetry()`.
+    - Chamadas em `getDiagnosticInfo()` e `get24HourTelemetry()` sincronizam o buffer antes de ler os hashes para assegurar visibilidade em tempo real ao administrador.
+  - **QueryProfiler Opt-in e Descarregamento em Lote (`QueryProfiler.php`):**
+    - `QueryProfiler::isEnabled()` desativa o profiler por padrão para visitantes anônimos em tráfego público, eliminando 100% de chamadas `debug_backtrace()` e escritas no Redis.
+    - Ativação opt-in permitida via configuração (`profiler_enabled`), amostragem estatística (`profiler_sample_rate`), sessão ativa de administrador ou rotas `/admin`.
+    - Buffer em memória `self::$pendingLogs` com descarga atômica via `Redis::PIPELINE` no shutdown (`QueryProfiler::flush()`).
+    - Adicionado `QueryProfiler::setEnabled(?bool $enabled)` e limpeza total no `QueryProfiler::reset()`.
+  - **Operações em Lote `mGet()` e `setMultiple()` (`core/ObjectCache.php`, `plugins/redis-cache-pro/redis-cache-pro.php`, `plugins/redis-cache-pro/src/RedisClient.php`):**
+    - Implementação de `ObjectCache::mGet(array $keys, string $group)` e `setMultiple(array $items, string $group, int $ttl)` com fallback transparente quando o cache persistente não estiver disponível.
+    - Resolução atômica de chaves ausentes no Redis via `$client->mGet()` e salvamento em bloco via pipeline.
+  - **Resolução em Lote no Carregamento de Mídias (`core/ImageProcessor.php`):**
+    - Refatoração de `ImageProcessor::loadDescriptions()`: substituição do loop sequencial de `ObjectCache::get()` por uma única chamada atômica `ObjectCache::mGet()`, e gravação em lote das descrições resolvidas via `ObjectCache::setMultiple()`.
+    - Redução de até 99,6% dos comandos Redis no carregamento de galerias e feeds de imagens.
+  - **Compatibilidade do Dublê `FakeRedis` e Testes (`plugins/redis-cache-pro/tests/FakeRedis.php`, `bin/test-image-descriptions.php`, `plugins/redis-cache-pro/tests/test-redis-cache-pro.php`):**
+    - Implementado suporte a `pipeline()`, `multi()`, `exec()`, `mGet()` e controle de fila de comandos em modo pipeline no `FakeRedis`.
+    - Adicionado `$shouldFailOps` para testar o desarmamento do Circuit Breaker por exceções em comandos reais de cache.
+    - Suíte `test-redis-cache-pro.php` expandida com Seção 7 cobrindo `isConnected()` sem ping, `mGet`/`setMultiple`, telemetria em pipeline e profiler opt-in (**17/17 PASS**).
+    - Suíte `test-image-descriptions.php` com mock de `mGet`/`setMultiple` aprovada (**30/30 PASS**).
+  - **Micro-Benchmark de Cache (`bin/benchmark.php`):**
+    - Correção de interrupção em `$router->dispatch()` via `$router->setTestingMode(true);`.
+    - Adicionado módulo de benchmark de cache aferindo throughput de **1.142.519 op/s** em hits de memória local e **166.526 op/s** em `mGet` de lote de 50 chaves (**8.326.327 chaves/s** resolvidas).
+
 ### Mitigação de Tempestade de Invalidação de Cache em Metadados de Mídia (PERF-01) — 2026-11-18
 
 - **Contenção e Blindagem de Invalidação em `ImageProcessor::invalidateMediaMetadata()` (`core/ImageProcessor.php`, `bin/test-image-descriptions.php`):**

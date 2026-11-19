@@ -5,6 +5,7 @@ namespace LightPress\Plugin\RedisCachePro;
 
 /**
  * Query Profiler em memória para telemetria de operações de cache da requisição atual.
+ * Opt-in para tráfego anônimo (0 overhead de CPU/rede); buffer em memória e pipeline no shutdown.
  */
 final class QueryProfiler
 {
@@ -12,13 +13,79 @@ final class QueryProfiler
      * @var array<int, array{command: string, key: string, caller: string, duration: float, status: string, time: float}>
      */
     private static array $logs = [];
-    private static int $maxEntries = 30;
 
     /**
-     * Registra a execução de um comando no profiler e persiste em buffer circular no Redis.
+     * @var array<int, array{command: string, key: string, caller: string, duration: float, status: string, time: float}> Buffer pendente para descarga em pipeline
+     */
+    private static array $pendingLogs = [];
+
+    private static int $maxEntries = 30;
+
+    /** @var bool|null Override explícito para testes unitários ou ferramentas de diagnóstico */
+    private static ?bool $forceEnabled = null;
+
+    /**
+     * Define forçadamente se o profiler está ativo (útil para suíte de testes).
+     */
+    public static function setEnabled(?bool $enabled): void
+    {
+        self::$forceEnabled = $enabled;
+    }
+
+    /**
+     * Avalia se o profiler está ativo na requisição corrente.
+     * Retorna falso para tráfego anônimo público (evitando debug_backtrace e chamadas ao Redis).
+     */
+    public static function isEnabled(): bool
+    {
+        if (self::$forceEnabled !== null) {
+            return self::$forceEnabled;
+        }
+
+        try {
+            $instance = RedisClient::getInstance();
+            $config = $instance->getConfig();
+
+            if (!empty($config['profiler_enabled'])) {
+                return true;
+            }
+
+            $sampleRate = (float)($config['profiler_sample_rate'] ?? 0.0);
+            if ($sampleRate > 0.0 && (mt_rand(1, 10000) / 10000) <= $sampleRate) {
+                return true;
+            }
+        } catch (\Throwable) {}
+
+        // Se estiver em rota administrativa
+        if (isset($_SERVER['REQUEST_URI']) && str_starts_with($_SERVER['REQUEST_URI'], '/admin')) {
+            return true;
+        }
+
+        // Se houver sessão ativa de administrador autenticado
+        if (session_status() === PHP_SESSION_ACTIVE || !empty($_COOKIE[session_name()])) {
+            try {
+                if (class_exists('LightPress\\Core\\Security')) {
+                    $user = \LightPress\Core\Security::getCurrentUser();
+                    if ($user !== null && ($user['role'] ?? '') === 'admin') {
+                        return true;
+                    }
+                }
+            } catch (\Throwable) {}
+        }
+
+        return false;
+    }
+
+    /**
+     * Registra a execução de um comando no profiler em memória.
+     * Não dispara comandos de rede ao Redis de forma síncrona; acumula em lote para o shutdown.
      */
     public static function log(string $command, string $key, float $durationMs, string $status = 'OK', ?string $caller = null): void
     {
+        if (!self::isEnabled()) {
+            return;
+        }
+
         if ($caller === null) {
             $caller = self::detectCaller();
         }
@@ -38,28 +105,69 @@ final class QueryProfiler
             array_shift(self::$logs);
         }
 
-        // Persistir no Redis em ring buffer (últimas 30 operações persistentes do site)
-        static $inLogPush = false;
-        if (!$inLogPush) {
-            $inLogPush = true;
-            try {
-                $instance = RedisClient::getInstance();
-                $client = $instance->getRawClient();
-                if ($client !== null && method_exists($client, 'lPush')) {
-                    $config = $instance->getConfig();
-                    $listKey = ($config['prefix'] ?? 'lp_cache:') . 'profiler:recent_logs';
+        self::$pendingLogs[] = $entry;
+        if (count(self::$pendingLogs) > self::$maxEntries) {
+            array_shift(self::$pendingLogs);
+        }
+    }
+
+    /**
+     * Descarrega os logs pendentes no Redis em uma única ida e volta de rede (Redis::PIPELINE).
+     */
+    public static function flush(): void
+    {
+        if (empty(self::$pendingLogs)) {
+            return;
+        }
+
+        $entries = self::$pendingLogs;
+        self::$pendingLogs = [];
+
+        try {
+            $instance = RedisClient::getInstance();
+            if (!$instance->isConnected()) {
+                return;
+            }
+            $client = $instance->getRawClient();
+            if ($client === null) {
+                return;
+            }
+
+            $config = $instance->getConfig();
+            $listKey = ($config['prefix'] ?? 'lp_cache:') . 'profiler:recent_logs';
+
+            $pipe = method_exists($client, 'pipeline')
+                ? $client->pipeline()
+                : (method_exists($client, 'multi') ? $client->multi(\Redis::PIPELINE) : null);
+
+            if ($pipe !== null && method_exists($pipe, 'lPush')) {
+                foreach ($entries as $entry) {
+                    $payload = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                    $pipe->lPush($listKey, $payload);
+                }
+                if (method_exists($pipe, 'lTrim')) {
+                    $pipe->lTrim($listKey, 0, self::$maxEntries - 1);
+                }
+                if (method_exists($pipe, 'expire')) {
+                    $pipe->expire($listKey, 7200);
+                }
+                if (method_exists($pipe, 'exec')) {
+                    $pipe->exec();
+                }
+            } else {
+                foreach ($entries as $entry) {
                     $payload = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                     $client->lPush($listKey, $payload);
-                    $client->lTrim($listKey, 0, self::$maxEntries - 1);
-                    if (method_exists($client, 'expire')) {
-                        $client->expire($listKey, 7200);
-                    }
                 }
-            } catch (\Throwable) {
-                // Silencioso em caso de inicialização ou indisponibilidade transitória
-            } finally {
-                $inLogPush = false;
+                if (method_exists($client, 'lTrim')) {
+                    $client->lTrim($listKey, 0, self::$maxEntries - 1);
+                }
+                if (method_exists($client, 'expire')) {
+                    $client->expire($listKey, 7200);
+                }
             }
+        } catch (\Throwable) {
+            // Silencioso em caso de inicialização ou indisponibilidade transitória
         }
     }
 
@@ -70,6 +178,8 @@ final class QueryProfiler
      */
     public static function getLogs(): array
     {
+        self::flush();
+
         try {
             $instance = RedisClient::getInstance();
             $client = $instance->getRawClient();
@@ -96,11 +206,22 @@ final class QueryProfiler
     }
 
     /**
-     * Limpa os logs em memória.
+     * Limpa os logs em memória e no buffer circular do Redis.
      */
     public static function reset(): void
     {
         self::$logs = [];
+        self::$pendingLogs = [];
+
+        try {
+            $instance = RedisClient::getInstance();
+            $client = $instance->getRawClient();
+            if ($client !== null && method_exists($client, 'del')) {
+                $config = $instance->getConfig();
+                $listKey = ($config['prefix'] ?? 'lp_cache:') . 'profiler:recent_logs';
+                $client->del($listKey);
+            }
+        } catch (\Throwable) {}
     }
 
     /**

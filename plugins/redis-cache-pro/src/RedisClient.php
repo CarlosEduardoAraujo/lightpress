@@ -50,6 +50,17 @@ class RedisClient
         'latency_sum_ms' => 0.0,
     ];
 
+    /** @var array{hits: int, misses: int, commands: int, latency_ms_total: float, latency_count: int} Buffer de telemetria pendente para pipeline */
+    private array $pendingTelemetry = [
+        'hits'             => 0,
+        'misses'           => 0,
+        'commands'         => 0,
+        'latency_ms_total' => 0.0,
+        'latency_count'    => 0,
+    ];
+
+    private static bool $shutdownRegistered = false;
+
     public static function getInstance(?array $customConfig = null): self
     {
         if (self::$instance === null) {
@@ -60,6 +71,9 @@ class RedisClient
 
     public static function resetInstance(): void
     {
+        if (self::$instance !== null) {
+            self::$instance->flushBuffers();
+        }
         self::$instance = null;
     }
 
@@ -67,6 +81,26 @@ class RedisClient
     {
         $this->initConfig($customConfig);
         $this->connect();
+        $this->registerShutdown();
+    }
+
+    private function registerShutdown(): void
+    {
+        if (!self::$shutdownRegistered) {
+            self::$shutdownRegistered = true;
+            register_shutdown_function(static function (): void {
+                self::$instance?->flushBuffers();
+            });
+        }
+    }
+
+    /**
+     * Descarrega buffers em lote no Redis (telemetria e profiler).
+     */
+    public function flushBuffers(): void
+    {
+        $this->flushTelemetry();
+        QueryProfiler::flush();
     }
 
     /**
@@ -98,6 +132,8 @@ class RedisClient
             'serializer'           => 'php', // 'igbinary' ou 'php'
             'compression'          => 'none', // 'zstd', 'lz4', 'none'
             'async_flush'          => true,  // Usa UNLINK em vez de DEL
+            'profiler_enabled'     => false, // Opt-in para admins ou diagnóstico
+            'profiler_sample_rate' => 0.0,   // Taxa de amostragem pública (0.0 = desativado)
         ];
 
         $constantConfig = [];
@@ -243,8 +279,10 @@ class RedisClient
 
     /**
      * Verifica se o Redis está operacional.
+     * Em estado CLOSED normal, confia na conexão estabelecida (0 RTTs de rede).
+     * Dispara PING apenas se em HALF_OPEN (teste de reabilitação) ou se $forceProbe for true.
      */
-    public function isConnected(): bool
+    public function isConnected(bool $forceProbe = false): bool
     {
         if ($this->redis === null) {
             return false;
@@ -258,20 +296,24 @@ class RedisClient
             }
         }
 
-        try {
-            $ping = $this->redis->ping();
-            if ($ping === true || $ping === '+PONG' || $ping === 'PONG') {
-                if ($this->breakerState === 'HALF_OPEN') {
-                    $this->breakerState = 'CLOSED';
-                    $this->breakerFailures = 0;
+        if ($this->breakerState === 'HALF_OPEN' || $forceProbe) {
+            try {
+                $ping = $this->redis->ping();
+                if ($ping === true || $ping === '+PONG' || $ping === 'PONG') {
+                    if ($this->breakerState === 'HALF_OPEN') {
+                        $this->breakerState = 'CLOSED';
+                        $this->breakerFailures = 0;
+                    }
+                    return true;
                 }
-                return true;
+                return false;
+            } catch (Throwable) {
+                $this->tripCircuitBreaker('Ping de verificação falhou.');
+                return false;
             }
-            return false;
-        } catch (Throwable) {
-            $this->tripCircuitBreaker('Ping falhou.');
-            return false;
         }
+
+        return true;
     }
 
     /**
@@ -460,6 +502,175 @@ class RedisClient
     }
 
     /**
+     * Recupera múltiplos valores em uma única operação atômica de rede.
+     *
+     * @param array<int, string> $keys
+     * @param string $group
+     * @return array<string, mixed> Mapa chave => valor (ou false)
+     */
+    public function mGet(array $keys, string $group = 'default'): array
+    {
+        if (empty($keys)) {
+            return [];
+        }
+
+        $startTime = microtime(true);
+        $results = [];
+        $missingKeys = [];
+        $keyMap = []; // redisKey => logicalKey
+
+        // 1. Verifica cache local em memória
+        foreach ($keys as $key) {
+            if (isset($this->localCache[$group][$key])) {
+                $results[$key] = $this->localCache[$group][$key];
+                $this->runtimeStats['hits']++;
+                $this->runtimeStats['memory_hits']++;
+            } else {
+                $missingKeys[] = $key;
+            }
+        }
+
+        if (empty($missingKeys)) {
+            $duration = (microtime(true) - $startTime) * 1000;
+            QueryProfiler::log('MGET (MEMORY)', "{$group}:" . count($keys) . ' keys', $duration, 'HIT');
+            return $results;
+        }
+
+        // 2. Se desconectado / disjuntor aberto, completa com false
+        if (!$this->isConnected()) {
+            foreach ($missingKeys as $key) {
+                $results[$key] = false;
+                $this->runtimeStats['misses']++;
+            }
+            return $results;
+        }
+
+        // 3. Monta mapeamento de chaves
+        foreach ($missingKeys as $key) {
+            $redisKey = $this->buildKey($key, $group);
+            $keyMap[$redisKey] = $key;
+        }
+
+        $client = $this->getTargetClient($group);
+        $redisKeys = array_keys($keyMap);
+
+        try {
+            $rawValues = $client->mGet($redisKeys);
+            $duration = (microtime(true) - $startTime) * 1000;
+            $this->runtimeStats['commands']++;
+            $this->runtimeStats['latency_sum_ms'] += $duration;
+
+            $hits = 0;
+            $misses = 0;
+
+            if (is_array($rawValues)) {
+                $idx = 0;
+                foreach ($keyMap as $rKey => $logicalKey) {
+                    $val = $rawValues[$idx] ?? ($rawValues[$rKey] ?? false);
+                    $idx++;
+
+                    if ($val !== false && $val !== null) {
+                        $results[$logicalKey] = $val;
+                        $this->localCache[$group][$logicalKey] = $val;
+                        $this->runtimeStats['hits']++;
+                        $hits++;
+                    } else {
+                        $results[$logicalKey] = false;
+                        $this->runtimeStats['misses']++;
+                        $misses++;
+                    }
+                }
+            } else {
+                foreach ($missingKeys as $key) {
+                    $results[$key] = false;
+                    $this->runtimeStats['misses']++;
+                    $misses++;
+                }
+            }
+
+            $this->recordTelemetry($hits, $misses, $duration, 1);
+            QueryProfiler::log('MGET', "{$group}:" . count($missingKeys) . ' keys', $duration, "H:{$hits}/M:{$misses}");
+            return $results;
+
+        } catch (Throwable $e) {
+            $this->tripCircuitBreaker('Erro em MGET: ' . $e->getMessage());
+            foreach ($missingKeys as $key) {
+                $results[$key] = false;
+                $this->runtimeStats['misses']++;
+            }
+            return $results;
+        }
+    }
+
+    /**
+     * Grava múltiplos valores no cache de uma só vez (via Pipeline).
+     *
+     * @param array<string, mixed> $items Mapa chave => valor
+     * @param string $group
+     * @param int $ttl
+     * @return bool
+     */
+    public function setMultiple(array $items, string $group = 'default', int $ttl = 0): bool
+    {
+        if (empty($items)) {
+            return true;
+        }
+
+        $startTime = microtime(true);
+        foreach ($items as $key => $val) {
+            $this->localCache[$group][$key] = $val;
+        }
+
+        if (!$this->isConnected()) {
+            return true; // Salvo em memória local
+        }
+
+        $client = $this->getTargetClient($group);
+        $effectiveTtl = $ttl > 0 ? $ttl : (int)$this->config['maxttl'];
+
+        try {
+            $pipe = method_exists($client, 'pipeline')
+                ? $client->pipeline()
+                : (method_exists($client, 'multi') ? $client->multi(Redis::PIPELINE) : null);
+
+            if ($pipe !== null) {
+                foreach ($items as $key => $val) {
+                    $redisKey = $this->buildKey($key, $group);
+                    if ($effectiveTtl > 0) {
+                        $pipe->setex($redisKey, $effectiveTtl, $val);
+                    } else {
+                        $pipe->set($redisKey, $val);
+                    }
+                }
+                if (method_exists($pipe, 'exec')) {
+                    $pipe->exec();
+                }
+            } else {
+                foreach ($items as $key => $val) {
+                    $redisKey = $this->buildKey($key, $group);
+                    if ($effectiveTtl > 0) {
+                        $client->setex($redisKey, $effectiveTtl, $val);
+                    } else {
+                        $client->set($redisKey, $val);
+                    }
+                }
+            }
+
+            $duration = (microtime(true) - $startTime) * 1000;
+            $this->runtimeStats['commands']++;
+            $this->runtimeStats['latency_sum_ms'] += $duration;
+            $this->recordTelemetry(0, 0, $duration, count($items));
+
+            QueryProfiler::log('MSET/PIPELINE', "{$group}:" . count($items) . ' keys', $duration, 'OK');
+            return true;
+
+        } catch (Throwable $e) {
+            $this->tripCircuitBreaker('Erro em setMultiple: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Remove uma chave do cache.
      */
     public function delete(string $key, string $group = 'default'): bool
@@ -601,11 +812,39 @@ class RedisClient
     }
 
     /**
-     * Registra métricas de telemetria em bucket de 1 hora e no acumulador agregado persistente.
+     * Registra deltas de telemetria em memória durante a requisição (0 RTTs).
+     * O envio consolidado ocorre no shutdown via Pipeline atômico.
      */
     private function recordTelemetry(int $hits = 0, int $misses = 0, float $latencyMs = 0.0, int $commands = 0): void
     {
-        if (!$this->isConnected()) {
+        if ($hits > 0) {
+            $this->pendingTelemetry['hits'] += $hits;
+        }
+        if ($misses > 0) {
+            $this->pendingTelemetry['misses'] += $misses;
+        }
+        if ($commands > 0) {
+            $this->pendingTelemetry['commands'] += $commands;
+        }
+        if ($latencyMs > 0) {
+            $this->pendingTelemetry['latency_ms_total'] += $latencyMs;
+            $this->pendingTelemetry['latency_count'] += 1;
+        }
+    }
+
+    /**
+     * Descarrega os deltas de telemetria acumulados em memória em um único Redis::PIPELINE.
+     */
+    public function flushTelemetry(): void
+    {
+        if ($this->redis === null || !$this->isConnected()) {
+            return;
+        }
+
+        if ($this->pendingTelemetry['hits'] === 0 &&
+            $this->pendingTelemetry['misses'] === 0 &&
+            $this->pendingTelemetry['commands'] === 0 &&
+            $this->pendingTelemetry['latency_ms_total'] === 0.0) {
             return;
         }
 
@@ -613,31 +852,78 @@ class RedisClient
         $telemetryKey = "{$this->config['prefix']}telemetry:{$hourBucket}";
         $aggregateKey = "{$this->config['prefix']}telemetry:aggregate";
 
-        try {
-            if ($hits > 0) {
-                $this->redis->hIncrBy($telemetryKey, 'hits', $hits);
-                $this->redis->hIncrBy($aggregateKey, 'hits', $hits);
-            }
-            if ($misses > 0) {
-                $this->redis->hIncrBy($telemetryKey, 'misses', $misses);
-                $this->redis->hIncrBy($aggregateKey, 'misses', $misses);
-            }
-            if ($commands > 0) {
-                $this->redis->hIncrBy($telemetryKey, 'commands', $commands);
-                $this->redis->hIncrBy($aggregateKey, 'commands', $commands);
-            }
-            if ($latencyMs > 0) {
-                $scaled = (int)($latencyMs * 100);
-                $this->redis->hIncrBy($telemetryKey, 'latency_ms_total', $scaled);
-                $this->redis->hIncrBy($aggregateKey, 'latency_ms_total', $scaled);
-                $this->redis->hIncrBy($aggregateKey, 'latency_count', 1);
-            }
+        $hits = $this->pendingTelemetry['hits'];
+        $misses = $this->pendingTelemetry['misses'];
+        $commands = $this->pendingTelemetry['commands'];
+        $latencyMs = $this->pendingTelemetry['latency_ms_total'];
+        $latencyCount = $this->pendingTelemetry['latency_count'];
 
-            // Garante TTL de 48h no bucket horário
-            if (method_exists($this->redis, 'expire')) {
-                $this->redis->expire($telemetryKey, 172800);
+        // Reseta o acumulador imediatamente
+        $this->pendingTelemetry = [
+            'hits'             => 0,
+            'misses'           => 0,
+            'commands'         => 0,
+            'latency_ms_total' => 0.0,
+            'latency_count'    => 0,
+        ];
+
+        try {
+            $client = $this->redis;
+            $pipe = method_exists($client, 'pipeline')
+                ? $client->pipeline()
+                : (method_exists($client, 'multi') ? $client->multi(Redis::PIPELINE) : null);
+
+            if ($pipe !== null) {
+                if ($hits > 0) {
+                    $pipe->hIncrBy($telemetryKey, 'hits', $hits);
+                    $pipe->hIncrBy($aggregateKey, 'hits', $hits);
+                }
+                if ($misses > 0) {
+                    $pipe->hIncrBy($telemetryKey, 'misses', $misses);
+                    $pipe->hIncrBy($aggregateKey, 'misses', $misses);
+                }
+                if ($commands > 0) {
+                    $pipe->hIncrBy($telemetryKey, 'commands', $commands);
+                    $pipe->hIncrBy($aggregateKey, 'commands', $commands);
+                }
+                if ($latencyMs > 0) {
+                    $scaled = (int)($latencyMs * 100);
+                    $pipe->hIncrBy($telemetryKey, 'latency_ms_total', $scaled);
+                    $pipe->hIncrBy($aggregateKey, 'latency_ms_total', $scaled);
+                    $pipe->hIncrBy($aggregateKey, 'latency_count', $latencyCount);
+                }
+                if (method_exists($pipe, 'expire')) {
+                    $pipe->expire($telemetryKey, 172800);
+                }
+                if (method_exists($pipe, 'exec')) {
+                    $pipe->exec();
+                }
+            } else {
+                if ($hits > 0) {
+                    $client->hIncrBy($telemetryKey, 'hits', $hits);
+                    $client->hIncrBy($aggregateKey, 'hits', $hits);
+                }
+                if ($misses > 0) {
+                    $client->hIncrBy($telemetryKey, 'misses', $misses);
+                    $client->hIncrBy($aggregateKey, 'misses', $misses);
+                }
+                if ($commands > 0) {
+                    $client->hIncrBy($telemetryKey, 'commands', $commands);
+                    $client->hIncrBy($aggregateKey, 'commands', $commands);
+                }
+                if ($latencyMs > 0) {
+                    $scaled = (int)($latencyMs * 100);
+                    $client->hIncrBy($telemetryKey, 'latency_ms_total', $scaled);
+                    $client->hIncrBy($aggregateKey, 'latency_ms_total', $scaled);
+                    $client->hIncrBy($aggregateKey, 'latency_count', $latencyCount);
+                }
+                if (method_exists($client, 'expire')) {
+                    $client->expire($telemetryKey, 172800);
+                }
             }
-        } catch (Throwable) {}
+        } catch (Throwable $e) {
+            $this->tripCircuitBreaker('Erro ao descarregar telemetria: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -647,6 +933,7 @@ class RedisClient
      */
     public function get24HourTelemetry(): array
     {
+        $this->flushTelemetry();
         $data = [];
         $now = time();
 
@@ -696,6 +983,7 @@ class RedisClient
      */
     public function getDiagnosticInfo(): array
     {
+        $this->flushTelemetry();
         $connected = $this->isConnected();
 
         // 1. Ler agregador persistente de telemetria no Redis

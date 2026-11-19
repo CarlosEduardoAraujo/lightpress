@@ -271,13 +271,29 @@ class ImageProcessor
 
     private static function loadDescriptions(array $requests): void
     {
-        $pending = [];
+        $needed = [];
         foreach ($requests as $key => $request) {
-            if (array_key_exists($key, self::$memoryDescCache)) {
-                continue;
+            if (!array_key_exists($key, self::$memoryDescCache)) {
+                $needed[$key] = $request;
             }
-            // Nova versão ignora fallbacks antigos que ficaram persistidos por 24h.
-            $cached = ObjectCache::get('media_desc:v2:' . md5($key), 'media');
+        }
+        if (!$needed) {
+            return;
+        }
+
+        // Mapear chaves de cache: cacheKey => logical key
+        $cacheKeys = [];
+        foreach ($needed as $key => $request) {
+            $cacheKeys['media_desc:v2:' . md5($key)] = $key;
+        }
+
+        // Busca em lote no ObjectCache em um único comando atômico
+        $cachedValues = ObjectCache::mGet(array_keys($cacheKeys), 'media');
+
+        $pending = [];
+        foreach ($needed as $key => $request) {
+            $cacheKey = 'media_desc:v2:' . md5($key);
+            $cached = $cachedValues[$cacheKey] ?? false;
             if (is_string($cached)) {
                 self::$memoryDescCache[$key] = $cached;
             } else {
@@ -347,13 +363,17 @@ class ImageProcessor
         } catch (\Throwable $e) {
             error_log('[ImageProcessor Description Error] ' . $e->getMessage());
         }
+        $itemsToCache = [];
         foreach ($pending as $key => $request) {
             $description = $resolved[$key] ?? self::filenameDescription($request['path']);
             self::$memoryDescCache[$key] = $description;
             // Falhas e vínculos ausentes não podem envenenar o cache persistente.
             if (array_key_exists($key, $resolved)) {
-                ObjectCache::set('media_desc:v2:' . md5($key), $description, 'media', 86400);
+                $itemsToCache['media_desc:v2:' . md5($key)] = $description;
             }
+        }
+        if (!empty($itemsToCache)) {
+            ObjectCache::setMultiple($itemsToCache, 'media', 86400);
         }
     }
 

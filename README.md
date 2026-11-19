@@ -1623,6 +1623,14 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Deduplicação de Tags e Proteção do Worker:** Deduplicação prévia de tags e contenção do array de purga para ~20–30 URLs (redução de 99,9% no volume), eliminando saturação de rate-limit na Cloudflare (HTTP 429) e travamento de lock no worker `bin/retry-cache-purge.php`.
   - [x] **100% de Aprovação na Suíte de Testes:** Suíte `bin/test-image-descriptions.php` ampliada com teste de estresse em escala (30/30 verificações aprovadas).
 
+* **FASE CONCLUÍDA — Otimização de Comandos Redis Síncronos, Telemetria e Batching (PERF-02):**
+  - [x] **Eliminação de `ping()` Redundante:** Otimização de `RedisClient::isConnected()` para checagem em RAM no estado `CLOSED` (0 RTTs), confiando na captura de exceções nos comandos ativos (`get`, `set`, etc.) para acionar o Circuit Breaker. `ping()` restrito ao estado `HALF_OPEN` e consultas de diagnóstico.
+  - [x] **Agregação de Telemetria com Pipeline no Shutdown:** Substituição de até 7 comandos individuais síncronos por `get`/`set` por acúmulo em memória (`$pendingTelemetry`) e descarga em lote atômico via `Redis::PIPELINE` em `register_shutdown_function` (`flushTelemetry()`).
+  - [x] **QueryProfiler Opt-in e Buffer em Memória:** Profiler desativado por padrão para requisições anônimas de visitantes, eliminando 100% das chamadas a `debug_backtrace()` e ao Redis em tráfego público. Ativação via flag `profiler_enabled`, amostragem (`profiler_sample_rate`) ou sessões de administrador, com descarga de logs em pipeline.
+  - [x] **Operações em Lote (`mGet` e `setMultiple`):** Implementação na camada unificada `ObjectCache`, na facade `RedisCache` e no `RedisClient`.
+  - [x] **Resolução em Lote no `ImageProcessor`:** Refatoração de `loadDescriptions()` para buscar metadados de mídias em uma única chamada `ObjectCache::mGet()` e gravação via `ObjectCache::setMultiple()`, reduzindo comandos Redis em >99% em listagens com múltiplas imagens.
+  - [x] **Compatibilidade e Baterias de Validação:** Dublê `FakeRedis` expandido com suporte a `pipeline()` e `mGet()`. Testes unitários do plugin ampliados para 17/17 PASS e micro-benchmark integrado demonstrando >1,1 milhão op/s em leituras de cache local e >8,3 milhões de chaves/s resolvidas via `mGet`.
+
 ---
 
 ## 11. Metas Mensuráveis e Critérios de Aceitação

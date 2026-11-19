@@ -6,7 +6,20 @@ namespace LightPress\Core {
     final class ObjectCache {
         public static array $data = [];
         public static function get(string $key, string $group = 'default'): mixed { return self::$data[$group][$key] ?? false; }
+        public static function mGet(array $keys, string $group = 'default'): array {
+            $res = [];
+            foreach ($keys as $k) {
+                $res[$k] = self::$data[$group][$k] ?? false;
+            }
+            return $res;
+        }
         public static function set(string $key, mixed $value, string $group = 'default', int $ttl = 0): bool { self::$data[$group][$key] = $value; return true; }
+        public static function setMultiple(array $items, string $group = 'default', int $ttl = 0): bool {
+            foreach ($items as $k => $v) {
+                self::$data[$group][$k] = $v;
+            }
+            return true;
+        }
         public static function flushGroup(string $group): bool { unset(self::$data[$group]); return true; }
     }
     final class CacheManager {

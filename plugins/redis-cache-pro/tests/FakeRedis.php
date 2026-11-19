@@ -16,6 +16,7 @@ class FakeRedis
     public array $watched = [];
     public bool $failExec = false;
     public bool $shouldFailPing = false;
+    public bool $shouldFailOps = false;
 
     public function select(int $db): bool
     {
@@ -48,8 +49,56 @@ class FakeRedis
         return '+PONG';
     }
 
+    public function pipeline(): self
+    {
+        $pipe = new self();
+        $pipe->db = $this->db;
+        $pipe->queue = [];
+        return $pipe;
+    }
+
+    public function multi(int $mode = 1): self
+    {
+        return $this->pipeline();
+    }
+
+    public function exec(): mixed
+    {
+        if ($this->queue === null) {
+            return [];
+        }
+        if ($this->failExec) {
+            $this->queue = null;
+            return false;
+        }
+        $results = [];
+        $queue = $this->queue;
+        $this->queue = null;
+        foreach ($queue as $call) {
+            $method = $call['method'];
+            $args = $call['args'];
+            $results[] = $this->$method(...$args);
+        }
+        return $results;
+    }
+
+    public function mGet(array $keys): array
+    {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: mGet');
+        }
+        $results = [];
+        foreach ($keys as $key) {
+            $results[] = $this->get($key);
+        }
+        return $results;
+    }
+
     public function get(string $key): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: get');
+        }
         $entry = $this->entry($key);
         return $entry === null ? false : $entry['value'];
     }
@@ -59,8 +108,15 @@ class FakeRedis
         return $this->entry($key) !== null ? 1 : 0;
     }
 
-    public function set(string $key, mixed $value, array $options = []): bool
+    public function set(string $key, mixed $value, array $options = []): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: set');
+        }
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $entry = $this->entry($key);
         if ((in_array('nx', $options, true) && $entry !== null) || (in_array('xx', $options, true) && $entry === null)) {
             return false;
@@ -77,21 +133,36 @@ class FakeRedis
         return true;
     }
 
-    public function setex(string $key, int $ttl, mixed $value): bool
+    public function setex(string $key, int $ttl, mixed $value): mixed
     {
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         return $this->set($key, $value, ['ex' => $ttl]);
     }
 
-    public function del(string $key): int
+    public function del(string $key): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: del');
+        }
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $exists = $this->exists($key);
         $store = &$this->store();
         unset($store[$key]);
         return $exists;
     }
 
-    public function unlink(string $key): int
+    public function unlink(string $key): mixed
     {
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         return $this->del($key);
     }
 
@@ -103,16 +174,27 @@ class FakeRedis
         return max(0, (int)ceil(($entry['expires'] - (microtime(true) * 1000)) / 1000));
     }
 
-    public function expire(string $key, int $seconds): bool
+    public function expire(string $key, int $seconds): mixed
     {
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $store = &$this->store();
         if (!isset($store[$key])) return false;
         $store[$key]['expires'] = microtime(true) * 1000 + ($seconds * 1000);
         return true;
     }
 
-    public function hIncrBy(string $key, string $field, int $offset): int
+    public function hIncrBy(string $key, string $field, int $offset): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: hIncrBy');
+        }
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $val = $this->get($key);
         $val = is_array($val) ? $val : [];
         $val[$field] = ($val[$field] ?? 0) + $offset;
@@ -157,8 +239,15 @@ class FakeRedis
         ];
     }
 
-    public function lPush(string $key, mixed $value): int
+    public function lPush(string $key, mixed $value): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: lPush');
+        }
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $val = $this->get($key);
         $list = is_array($val) ? $val : [];
         array_unshift($list, $value);
@@ -166,8 +255,15 @@ class FakeRedis
         return count($list);
     }
 
-    public function lTrim(string $key, int $start, int $stop): bool
+    public function lTrim(string $key, int $start, int $stop): mixed
     {
+        if ($this->shouldFailOps) {
+            throw new RuntimeException('Redis operation failed: lTrim');
+        }
+        if ($this->queue !== null) {
+            $this->queue[] = ['method' => __FUNCTION__, 'args' => func_get_args()];
+            return $this;
+        }
         $val = $this->get($key);
         if (!is_array($val)) return true;
         $length = ($stop - $start) + 1;

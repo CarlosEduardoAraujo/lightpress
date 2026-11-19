@@ -55,6 +55,7 @@ FakeRedis::clear();
 $fake = new FakeRedis();
 $client = RedisClient::getInstance();
 $client->setClient($fake);
+QueryProfiler::setEnabled(true);
 
 echo "1. Testes de Operações Básicas de Cache (GET, SET, DELETE, REMEMBER)\n";
 
@@ -146,12 +147,13 @@ it('Invalidação Global (flush) invalida todo o namespace em O(1)', function() 
 
 echo "\n3. Testes do Circuit Breaker & Resiliência\n";
 
-it('Circuit Breaker desarma para estado OPEN em 3 falhas consecutivas', function() use ($client, $fake) {
-    $fake->shouldFailPing = true;
+it('Circuit Breaker desarma para estado OPEN em 3 falhas consecutivas de comandos', function() use ($client, $fake) {
+    $fake->shouldFailOps = true;
 
-    // Forçar falhas
+    // Forçar falhas reais em comandos de cache para trip do disjuntor sem necessidade de ping
     for ($i = 0; $i < 3; $i++) {
-        $client->isConnected();
+        $found = false;
+        $client->get('chave_falha_' . $i, 'posts', $found);
     }
 
     $diag = $client->getDiagnosticInfo();
@@ -163,7 +165,7 @@ it('Circuit Breaker desarma para estado OPEN em 3 falhas consecutivas', function
     $val = $client->get('chave_degradada', 'posts');
     expectEqual('salva_em_memoria', $val, 'deve operar com transparência via fallback');
 
-    $fake->shouldFailPing = false;
+    $fake->shouldFailOps = false;
     $client->setClient($fake);
 });
 
@@ -227,6 +229,73 @@ it('Telemetria agregada e RTT são calculados sem valores fixos artificiais', fu
     $diag = $client->getDiagnosticInfo();
     expectTrue(isset($diag['commands_count']));
     expectTrue(isset($diag['ping_rtt_ms']));
+});
+
+echo "\n7. Validação PERF-02: Eliminação de Ping, Pipeline de Telemetria e Operações em Lote\n";
+
+it('isConnected() não dispara ping() quando em estado normal CLOSED (0 RTTs)', function() use ($client, $fake) {
+    // Se o ping estiver indisponível no daemon, operações normais NÃO devem falhar
+    $fake->shouldFailPing = true;
+
+    $connected = $client->isConnected();
+    expectTrue($connected, 'isConnected() em estado CLOSED deve responder true em memória sem ping');
+
+    // Leitura normal deve funcionar sem disparar exceção de ping
+    $client->set('perf_key_ping', 'ok', 'default');
+    $val = $client->get('perf_key_ping', 'default');
+    expectEqual('ok', $val, 'get() deve executar normalmente sem depender de ping prévio');
+
+    // Apenas sondagem forçada deve disparar ping e falhar
+    $probed = $client->isConnected(true);
+    expectEqual(false, $probed, 'isConnected(true) forçado deve falhar quando ping está bloqueado');
+
+    $fake->shouldFailPing = false;
+    $client->setClient($fake);
+});
+
+it('mGet() e setMultiple() operam em lote atômico no Redis e ObjectCache', function() use ($client) {
+    $items = [
+        'lote_img_1' => 'Descricao 1',
+        'lote_img_2' => 'Descricao 2',
+        'lote_img_3' => 'Descricao 3',
+    ];
+
+    $saved = \LightPress\Core\ObjectCache::setMultiple($items, 'media', 3600);
+    expectTrue($saved, 'setMultiple deve salvar com sucesso');
+
+    // Recuperação em lote
+    $results = \LightPress\Core\ObjectCache::mGet(['lote_img_1', 'lote_img_2', 'lote_img_3', 'lote_img_inexistente'], 'media');
+    expectEqual('Descricao 1', $results['lote_img_1']);
+    expectEqual('Descricao 2', $results['lote_img_2']);
+    expectEqual('Descricao 3', $results['lote_img_3']);
+    expectEqual(false, $results['lote_img_inexistente'], 'Chave ausente deve retornar false');
+});
+
+it('Telemetria acumula em memória e descarrega em Pipeline atômico via flushTelemetry()', function() use ($client, $fake) {
+    // Executa operações
+    $client->set('tel_key', 'valor', 'default');
+    $client->get('tel_key', 'default');
+    $client->get('tel_inexistente', 'default');
+
+    // flushTelemetry descarrega sem erros
+    $client->flushTelemetry();
+
+    $diag = $client->getDiagnosticInfo();
+    expectTrue($diag['hits'] > 0, 'Hits devem estar registrados após flush');
+    expectTrue($diag['misses'] > 0, 'Misses devem estar registrados após flush');
+});
+
+it('QueryProfiler opt-in: não consome CPU nem gera logs quando inativo', function() use ($client) {
+    QueryProfiler::setEnabled(false);
+    QueryProfiler::reset();
+
+    $client->set('prof_key_off', 'valor', 'default');
+    $client->get('prof_key_off', 'default');
+
+    $logs = QueryProfiler::getLogs();
+    expectEqual(0, count($logs), 'Profiler inativo não deve acumular logs');
+
+    QueryProfiler::setEnabled(true);
 });
 
 echo "\n========================================================\n";
