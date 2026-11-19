@@ -376,14 +376,11 @@ class ImageProcessor
                     }
                 }
                 $names = array_values(array_unique($names));
-                $candidates = [];
-                if (!empty($names)) {
-                    $nameMarks = implode(',', array_fill(0, count($names), '?'));
-                    $candidates = Database::fetchAll(
-                        "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE original_name IN ({$nameMarks})",
-                        $names
-                    );
-                }
+                $nameMarks = implode(',', array_fill(0, count($names), '?'));
+                $candidates = Database::fetchAll(
+                    "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE original_name IN ({$nameMarks})",
+                    $names
+                );
 
                 foreach ($stage3Requests as $key => $request) {
                     $path = $request['path'];
