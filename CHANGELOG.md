@@ -7,6 +7,29 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Precedência e Desombreamento de Rotas no Front Controller (ARCH-01) — 2026-11-19
+
+- **Desombreamento das Rotas `/feed`, `/feed/`, `/admin` e `/admin/` (`public/index.php`, `core/Router.php`, `bin/test-feeds-news.php`):**
+  - **Diagnóstico da Causa Raiz:** Em `public/index.php`, a rota genérica `$router->get('/{slug}/', ...)` estava registrada antes das rotas dedicadas de Feeds RSS (`/feed.xml`, `/feed`, `/feed/`), Sitemaps XML, endpoints de API e painel administrativo (`/admin`, `/admin/`). Como a classe `Router` avalia rotas sequencialmente (*first-match*) e aplica canonicalização com redirecionamento 301 (`/feed` → `/feed/` e `/admin` → `/admin/`), qualquer requisição a `/feed` ou `/admin` casava com `/{slug}/` (onde `$slug` = `'feed'` ou `'admin'`). Por estarem presentes na lista `$reserved`, a rota emitia imediatamente `HTTP 404`, quebrando os endpoints canônicos de feeds anunciados nas purgas de cache e na documentação.
+  - **Reordenação Arquitetural do Front Controller (`public/index.php`):**
+    - Todas as rotas literais e específicas foram realocadas para antes de `/{slug}/`:
+      - Helper de feeds `$renderRssFeed`
+      - Feeds RSS gerais: `/feed.xml`, `/feed`, `/feed/`
+      - Feeds RSS por categoria: `/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed`, `/categoria/{slug}/feed/`
+      - Sitemaps XML: `/sitemap-news.xml`, `/sitemap.xml`, `/sitemap-main.xml`, `/sitemap-posts-{part}.xml`
+      - APIs de visualização: `POST /api/view/page/{id}`, `POST /api/view/{id}`
+      - Redirecionamentos administrativos: `GET /admin`, `GET /admin/` (redirecionando 302 para `/admin/login.php`)
+      - Registro de rotas de plugins: `Hook::doAction('register_routes', $router)`
+    - A rota `/{slug}/` foi consolidada como rota canônica final de conteúdo antes do tratador 404 (`$router->setNotFound(...)`).
+  - **Blindagem Defensiva com Guarda de SAPI (`public/index.php`):**
+    - Ativação do modo de teste do roteador protegida com `PHP_SAPI === 'cli' && !empty($GLOBALS['lightpress_testing'])`, garantindo que o modo de testes nunca seja acionado em ambientes Web (PHP-FPM, FastCGI, Apache, etc.).
+  - **Emissão Defensiva de Status Code em Modo de Teste (`core/Router.php`):**
+    - `Router::redirect()` atualizado para registrar `http_response_code($statusCode)` respeitando `!headers_sent()` quando em modo de teste, permitindo que asserções inspecionem códigos de redirecionamento sem disparar warnings de cabeçalhos.
+  - **Cobertura de Testes Automatizados Expandida (`bin/test-feeds-news.php`):**
+    - Adicionadas 10 novas asserções cobrindo `HTTP 200` e XML válido em `/feed/`, redirecionamento `301` em `/feed` → `/feed/`, redirecionamento `302` em `/admin/` → `/admin/login.php` e redirecionamento `301` em `/admin` → `/admin/`.
+    - Total de testes em `bin/test-feeds-news.php` expandido para **36/36 aprovados** com 100% de sucesso.
+    - Suíte geral de testes unitários `bin/test.php` aprovada com **82/82 testes**.
+
 ### Deduplicação Sistemática de Purgas Cloudflare e Nginx FastCGI (PERF-06) — 2026-11-18
 
 - **Eliminação de Duplicação Sistemática de Invalidação no Nginx e Cloudflare (`core/CacheManager.php`, `core/CloudflareCache.php`, `core/PostService.php`, `core/ImageProcessor.php`, `public/admin/dashboard.php`, `bin/retry-cache-purge.php`, `bin/purge-cache.php`):**

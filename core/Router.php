@@ -77,6 +77,9 @@ class Router
         $this->lastRedirect = ['url' => $target, 'status' => $statusCode];
 
         if ($this->isTesting) {
+            if (!headers_sent()) {
+                http_response_code($statusCode);
+            }
             return;
         }
 

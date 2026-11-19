@@ -29,6 +29,9 @@ PostService::promoteScheduledPosts();
 
 $basePath = $config['app']['base_path'] ?? (parse_url($config['app']['canonical_origin'] ?? '', PHP_URL_PATH) ?: '');
 $router = new Router($basePath);
+if (PHP_SAPI === 'cli' && !empty($GLOBALS['lightpress_testing'])) {
+    $router->setTestingMode(true);
+}
 
 // Rota 1: Home Grid (Últimas notícias ou Home Institucional conforme o tema ativo)
 $router->get('/', function () use ($config, $router): void {
@@ -588,125 +591,6 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     require ThemeManager::getTemplateFile('tag.php');
 });
 
-// Registro de rotas adicionais disponibilizadas por plugins ativos
-Hook::doAction('register_routes', $router);
-
-// Rota 6: Artigo Individual na Raiz (/{slug}/)
-$router->get('/{slug}/', function (array $params) use ($config): void {
-    $slug = $params['slug'] ?? '';
-    $nowUtc = gmdate('Y-m-d H:i:s');
-
-    // Palavras reservadas que não devem ser tratadas como slug de notícia
-    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag', 'noticia', 'blog'];
-    if (in_array(strtolower($slug), $reserved, true)) {
-        http_response_code(404);
-        require ThemeManager::getTemplateFile('404.php');
-        return;
-    }
-
-    // Consulta atômica do artigo com cache em memória RAM (Redis/ObjectCache)
-    $post = ObjectCache::get("post_slug:{$slug}", 'posts');
-    if ($post === false || !is_array($post)) {
-        $p = Database::fetchOne(
-            "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
-             FROM posts p
-             JOIN users u ON u.id = p.user_id
-             WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
-             LIMIT 1",
-            [$slug, $nowUtc]
-        );
-
-        if ($p) {
-            // TTL Estratificado Inteligente no Redis:
-            // Até 1 dia da publicação ou da última atualização: 1 dia (86.400s)
-            // Mais de 1 dia da publicação/atualização: 10 dias (864.000s)
-            $lastTime = 0;
-            if (!empty($p['updated_at'])) {
-                $lastTime = (int)strtotime((string)$p['updated_at']);
-            }
-            if ($lastTime <= 0 && !empty($p['published_at'])) {
-                $lastTime = (int)strtotime((string)$p['published_at']);
-            }
-            if ($lastTime <= 0) {
-                $lastTime = time();
-            }
-
-            $postTtl = (time() - $lastTime <= 86400) ? 86400 : 864000;
-            ObjectCache::set("post_slug:{$slug}", $p, 'posts', $postTtl);
-            $post = $p;
-        } else {
-            $post = null;
-        }
-    }
-
-    if (!$post) {
-        // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
-        \LightPress\Core\Schema::ensurePagesTable();
-        $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
-            $pg = Database::fetchOne(
-                "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
-                [$slug]
-            );
-            return $pg ?: null;
-        }, 'pages');
-
-        if ($page) {
-            header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
-            $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
-            require ThemeManager::getTemplateFile('page.php');
-            return;
-        }
-
-        http_response_code(404);
-        require ThemeManager::getTemplateFile('404.php');
-        return;
-    }
-
-    // Buscar até 4 notícias relacionadas da mesma categoria para retenção de audiência (com cache de 30m)
-    $relatedPosts = ObjectCache::remember("related:{$post['category']}:{$post['id']}", 1800, function () use ($post, $nowUtc): array {
-        return Database::fetchAll(
-            "SELECT id, slug, title, summary, category, featured_image, published_at 
-             FROM posts 
-             WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
-             ORDER BY published_at DESC LIMIT 4",
-            [$post['category'], (int)$post['id'], $nowUtc]
-        );
-    }, 'posts');
-
-    // Calcular tempo estimado de leitura (média de 200 palavras/minuto)
-    $cleanText = strip_tags($post['content_html']);
-    $wordCount = str_word_count($cleanText);
-    $readingTime = max(1, (int)ceil($wordCount / 200));
-
-    // Pré-carregamento em lote: imagem principal e imagens das matérias relacionadas
-    $postImages = array_filter(array_merge(
-        [!empty($post['featured_image']) ? (string)$post['featured_image'] : null],
-        array_column($relatedPosts, 'featured_image')
-    ));
-    if (!empty($postImages)) {
-        ImageProcessor::preloadDescriptions($postImages);
-    }
-
-    // TTL Estratificado Inteligente para o FastCGI Cache do Nginx:
-    // Se a matéria foi publicada ou atualizada nas últimas 24h: 1 dia (86.400s)
-    // Se tem mais de 24h sem nenhuma modificação: 10 dias (864.000s)
-    $lastActionTime = 0;
-    if (!empty($post['updated_at'])) {
-        $lastActionTime = (int)strtotime((string)$post['updated_at']);
-    }
-    if ($lastActionTime <= 0 && !empty($post['published_at'])) {
-        $lastActionTime = (int)strtotime((string)$post['published_at']);
-    }
-    if ($lastActionTime <= 0) {
-        $lastActionTime = time();
-    }
-
-    $cacheTtl = (time() - $lastActionTime <= 86400) ? 86400 : 864000;
-    header("X-Accel-Expires: {$cacheTtl}");
-    $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
-    require ThemeManager::getTemplateFile('post.php');
-});
-
 // Helper para renderização padronizada de Feeds RSS 2.0 com suporte nativo ao Google News
 $renderRssFeed = function (
     string $title,
@@ -1055,6 +939,125 @@ $router->get('/admin', function () use ($router): void {
 $router->get('/admin/', function () use ($router): void {
     $router->redirect('/admin/login.php', 302);
     return;
+});
+
+// Registro de rotas adicionais disponibilizadas por plugins ativos
+Hook::doAction('register_routes', $router);
+
+// Rota 6: Artigo Individual na Raiz (/{slug}/)
+$router->get('/{slug}/', function (array $params) use ($config): void {
+    $slug = $params['slug'] ?? '';
+    $nowUtc = gmdate('Y-m-d H:i:s');
+
+    // Palavras reservadas que não devem ser tratadas como slug de notícia
+    $reserved = ['admin', 'api', 'uploads', 'assets', 'storage', 'busca', 'feed', 'sitemap', 'page', 'categoria', 'tag', 'noticia', 'blog'];
+    if (in_array(strtolower($slug), $reserved, true)) {
+        http_response_code(404);
+        require ThemeManager::getTemplateFile('404.php');
+        return;
+    }
+
+    // Consulta atômica do artigo com cache em memória RAM (Redis/ObjectCache)
+    $post = ObjectCache::get("post_slug:{$slug}", 'posts');
+    if ($post === false || !is_array($post)) {
+        $p = Database::fetchOne(
+            "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
+             FROM posts p
+             JOIN users u ON u.id = p.user_id
+             WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             LIMIT 1",
+            [$slug, $nowUtc]
+        );
+
+        if ($p) {
+            // TTL Estratificado Inteligente no Redis:
+            // Até 1 dia da publicação ou da última atualização: 1 dia (86.400s)
+            // Mais de 1 dia da publicação/atualização: 10 dias (864.000s)
+            $lastTime = 0;
+            if (!empty($p['updated_at'])) {
+                $lastTime = (int)strtotime((string)$p['updated_at']);
+            }
+            if ($lastTime <= 0 && !empty($p['published_at'])) {
+                $lastTime = (int)strtotime((string)$p['published_at']);
+            }
+            if ($lastTime <= 0) {
+                $lastTime = time();
+            }
+
+            $postTtl = (time() - $lastTime <= 86400) ? 86400 : 864000;
+            ObjectCache::set("post_slug:{$slug}", $p, 'posts', $postTtl);
+            $post = $p;
+        } else {
+            $post = null;
+        }
+    }
+
+    if (!$post) {
+        // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
+        \LightPress\Core\Schema::ensurePagesTable();
+        $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
+            $pg = Database::fetchOne(
+                "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
+                [$slug]
+            );
+            return $pg ?: null;
+        }, 'pages');
+
+        if ($page) {
+            header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional
+            $pageTitle = (!empty($page['seo_title']) ? $page['seo_title'] : $page['title']) . ' - ' . $config['app']['name'];
+            require ThemeManager::getTemplateFile('page.php');
+            return;
+        }
+
+        http_response_code(404);
+        require ThemeManager::getTemplateFile('404.php');
+        return;
+    }
+
+    // Buscar até 4 notícias relacionadas da mesma categoria para retenção de audiência (com cache de 30m)
+    $relatedPosts = ObjectCache::remember("related:{$post['category']}:{$post['id']}", 1800, function () use ($post, $nowUtc): array {
+        return Database::fetchAll(
+            "SELECT id, slug, title, summary, category, featured_image, published_at 
+             FROM posts 
+             WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
+             ORDER BY published_at DESC LIMIT 4",
+            [$post['category'], (int)$post['id'], $nowUtc]
+        );
+    }, 'posts');
+
+    // Calcular tempo estimado de leitura (média de 200 palavras/minuto)
+    $cleanText = strip_tags($post['content_html']);
+    $wordCount = str_word_count($cleanText);
+    $readingTime = max(1, (int)ceil($wordCount / 200));
+
+    // Pré-carregamento em lote: imagem principal e imagens das matérias relacionadas
+    $postImages = array_filter(array_merge(
+        [!empty($post['featured_image']) ? (string)$post['featured_image'] : null],
+        array_column($relatedPosts, 'featured_image')
+    ));
+    if (!empty($postImages)) {
+        ImageProcessor::preloadDescriptions($postImages);
+    }
+
+    // TTL Estratificado Inteligente para o FastCGI Cache do Nginx:
+    // Se a matéria foi publicada ou atualizada nas últimas 24h: 1 dia (86.400s)
+    // Se tem mais de 24h sem nenhuma modificação: 10 dias (864.000s)
+    $lastActionTime = 0;
+    if (!empty($post['updated_at'])) {
+        $lastActionTime = (int)strtotime((string)$post['updated_at']);
+    }
+    if ($lastActionTime <= 0 && !empty($post['published_at'])) {
+        $lastActionTime = (int)strtotime((string)$post['published_at']);
+    }
+    if ($lastActionTime <= 0) {
+        $lastActionTime = time();
+    }
+
+    $cacheTtl = (time() - $lastActionTime <= 86400) ? 86400 : 864000;
+    header("X-Accel-Expires: {$cacheTtl}");
+    $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
+    require ThemeManager::getTemplateFile('post.php');
 });
 
 // Configurar manipulador 404

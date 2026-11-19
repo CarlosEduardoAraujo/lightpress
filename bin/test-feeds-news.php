@@ -44,6 +44,7 @@ $oldPostTime = gmdate('Y-m-d H:i:s', time() - (50 * 3600)); // 50h atrás (fora 
 // Helper para disparar buffer e capturar output
 function captureRoute(string $method, string $uri): array {
     global $config;
+    $GLOBALS['lightpress_testing'] = true;
     $_SERVER['REQUEST_METHOD'] = $method;
     $_SERVER['REQUEST_URI'] = $uri;
 
@@ -56,8 +57,15 @@ function captureRoute(string $method, string $uri): array {
 
     ini_set('display_errors', $oldDisplay);
 
-    $is404 = http_response_code() === 404 || str_contains($output, 'Página Não Encontrada') || str_contains($output, '404');
-    $status = $is404 ? 404 : 200;
+    $code = http_response_code();
+    $redirect = isset($router) ? $router->getLastRedirect() : null;
+
+    if ($redirect !== null && isset($redirect['status'])) {
+        $status = (int)$redirect['status'];
+    } else {
+        $is404 = $code === 404 || str_contains($output, 'Página Não Encontrada') || str_contains($output, '404');
+        $status = $is404 ? 404 : ($code ?: 200);
+    }
 
     // Extrai o conteúdo XML puro a partir da declaração <?xml
     $xmlPos = strpos($output, '<?xml');
@@ -65,7 +73,7 @@ function captureRoute(string $method, string $uri): array {
         $output = substr($output, $xmlPos);
     }
 
-    return ['status' => $status, 'body' => trim($output)];
+    return ['status' => $status, 'body' => trim($output), 'redirect' => $redirect];
 }
 
 // -------------------------------------------------------------
@@ -129,6 +137,38 @@ assertTest("/feed.xml contém título da matéria recente", str_contains($body, 
 assertTest("/feed.xml contém enclosure com type='image/webp'", str_contains($body, 'type="image/webp"'));
 assertTest("/feed.xml contém <dc:creator>", str_contains($body, '<dc:creator>'));
 assertTest("/feed.xml contém <content:encoded>", str_contains($body, '<content:encoded>'));
+
+// -------------------------------------------------------------
+// 2b. Testar Feed RSS Geral na URL Canônica (/feed/) - ARCH-01
+// -------------------------------------------------------------
+echo "\n[1b] Testando Feed RSS Geral na URL Canônica (/feed/ - ARCH-01)\n";
+$resFeedSlash = captureRoute('GET', '/feed/');
+assertTest("Rota /feed/ responde com status 200 (não sombreada por /{slug}/)", $resFeedSlash['status'] === 200);
+
+$xmlFeedSlash = @simplexml_load_string($resFeedSlash['body']);
+assertTest("/feed/ retorna XML válido", $xmlFeedSlash !== false);
+assertTest("/feed/ declara versão 2.0", (string)($xmlFeedSlash['version'] ?? '') === '2.0');
+assertTest("/feed/ contém título da matéria recente", str_contains($resFeedSlash['body'], 'Matéria Recente Teste'));
+
+// -------------------------------------------------------------
+// 2c. Testar Redirecionamento Canônico (/feed -> /feed/) - ARCH-01
+// -------------------------------------------------------------
+echo "\n[1c] Testando Redirecionamento Canônico de /feed para /feed/ (ARCH-01)\n";
+$resFeedNoSlash = captureRoute('GET', '/feed');
+assertTest("Rota /feed responde com redirecionamento canônico 301", $resFeedNoSlash['status'] === 301);
+assertTest("Redirecionamento de /feed aponta para /feed/", ($resFeedNoSlash['redirect']['url'] ?? '') === '/feed/');
+
+// -------------------------------------------------------------
+// 2d. Testar Rotas Administrativas (/admin/ e /admin - ARCH-01)
+// -------------------------------------------------------------
+echo "\n[1d] Testando Rotas Administrativas (/admin/ e /admin - ARCH-01)\n";
+$resAdminSlash = captureRoute('GET', '/admin/');
+assertTest("Rota /admin/ responde com status 302 (não sombreada por /{slug}/)", $resAdminSlash['status'] === 302);
+assertTest("Rota /admin/ redireciona para /admin/login.php", ($resAdminSlash['redirect']['url'] ?? '') === '/admin/login.php');
+
+$resAdminNoSlash = captureRoute('GET', '/admin');
+assertTest("Rota /admin responde com redirecionamento canônico 301", $resAdminNoSlash['status'] === 301);
+assertTest("Redirecionamento de /admin aponta para /admin/", ($resAdminNoSlash['redirect']['url'] ?? '') === '/admin/');
 
 // -------------------------------------------------------------
 // 3. Testar Feed RSS por Categoria (/categoria/{slug}/feed.xml)

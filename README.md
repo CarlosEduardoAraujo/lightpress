@@ -1590,7 +1590,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Feed RSS Geral Enriquecido (`/feed.xml`, `/feed/`):** Compatível com o Google Publisher Center, com namespaces `content`, `media`, `dc`, imagens em `<enclosure>` WebP e corpo editorial em `<content:encoded>`.
   - [x] **Feeds por Categoria Editorial (`/categoria/{slug}/feed.xml`, `/categoria/{slug}/feed/`):** Feeds temáticos por categoria para seções no Google Notícias, com autodescoberta no `<head>`.
   - [x] **Google News XML Sitemap (`/sitemap-news.xml`):** Janela estrita de 48h, namespaces oficiais (`xmlns:news`, `xmlns:image`) e inclusão no índice `/sitemap.xml`.
-  - [x] **Suíte de Testes Automatizados (`bin/test-feeds-news.php`):** 26 asserções com 100% de aprovação.
+  - [x] **Suíte de Testes Automatizados (`bin/test-feeds-news.php`):** 36 asserções com 100% de aprovação (incluindo cobertura de `/feed/`, `/feed` e `/admin*` do ARCH-01).
 
 * **FASE CONCLUÍDA — Sanitização de Paste (Poda de Parágrafos Vazios) e Suporte Completo a Tabelas:**
   - [x] **Poda de Parágrafos Vazios e `<br>` Espúrios:** Limpeza de placeholders `<p><br></p>` ao colar em editor vazio, eliminação de nós vazios (`<p>`, `<h2>`, `<h3>`, `<h4>`, `<blockquote>`, `<li>`) com `&nbsp;` ou quebras soltas, remoção de `<br class="Apple-interchange-newline">` e poda de `<br>` residuais no final de parágrafos.
@@ -1645,6 +1645,13 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Bypass de Cloudflare para Utilitários e Diagnósticos:** Introdução do parâmetro `$purgeCloudflare = true` em `CacheManager::purgeUrls()`, ajustando `bin/purge-cache.php --home` para expurgar apenas o Nginx local antes de exibir o status da Cloudflare.
   - [x] **Tolerância a Falhas com Fallback Transparente:** Em caso de falha parcial ou exceção na purga síncrona, o job permanece `pending` e é retomado pelo worker de retentativa com backoff exponencial. Lotes grandes de mídia ($> 30$ URLs) continuam delegados ao worker em segundo plano.
   - [x] **Automação de CI e Cobertura de Testes:** Criação da suíte `bin/test-perf06-cache-dedup.php` (16/16 asserções aprovadas), integração na pipeline `.github/workflows/ci.yml` (PHP 8.4 e 8.5) e conformidade integral com PHPStan Nível 8.
+
+* **FASE CONCLUÍDA — Precedência e Desombreamento de Rotas no Front Controller (ARCH-01):**
+  - [x] **Precedência de Rotas Literais e Específicas (`public/index.php`):** Reordenação estrutural das rotas do Front Controller movendo Feeds RSS (`/feed.xml`, `/feed`, `/feed/`, `/categoria/{slug}/feed*`), Sitemaps XML (`/sitemap-news.xml`, `/sitemap.xml`, etc.), APIs de visualização (`/api/view/*`), redirecionamentos administrativos (`/admin`, `/admin/`) e o hook `Hook::doAction('register_routes', $router)` para antes da rota wildcard de nível único `/{slug}/`.
+  - [x] **Eliminação de Falso Positivo HTTP 404 em Feeds e Painel:** Resolução do sombreamento em que requisições canônicas para `/feed`, `/feed/`, `/admin` e `/admin/` casavam prematuramente com a rota de notícias `/{slug}/`, eram interceptadas pela lista `$reserved` e retornavam 404.
+  - [x] **Guarda de SAPI e Isolamento Defensivo (`PHP_SAPI === 'cli'`):** Ativação estrita do modo de teste do roteador (`$router->setTestingMode(true)`) condicionada a `PHP_SAPI === 'cli' && !empty($GLOBALS['lightpress_testing'])`, impedindo qualquer ativação indevida sob PHP-FPM / servidores Web de produção.
+  - [x] **Emissão Defensiva de Códigos HTTP em Testes (`core/Router.php`):** Ajuste em `Router::redirect()` para registrar `http_response_code($statusCode)` respeitando `!headers_sent()` durante a execução de suítes de teste sem interromper prematuramente o fluxo via `exit`.
+  - [x] **Expansão da Cobertura de Testes Automatizados (`bin/test-feeds-news.php`):** Adição de 10 novas asserções cobrindo `/feed/` (HTTP 200 e XML RSS 2.0 válido), redirecionamento 301 de `/feed` para `/feed/`, redirecionamento 302 de `/admin/` para `/admin/login.php` e redirecionamento 301 de `/admin` para `/admin/` (totalizando 36/36 testes aprovados, somados aos 82/82 da suíte `bin/test.php`).
 
 ---
 
