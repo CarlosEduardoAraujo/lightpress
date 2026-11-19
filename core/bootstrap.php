@@ -44,6 +44,12 @@ if (!file_exists($configFile)) {
 
 $config = require $configFile;
 
+// Disponibilizar antecipadamente para o ciclo de inicialização (evita falhas de descriptografia prematura)
+$GLOBALS['config'] = $config;
+
+// Inicializar Camada de Configurações Dinâmicas e Chave de Criptografia
+\LightPress\Core\Settings::init($config['security']['encryption_key'] ?? null);
+
 // Validação defensiva de segurança em ambiente de produção (fail-fast HTTP)
 if (PHP_SAPI !== 'cli' && ($config['app']['env'] ?? '') === 'production') {
     $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
@@ -89,7 +95,7 @@ $config['theme'] = [
 ];
 $config['paths']['templates'] = \LightPress\Core\ThemeManager::getActiveThemeDir();
 
-// Disponibilizar globalmente para helpers de infraestrutura
+// Atualizar globalmente com os dados consolidados do tema e banco
 $GLOBALS['config'] = $config;
 
 // Carregar Plugins Ativos

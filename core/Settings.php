@@ -13,6 +13,7 @@ use Throwable;
 class Settings
 {
     private static ?array $cache = null;
+    private static ?string $encryptionKey = null;
 
     /**
      * Lista de chaves cujos valores contêm credenciais ou dados confidenciais e devem ser cifrados em repouso.
@@ -26,10 +27,37 @@ class Settings
     ];
 
     /**
+     * Inicializa explicitamente a chave de criptografia de segredos em repouso.
+     * Suporta a chave bruta (string) ou o array completo de configuração ($config).
+     *
+     * @param string|array<string, mixed>|null $keyOrConfig
+     */
+    public static function init(string|array|null $keyOrConfig = null): void
+    {
+        $rawKey = null;
+        if (is_array($keyOrConfig)) {
+            $rawKey = $keyOrConfig['security']['encryption_key'] ?? null;
+        } elseif (is_string($keyOrConfig)) {
+            $rawKey = $keyOrConfig;
+        }
+
+        if (!empty($rawKey) && is_string($rawKey)) {
+            self::$encryptionKey = hash('sha256', $rawKey, true);
+        } else {
+            self::$encryptionKey = null;
+        }
+    }
+
+    /**
      * Deriva a chave binária de 32 bytes (SODIUM_CRYPTO_SECRETBOX_KEYBYTES) a partir de security.encryption_key.
+     * Prioriza a chave injetada explicitamente via init() com fallback resiliente para $GLOBALS['config'].
      */
     public static function getEncryptionKey(): ?string
     {
+        if (self::$encryptionKey !== null) {
+            return self::$encryptionKey;
+        }
+
         $rawKey = $GLOBALS['config']['security']['encryption_key'] ?? null;
         if (empty($rawKey) || !is_string($rawKey)) {
             return null;
@@ -186,6 +214,17 @@ class Settings
     public static function flushCache(): void
     {
         self::$cache = null;
+        ObjectCache::flushGroup('settings');
+    }
+
+    /**
+     * Reseta todo o estado estático em memória (cache e chave de criptografia).
+     * Útil para isolamento entre execuções de testes unitários.
+     */
+    public static function reset(): void
+    {
+        self::$cache = null;
+        self::$encryptionKey = null;
         ObjectCache::flushGroup('settings');
     }
 

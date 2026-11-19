@@ -7,6 +7,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Ordem de Inicialização e Descriptografia de Segredos em Settings (SEC-02 / CWE-665) — 2026-11-18
+
+- **Resolução de Dependência de Inicialização no Bootstrap (`core/bootstrap.php`, `core/Settings.php`, CWE-665):**
+  - **Diagnóstico da Causa Raiz:** Em `core/bootstrap.php`, `Settings::applyToConfig($config)` era invocado na linha 80, enquanto `$GLOBALS['config'] = $config;` só era atribuído na linha 93. Durante `Settings::applyToConfig()`, a leitura `Settings::getAll()` acionava `ObjectCache::remember()`, que através de `ObjectCache::isAvailable()` carregava antecipadamente o plugin `redis-cache-pro`. Ao inicializar, `RedisClient::initConfig()` consultava `Settings::get('redis_cache_pro_settings')`, que executava `Settings::decryptValue()`. Por sua vez, `Settings::getEncryptionKey()` dependia estritamente de `$GLOBALS['config']['security']['encryption_key']`, que ainda se encontrava `null`, fazendo com que a decifragem falhasse silenciosamente e retornasse o texto cifrado bruto (`enc:gcm:...`). Com isso, `json_decode()` resultava em `null` e o cliente do Redis operava com defaults vazios/inseguros (127.0.0.1:6379 sem senha), sem autenticar no cluster protegido.
+  - **Atribuição Antecipada de Globais (`core/bootstrap.php`):** `$GLOBALS['config'] = $config;` passa a ser atribuído imediatamente após a leitura de `config.php`, sendo reatualizado ao término da resolução dos temas para refletir o estado dinâmico consolidado do banco e caminhos de templates.
+  - **Injeção Explícita e Desacoplamento de Globais (`core/Settings.php`):**
+    - Adicionada a propriedade estática privada `private static ?string $encryptionKey = null;`.
+    - Implementado `Settings::init(string|array|null $keyOrConfig = null): void`, permitindo injetar a chave bruta ou o array de configuração `$config`, calculando e armazenando diretamente a chave binária de 32 bytes (`hash('sha256', $rawKey, true)`).
+    - Invocação explícita de `\LightPress\Core\Settings::init($config['security']['encryption_key'] ?? null);` no `core/bootstrap.php` antes da inicialização do banco de dados e de `applyToConfig()`.
+    - Atualizado `Settings::getEncryptionKey(): ?string` para priorizar a chave em memória com fallback resiliente para `$GLOBALS['config']['security']['encryption_key']`.
+    - Implementado `Settings::reset(): void` para limpeza do cache e da chave estática em memória, assegurando isolamento entre testes.
+  - **Eliminação de Falhas Silenciosas em Chaves Sensíveis:** Proteção estendida a todos os segredos em `Settings::SENSITIVE_KEYS` (`ai_copilot_gemini_key`, `ai_copilot_openai_key`, `ai_copilot_custom_key`, `plugin_webhook_sender_urls`, `redis_cache_pro_settings`), garantindo que qualquer leitura precoce seja capaz de decifrar o valor em repouso sem depender do término do bootstrap.
+  - **Suíte de Testes Automatizados (`bin/test-sec02-settings-encryption.php`):** Criação de suíte de testes unitários contendo 14 asserções cobrindo injeção explícita de chave, fallback para `$GLOBALS`, precedência, roundtrip de cifragem/decifragem, persistência no banco SQLite e execução de subprocesso isolado simulando o primeiro boot com configurações cifradas no banco e validação da integridade do JSON decifrado.
+
 ### Otimização de Acessibilidade WCAG 2.1 AA (100/100 PageSpeed Insights) no Botão CTA do Canal WhatsApp — 2026-11-18
 
 - **Correção Cirúrgica de Contraste de Cores (WCAG 2.1 AA / axe-core 4.14):**

@@ -777,6 +777,7 @@ Para viabilizar fluxos mistos em que fotos e acervos são manipulados tanto pela
 O gerenciamento de metadados fundamentais do portal opera desacoplado de arquivos estáticos, permitindo ajustes em tempo real via Painel Administrativo com propagação imediata:
 * **Tabela `settings`:** Modelo chave-valor (`key`, `value`, `updated_at`) com persistência via `REPLACE INTO` atômico e cache em memória durante o ciclo de vida da requisição.
 * **Propagação Central (`core/bootstrap.php`):** Sobrescreve dinamicamente `$config['app']['name']`, `$config['app']['description']`, `$config['app']['favicon']` e `$config['app']['display_timezone']`.
+* **Ciclo de Inicialização Seguro e Descriptografia Precoce (`core/bootstrap.php`):** Durante o boot, `$GLOBALS['config']` é disponibilizado imediatamente e `Settings::init($config['security']['encryption_key'] ?? null)` inicializa em memória a chave binária de criptografia (32 bytes via SHA-256) antes de qualquer leitura do banco (`Database::init`) ou aplicação de configurações (`Settings::applyToConfig`), garantindo que plugins ou serviços carregados precocemente (como `redis-cache-pro`) possam decifrar credenciais em repouso sem falhas de ordem de boot (CWE-665 / SEC-02).
 * **Invalidação Proativa de Cache:** Salvar as configurações expurga imediatamente o FastCGI Cache da Home (`/`), sitemap e feeds RSS (`/feed.xml`).
 * **Seletor de Fuso Horário:** Catálogo com fusos recomendados para motorsport e lista completa de offsets fixos de UTC-12 a UTC+14, ajustando `date_default_timezone_set()` de ponta a ponta.
 
@@ -1328,6 +1329,19 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 
 #### 8.21.15. Sanitização de Favicon sem Duplo Escape (SEC-B04)
 * **Validação Semântica de Favicon (`public/admin/settings.php`):** A URL do favicon enviada nas configurações é validada e armazenada no banco como string pura (sem aplicação redundante de `htmlspecialchars()`). Os templates de renderização (`templates/header.php` e `public/admin/header.php`) continuam utilizando `Security::e()` no ponto de saída, eliminando problemas de duplo escape visual em URLs contendo caracteres especiais.
+
+#### 8.21.16. Correção de Ordem de Inicialização e Descriptografia de Segredos em Settings (SEC-02 / CWE-665)
+* **Diagnóstico da Vulnerabilidade:** No ciclo de bootstrap anterior, `Settings::applyToConfig($config)` era executado antes da atribuição de `$GLOBALS['config'] = $config;`. Quando o plugin `redis-cache-pro` era avaliado e carregado antecipadamente por `ObjectCache::isAvailable()`, sua inicialização em `RedisClient::initConfig()` invocava `Settings::get('redis_cache_pro_settings')`. Como `Settings::getEncryptionKey()` dependia estritamente de `$GLOBALS['config']['security']['encryption_key']`, a leitura resultava em `null`, fazendo com que a descriptografia falhasse silenciosamente e retornasse a string cifrada crua (`enc:gcm:...`). O `json_decode()` subsequente retornava `null`, forçando o cliente Redis a operar com credenciais padrão vazias (`127.0.0.1:6379`, sem senha).
+* **Defesa em Profundidade no Bootstrap (`core/bootstrap.php`):**
+  - `$GLOBALS['config'] = $config;` passa a ser atribuído imediatamente após a leitura do arquivo `config.php`, sendo reatualizado ao final da resolução dos temas com as mutações consolidadas.
+  - Chamada explícita a `\LightPress\Core\Settings::init($config['security']['encryption_key'] ?? null);` antes da inicialização do banco de dados e de `applyToConfig()`.
+* **Injeção Explícita e Desacoplamento (`core/Settings.php`):**
+  - Adicionada a propriedade estática privada `private static ?string $encryptionKey = null;`.
+  - Implementado o método estático `Settings::init(string|array|null $keyOrConfig = null): void`, capaz de receber a chave bruta ou o array `$config` e derivar deterministicamente a chave de 32 bytes (`hash('sha256', $rawKey, true)`).
+  - Atualizado `Settings::getEncryptionKey(): ?string` para priorizar a chave em memória com fallback resiliente para `$GLOBALS['config']['security']['encryption_key']`.
+  - Implementado `Settings::reset(): void` para limpeza completa do cache e chave estática em baterias de testes.
+* **Cobertura Automatizada e Validação de Boot Limpo (`bin/test-sec02-settings-encryption.php`):**
+  - Suíte dedicada com 14 asserções validando injeção direta, fallback para `$GLOBALS`, precedência, roundtrip de cifragem/decifragem, persistência em SQLite e simulação de processo limpo via subprocesso PHP CLI validando que `Settings::get('redis_cache_pro_settings')` decifra com 100% de integridade já no primeiro boot.
 
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
