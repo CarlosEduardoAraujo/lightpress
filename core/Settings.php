@@ -41,7 +41,11 @@ class Settings
             $rawKey = $keyOrConfig;
         }
 
-        if (!empty($rawKey) && is_string($rawKey)) {
+        if (is_string($rawKey)) {
+            $rawKey = trim($rawKey);
+        }
+
+        if (!empty($rawKey)) {
             self::$encryptionKey = hash('sha256', $rawKey, true);
         } else {
             self::$encryptionKey = null;
@@ -59,10 +63,10 @@ class Settings
         }
 
         $rawKey = $GLOBALS['config']['security']['encryption_key'] ?? null;
-        if (empty($rawKey) || !is_string($rawKey)) {
+        if (empty($rawKey) || !is_string($rawKey) || trim($rawKey) === '') {
             return null;
         }
-        return hash('sha256', $rawKey, true);
+        return hash('sha256', trim($rawKey), true);
     }
 
     /**

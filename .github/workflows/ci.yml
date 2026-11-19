@@ -108,6 +108,7 @@ jobs:
         run_strict bin/test-feeds-news.php
         run_strict bin/test-image-descriptions.php
         run_strict bin/test-plugins.php
+        run_strict bin/test-sec02-settings-encryption.php
         run_strict bin/test-ssrf.php
         run_strict plugins/api-publisher/tests/test-api-publisher.php
         run_strict plugins/api-publisher/tests/test-api-e2e.php

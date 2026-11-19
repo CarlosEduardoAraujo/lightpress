@@ -85,6 +85,46 @@ assertTest(
     Settings::getEncryptionKey() === $expectedKey1
 );
 
+// Guarda estrita contra string vazia e espaços em branco
+$GLOBALS['config'] = [];
+
+Settings::init('');
+assertTest(
+    "Settings::init('') atribui null e NÃO calcula hash de string vazia",
+    Settings::getEncryptionKey() === null
+);
+
+Settings::init('   ');
+assertTest(
+    "Settings::init('   ') com espaços em branco atribui null",
+    Settings::getEncryptionKey() === null
+);
+
+Settings::init(['security' => ['encryption_key' => '']]);
+assertTest(
+    "Settings::init(array) com chave vazia atribui null",
+    Settings::getEncryptionKey() === null
+);
+
+Settings::init(['security' => ['encryption_key' => '   ']]);
+assertTest(
+    "Settings::init(array) com espaços em branco atribui null",
+    Settings::getEncryptionKey() === null
+);
+
+Settings::init(null);
+$GLOBALS['config'] = ['security' => ['encryption_key' => '']];
+assertTest(
+    "Fallback para \$GLOBALS['config'] com chave vazia retorna null",
+    Settings::getEncryptionKey() === null
+);
+
+$GLOBALS['config'] = ['security' => ['encryption_key' => '   ']];
+assertTest(
+    "Fallback para \$GLOBALS['config'] com espaços em branco retorna null",
+    Settings::getEncryptionKey() === null
+);
+
 // Restaurar globals
 $GLOBALS['config'] = $originalGlobalConfig;
 Settings::init($originalGlobalConfig['security']['encryption_key'] ?? null);
@@ -184,9 +224,18 @@ chdir(\$rootDir);
 \$retrieved = \\LightPress\\Core\\Settings::get('redis_cache_pro_settings');
 \$parsed = json_decode((string)(\$retrieved ?? ''), true);
 
+// Validar se o plugin redis-cache-pro foi carregado e o RedisClient obteve as credenciais decifradas
+\$redisClientLoaded = class_exists(\\LightPress\\Plugin\\RedisCachePro\\RedisClient::class, false);
+\$redisConfig = \$redisClientLoaded ? \\LightPress\\Plugin\\RedisCachePro\\RedisClient::getInstance()->getConfig() : [];
+
+\$redisDecryptedOk = (\$redisConfig['host'] ?? '') === 'redis-cluster.internal'
+    && (\$redisConfig['password'] ?? '') === 'P@sswordEnterprise2026!';
+
 \$success = is_array(\$parsed)
     && (\$parsed['host'] ?? '') === 'redis-cluster.internal'
-    && (\$parsed['password'] ?? '') === 'P@sswordEnterprise2026!';
+    && (\$parsed['password'] ?? '') === 'P@sswordEnterprise2026!'
+    && \$redisClientLoaded
+    && \$redisDecryptedOk;
 
 echo json_encode([
     'ok' => \$success,
@@ -194,6 +243,9 @@ echo json_encode([
     'parsed' => \$parsed,
     'has_globals' => !empty(\$GLOBALS['config']),
     'has_enc_key' => \\LightPress\\Core\\Settings::getEncryptionKey() !== null,
+    'redis_client_loaded' => \$redisClientLoaded,
+    'redis_decrypted_ok' => \$redisDecryptedOk,
+    'redis_host' => \$redisConfig['host'] ?? null,
 ]);
 PHP;
 
@@ -269,6 +321,16 @@ try {
     assertTest(
         "Settings::get('redis_cache_pro_settings') decifrou com sucesso durante o boot inicial",
         !empty($result['ok']) && ($result['parsed']['host'] ?? '') === 'redis-cluster.internal'
+    );
+
+    assertTest(
+        "Subprocesso carregou antecipadamente o plugin redis-cache-pro via ObjectCache::isAvailable()",
+        !empty($result['redis_client_loaded'])
+    );
+
+    assertTest(
+        "RedisClient::getInstance() obteve host e senha decifrados do banco (sem fallback para defaults)",
+        !empty($result['redis_decrypted_ok']) && ($result['redis_host'] ?? '') === 'redis-cluster.internal'
     );
 } finally {
     // Limpeza de arquivos temporários e restauração do config.local.php original
