@@ -72,18 +72,19 @@ class Settings
     /**
      * Garante a existência da tabela `settings` no banco e faz seed com valores padrão.
      */
-    public static function ensureTable(): void
+    public static function ensureTable(?PDO $pdo = null, ?string $driver = null): void
     {
-        $driver = Database::getDriver();
-        if ($driver === 'sqlite') {
-            Database::query("CREATE TABLE IF NOT EXISTS settings (
+        $conn = $pdo ?? Database::getConnection();
+        $drv = $driver ?? Database::getDriver();
+        if ($drv === 'sqlite') {
+            $conn->exec("CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NULL,
                 created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
                 updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
             );");
         } else {
-            Database::query("CREATE TABLE IF NOT EXISTS `settings` (
+            $conn->exec("CREATE TABLE IF NOT EXISTS `settings` (
                 `key` VARCHAR(64) NOT NULL PRIMARY KEY,
                 `value` MEDIUMTEXT NULL,
                 `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -93,7 +94,8 @@ class Settings
 
         // Se a tabela estiver vazia, semeia as opções padrão
         try {
-            $count = (int)Database::fetchValue("SELECT COUNT(*) FROM settings");
+            $stmt = $conn->query("SELECT COUNT(*) FROM settings");
+            $count = $stmt ? (int)$stmt->fetchColumn() : 0;
             if ($count === 0) {
                 $defaults = [
                     'site_title' => 'SpeedRacing',
@@ -101,8 +103,13 @@ class Settings
                     'site_favicon' => '',
                     'site_timezone' => 'America/Sao_Paulo',
                 ];
+                if ($drv === 'sqlite') {
+                    $insertStmt = $conn->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
+                } else {
+                    $insertStmt = $conn->prepare("REPLACE INTO `settings` (`key`, `value`) VALUES (?, ?)");
+                }
                 foreach ($defaults as $k => $v) {
-                    Database::query("REPLACE INTO `settings` (`key`, `value`) VALUES (?, ?)", [$k, $v]);
+                    $insertStmt->execute([$k, $v]);
                 }
             }
         } catch (Throwable) {
@@ -124,7 +131,6 @@ class Settings
         self::$cache = ObjectCache::remember('all_settings', 86400, function (): array {
             $data = [];
             try {
-                self::ensureTable();
                 $rows = Database::fetchAll("SELECT `key`, `value` FROM settings");
                 foreach ($rows as $row) {
                     $data[$row['key']] = $row['value'] ?? '';

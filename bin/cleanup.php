@@ -57,7 +57,7 @@ echo "  - Arquivos temporários residuais de staging removidos: {$deletedFiles}\
 
 // 4. Promoção automática de artigos agendados cujo horário já foi atingido
 try {
-    $promoted = \LightPress\Core\PostService::promoteScheduledPosts();
+    $promoted = \LightPress\Core\PostService::promoteScheduledPosts(true);
 
     echo "  - Artigos agendados promovidos para publicação: {$promoted}\n";
 } catch (\Throwable $e) {

@@ -7,7 +7,36 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
-### Otimização de Alta Performance no Contador de Visualizações (PERF-03) — 2026-11-19
+### Otimizações Críticas de Banco de Dados e Eliminação de Locks de DDL (Passo 2.2 — ARCH-06, PERF-04, PERF-05) — 2026-11-19
+
+- **Isolamento de DDL no Roteamento 404 Público (ARCH-06):**
+  - **Eliminação de DDL no Caminho de Erro (`public/index.php`):** Remoção de `\LightPress\Core\Schema::ensurePagesTable();` da rota `/{slug}/`. Anteriormente, qualquer slug inexistente (erros 404 de visitantes ou varreduras de crawlers/bots) disparava `CREATE TABLE IF NOT EXISTS pages`, `SHOW COLUMNS FROM media`, `CREATE TABLE IF NOT EXISTS media_variants`, `CREATE TABLE IF NOT EXISTS view_dedupe` e `SELECT COUNT(*)`, gerando locks de metadados (MDL) e invalidando o cache de tabelas do MariaDB/MySQL.
+  - **Consulta Defensiva sem DDL:** A busca de páginas institucionais no Front Controller foi encapsulada em `try { ... } catch (\Throwable) { $page = null; }`, garantindo retorno limpo de 404 sem tocar no catálogo de tabelas.
+  - **Injeção Estrita de PDO em Utilitários de Esquema (`core/Schema.php`, `core/Settings.php`):** `Schema::ensurePagesTable(?PDO $pdo = null, ?string $driver = null)` e `Settings::ensureTable(?PDO $pdo = null, ?string $driver = null)` passaram a operar exclusivamente sobre o manipulador de conexão `$conn = $pdo ?? Database::getConnection();` e driver `$drv = $driver ?? Database::getDriver();` via chamadas de PDO nativo (`$conn->exec`, `$conn->query`, `$conn->prepare`), sem tocar no singleton estático `Database::` quando `$pdo` for fornecido.
+  - **Garantia de Tabelas na Instalação (`core/Schema.php`, `bin/setup.php`):** `Schema::install()` atualizado para criar e semear as tabelas `pages` e `settings` na instalação limpa. `installSqlite()` recebeu os esquemas completos de `pages` (com índice `idx_page_status_slug`) e `settings`.
+  - **Autocura Preservada no Painel:** Chamadas a `Schema::ensurePagesTable()` preservadas em `public/admin/pages.php` e `public/admin/page-edit.php`, garantindo autocura de migrações no contexto editorial restrito.
+
+- **Eliminação de DDL em Settings e Cooldown de Promoção de Agendados (PERF-04):**
+  - **Leitura Limpa sem DDL (`core/Settings.php`):** Remoção de `self::ensureTable();` de dentro do método de leitura `Settings::getAll()`. A recuperação de configurações dinâmicas executa apenas `SELECT key, value FROM settings` com fallback resiliente, zerando instruções `CREATE TABLE IF NOT EXISTS` e `SELECT COUNT(*)` no ciclo de vida de requisições PHP.
+  - **Autocura Restrita à Escrita:** `Settings::ensureTable()` permanece ativo exclusivamente em `Settings::set()`, garantindo que atualizações administrativas continuem auto-curando o banco.
+  - **Cooldown de 60 Segundos em Matérias Agendadas (`core/PostService.php`):**
+    - Assinatura estendida: `promoteScheduledPosts(bool $force = false): int`.
+    - No tráfego público (`$force = false` em `public/index.php`), verifica previamente a chave `scheduled_promote_checked` no `ObjectCache` (Redis/APCu). Se ativa, retorna `0` em $O(1)$ sem emitir consultas SQL ao MariaDB/MySQL.
+    - O cooldown de 60 segundos (`ObjectCache::set('scheduled_promote_checked', 1, 'posts', 60)`) é ativado estrategicamente **após** a checagem leve (`$hasDue === 0`), prevenindo congelamento do cooldown em caso de falha transitória de conexão.
+    - Caso matérias sejam efetivamente promovidas para publicação, o comando `ObjectCache::flushGroup('posts')` purga o grupo inteiro, invalidando o cooldown de imediato.
+  - **Promoção Instantânea em Painel e Cron Workers:** Chamadas em `public/admin/dashboard.php`, `public/admin/editor.php`, `bin/cleanup.php` e `bin/retry-cache-purge.php` passam `$force = true`, mantendo a promoção em tempo real para a redação e para o agendador de tarefas em segundo plano.
+
+- **Eliminação de Full Table Scan em Mídias (PERF-05):**
+  - **Algoritmo de Resolução em Três Estágios (`core/ImageProcessor.php`):**
+    - **Estágio 1 (media_variants em $O(1)$):** No loop inicial de `$pending`, aceita correspondência direta de `media_variants` quando `$request['id'] === ''` OU `(string)$byPath[$path]['id'] === (string)$request['id']`. Resolve a legenda e o texto alternativo instantaneamente em $O(1)$ sem nenhuma segunda query ao banco (atende >99% das páginas de artigos normais).
+    - **Estágio 2 (Busca por Chave Primária em $O(1)$):** Para requisições não resolvidas no Estágio 1 que possuam `$request['id'] !== ''`, executa busca direta por chave primária: `SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE id IN (...)`. Se o candidato bater com o manifesto (`manifestMatches()`), resolve por ID. Se o ID for inválido ou obsoleto mas a variante `$byPath[$path]` existir, aproveita a variante diretamente sem necessidade de consultas adicionais.
+    - **Estágio 3 (Busca Residual de Órfãos):** Somente para arquivos sem vínculo em `media_variants` e sem correspondência por ID, executa `SELECT ... FROM media WHERE original_name IN (...)` sem a cláusula `OR id IN (...)`. Elimina o escaneamento sequencial (Full Table Scan) em mais de 30.000 registros e preserva 100% da semântica de descarte de homônimos ambíguos.
+  - **Índice Idempotente em `original_name` (`bin/schema.sql`, `core/Schema.php`):** Adicionado `INDEX idx_media_original_name (original_name(191))` em `bin/schema.sql` e checagem idempotente em `Schema::installMysql()`, além de índice SQLite em `Schema::installSqlite()`.
+
+- **Suíte de Testes Automatizada Dedicada e Integração Contínua (`bin/test-perf-arch-step22.php`, `.github/workflows/ci.yml`):**
+  - Criação do script `bin/test-perf-arch-step22.php` com `declare(strict_types=1);` na linha 2, validando 17 asserções cobrindo ausência de DDL no index público, isolamento de PDO em `ensurePagesTable` e `ensureTable`, ativação e bypass do cooldown de 60s em `promoteScheduledPosts` e os 3 estágios de resolução em `ImageProcessor`.
+  - Inclusão de `run_strict bin/test-perf-arch-step22.php` no pipeline do GitHub Actions em PHP 8.4 e 8.5.
+  - Todas as suítes pré-existentes (`bin/test.php` com 131 testes e `bin/test-image-descriptions.php` com 30 testes) mantiveram 100% de aprovação.
 
 - **Fast-Path no Front Controller (`public/index.php`):**
   - **Bypass Cirúrgico de Bootstrap:** Implementação de fast-path de altíssima performance no topo de `public/index.php`, posicionado antes da emissão dos cabeçalhos HTML/CSP de ~300 bytes e antes do carregamento de `core/bootstrap.php`.

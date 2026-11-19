@@ -64,16 +64,25 @@ class PostService
      * Promove automaticamente matérias agendadas cujo horário de publicação foi atingido
      * e dispara a invalidação de cache em disco e na borda Cloudflare.
      */
-    public static function promoteScheduledPosts(): int
+    public static function promoteScheduledPosts(bool $force = false): int
     {
         $nowUtc = gmdate('Y-m-d H:i:s');
         try {
+            if (!$force) {
+                if (ObjectCache::get('scheduled_promote_checked', 'posts') !== false) {
+                    return 0;
+                }
+            }
+
             // Verificação prévia leve sem transação para evitar locks desnecessários sob alta concorrência
             $hasDue = (int)Database::fetchValue(
                 "SELECT 1 FROM posts WHERE status = 'scheduled' AND published_at <= ? LIMIT 1",
                 [$nowUtc]
             );
             if ($hasDue === 0) {
+                if (!$force) {
+                    ObjectCache::set('scheduled_promote_checked', 1, 'posts', 60);
+                }
                 return 0;
             }
 

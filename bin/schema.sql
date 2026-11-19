@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS media (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_media_user (user_id),
     INDEX idx_media_created (created_at DESC),
+    INDEX idx_media_original_name (original_name(191)),
     CONSTRAINT fk_media_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

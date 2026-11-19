@@ -19,7 +19,7 @@ use LightPress\Core\Hook;
 $currentUser = Security::requireAuth();
 
 // Auto-promoção de matérias agendadas cujo horário já foi atingido
-\LightPress\Core\PostService::promoteScheduledPosts();
+\LightPress\Core\PostService::promoteScheduledPosts(true);
 
 $cacheMgr = new CacheManager($config);
 

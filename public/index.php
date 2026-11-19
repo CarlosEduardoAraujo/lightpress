@@ -1007,14 +1007,17 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
 
     if (!$post) {
         // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
-        \LightPress\Core\Schema::ensurePagesTable();
-        $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
-            $pg = Database::fetchOne(
-                "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
-                [$slug]
-            );
-            return $pg ?: null;
-        }, 'pages');
+        try {
+            $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
+                $pg = Database::fetchOne(
+                    "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
+                    [$slug]
+                );
+                return $pg ?: null;
+            }, 'pages');
+        } catch (\Throwable) {
+            $page = null;
+        }
 
         if ($page) {
             header('X-Accel-Expires: 3600'); // 60 minutos de cache para página institucional

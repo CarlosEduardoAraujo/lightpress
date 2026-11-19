@@ -29,7 +29,7 @@ $nowUtc = gmdate('Y-m-d H:i:s');
 
 // Promover matérias agendadas vencidas
 try {
-    $promoted = \LightPress\Core\PostService::promoteScheduledPosts();
+    $promoted = \LightPress\Core\PostService::promoteScheduledPosts(true);
     if ($promoted > 0) {
         error_log("[retry-cache-purge] Sucesso: {$promoted} matéria(s) agendada(s) promovida(s) para 'published' e caches purgados.");
     }

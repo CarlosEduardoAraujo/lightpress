@@ -15,11 +15,12 @@ class Schema
     /**
      * Garante a existência da tabela de Páginas Institucionais e faz seed das páginas iniciais.
      */
-    public static function ensurePagesTable(): void
+    public static function ensurePagesTable(?PDO $pdo = null, ?string $driver = null): void
     {
-        $driver = Database::getDriver();
-        if ($driver === 'sqlite') {
-            Database::query("CREATE TABLE IF NOT EXISTS pages (
+        $conn = $pdo ?? Database::getConnection();
+        $drv = $driver ?? Database::getDriver();
+        if ($drv === 'sqlite') {
+            $conn->exec("CREATE TABLE IF NOT EXISTS pages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NULL,
                 slug TEXT NOT NULL UNIQUE,
@@ -33,9 +34,9 @@ class Schema
                 created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
                 updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
             );");
-            Database::query("CREATE INDEX IF NOT EXISTS idx_page_status_slug ON pages (status, slug);");
+            $conn->exec("CREATE INDEX IF NOT EXISTS idx_page_status_slug ON pages (status, slug);");
         } else {
-            Database::query("CREATE TABLE IF NOT EXISTS `pages` (
+            $conn->exec("CREATE TABLE IF NOT EXISTS `pages` (
                 `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 `user_id` SMALLINT UNSIGNED NULL,
                 `slug` VARCHAR(191) NOT NULL UNIQUE,
@@ -52,12 +53,13 @@ class Schema
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         }
 
-        self::ensureMediaAiSchema(Database::getConnection(), $driver);
-        self::ensureMediaVariantsSchema(Database::getConnection(), $driver);
-        self::ensureViewDedupeSchema(Database::getConnection(), $driver);
+        self::ensureMediaAiSchema($conn, $drv);
+        self::ensureMediaVariantsSchema($conn, $drv);
+        self::ensureViewDedupeSchema($conn, $drv);
 
         // Se a tabela estiver vazia, cria as páginas institucionais padrão
-        $count = (int)Database::fetchValue("SELECT COUNT(*) FROM pages");
+        $stmt = $conn->query("SELECT COUNT(*) FROM pages");
+        $count = $stmt ? (int)$stmt->fetchColumn() : 0;
         if ($count === 0) {
             $initialPages = [
                 [
@@ -104,18 +106,19 @@ class Schema
                 ],
             ];
 
+            $insertStmt = $conn->prepare(
+                "INSERT INTO pages (slug, title, content_html, seo_title, seo_description, status) VALUES (?, ?, ?, ?, ?, 'published')"
+            );
             foreach ($initialPages as $pg) {
-                Database::query(
-                    "INSERT INTO pages (slug, title, content_html, seo_title, seo_description, status) VALUES (?, ?, ?, ?, ?, 'published')",
-                    [$pg['slug'], $pg['title'], $pg['content_html'], $pg['seo_title'], $pg['seo_description']]
-                );
+                $insertStmt->execute([$pg['slug'], $pg['title'], $pg['content_html'], $pg['seo_title'], $pg['seo_description']]);
             }
         } else {
             // Se já existia 'quem-somos' e ainda não existe 'nossa-equipe', migra o slug automaticamente
             try {
-                $hasNossaEquipe = Database::fetchOne("SELECT id FROM pages WHERE slug = 'nossa-equipe' LIMIT 1");
+                $stmtCheck = $conn->query("SELECT id FROM pages WHERE slug = 'nossa-equipe' LIMIT 1");
+                $hasNossaEquipe = $stmtCheck ? $stmtCheck->fetch() : false;
                 if (!$hasNossaEquipe) {
-                    Database::query("UPDATE pages SET slug = 'nossa-equipe' WHERE slug = 'quem-somos'");
+                    $conn->exec("UPDATE pages SET slug = 'nossa-equipe' WHERE slug = 'quem-somos'");
                 }
             } catch (\Throwable $e) {
                 // Silencioso se o banco estiver em processo de criação
@@ -133,6 +136,9 @@ class Schema
         } else {
             self::installMysql($pdo);
         }
+
+        self::ensurePagesTable($pdo, $driver);
+        Settings::ensureTable($pdo, $driver);
     }
 
     /**
@@ -227,6 +233,16 @@ class Schema
             $hasMediaCreated = $pdo->query("SHOW INDEX FROM media WHERE Key_name = 'idx_media_created'")->fetch();
             if (!$hasMediaCreated) {
                 $pdo->exec("ALTER TABLE media ADD INDEX idx_media_created (created_at DESC)");
+            }
+        } catch (\Throwable $e) {
+            // Ignora se já existir
+        }
+
+        try {
+            $stmt = $pdo->query("SHOW INDEX FROM media WHERE Key_name = 'idx_media_original_name'");
+            $hasMediaOrigName = $stmt ? $stmt->fetch() : false;
+            if (!$hasMediaOrigName) {
+                $pdo->exec("ALTER TABLE media ADD INDEX idx_media_original_name (original_name(191))");
             }
         } catch (\Throwable $e) {
             // Ignora se já existir
@@ -411,6 +427,34 @@ class Schema
                 status_code INTEGER NOT NULL DEFAULT 301,
                 created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
             );",
+
+            // 13. pages
+            "CREATE TABLE IF NOT EXISTS pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NULL,
+                slug TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                content_html TEXT NOT NULL,
+                featured_image TEXT NULL,
+                seo_title TEXT NULL,
+                seo_description TEXT NULL,
+                status TEXT NOT NULL DEFAULT 'published',
+                views INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+            );",
+            "CREATE INDEX IF NOT EXISTS idx_page_status_slug ON pages (status, slug);",
+
+            // 14. settings
+            "CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NULL,
+                created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                updated_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+            );",
+
+            // 15. índice em media.original_name
+            "CREATE INDEX IF NOT EXISTS idx_media_original_name ON media (original_name);",
         ];
 
         foreach ($statements as $sql) {

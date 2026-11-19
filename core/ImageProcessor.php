@@ -313,51 +313,98 @@ class ImageProcessor
                  WHERE mv.url_path IN ({$marks})", $paths
             );
             $byPath = array_column($rows, null, 'url_path');
-            $names = [];
-            $ids = [];
-            foreach ($pending as $key => $request) {
-                if (isset($byPath[$request['path']]) && $request['id'] === '') {
-                    $resolved[$key] = self::mediaDescription($byPath[$request['path']]);
-                    continue;
-                }
-                $names[] = basename($request['path']);
-                foreach (['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'] as $extension) {
-                    $names[] = self::descriptionStem($request['path']) . '.' . $extension;
-                }
-                if ($request['id'] !== '') {
-                    $ids[] = $request['id'];
-                }
-            }
-            $names = array_values(array_unique($names));
-            $params = $names;
-            $condition = 'original_name IN (' . implode(',', array_fill(0, count($names), '?')) . ')';
-            if ($ids) {
-                $ids = array_values(array_unique($ids));
-                $condition .= ' OR id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
-                $params = array_merge($params, $ids);
-            }
-            $candidates = $names ? Database::fetchAll(
-                "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE {$condition}", $params
-            ) : [];
+
+            // Estágio 1: Correspondência direta em media_variants (O(1))
+            $stage2Requests = [];
             foreach ($pending as $key => $request) {
                 $path = $request['path'];
-                $media = $byPath[$path] ?? null;
-                $matches = [];
-                foreach ($candidates as $candidate) {
-                    if (self::manifestMatches($candidate, $path)) {
-                        if ($request['id'] !== '' && $candidate['id'] === $request['id']) {
-                            $media = $candidate;
-                            $matches = [];
-                            break;
-                        }
-                        $matches[$candidate['id']] = $candidate;
+                if (isset($byPath[$path])) {
+                    $vm = $byPath[$path];
+                    if ($request['id'] === '' || (string)$vm['id'] === (string)$request['id']) {
+                        $resolved[$key] = self::mediaDescription($vm);
+                        continue;
                     }
                 }
-                if (!$media && count($matches) === 1) {
-                    $media = reset($matches);
+                $stage2Requests[$key] = $request;
+            }
+
+            // Estágio 2: Busca por Chave Primária (PK lookup O(1) em media WHERE id IN (...))
+            $stage3Requests = [];
+            $stage2Ids = [];
+            foreach ($stage2Requests as $request) {
+                if ($request['id'] !== '') {
+                    $stage2Ids[] = $request['id'];
                 }
-                if ($media) {
-                    $resolved[$key] = self::mediaDescription($media);
+            }
+            $stage2Ids = array_values(array_unique($stage2Ids));
+            $mediaById = [];
+            if (!empty($stage2Ids)) {
+                $idMarks = implode(',', array_fill(0, count($stage2Ids), '?'));
+                $idRows = Database::fetchAll(
+                    "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE id IN ({$idMarks})",
+                    $stage2Ids
+                );
+                $mediaById = array_column($idRows, null, 'id');
+            }
+
+            foreach ($stage2Requests as $key => $request) {
+                $path = $request['path'];
+                $reqId = $request['id'];
+
+                if ($reqId !== '') {
+                    $candidate = $mediaById[$reqId] ?? null;
+                    if ($candidate !== null && self::manifestMatches($candidate, $path)) {
+                        $resolved[$key] = self::mediaDescription($candidate);
+                        continue;
+                    }
+                    if (isset($byPath[$path])) {
+                        $resolved[$key] = self::mediaDescription($byPath[$path]);
+                        continue;
+                    }
+                }
+
+                $stage3Requests[$key] = $request;
+            }
+
+            // Estágio 3: Busca residual por original_name para itens verdadeiramente órfãos
+            if (!empty($stage3Requests)) {
+                $names = [];
+                foreach ($stage3Requests as $request) {
+                    $names[] = basename($request['path']);
+                    foreach (['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'] as $extension) {
+                        $names[] = self::descriptionStem($request['path']) . '.' . $extension;
+                    }
+                }
+                $names = array_values(array_unique($names));
+                $candidates = [];
+                if (!empty($names)) {
+                    $nameMarks = implode(',', array_fill(0, count($names), '?'));
+                    $candidates = Database::fetchAll(
+                        "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE original_name IN ({$nameMarks})",
+                        $names
+                    );
+                }
+
+                foreach ($stage3Requests as $key => $request) {
+                    $path = $request['path'];
+                    $media = $byPath[$path] ?? null;
+                    $matches = [];
+                    foreach ($candidates as $candidate) {
+                        if (self::manifestMatches($candidate, $path)) {
+                            if ($request['id'] !== '' && (string)$candidate['id'] === (string)$request['id']) {
+                                $media = $candidate;
+                                $matches = [];
+                                break;
+                            }
+                            $matches[$candidate['id']] = $candidate;
+                        }
+                    }
+                    if (!$media && count($matches) === 1) {
+                        $media = reset($matches);
+                    }
+                    if ($media) {
+                        $resolved[$key] = self::mediaDescription($media);
+                    }
                 }
             }
         } catch (\Throwable $e) {

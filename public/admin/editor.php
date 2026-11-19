@@ -20,7 +20,7 @@ use LightPress\Core\Security;
 $currentUser = Security::requireAuth();
 
 // Auto-promoção de matérias agendadas cujo horário já foi atingido
-PostService::promoteScheduledPosts();
+PostService::promoteScheduledPosts(true);
 
 $postId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $post = null;

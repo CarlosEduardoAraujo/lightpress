@@ -1711,6 +1711,17 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Suíte com Subprocessos Isolados (`bin/test-perf03-view-fastpath.php`):** 24 testes executados em processos PHP novos com SQLite em WAL mode, comprovando incremento atômico, deduplicação de 30s, códigos 204, 403 e 404, rotas com barra final e ausência absoluta na memória de classes de configurações (`Settings`), temas (`ThemeManager`) e plugins (`PluginManager`, `RedisClient`).
   - [x] **Integração Contínua e Zero Regressão:** Suíte adicionada à matriz de CI (`.github/workflows/ci.yml`) sob PHP 8.4 e 8.5 com 100% de sucesso.
 
+* **FASE CONCLUÍDA — Mitigação de Locks de DDL e Otimização de Consultas (Passo 2.2 — ARCH-06, PERF-04, PERF-05):**
+  - [x] **Isolamento de DDL no Roteamento 404 Público (ARCH-06):** Remoção de `Schema::ensurePagesTable()` da rota pública `/{slug}/` em `public/index.php`, encapsulando a busca em `try/catch` defensivo. Elimina a execução de `CREATE TABLE IF NOT EXISTS`, `SHOW COLUMNS` e locks de metadados (MDL) em URLs inexistentes e scans de bots. Autocura mantida no painel administrativo (`public/admin/pages.php`, `public/admin/page-edit.php`) e tabelas `pages` e `settings` integradas diretamente na instalação (`Schema::install()`, `bin/setup.php`).
+  - [x] **Uso Estrito de PDO em Utilitários de Esquema:** Refatoração de `Schema::ensurePagesTable(?PDO $pdo, ?string $driver)` e `Settings::ensureTable(?PDO $pdo, ?string $driver)` para operarem exclusivamente com a conexão PDO injetada quando fornecida, garantindo conformidade total com PHPStan Nível 8.
+  - [x] **Eliminação de DDL em Leituras de Configurações e Cooldown de Agendados (PERF-04):** `Settings::getAll()` agora executa leitura direta `SELECT key, value FROM settings`, zerando comandos `CREATE TABLE` e `SELECT COUNT(*)` do ciclo de leitura do PHP. Adição de cooldown leve de 60 segundos via `ObjectCache` na rota pública para `PostService::promoteScheduledPosts()`, ativado após a checagem preliminar (`$hasDue === 0`) e contornado com `$force = true` no painel editorial e workers de cron (`cleanup.php`, `retry-cache-purge.php`).
+  - [x] **Eliminação de Full Table Scan em Mídias (PERF-05):** Refatoração de `ImageProcessor::loadDescriptions()` em 3 estágios estritos:
+    1. *Estágio 1 (Variantes em $O(1)$)*: Match imediato em `media_variants` quando `$request['id'] === ''` ou `$byPath[$path]['id'] === $request['id']`, atendendo >99% dos posts sem segunda query.
+    2. *Estágio 2 (Chave Primária em $O(1)$)*: Consulta direta por `WHERE id IN (...)` com validação de `manifestMatches()` e fallback imediato para `$byPath[$path]` quando o ID fornecido é obsoleto/inválido.
+    3. *Estágio 3 (Busca residual de órfãos)*: Consulta por `WHERE original_name IN (...)` restrita a itens sem variante e sem correspondência por ID, eliminando a cláusula `OR id IN (...)` que causava escaneamento de mais de 30.000 linhas no MariaDB/MySQL.
+    4. *Índice idempotente*: Adição do índice `idx_media_original_name (original_name(191))` em `bin/schema.sql` e `core/Schema.php`.
+  - [x] **Suíte de Testes Automatizada Dedicada:** Criação de `bin/test-perf-arch-step22.php` com `declare(strict_types=1);` cobrindo 17 asserções de isolamento de DDL, uso de PDO injetado, cooldown e os 3 estágios de busca, integrada ao workflow do GitHub Actions (`.github/workflows/ci.yml`).
+
 ---
 
 ## 11. Metas Mensuráveis e Critérios de Aceitação

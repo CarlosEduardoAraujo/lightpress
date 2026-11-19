@@ -109,6 +109,7 @@ jobs:
         run_strict bin/test-perf03-view-fastpath.php
         run_strict bin/test-feeds-news.php
         run_strict bin/test-image-descriptions.php
+        run_strict bin/test-perf-arch-step22.php
         run_strict bin/test-plugins.php
         run_strict bin/test-sec02-settings-encryption.php
         run_strict bin/test-ssrf.php
