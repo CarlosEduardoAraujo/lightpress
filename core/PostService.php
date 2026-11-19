@@ -286,7 +286,7 @@ class PostService
         $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current, &$jobId): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
-                "SELECT id, user_id, slug, category, status, version, is_featured, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
+                "SELECT id, user_id, slug, category, status, is_featured, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
                 [$postId]
             );
 

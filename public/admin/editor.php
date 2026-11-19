@@ -226,12 +226,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $wasPublished = false;
                     $prevSlug = '';
                     $prevCat = '';
+                    $cleanSlug = '';
 
                     Database::transaction(function (\PDO $pdo) use (
-                        $postId, $currentUser, $knownVersion, $knownRevisionId, $title, $slug, $summary,
+                        $postId, $currentUser, $knownVersion, $knownRevisionId, $action, $title, $slug, $summary,
                         $category, $tags, $featuredImage, $cleanJson, $cleanHtml,
-                        $seoTitle, $seoDesc, $focusKeyword, $publishedAt, &$message,
-                        &$wasPublished, &$prevSlug, &$prevCat
+                        $seoTitle, $seoDesc, $focusKeyword, $publishedAt, $publishedAtRaw, &$message,
+                        &$wasPublished, &$prevSlug, &$prevCat, &$cleanSlug
                     ): void {
                         // 1. Bloqueia e relê a linha atualizada do banco
                         $current = Database::fetchOne("SELECT * FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''), [$postId]);
