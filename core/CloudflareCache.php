@@ -176,15 +176,24 @@ class CloudflareCache
             $urlsToPurge[] = $categoryUrl;
         }
 
-        $res = self::purgeUrls($urlsToPurge);
+        // Se a Cloudflare estiver desabilitada, limpa o Nginx local sem chamar a Cloudflare e retorna false
+        if (empty($config['cloudflare']['enabled']) || empty($config['cloudflare']['api_token']) || empty($config['cloudflare']['zone_id'])) {
+            try {
+                $cacheMgr = new CacheManager($config);
+                $cacheMgr->purgeUrls($urlsToPurge, false);
+            } catch (Throwable $e) {}
+            return false;
+        }
 
-        // Sincroniza também com o cache Nginx FastCGI local em disco
+        // Delega para o CacheManager, que realiza a purga no Nginx local e dispara a Cloudflare exatamente uma vez
         try {
             $cacheMgr = new CacheManager($config);
-            $cacheMgr->purgeUrls($urlsToPurge);
-        } catch (Throwable $e) {}
-
-        return $res;
+            $results = $cacheMgr->purgeUrls($urlsToPurge, true);
+            return !empty($results) && !in_array(false, $results, true);
+        } catch (Throwable $e) {
+            error_log("[CloudflareCache] Erro em purgeOnPostPublish: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**

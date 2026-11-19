@@ -465,10 +465,13 @@ class ImageProcessor
             }
             $cache = new CacheManager();
             $urls = array_values(array_unique($urls));
-            $cache->recordPurgeJob(null, 'media_metadata', $urls);
+            $jobId = $cache->recordPurgeJob(null, 'media_metadata', $urls);
             // Lotes grandes ficam com o worker para não bloquear a edição da mídia.
             if (count($urls) <= 30) {
-                $cache->purgeUrls($urls);
+                $purgeResults = $cache->purgeUrls($urls);
+                if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                    $cache->completePurgeJob($jobId);
+                }
             }
         } catch (\Throwable $e) {
             error_log('[ImageProcessor Metadata Purge Error] ' . $e->getMessage());

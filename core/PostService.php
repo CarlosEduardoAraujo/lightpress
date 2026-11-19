@@ -281,11 +281,12 @@ class PostService
         $isNowPublished = false;
         $isFirstPublish = false;
         $current = null;
+        $jobId = 0;
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current, &$jobId): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
-                "SELECT id, user_id, slug, category, status, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
+                "SELECT id, user_id, slug, category, status, version, is_featured, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
                 [$postId]
             );
 
@@ -346,7 +347,7 @@ class PostService
                     ) ?: null;
                 } catch (\Throwable) {}
             }
-            $isFeatured = array_key_exists('is_featured', $data) ? (!empty($data['is_featured']) ? 1 : 0) : (int)$current['is_featured'];
+            $isFeatured = array_key_exists('is_featured', $data) ? (!empty($data['is_featured']) ? 1 : 0) : (int)($current['is_featured'] ?? 0);
 
             if (array_key_exists('content_html', $data) && $data['content_html'] !== null) {
                 $sanitized = BlockCompiler::sanitizeHtml((string)$data['content_html']);
@@ -488,7 +489,7 @@ class PostService
             }
 
             // Registra job de purga atomicamente dentro da transação
-            $this->cacheManager->recordPurgeJob($postId, 'publish_update', $affectedUrls);
+            $jobId = $this->cacheManager->recordPurgeJob($postId, 'publish_update', $affectedUrls);
 
             return true;
         });
@@ -498,7 +499,10 @@ class PostService
             ObjectCache::flushGroup('posts');
             if (!empty($affectedUrls)) {
                 try {
-                    $this->cacheManager->purgeUrls($affectedUrls);
+                    $purgeResults = $this->cacheManager->purgeUrls($affectedUrls);
+                    if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                        $this->cacheManager->completePurgeJob($jobId);
+                    }
                 } catch (\Throwable $e) {
                     error_log("[PostService Cache Purge Error] " . $e->getMessage());
                 }

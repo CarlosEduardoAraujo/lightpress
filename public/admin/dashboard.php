@@ -82,12 +82,13 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
                 }
             }
 
-            Database::transaction(function (\PDO $pdo) use ($delPostId, $affectedUrls, $cacheMgr): void {
+            $jobId = 0;
+            Database::transaction(function (\PDO $pdo) use ($delPostId, $affectedUrls, $cacheMgr, &$jobId): void {
                 Database::query("DELETE FROM post_stats WHERE post_id = ?", [$delPostId]);
                 Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$delPostId]);
                 Database::query("DELETE FROM posts WHERE id = ?", [$delPostId]);
                 
-                $cacheMgr->recordPurgeJob($delPostId, 'post_deletion', $affectedUrls);
+                $jobId = $cacheMgr->recordPurgeJob($delPostId, 'post_deletion', $affectedUrls);
             });
 
             // Invalidação imediata do cache de objetos Redis (CH-02)
@@ -97,7 +98,14 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
             // Disparar hook de exclusão de post
             Hook::doAction('post_deleted', $delPostId, $targetPost);
 
-            $cacheMgr->purgeUrls($affectedUrls);
+            try {
+                $purgeResults = $cacheMgr->purgeUrls($affectedUrls);
+                if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                    $cacheMgr->completePurgeJob($jobId);
+                }
+            } catch (\Throwable $e) {
+                error_log("[Dashboard Post Delete Purge Error] " . $e->getMessage());
+            }
 
             $queryParams = $_GET;
             unset($queryParams['delete_id'], $queryParams['_csrf_token']);

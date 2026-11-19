@@ -60,10 +60,7 @@ foreach ($jobs as $job) {
     $urls = $payload['urls'] ?? [];
 
     if (empty($urls)) {
-        Database::query(
-            "UPDATE cache_purge_jobs SET status = 'completed', completed_at = ? WHERE id = ?",
-            [$nowUtc, $jobId]
-        );
+        $cacheManager->completePurgeJob($jobId, $attempts);
         continue;
     }
 
@@ -71,12 +68,7 @@ foreach ($jobs as $job) {
     $allSucceeded = !in_array(false, $results, true);
 
     if ($allSucceeded) {
-        Database::query(
-            "UPDATE cache_purge_jobs 
-             SET status = 'completed', attempts = ?, completed_at = ?, last_error = NULL 
-             WHERE id = ?",
-            [$attempts, $nowUtc, $jobId]
-        );
+        $cacheManager->completePurgeJob($jobId, $attempts);
     } else {
         // Backoff exponencial: tentativa 1 -> +1 min, tentativa 2 -> +5 min, tentativa 3 -> +15 min
         $backoffMinutes = match ($attempts) {

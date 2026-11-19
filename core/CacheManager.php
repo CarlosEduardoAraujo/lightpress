@@ -93,9 +93,10 @@ class CacheManager
      * Retorna array com status local de cada URI: ['/uri' => true/false].
      * 
      * @param string[] $uris
+     * @param bool $purgeCloudflare Se falso, invalida apenas o FastCGI cache local em disco
      * @return array<string, bool>
      */
-    public function purgeUrls(array $uris): array
+    public function purgeUrls(array $uris, bool $purgeCloudflare = true): array
     {
         if (empty($uris)) {
             return [];
@@ -169,7 +170,7 @@ class CacheManager
         }
 
         // 2. Invalidação Seletiva na Cloudflare (Edge API v4) se configurada
-        if (!empty($this->config['cloudflare']['enabled'])) {
+        if ($purgeCloudflare && !empty($this->config['cloudflare']['enabled'])) {
             try {
                 if (!CloudflareCache::purgeUrls($uris)) {
                     $results = array_fill_keys($uris, false);
@@ -237,5 +238,29 @@ class CacheManager
         );
 
         return (int)Database::lastInsertId();
+    }
+
+    /**
+     * Marca um job de purga como concluído com sucesso em cache_purge_jobs.
+     *
+     * @param int $jobId ID do job em cache_purge_jobs
+     * @param int $attempts Quantidade de tentativas computadas (padrão 1)
+     * @return bool
+     */
+    public function completePurgeJob(int $jobId, int $attempts = 1): bool
+    {
+        if ($jobId <= 0) {
+            return false;
+        }
+
+        $nowUtc = gmdate('Y-m-d H:i:s');
+        Database::query(
+            "UPDATE cache_purge_jobs 
+             SET status = 'completed', attempts = ?, completed_at = ?, last_error = NULL 
+             WHERE id = ?",
+            [$attempts, $nowUtc, $jobId]
+        );
+
+        return true;
     }
 }

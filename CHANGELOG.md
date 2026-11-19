@@ -7,6 +7,30 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Deduplicação Sistemática de Purgas Cloudflare e Nginx FastCGI (PERF-06) — 2026-11-18
+
+- **Eliminação de Duplicação Sistemática de Invalidação no Nginx e Cloudflare (`core/CacheManager.php`, `core/CloudflareCache.php`, `core/PostService.php`, `core/ImageProcessor.php`, `public/admin/dashboard.php`, `bin/retry-cache-purge.php`, `bin/purge-cache.php`):**
+  - **Diagnóstico da Causa Raiz:** Identificada duplicação sistemática de requisições à API da Cloudflare e operações I/O de disco no Nginx FastCGI Cache gerada por dois mecanismos independentes:
+    1. **Falta de Conclusão Imediata de Jobs Síncronos (`cache_purge_jobs`):** `PostService::publishOrUpdate()`, `public/admin/dashboard.php` (exclusão de matéria) e `ImageProcessor::invalidateMediaMetadata()` gravavam um registro de purga com `status = 'pending'` via `$cacheManager->recordPurgeJob(...)` e, após o commit da transação, executavam com sucesso a purga síncrona com `$cacheManager->purgeUrls($affectedUrls)`. Contudo, o `$jobId` retornado era descartado e o registro permanecia em `pending`. Um minuto depois, o cron `bin/retry-cache-purge.php` lia o job pendente e re-executava a purga de todas as URLs no Nginx e na Cloudflare.
+    2. **Invocação Circular na Cloudflare:** Em `CloudflareCache::purgeOnPostPublish()`, o método executava `self::purgeUrls($urlsToPurge)` (1ª chamada HTTP à API) e logo em seguida chamava `$cacheMgr->purgeUrls($urlsToPurge)`. Como `CacheManager::purgeUrls()` já invoca `CloudflareCache::purgeUrls()` quando a Cloudflare está habilitada, a API era acionada uma 2ª vez de forma síncrona. De forma análoga, em `bin/purge-cache.php` (`--home`), `$cacheManager->purgeUrls($urls)` já expurgava a Cloudflare antes do bloco explícito que chamava `CloudflareCache::purgeUrls($urls)`.
+  - **Conclusão Atômica de Jobs (`core/CacheManager.php`):**
+    - Implementação de `CacheManager::completePurgeJob(int $jobId, int $attempts = 1): bool`, realizando a transição atômica para `status = 'completed'`, `completed_at = CURRENT_TIMESTAMP`, registro de tentativas e limpeza de `last_error`.
+    - Adição do parâmetro opcional `$purgeCloudflare = true` em `CacheManager::purgeUrls(array $uris, bool $purgeCloudflare = true): array`, permitindo purgar seletivamente apenas o FastCGI cache em disco sem contatar a Cloudflare.
+  - **Captura de `$jobId` e Conclusão Síncrona nos Pontos Editoriais:**
+    - `PostService::publishOrUpdate()`: captura `$jobId` por referência na closure da transação e, após o commit, verifica `$jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))` para marcar o job imediatamente como concluído.
+    - `public/admin/dashboard.php`: captura `$jobId` na transação de exclusão de matéria e conclui o job após a purga com sucesso.
+    - `core/ImageProcessor.php`: em `invalidateMediaMetadata()`, lotes síncronos ($\le 30$ URLs) concluem o job imediatamente após o retorno bem-sucedido de `purgeUrls()`.
+  - **Tolerância a Falhas e Resiliência:** Caso ocorra falha parcial em qualquer URL (`false` no array de retorno) ou exceção de rede/disco, `completePurgeJob()` não é acionado, mantendo o job em `status = 'pending'` para que o cron `bin/retry-cache-purge.php` execute o reprocessamento com backoff exponencial. Lotes grandes de mídia ($> 30$ URLs) permanecem delegados ao worker em segundo plano.
+  - **Desduplicação e Quebra de Circularidade na Cloudflare (`core/CloudflareCache.php`, `bin/purge-cache.php`):**
+    - `CloudflareCache::purgeOnPostPublish()` passa a delegar exclusivamente para `$cacheMgr->purgeUrls($urlsToPurge, true)` quando a Cloudflare está ativa, retornando `!empty($results) && !in_array(false, $results, true)` (e `false` em caso de exceção). Quando a Cloudflare está desligada, purga o Nginx local com `$purgeCloudflare = false` e retorna `false` com segurança.
+    - `bin/purge-cache.php` na flag `--home` invoca `$cacheManager->purgeUrls($urls, false)` para limpar apenas o Nginx local, permitindo que a verificação subsequente de status acione a Cloudflare exatamente uma vez.
+    - `bin/retry-cache-purge.php` refatorado para reutilizar `completePurgeJob()`.
+  - **Integração no CI e Suíte de Testes Dedicada (`bin/test-perf06-cache-dedup.php`, `.github/workflows/ci.yml`):**
+    - Nova suíte de testes com 16 asserções cobrindo registro, conclusão atômica, bypass de Cloudflare, ciclo de publicação do `PostService`, integridade pós-commit, idempotência perante o retry worker, retenção de status em falhas simuladas, exclusão no dashboard e purga de metadados de imagem (**16/16 PASS**).
+    - Inclusão de `bin/test-perf06-cache-dedup.php` na pipeline de CI (`.github/workflows/ci.yml`) na matriz dual PHP 8.4 e 8.5 com cabeçalho obrigatório `declare(strict_types=1);`.
+    - Atualização do dublê de testes `CacheManager` em `bin/test-image-descriptions.php` (**30/30 PASS**).
+    - Auditoria de análise estática PHPStan Nível 8 aprovada com **[OK] No errors** em todos os arquivos alterados e no projeto integral.
+
 ### Otimização de Comandos Redis Síncronos, Pipeline de Telemetria e Operações em Lote (PERF-02) — 2026-11-18
 
 - **Eliminação de Amplificação de Comandos e Latência no Plugin Redis Cache Pro (`plugins/redis-cache-pro/src/RedisClient.php`, `plugins/redis-cache-pro/src/QueryProfiler.php`):**

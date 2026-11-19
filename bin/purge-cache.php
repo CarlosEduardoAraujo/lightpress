@@ -92,7 +92,7 @@ if (isset($options['home'])) {
         echo "  - {$u}\n";
     }
 
-    $results = $cacheManager->purgeUrls($urls);
+    $results = $cacheManager->purgeUrls($urls, false);
     echo "Status Nginx Local: " . count(array_filter($results)) . "/" . count($results) . " purgados.\n";
     if ($cfEnabled) {
         $cfOk = CloudflareCache::purgeUrls($urls);

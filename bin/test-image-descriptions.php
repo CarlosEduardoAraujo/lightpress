@@ -25,7 +25,8 @@ namespace LightPress\Core {
     final class CacheManager {
         public static array $urls = [];
         public function recordPurgeJob(?int $id, string $event, array $urls): int { self::$urls = $urls; return 1; }
-        public function purgeUrls(array $urls): array { return array_fill_keys($urls, true); }
+        public function purgeUrls(array $urls, bool $purgeCloudflare = true): array { return array_fill_keys($urls, true); }
+        public function completePurgeJob(int $id, int $attempts = 1): bool { return true; }
     }
 }
 namespace {
