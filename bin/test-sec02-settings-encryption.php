@@ -175,30 +175,42 @@ Settings::init($originalGlobalConfig['security']['encryption_key'] ?? null);
 // -------------------------------------------------------------
 echo "\n[3] Testando Persistência de Chaves Sensíveis (redis_cache_pro_settings)\n";
 
-Settings::init('chave-teste-banco-dados-123456');
-Settings::set('redis_cache_pro_settings', $payloadOriginal);
+$origRedisSettings = Database::fetchValue("SELECT value FROM settings WHERE key = 'redis_cache_pro_settings'");
 
-// Consulta direta no SQLite para verificar se gravou CIFRADO no banco
-$rawDbValue = (string)Database::fetchValue("SELECT value FROM settings WHERE key = 'redis_cache_pro_settings'");
-assertTest(
-    "Valor de 'redis_cache_pro_settings' está fisicamente cifrado no banco (enc:...)",
-    str_starts_with($rawDbValue, 'enc:')
-);
+try {
+    Settings::init('chave-teste-banco-dados-123456');
+    Settings::set('redis_cache_pro_settings', $payloadOriginal);
 
-// Leitura via Settings::get() com descriptografia automática
-$fetchedDecrypted = Settings::get('redis_cache_pro_settings');
-assertTest(
-    "Settings::get('redis_cache_pro_settings') retorna payload JSON decifrado",
-    $fetchedDecrypted === $payloadOriginal
-);
+    // Consulta direta no SQLite para verificar se gravou CIFRADO no banco
+    $rawDbValue = (string)Database::fetchValue("SELECT value FROM settings WHERE key = 'redis_cache_pro_settings'");
+    assertTest(
+        "Valor de 'redis_cache_pro_settings' está fisicamente cifrado no banco (enc:...)",
+        str_starts_with($rawDbValue, 'enc:')
+    );
 
-$decodedData = json_decode((string)$fetchedDecrypted, true);
-assertTest(
-    "json_decode() do valor decifrado recupera host e senha corretos",
-    is_array($decodedData)
-    && ($decodedData['host'] ?? '') === '10.0.0.50'
-    && ($decodedData['password'] ?? '') === 'super_secret_redis_pass_2026'
-);
+    // Leitura via Settings::get() com descriptografia automática
+    $fetchedDecrypted = Settings::get('redis_cache_pro_settings');
+    assertTest(
+        "Settings::get('redis_cache_pro_settings') retorna payload JSON decifrado",
+        $fetchedDecrypted === $payloadOriginal
+    );
+
+    $decodedData = json_decode((string)$fetchedDecrypted, true);
+    assertTest(
+        "json_decode() do valor decifrado recupera host e senha corretos",
+        is_array($decodedData)
+        && ($decodedData['host'] ?? '') === '10.0.0.50'
+        && ($decodedData['password'] ?? '') === 'super_secret_redis_pass_2026'
+    );
+} finally {
+    if ($origRedisSettings !== null && $origRedisSettings !== false) {
+        Database::query("UPDATE settings SET value = ? WHERE key = 'redis_cache_pro_settings'", [(string)$origRedisSettings]);
+    } else {
+        Database::query("DELETE FROM settings WHERE key = 'redis_cache_pro_settings'");
+    }
+    Settings::flushCache();
+    Settings::init($originalGlobalConfig['security']['encryption_key'] ?? null);
+}
 
 // -------------------------------------------------------------
 // 4. Teste Isolado em Subprocesso: Ordem de Boot Real (core/bootstrap.php)
@@ -278,6 +290,12 @@ $stmt = $tempPdo->prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
 $stmt->execute(['redis_cache_pro_settings', $ciphertext]);
 $stmt->execute(['active_plugins', json_encode(['redis-cache-pro'])]);
 
+// Fechar explicitamente statement e conexão PDO antes de invocar o subprocesso
+// para desimpedir locks POSIX no Linux antes da transição para journal_mode = WAL
+$stmt->closeCursor();
+$stmt = null;
+$tempPdo = null;
+
 // Criar config.local.php temporário para forçar o subprocesso a usar o banco temporário e a chave
 $localConfigBackup = file_exists(__DIR__ . '/../config.local.php') ? file_get_contents(__DIR__ . '/../config.local.php') : null;
 $tempLocalConfig = <<<PHP
@@ -287,7 +305,8 @@ declare(strict_types=1);
 return [
     'app' => [
         'env' => 'development',
-        'debug' => true,
+        'debug' => false,
+        'log_deprecations' => true,
     ],
     'database' => [
         'driver' => 'sqlite',
@@ -304,13 +323,38 @@ file_put_contents(__DIR__ . '/../config.local.php', $tempLocalConfig);
 file_put_contents($tempScript, $testScriptContent);
 
 try {
-    $cmd = escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($tempScript) . ' ' . escapeshellarg($testDbFile);
-    $output = shell_exec($cmd);
-    $result = json_decode((string)$output, true);
+    $process = proc_open(
+        [PHP_BINARY, $tempScript, $testDbFile],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes
+    );
+
+    $stdout = '';
+    $stderr = '';
+    $exitCode = -1;
+
+    if (is_resource($process)) {
+        fclose($pipes[0]);
+        $stdout = (string)stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = (string)stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+    }
+
+    $result = json_decode((string)$stdout, true);
+    $detail = "ExitCode: {$exitCode}"
+        . ($stderr !== '' ? " | Stderr: " . trim($stderr) : '')
+        . ($stdout !== '' ? " | Stdout: " . trim($stdout) : '');
 
     assertTest(
         "Subprocesso isolado executou bootstrap limpo sem erros",
-        is_array($result)
+        is_array($result) && $exitCode === 0,
+        $detail
     );
 
     assertTest(
@@ -336,6 +380,8 @@ try {
     // Limpeza de arquivos temporários e restauração do config.local.php original
     @unlink($tempScript);
     @unlink($testDbFile);
+    @unlink($testDbFile . '-wal');
+    @unlink($testDbFile . '-shm');
     if ($localConfigBackup !== null) {
         file_put_contents(__DIR__ . '/../config.local.php', $localConfigBackup);
     } else {

@@ -85,9 +85,9 @@ jobs:
           local script="$1"
           shift || true
           echo "=== Executando: php $script $* ==="
-          local out
-          out=$(php -d error_reporting=E_ALL -d display_errors=On "$script" "$@" 2>&1)
-          local status=$?
+          local out=""
+          local status=0
+          out=$(php -d error_reporting=E_ALL -d display_errors=On "$script" "$@" 2>&1) || status=$?
           echo "$out"
           if [ $status -ne 0 ]; then
             echo "::error::Falha em $script (exit $status)"
@@ -120,4 +120,12 @@ jobs:
           echo "::error::E_DEPRECATED registrado em storage/logs/error.log:"
           cat storage/logs/error.log
           exit 1
+        fi
+
+    - name: Exibir log de erros em caso de falha
+      if: failure()
+      run: |
+        if [ -s storage/logs/error.log ]; then
+          echo "=== Conteúdo de storage/logs/error.log ==="
+          cat storage/logs/error.log
         fi
