@@ -418,6 +418,81 @@ assertTest("SEC-03: Security::e com double_encode=true escapa entidades para con
 assertTest("SEC-03: Security::e padrão com double_encode=false preserva entidades prévias", Security::e("<code>&lt;div&gt;</code>") === "&lt;code&gt;&lt;div&gt;&lt;/code&gt;");
 
 // -------------------------------------------------------------
+// [10] Testando ARCH-04: Integridade do Modal de Mídias em Temas
+// -------------------------------------------------------------
+echo "\n[10] Testando Integridade do Modal de Mídias (ARCH-04 em public/admin/themes.php)\n";
+$themesPhpCode = file_get_contents(dirname(__DIR__) . '/public/admin/themes.php');
+
+assertTest("ARCH-04: themes.php utiliza endpoint canônico /admin/api/media.php", str_contains($themesPhpCode, "'/admin/api/media.php'"));
+assertTest("ARCH-04: themes.php não referencia rota inexistente format=json", !str_contains($themesPhpCode, 'media.php?format=json'));
+assertTest("ARCH-04: themes.php lê array correto data.media", str_contains($themesPhpCode, 'Array.isArray(data.media)') && str_contains($themesPhpCode, 'modalMediaList = data.media;'));
+assertTest("ARCH-04: themes.php não referencia chave incorreta data.items", !str_contains($themesPhpCode, 'data.items'));
+assertTest("ARCH-04: uploadFromModal envia cabeçalhos AJAX (Accept: application/json)", str_contains($themesPhpCode, "'Accept': 'application/json'"));
+assertTest("ARCH-04: uploadFromModal envia cabeçalhos AJAX (X-Requested-With: XMLHttpRequest)", str_contains($themesPhpCode, "'X-Requested-With': 'XMLHttpRequest'"));
+assertTest("ARCH-04: Modal grid não utiliza innerHTML para renderização de itens", !str_contains($themesPhpCode, 'grid.innerHTML'));
+assertTest("ARCH-04: themes.php possui validador de URL seguro isSafeMediaUrl", str_contains($themesPhpCode, 'function isSafeMediaUrl('));
+assertTest("ARCH-04: themes.php implementa busca com debounce searchDebounceTimer", str_contains($themesPhpCode, 'searchDebounceTimer'));
+
+// -------------------------------------------------------------
+// [11] Testando ARCH-02: Preservação de is_featured e Transação do Editor
+// -------------------------------------------------------------
+echo "\n[11] Testando ARCH-02: Preservação de is_featured e Transação do Editor\n";
+$editorPhpCode = file_get_contents(dirname(__DIR__) . '/public/admin/editor.php');
+
+assertTest("ARCH-02: editor.php inicializa \$cleanSlug antes da transação", str_contains($editorPhpCode, '$cleanSlug = \'\';'));
+assertTest("ARCH-02: editor.php captura \$action na closure da transação", str_contains($editorPhpCode, '$action, $title, $slug'));
+assertTest("ARCH-02: editor.php captura \$publishedAtRaw na closure da transação", str_contains($editorPhpCode, '$publishedAt, $publishedAtRaw'));
+assertTest("ARCH-02: editor.php captura &\$cleanSlug por referência na closure da transação", str_contains($editorPhpCode, '&$cleanSlug'));
+
+// Teste de integridade em PostService:
+$postServiceCode = file_get_contents(dirname(__DIR__) . '/core/PostService.php');
+assertTest("ARCH-02: PostService::publishOrUpdate inclui is_featured no SELECT FOR UPDATE", str_contains($postServiceCode, 'status, is_featured, version, published_at FROM posts WHERE id = ?'));
+
+// Teste funcional do PostService::publishOrUpdate preservando is_featured
+$postService = new \LightPress\Core\PostService();
+$tempRevId = 0;
+$tempPostId = $postService->createPost([
+    'title' => 'Teste ARCH-02 Feature Flag',
+    'slug' => 'teste-arch-02-feature-' . time(),
+    'content_html' => '<p>Artigo de teste</p>',
+    'content_json' => '[]',
+    'status' => 'draft',
+], 1, $tempRevId);
+
+// 1. Publicar artigo com is_featured = 1
+$postService->publishOrUpdate($tempPostId, [
+    'title' => 'Teste ARCH-02 Feature Flag Publicado',
+    'content_html' => '<p>Artigo publicado com destaque</p>',
+    'is_featured' => 1,
+], 1, 1, $tempRevId);
+
+$initiallyFeatured = \LightPress\Core\Database::fetchOne("SELECT is_featured, version FROM posts WHERE id = ?", [$tempPostId]);
+assertTest("ARCH-02: PostService::publishOrUpdate grava is_featured = 1 na publicação inicial", (int)($initiallyFeatured['is_featured'] ?? 0) === 1);
+
+// 2. Chamar publishOrUpdate SEM a chave 'is_featured' no payload (ex: aprovação de revisão sem campo is_featured)
+$postService->publishOrUpdate($tempPostId, [
+    'title' => 'Teste ARCH-02 Feature Flag Atualizado',
+    'content_html' => '<p>Artigo atualizado sem alterar destaque</p>',
+], 1, (int)$initiallyFeatured['version']);
+
+$persisted = \LightPress\Core\Database::fetchOne("SELECT is_featured, version FROM posts WHERE id = ?", [$tempPostId]);
+assertTest("ARCH-02: PostService::publishOrUpdate preserva is_featured = 1 quando chave ausente no payload", (int)($persisted['is_featured'] ?? 0) === 1);
+
+// 3. Chamar publishOrUpdate passando explicitamente is_featured = 0 para desmarcar
+$postService->publishOrUpdate($tempPostId, [
+    'title' => 'Teste ARCH-02 Desmarcado',
+    'content_html' => '<p>Artigo desmarcado</p>',
+    'is_featured' => 0,
+], 1, (int)$persisted['version']);
+
+$persistedZero = \LightPress\Core\Database::fetchOne("SELECT is_featured, version FROM posts WHERE id = ?", [$tempPostId]);
+assertTest("ARCH-02: PostService::publishOrUpdate altera is_featured = 0 quando especificado no payload", (int)($persistedZero['is_featured'] ?? 1) === 0);
+
+// Limpeza do post temporário
+\LightPress\Core\Database::query("DELETE FROM posts WHERE id = ?", [$tempPostId]);
+\LightPress\Core\Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$tempPostId]);
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";
