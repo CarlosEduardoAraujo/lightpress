@@ -181,18 +181,107 @@ it('Mapeia corretamente os aliases do workflow Reddit - IA.json', function () us
     Database::query("DELETE FROM posts WHERE id = ?", [$res['id']]);
 });
 
+// Helper para executar o script físico public/api/v1/posts.php via subprocesso CLI isolado
+function runPhysicalPostsEndpoint(array $serverVars = []): array {
+    $php = PHP_BINARY;
+    $script = addslashes(dirname(__DIR__, 3) . '/public/api/v1/posts.php');
+
+    $envCode = '';
+    foreach ($serverVars as $k => $v) {
+        $envCode .= '$_SERVER[' . var_export($k, true) . '] = ' . var_export($v, true) . ';' . PHP_EOL;
+    }
+
+    $code = "<?php
+{$envCode}
+register_shutdown_function(function() {
+    echo PHP_EOL . '__STATUS__:' . (http_response_code() ?: 200);
+});
+require '{$script}';
+";
+
+    $process = proc_open(
+        [$php],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes
+    );
+
+    if (!is_resource($process)) {
+        throw new RuntimeException('Falha ao iniciar subprocesso PHP.');
+    }
+
+    fwrite($pipes[0], $code);
+    fclose($pipes[0]);
+
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+
+    $exitCode = proc_close($process);
+
+    $status = 0;
+    $rawBody = $stdout;
+    if (preg_match('/__STATUS__:(\d+)/', $stdout, $matches)) {
+        $status = (int)$matches[1];
+        $rawBody = trim(preg_replace('/[\r\n]*__STATUS__:\d+/', '', $stdout));
+    }
+
+    $json = json_decode($rawBody, true);
+
+    return [
+        'status' => $status,
+        'body' => $rawBody,
+        'json' => is_array($json) ? $json : null,
+        'stderr' => $stderr,
+        'exitCode' => $exitCode,
+    ];
+}
+
 it('Garante que o fallback físico public/api/v1/posts.php isola e retorna 404 quando o plugin é desativado', function (): void {
     // 1. Desativar plugin temporariamente
     $plugins = PluginManager::getActivePluginSlugs();
     $withoutPublisher = array_values(array_filter($plugins, fn($s) => $s !== 'api-publisher'));
     Settings::set('active_plugins', json_encode($withoutPublisher));
 
-    expectTrue(!PluginManager::isActive('api-publisher'), 'Plugin deve estar inativo');
+    try {
+        expectTrue(!PluginManager::isActive('api-publisher'), 'Plugin deve estar inativo');
 
-    // 2. Re-ativar o plugin
-    $withoutPublisher[] = 'api-publisher';
-    Settings::set('active_plugins', json_encode(array_values(array_unique($withoutPublisher))));
-    expectTrue(PluginManager::isActive('api-publisher'), 'Plugin deve estar ativo novamente');
+        // Executar o script físico através de subprocesso isolado
+        $res = runPhysicalPostsEndpoint(['REQUEST_METHOD' => 'POST']);
+        expectEqual(404, $res['status'], 'Deve retornar HTTP 404 quando plugin inativo');
+        expectTrue(is_array($res['json']), 'Resposta deve ser JSON válido');
+        expectEqual(false, $res['json']['ok'] ?? null, 'JSON ok deve ser false');
+        expectEqual('Endpoint de API indisponível ou plugin desativado.', $res['json']['error'] ?? '', 'Mensagem de erro esperada');
+        expectEqual('', trim($res['stderr']), 'Não deve haver warnings ou fatal errors no stderr');
+    } finally {
+        // 2. Re-ativar o plugin
+        $withoutPublisher[] = 'api-publisher';
+        Settings::set('active_plugins', json_encode(array_values(array_unique($withoutPublisher))));
+        expectTrue(PluginManager::isActive('api-publisher'), 'Plugin deve estar ativo novamente');
+    }
+});
+
+it('Garante que o fallback físico public/api/v1/posts.php rejeita GET com HTTP 405 Method Not Allowed', function (): void {
+    $res = runPhysicalPostsEndpoint(['REQUEST_METHOD' => 'GET']);
+    expectEqual(405, $res['status'], 'Deve retornar HTTP 405 para requisições GET');
+    expectTrue(is_array($res['json']), 'Resposta deve ser JSON válido');
+    expectEqual(false, $res['json']['ok'] ?? null, 'JSON ok deve ser false');
+    expectEqual('Método não permitido. Utilize POST.', $res['json']['error'] ?? '', 'Mensagem de erro esperada');
+    expectEqual('', trim($res['stderr']), 'Não deve haver warnings ou fatal errors no stderr');
+});
+
+it('Garante que o fallback físico public/api/v1/posts.php rejeita POST sem autenticação com HTTP 401', function (): void {
+    $res = runPhysicalPostsEndpoint(['REQUEST_METHOD' => 'POST']);
+    expectEqual(401, $res['status'], 'Deve retornar HTTP 401 quando não informado Basic Auth');
+    expectTrue(is_array($res['json']), 'Resposta deve ser JSON válido');
+    expectEqual(false, $res['json']['ok'] ?? null, 'JSON ok deve ser false');
+    expectEqual('Autenticação obrigatória via HTTP Basic Auth.', $res['json']['error'] ?? '', 'Mensagem de erro esperada');
+    expectEqual('', trim($res['stderr']), 'Não deve haver warnings ou fatal errors no stderr');
 });
 
 // Limpeza

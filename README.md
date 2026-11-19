@@ -1021,6 +1021,11 @@ O quarto módulo oficial do ecossistema LightPress viabiliza a ingestão contín
   - Gerador de senhas com seleção de autor e allowlist de IP.
   - Tabela de senhas emitidas com dados de último uso, último IP registrado, status e revogação imediata via POST protegido por CSRF.
   - Auditoria dos últimos 15 rascunhos ingeridos via API.
+* **Micro-Endpoint Físico de Fallback (`public/api/v1/posts.php`):**
+  - **Compatibilidade Universal com Servidores Web:** Ponto de acesso físico direto que viabiliza a ingestão via API REST em servidores Apache, Nginx, IIS ou Caddy mesmo em cenários onde reescritas de URL (`.htaccess` / `try_files`) sejam restritas ou contornadas.
+  - **Guarda Estrita de Isolamento:** Se o plugin estiver desativado no painel administrativo, o script encerra imediatamente com `HTTP 404 Not Found`, JSON estruturado e cabeçalhos defensivos de não-cache (`Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0`) e segurança (`X-Content-Type-Options: nosniff`).
+  - **Resolução Canônica da Raiz (ARCH-03):** Localizado a 3 níveis de profundidade (`public/api/v1/posts.php`), o arquivo resolve deterministicamente a raiz via `dirname(__DIR__, 3)`, garantindo o carregamento íntegro de `core/bootstrap.php` e dos componentes internos do plugin.
+  - **Testabilidade E2E Determinística:** Cobertura de testes automatizados via subprocesso isolado CLI (`proc_open` em `plugins/api-publisher/tests/test-api-e2e.php`), validando isolamento (404), método não permitido (405) e exigência de autenticação Basic Auth (401).
 
 ---
 

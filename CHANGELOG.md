@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Resolução de Caminhos no Fallback Físico da API REST e Blindagem de Testes E2E (ARCH-03) — 2026-11-19
+
+- **Correção da Resolução de Diretório Raiz no Micro-Endpoint Físico (`public/api/v1/posts.php`):**
+  - **Diagnóstico da Causa Raiz:** O arquivo de fallback físico localiza-se em `public/api/v1/posts.php`, a uma profundidade de 3 níveis da raiz (`__DIR__` = `<raiz>/public/api/v1`). O uso de `dirname(__DIR__, 2)` resolvia erroneamente para `<raiz>/public`, provocando `PHP Fatal error: Failed opening required '<raiz>/public/core/bootstrap.php'` e impedindo também a inclusão de `plugins/api-publisher/api-publisher.php`.
+  - **Ajuste Cirúrgico de Caminho:** Definição canônica de `$rootDir = dirname(__DIR__, 3);`, garantindo a resolução exata da raiz do sistema para os requires de `core/bootstrap.php` e `plugins/api-publisher/api-publisher.php`.
+  - **Padronização PSR-12 e Cabeçalhos de Segurança:**
+    - Declarações `use LightPress\Core\PluginManager;` e `use LightPress\Plugin\ApiPublisher\ApiPublisherController;` movidas para o topo do arquivo, respeitando o padrão PSR-12.
+    - Adicionados os cabeçalhos defensivos `Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0` e `X-Content-Type-Options: nosniff` no retorno HTTP 404 quando o plugin estiver desativado, preservando a flag `JSON_UNESCAPED_UNICODE`.
+- **Refatoração e Expansão da Suíte de Testes E2E (`plugins/api-publisher/tests/test-api-e2e.php`):**
+  - **Diagnóstico do Falso Positivo:** O teste existente com a descrição *"Garante que o fallback físico public/api/v1/posts.php isola e retorna 404 quando o plugin é desativado"* apenas validava o estado interno de `PluginManager::isActive('api-publisher')` em memória sem nunca executar o arquivo físico `public/api/v1/posts.php`, permitindo que o Fatal Error passasse despercebido.
+  - **Subprocesso CLI Determinístico com `proc_open`:** Implementação da função `runPhysicalPostsEndpoint()`, executando o script físico através de processo filho independente via `PHP_BINARY` com injeção de superglobais `$_SERVER` e gancho `register_shutdown_function` para extração do código HTTP real em ambiente CLI de forma cross-platform (Windows/Linux).
+  - **Cobertura Completa dos 3 Cenários Reais:**
+    1. **Cenário 1 (Plugin Inativo):** Validação de isolamento com HTTP 404, payload JSON com `'ok' => false`, mensagem clara de indisponibilidade e ausência de warnings/erros em `stderr`.
+    2. **Cenário 2 (Plugin Ativo + GET):** Validação de HTTP 405 Method Not Allowed e JSON de erro.
+    3. **Cenário 3 (Plugin Ativo + POST sem Autenticação):** Validação de HTTP 401 Unauthorized e exigência de HTTP Basic Auth, provando o ciclo de execução íntegro de `bootstrap.php` -> `api-publisher.php` -> `ApiPublisherController::handleCreatePost()`.
+  - **Resultados dos Testes:** Suíte E2E expandida para **5 PASS, 0 FAIL** (100% de sucesso) e suíte geral do plugin mantida com **12 PASS, 0 FAIL**.
+
 ### Correção de Precedência e Desombreamento de Rotas no Front Controller (ARCH-01) — 2026-11-19
 
 - **Desombreamento das Rotas `/feed`, `/feed/`, `/admin` e `/admin/` (`public/index.php`, `core/Router.php`, `bin/test-feeds-news.php`):**
