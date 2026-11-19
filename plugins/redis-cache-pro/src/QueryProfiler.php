@@ -61,16 +61,12 @@ final class QueryProfiler
             return true;
         }
 
-        // Se houver sessão ativa de administrador autenticado
-        if (session_status() === PHP_SESSION_ACTIVE || !empty($_COOKIE[session_name()])) {
-            try {
-                if (class_exists('LightPress\\Core\\Security')) {
-                    $user = \LightPress\Core\Security::getCurrentUser();
-                    if ($user !== null && ($user['role'] ?? '') === 'admin') {
-                        return true;
-                    }
-                }
-            } catch (\Throwable) {}
+        // Se houver sessão ativa já iniciada de administrador autenticado (sem acionar session_start())
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $role = $_SESSION['user']['role'] ?? ($_SESSION['user_role'] ?? '');
+            if ($role === 'admin') {
+                return true;
+            }
         }
 
         return false;
@@ -136,11 +132,16 @@ final class QueryProfiler
             $config = $instance->getConfig();
             $listKey = ($config['prefix'] ?? 'lp_cache:') . 'profiler:recent_logs';
 
-            $pipe = method_exists($client, 'pipeline')
-                ? $client->pipeline()
-                : (method_exists($client, 'multi') ? $client->multi(\Redis::PIPELINE) : null);
+            $pipe = null;
+            if (is_object($client)) {
+                if (method_exists($client, 'pipeline')) {
+                    $pipe = $client->pipeline();
+                } elseif (method_exists($client, 'multi')) {
+                    $pipe = $client->multi(\Redis::PIPELINE);
+                }
+            }
 
-            if ($pipe !== null && method_exists($pipe, 'lPush')) {
+            if (is_object($pipe) && method_exists($pipe, 'lPush')) {
                 foreach ($entries as $entry) {
                     $payload = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                     $pipe->lPush($listKey, $payload);
@@ -154,7 +155,7 @@ final class QueryProfiler
                 if (method_exists($pipe, 'exec')) {
                     $pipe->exec();
                 }
-            } else {
+            } elseif (is_object($client) && method_exists($client, 'lPush')) {
                 foreach ($entries as $entry) {
                     $payload = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                     $client->lPush($listKey, $payload);

@@ -75,6 +75,10 @@ final class RedisCache
         return RedisClient::getInstance()->get($key, $group, $found);
     }
 
+    /**
+     * @param array<int, string> $keys
+     * @return array<string, mixed>
+     */
     public static function mGet(array $keys, string $group = 'default'): array
     {
         return RedisClient::getInstance()->mGet($keys, $group);
@@ -85,6 +89,12 @@ final class RedisCache
         return RedisClient::getInstance()->set($key, $value, $group, $ttl);
     }
 
+    /**
+     * @param array<string, mixed> $items
+     * @param string $group
+     * @param int $ttl
+     * @return bool
+     */
     public static function setMultiple(array $items, string $group = 'default', int $ttl = 0): bool
     {
         return RedisClient::getInstance()->setMultiple($items, $group, $ttl);

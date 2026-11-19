@@ -337,6 +337,12 @@ parameters:
 			path: core/Security.php
 
 		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: core/Security.php
+
+		-
 			message: '#^Method LightPress\\Core\\Seo\:\:renderJsonLd\(\) has parameter \$appConfig with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -505,9 +511,9 @@ parameters:
 			path: plugins/redis-cache-pro/src/CacheMaintenance.php
 
 		-
-			message: '#^Call to an undefined method object\:\:lTrim\(\)\.$#'
-			identifier: method.notFound
-			count: 1
+			message: '#^Call to function is_object\(\) with object will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
 			path: plugins/redis-cache-pro/src/QueryProfiler.php
 
 		-
@@ -529,6 +535,18 @@ parameters:
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
+			message: '#^Call to an undefined method object\:\:hIncrBy\(\)\.$#'
+			identifier: method.notFound
+			count: 18
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Call to an undefined method object\:\:mGet\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
 			message: '#^Call to an undefined method object\:\:ping\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -537,6 +555,18 @@ parameters:
 		-
 			message: '#^Call to an undefined method object\:\:set\(\)\.$#'
 			identifier: method.notFound
+			count: 4
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Call to an undefined method object\:\:setex\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Call to function is_object\(\) with object will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
 			count: 2
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
@@ -556,12 +586,6 @@ parameters:
 			message: '#^Cannot call method hGetAll\(\) on object\|null\.$#'
 			identifier: method.nonObject
 			count: 2
-			path: plugins/redis-cache-pro/src/RedisClient.php
-
-		-
-			message: '#^Cannot call method hIncrBy\(\) on object\|null\.$#'
-			identifier: method.nonObject
-			count: 9
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
@@ -609,7 +633,7 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$object_or_class of function method_exists expects object\|string, object\|null given\.$#'
 			identifier: argument.type
-			count: 3
+			count: 2
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-

@@ -552,6 +552,13 @@ class RedisClient
         }
 
         $client = $this->getTargetClient($group);
+        if ($client === null) {
+            foreach ($missingKeys as $key) {
+                $results[$key] = false;
+                $this->runtimeStats['misses']++;
+            }
+            return $results;
+        }
         $redisKeys = array_keys($keyMap);
 
         try {
@@ -569,7 +576,7 @@ class RedisClient
                     $val = $rawValues[$idx] ?? ($rawValues[$rKey] ?? false);
                     $idx++;
 
-                    if ($val !== false && $val !== null) {
+                    if ($val !== false) {
                         $results[$logicalKey] = $val;
                         $this->localCache[$group][$logicalKey] = $val;
                         $this->runtimeStats['hits']++;
@@ -626,14 +633,22 @@ class RedisClient
         }
 
         $client = $this->getTargetClient($group);
+        if ($client === null) {
+            return true;
+        }
         $effectiveTtl = $ttl > 0 ? $ttl : (int)$this->config['maxttl'];
 
         try {
-            $pipe = method_exists($client, 'pipeline')
-                ? $client->pipeline()
-                : (method_exists($client, 'multi') ? $client->multi(Redis::PIPELINE) : null);
+            $pipe = null;
+            if (is_object($client)) {
+                if (method_exists($client, 'pipeline')) {
+                    $pipe = $client->pipeline();
+                } elseif (method_exists($client, 'multi')) {
+                    $pipe = $client->multi(Redis::PIPELINE);
+                }
+            }
 
-            if ($pipe !== null) {
+            if (is_object($pipe)) {
                 foreach ($items as $key => $val) {
                     $redisKey = $this->buildKey($key, $group);
                     if ($effectiveTtl > 0) {
@@ -869,11 +884,16 @@ class RedisClient
 
         try {
             $client = $this->redis;
-            $pipe = method_exists($client, 'pipeline')
-                ? $client->pipeline()
-                : (method_exists($client, 'multi') ? $client->multi(Redis::PIPELINE) : null);
+            $pipe = null;
+            if (is_object($client)) {
+                if (method_exists($client, 'pipeline')) {
+                    $pipe = $client->pipeline();
+                } elseif (method_exists($client, 'multi')) {
+                    $pipe = $client->multi(Redis::PIPELINE);
+                }
+            }
 
-            if ($pipe !== null) {
+            if (is_object($pipe)) {
                 if ($hits > 0) {
                     $pipe->hIncrBy($telemetryKey, 'hits', $hits);
                     $pipe->hIncrBy($aggregateKey, 'hits', $hits);
