@@ -118,7 +118,7 @@ $ctaBtnLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('cta_banne
                     <h2 class="corp-section-title"><?= Security::e($staticPage['title']) ?></h2>
                 </div>
                 <div style="font-size: 1.05rem; line-height: 1.7; color: var(--corp-text);">
-                    <?= $staticPage['content_html'] ?>
+                    <?= BlockCompiler::sanitizeHtml((string)($staticPage['content_html'] ?? '')) ?>
                 </div>
             </div>
         </section>

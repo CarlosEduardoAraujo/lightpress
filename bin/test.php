@@ -493,6 +493,84 @@ assertTest("ARCH-02: PostService::publishOrUpdate altera is_featured = 0 quando 
 \LightPress\Core\Database::query("DELETE FROM post_revisions WHERE post_id = ?", [$tempPostId]);
 
 // -------------------------------------------------------------
+// [12] Testando Bloco 2.4a: SEC-04, SEC-06, SEC-07 e SEC-08
+// -------------------------------------------------------------
+echo "\n[12] Testando Bloco 2.4a: SEC-04, SEC-06, SEC-07 e SEC-08\n";
+
+// SEC-04: Testes de preservação, mascaramento e remoção de senha
+$fakePostMasked = ['password' => '••••••••'];
+$passMasked = \LightPress\Core\Security::getSafePassword($fakePostMasked, 'password');
+assertTest("SEC-04: getSafePassword captura valor mascarado com segurança", $passMasked === '••••••••');
+$trimmedMask = trim($passMasked);
+assertTest("SEC-04: Regex de máscara identifica bolinhas/asteriscos", (bool)preg_match('/^[•*]+$/u', $trimmedMask));
+
+$fakePostArray = ['password' => ['malicious' => 'array']];
+$passFromArray = \LightPress\Core\Security::getSafePassword($fakePostArray, 'password');
+assertTest("SEC-04: getSafePassword neutraliza array de entrada retornando string vazia", $passFromArray === '');
+
+$redisSettingsFile = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/settings.php');
+assertTest("SEC-04: settings.php não imprime senha no atributo value", !str_contains($redisSettingsFile, 'value="<?= Security::e((string)($settings[\'password\']'));
+assertTest("SEC-04: settings.php possui checkbox de remoção de senha", str_contains($redisSettingsFile, 'name="remove_password"'));
+
+// SEC-06: Resolução de IP com flag trust_cloudflare_headers
+$origServer = $_SERVER;
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+$_SERVER['HTTP_CF_CONNECTING_IP'] = '198.51.100.77';
+unset($_SERVER['HTTP_X_REAL_IP']);
+
+$ipUntrusted = \LightPress\Core\Security::getClientIp(['127.0.0.1'], false);
+assertTest("SEC-06: getClientIp ignora CF-Connecting-IP quando trustCloudflareHeaders for falso", $ipUntrusted !== '198.51.100.77');
+
+$ipTrusted = \LightPress\Core\Security::getClientIp(['127.0.0.1'], true);
+assertTest("SEC-06: getClientIp aceita CF-Connecting-IP quando trustCloudflareHeaders for verdadeiro", $ipTrusted === '198.51.100.77');
+
+$tunnelConf = file_get_contents(dirname(__DIR__) . '/nginx/speedracing-tunnel.conf');
+assertTest("SEC-06: speedracing-tunnel.conf possui location = /admin/activate.php com limit_req", str_contains($tunnelConf, 'location = /admin/activate.php') && str_contains($tunnelConf, 'limit_req zone=speedracing_login burst=5 nodelay;'));
+
+$_SERVER = $origServer;
+
+// SEC-07: Guarda CLI em bin/*.php e sanitização de formulários
+$cliScripts = [
+    'audit-media-links.php', 'benchmark.php', 'catalog-media.php',
+    'cleanup.php', 'migrate-scheduled.php', 'migrate-wp.php',
+    'purge-cache.php', 'retry-cache-purge.php', 'seed.php', 'serve.php'
+];
+foreach ($cliScripts as $script) {
+    $scriptContent = file_get_contents(dirname(__DIR__) . "/bin/{$script}");
+    assertTest("SEC-07: bin/{$script} possui guarda de PHP_SAPI !== 'cli'", str_contains($scriptContent, "if (PHP_SAPI !== 'cli')"));
+}
+
+$sampleArrayPost = ['name' => ['injetado'], 'password' => '  minhasenha  '];
+assertTest("SEC-07: getSafeString não dispara TypeError e retorna default com array", \LightPress\Core\Security::getSafeString($sampleArrayPost, 'name', 'padrao') === 'padrao');
+assertTest("SEC-07: getSafePassword preserva espaços intactos em senhas legítimas", \LightPress\Core\Security::getSafePassword($sampleArrayPost, 'password') === '  minhasenha  ');
+
+// SEC-08: BlockCompiler sanitiza img[src], srcset e garante noopener noreferrer
+$imgMailto = \LightPress\Core\BlockCompiler::sanitizeHtml('<p><img src="mailto:vitima@speedracing.com.br" alt="teste"></p>');
+assertTest("SEC-08: sanitizeHtml rejeita mailto: em img[src]", !str_contains($imgMailto, 'mailto:'));
+
+$imgTel = \LightPress\Core\BlockCompiler::sanitizeHtml('<p><img src="tel:+551199999999" alt="teste"></p>');
+assertTest("SEC-08: sanitizeHtml rejeita tel: em img[src]", !str_contains($imgTel, 'tel:'));
+
+$imgSrcsetMailto = \LightPress\Core\BlockCompiler::sanitizeHtml('<p><img src="/uploads/teste.jpg" srcset="mailto:vitima@speedracing.com.br 100w" alt="teste"></p>');
+assertTest("SEC-08: sanitizeHtml rejeita mailto: em img[srcset]", !str_contains($imgSrcsetMailto, 'mailto:'));
+
+$linkBlankNofollow = \LightPress\Core\BlockCompiler::sanitizeHtml('<p><a href="https://example.com" target="_blank" rel="nofollow">Link</a></p>');
+assertTest("SEC-08: sanitizeHtml injeta noopener em link com target=_blank e rel=nofollow", str_contains($linkBlankNofollow, 'noopener'));
+assertTest("SEC-08: sanitizeHtml injeta noreferrer em link com target=_blank e rel=nofollow", str_contains($linkBlankNofollow, 'noreferrer'));
+assertTest("SEC-08: sanitizeHtml preserva nofollow em link com target=_blank", str_contains($linkBlankNofollow, 'nofollow'));
+
+$mediaPhp = file_get_contents(dirname(__DIR__) . '/public/admin/media.php');
+assertTest("SEC-08: media.php não possui onclick='copyUrl('", !str_contains($mediaPhp, "onclick=\"copyUrl('"));
+assertTest("SEC-08: media.php utiliza atributo data-copy-url", str_contains($mediaPhp, 'data-copy-url='));
+assertTest("SEC-08: media.php possui delegação de clique no document para cópia", str_contains($mediaPhp, "document.addEventListener('click'") && str_contains($mediaPhp, "closest('.btn-copy[data-copy-url]')"));
+
+$empresaPage = file_get_contents(dirname(__DIR__) . '/themes/empresa/page.php');
+assertTest("SEC-08: themes/empresa/page.php aplica BlockCompiler::sanitizeHtml", str_contains($empresaPage, 'BlockCompiler::sanitizeHtml'));
+
+$empresaHome = file_get_contents(dirname(__DIR__) . '/themes/empresa/home.php');
+assertTest("SEC-08: themes/empresa/home.php aplica BlockCompiler::sanitizeHtml", str_contains($empresaHome, 'BlockCompiler::sanitizeHtml'));
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

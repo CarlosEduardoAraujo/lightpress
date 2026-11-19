@@ -116,24 +116,25 @@ $postService = new PostService();
 
 // Processamento do formulário de salvamento
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['_csrf_token'] ?? '';
+    $token = Security::getSafeString($_POST, '_csrf_token');
     if (!Security::verifyCsrfToken($token)) {
         $error = "Token de segurança expirado. Recarregue a página.";
     } else {
-        $action = $_POST['form_action'] ?? 'save_draft';
-        $title = trim($_POST['title'] ?? '');
-        $slug = trim($_POST['slug'] ?? '');
-        $category = trim($_POST['category'] ?? 'geral');
-        $tags = trim($_POST['tags'] ?? '');
-        $summary = trim($_POST['summary'] ?? '');
-        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['featured_image'])) : '';
-        $contentHtml = trim($_POST['content_html'] ?? '');
-        $contentJson = $_POST['content_json'] ?? '';
-        $seoTitle = trim($_POST['seo_title'] ?? '');
-        $seoDesc = trim($_POST['seo_description'] ?? '');
-        $focusKeyword = trim($_POST['focus_keyword'] ?? '');
+        $action = Security::getSafeString($_POST, 'form_action', 'save_draft');
+        $title = Security::getSafeString($_POST, 'title');
+        $slug = Security::getSafeString($_POST, 'slug');
+        $category = Security::getSafeString($_POST, 'category', 'geral');
+        $tags = Security::getSafeString($_POST, 'tags');
+        $summary = Security::getSafeString($_POST, 'summary');
+        $featuredImageRaw = Security::getSafeString($_POST, 'featured_image');
+        $featuredImage = $featuredImageRaw !== '' ? BlockCompiler::sanitizeImageUrl($featuredImageRaw) : '';
+        $contentHtml = Security::getSafeString($_POST, 'content_html');
+        $contentJson = Security::getSafeString($_POST, 'content_json');
+        $seoTitle = Security::getSafeString($_POST, 'seo_title');
+        $seoDesc = Security::getSafeString($_POST, 'seo_description');
+        $focusKeyword = Security::getSafeString($_POST, 'focus_keyword');
         $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
-        $publishedAtRaw = trim($_POST['published_at'] ?? '');
+        $publishedAtRaw = Security::getSafeString($_POST, 'published_at');
         $displayTzName = $config['app']['display_timezone'] ?? 'America/Sao_Paulo';
         $publishedAt = null;
         if (!empty($publishedAtRaw)) {

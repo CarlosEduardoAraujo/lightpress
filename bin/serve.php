@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /**
  * Utilitário CLI para Servidor de Desenvolvimento Local
  * Execução: php bin/serve.php [--port=8080] [--host=localhost]

@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /**
  * Worker CLI de Retentativa de Invalidação de Cache Nginx - LightPress
  * Execução recomendada via Cron a cada minuto:

@@ -281,8 +281,9 @@ class Security
      * se a conexão física ($_SERVER['REMOTE_ADDR']) partir de um proxy reverso confiável.
      *
      * @param string[]|null $trustedProxies Lista de IPs de proxies confiáveis
+     * @param bool|null $trustCloudflareHeaders Define se deve confiar no cabeçalho CF-Connecting-IP (SEC-06)
      */
-    public static function getClientIp(?array $trustedProxies = null): string
+    public static function getClientIp(?array $trustedProxies = null, ?bool $trustCloudflareHeaders = null): string
     {
         $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
         $trusted = $trustedProxies 
@@ -303,8 +304,9 @@ class Security
             }
         }
 
-        // 2. Cabeçalho Cloudflare (suporte compatível com Cloudflare Tunnel / CDN)
-        if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        // 2. Cabeçalho Cloudflare (suporte controlado explicitamente por flag de segurança - SEC-06)
+        $trustCf = $trustCloudflareHeaders ?? (bool)($GLOBALS['config']['security']['trust_cloudflare_headers'] ?? false);
+        if ($trustCf && !empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $cfIp = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
             if (filter_var($cfIp, FILTER_VALIDATE_IP)) {
                 return $cfIp;

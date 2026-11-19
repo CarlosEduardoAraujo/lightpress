@@ -192,7 +192,9 @@ class BlockCompiler
                     $val = trim($attr->nodeValue ?? '');
 
                     if (in_array($attrName, ['href', 'src', 'cite'], true)) {
-                        $safeUrl = self::sanitizeUrl($val);
+                        $safeUrl = ($tagName === 'img' && $attrName === 'src')
+                            ? self::sanitizeImageUrl($val)
+                            : self::sanitizeUrl($val);
                         if ($safeUrl === '') {
                             $attrsToRemove[] = $attrName;
                         } else {
@@ -213,7 +215,7 @@ class BlockCompiler
                             $candUrl = $parts[0] ?? '';
                             $candDesc = $parts[1] ?? '';
 
-                            $safeCandUrl = self::sanitizeUrl($candUrl);
+                            $safeCandUrl = self::sanitizeImageUrl($candUrl);
                             if ($safeCandUrl !== '') {
                                 $rawCandUrl = html_entity_decode($safeCandUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                                 // Validar descritor para conter apenas especificações válidas (ex: 1024w, 2x, 1.5x)
@@ -279,8 +281,20 @@ class BlockCompiler
                     $node->removeChild($child);
                     continue;
                 }
+                $target = strtolower($child->getAttribute('target'));
                 $rel = $child->getAttribute('rel');
-                if (empty($rel)) {
+                $relParts = array_filter(explode(' ', strtolower($rel)));
+
+                if ($target === '_blank') {
+                    // Garante estritamente noopener e noreferrer contra reverse-tabnabbing (SEC-08)
+                    if (!in_array('noopener', $relParts, true)) {
+                        $relParts[] = 'noopener';
+                    }
+                    if (!in_array('noreferrer', $relParts, true)) {
+                        $relParts[] = 'noreferrer';
+                    }
+                    $child->setAttribute('rel', implode(' ', $relParts));
+                } elseif (empty($rel)) {
                     $child->setAttribute('rel', 'noopener noreferrer');
                 }
             } elseif ($tagName === 'img') {

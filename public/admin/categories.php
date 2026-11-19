@@ -28,12 +28,12 @@ if ($editId > 0) {
 
 // 1. Processar Criação ou Edição
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? '')) {
+    if (!Security::verifyCsrfToken(Security::getSafeString($_POST, '_csrf_token'))) {
         $error = "Token CSRF inválido ou expirado.";
     } else {
-        $action = $_POST['action'] ?? 'create';
-        $name = trim($_POST['name'] ?? '');
-        $slug = trim($_POST['slug'] ?? '');
+        $action = Security::getSafeString($_POST, 'action', 'create');
+        $name = Security::getSafeString($_POST, 'name');
+        $slug = Security::getSafeString($_POST, 'slug');
         if (empty($slug) && !empty($name)) {
             $slug = Security::slugify($name);
         } else {
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // 2. Alternar Status Ativo / Inativo (Estritamente via POST com CSRF)
 $toggleCatId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
-$csrfToggle = $_POST['_csrf_token'] ?? '';
+$csrfToggle = Security::getSafeString($_POST, '_csrf_token');
 if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
     $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleCatId]);
     if ($cat && $cat['slug'] !== 'geral') {
@@ -127,7 +127,7 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
 
 // 3. Exclusão Segura de Categoria (Estritamente via POST com CSRF)
 $delCatId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['delete_id'] ?? 0) : 0;
-$csrfDel = $_POST['_csrf_token'] ?? '';
+$csrfDel = Security::getSafeString($_POST, '_csrf_token');
 if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
     $cat = Database::fetchOne("SELECT slug FROM categories WHERE id = ? LIMIT 1", [$delCatId]);
     

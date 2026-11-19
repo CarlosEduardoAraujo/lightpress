@@ -26,16 +26,16 @@ $errorMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? null)) {
+        if (!Security::verifyCsrfToken(Security::getSafeString($_POST, '_csrf_token'))) {
             $errorMessage = 'Token de segurança CSRF inválido ou expirado. Recarregue a página e tente novamente.';
         } else {
-            $siteTitle = trim($_POST['site_title'] ?? 'SpeedRacing');
+            $siteTitle = Security::getSafeString($_POST, 'site_title', 'SpeedRacing');
             if ($siteTitle === '') {
                 $siteTitle = 'SpeedRacing';
             }
 
-            $siteDescription = trim($_POST['site_description'] ?? '');
-            $rawFavicon = trim($_POST['site_favicon'] ?? '');
+            $siteDescription = Security::getSafeString($_POST, 'site_description');
+            $rawFavicon = Security::getSafeString($_POST, 'site_favicon');
             $siteFavicon = '';
             if ($rawFavicon !== '') {
                 // Remove qualquer escape prévio e bloqueia caracteres de controle ou caminhos protocol-relative maliciosos
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             }
-            $siteTimezone = trim($_POST['site_timezone'] ?? 'America/Sao_Paulo');
+            $siteTimezone = Security::getSafeString($_POST, 'site_timezone', 'America/Sao_Paulo');
 
             // Validação estrita do Fuso Horário informado
             $validTz = false;

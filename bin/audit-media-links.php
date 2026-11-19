@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /** Diagnóstico padrão sem gravação. Reparação aditiva somente com --apply. */
 use LightPress\Core\Database;
 require __DIR__ . '/../core/Database.php';

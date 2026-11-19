@@ -600,19 +600,19 @@ require __DIR__ . '/header.php';
                             </div>
 
                             <?php if (!empty($fullAvifUrl)): ?>
-                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($fullAvifUrl) ?>', this)">
+                                <button type="button" class="btn-copy" data-copy-url="<?= Security::e($fullAvifUrl) ?>">
                                     Copiar URL (Original / Full .avif)
                                 </button>
                             <?php endif; ?>
 
                             <?php if (!empty($mediumAvifUrl)): ?>
-                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($mediumAvifUrl) ?>', this)">
+                                <button type="button" class="btn-copy" data-copy-url="<?= Security::e($mediumAvifUrl) ?>">
                                     Copiar URL (1024px .avif)
                                 </button>
                             <?php endif; ?>
 
                             <?php if (!empty($thumbAvifUrl)): ?>
-                                <button type="button" class="btn-copy" onclick="copyUrl('<?= Security::e($thumbAvifUrl) ?>', this)">
+                                <button type="button" class="btn-copy" data-copy-url="<?= Security::e($thumbAvifUrl) ?>">
                                     Copiar URL (Thumb .avif)
                                 </button>
                             <?php endif; ?>
@@ -799,6 +799,17 @@ require __DIR__ . '/header.php';
                 }, 1500);
             });
         }
+
+        // Delegação de eventos para suportar cópia em itens carregados via busca/AJAX (SEC-08)
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.btn-copy[data-copy-url]');
+            if (btn) {
+                var url = btn.getAttribute('data-copy-url');
+                if (url) {
+                    copyUrl(url, btn);
+                }
+            }
+        });
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');

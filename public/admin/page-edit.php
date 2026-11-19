@@ -36,20 +36,22 @@ if ($pageId > 0) {
 
 // Processamento do formulário de salvamento
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $csrf = $_POST['_csrf_token'] ?? '';
+    $csrf = Security::getSafeString($_POST, '_csrf_token');
     if (!Security::verifyCsrfToken($csrf)) {
         $error = "Token CSRF inválido ou expirado. Recarregue e tente novamente.";
     } else {
-        $action = $_POST['form_action'] ?? 'publish';
-        $title = trim($_POST['title'] ?? '');
-        $slug = trim($_POST['slug'] ?? '');
+        $action = Security::getSafeString($_POST, 'form_action', 'publish');
+        $title = Security::getSafeString($_POST, 'title');
+        $slug = Security::getSafeString($_POST, 'slug');
         $rawContentHtml = Security::getSafeString($_POST, 'content_html');
         $contentHtml = BlockCompiler::sanitizeHtml($rawContentHtml);
-        $featuredImage = !empty($_POST['featured_image']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['featured_image'])) : null;
-        $seoTitle = trim($_POST['seo_title'] ?? '');
-        $seoDesc = trim($_POST['seo_description'] ?? '');
+        $featuredImageRaw = Security::getSafeString($_POST, 'featured_image');
+        $featuredImage = $featuredImageRaw !== '' ? BlockCompiler::sanitizeImageUrl($featuredImageRaw) : null;
+        $seoTitle = Security::getSafeString($_POST, 'seo_title');
+        $seoDesc = Security::getSafeString($_POST, 'seo_description');
         
-        $status = in_array($_POST['status'] ?? '', ['published', 'draft', 'archived'], true) ? $_POST['status'] : 'published';
+        $statusRaw = Security::getSafeString($_POST, 'status', 'published');
+        $status = in_array($statusRaw, ['published', 'draft', 'archived'], true) ? $statusRaw : 'published';
         if ($action === 'save_draft') {
             $status = 'draft';
         } elseif ($action === 'publish' && $status === 'draft') {

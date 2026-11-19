@@ -26,7 +26,7 @@ $whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_wha
                 <?php endif; ?>
 
                 <div class="corp-content" style="font-size: 1.08rem; line-height: 1.75; color: var(--corp-text);">
-                    <?= $page['content_html'] ?>
+                    <?= BlockCompiler::sanitizeHtml((string)($page['content_html'] ?? '')) ?>
                 </div>
             </article>
 
@@ -41,7 +41,7 @@ $whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_wha
 
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                         <?php if (!empty($whatsapp)): ?>
-                            <a href="<?= Security::e($whatsapp) ?>" target="_blank" class="corp-btn corp-btn-primary" style="width: 100%; box-sizing: border-box;">
+                            <a href="<?= Security::e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" class="corp-btn corp-btn-primary" style="width: 100%; box-sizing: border-box;">
                                 💬 WhatsApp Direto
                             </a>
                         <?php endif; ?>

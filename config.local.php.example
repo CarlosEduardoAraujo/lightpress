@@ -50,5 +50,6 @@ return [
     ],
     'security' => [
         'hmac_secret' => 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO',
+        'trust_cloudflare_headers' => false, // Defina true se a aplicação estiver atrás de CDN/Tunnel Cloudflare
     ],
 ];

@@ -27,17 +27,18 @@ if ($editId > 0) {
 
 // 1. Processar Criação ou Edição
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!Security::verifyCsrfToken($_POST['_csrf_token'] ?? '')) {
+    if (!Security::verifyCsrfToken(Security::getSafeString($_POST, '_csrf_token'))) {
         $error = "Token CSRF inválido ou expirado.";
     } else {
-        $action = $_POST['action'] ?? 'create';
-        $name = trim($_POST['name'] ?? '');
-        $username = trim($_POST['username'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $role = $_POST['role'] ?? 'author';
-        $bio = trim($_POST['bio'] ?? '');
-        $avatar = !empty($_POST['avatar']) ? BlockCompiler::sanitizeImageUrl(trim($_POST['avatar'])) : null;
-        $newPassword = trim($_POST['password'] ?? '');
+        $action = Security::getSafeString($_POST, 'action', 'create');
+        $name = Security::getSafeString($_POST, 'name');
+        $username = Security::getSafeString($_POST, 'username');
+        $email = Security::getSafeString($_POST, 'email');
+        $role = Security::getSafeString($_POST, 'role', 'author');
+        $bio = Security::getSafeString($_POST, 'bio');
+        $avatarRaw = Security::getSafeString($_POST, 'avatar');
+        $avatar = $avatarRaw !== '' ? BlockCompiler::sanitizeImageUrl($avatarRaw) : null;
+        $newPassword = Security::getSafePassword($_POST, 'password');
 
         if (!in_array($role, ['author', 'editor', 'admin'], true)) {
             $role = 'author';
@@ -189,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // 2. Alternar Status Ativo / Bloqueado (Estritamente via POST com CSRF)
 $toggleUserId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_id'] ?? 0) : 0;
-$csrfUsr = $_POST['_csrf_token'] ?? '';
+$csrfUsr = Security::getSafeString($_POST, '_csrf_token');
 if ($toggleUserId > 0 && Security::verifyCsrfToken($csrfUsr)) {
     if ($toggleUserId === (int)$currentUser['id']) {
         $error = "Você não pode desativar seu próprio usuário.";

@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /**
  * Script CLI de Migração: Suporte a Agendamento de Matérias ('scheduled')
  * Execução: php bin/migrate-scheduled.php

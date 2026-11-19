@@ -27,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($isPasswordResetRequired) {
                 $error = "Redefinição de senha obrigatória: você deve alterar sua senha antes de atualizar as informações de perfil.";
             } else {
-                $name = trim(strip_tags((string)($_POST['name'] ?? '')));
-                $bio = trim(strip_tags((string)($_POST['bio'] ?? '')));
+                $name = trim(strip_tags(Security::getSafeString($_POST, 'name')));
+                $bio = trim(strip_tags(Security::getSafeString($_POST, 'bio')));
 
                 if (empty($name)) {
                     $error = "O nome não pode ficar em branco.";
@@ -44,9 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } elseif ($action === 'change_password') {
-            $currentPass = (string)($_POST['current_password'] ?? '');
-            $newPass = (string)($_POST['new_password'] ?? '');
-            $confirmPass = (string)($_POST['confirm_password'] ?? '');
+            $currentPass = Security::getSafePassword($_POST, 'current_password');
+            $newPass = Security::getSafePassword($_POST, 'new_password');
+            $confirmPass = Security::getSafePassword($_POST, 'confirm_password');
 
             if (!Security::verifyPassword($currentPass, $currentUser['password_hash'])) {
                 $error = "A senha atual informada está incorreta.";

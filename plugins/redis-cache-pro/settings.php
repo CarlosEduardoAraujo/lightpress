@@ -98,9 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $currentRaw = Settings::get('redis_cache_pro_settings', '[]');
             $currentSettings = json_decode($currentRaw, true) ?: [];
 
-            // Campos da tela
+            // Campos da tela (campo 'password' tratado defensivamente abaixo - SEC-04)
             $fields = [
-                'host', 'port', 'password', 'database', 'split_transients_db',
+                'host', 'port', 'database', 'split_transients_db',
                 'timeout', 'prefix', 'maxttl', 'stampede_protection', 'serializer',
                 'compression', 'warmup_posts', 'warmup_categories', 'warmup_custom_urls',
                 'webhook_url', 'alert_email', 'memory_threshold', 'notify_circuit_breaker',
@@ -120,6 +120,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $val = $val !== '' ? (int)$val : null;
                     }
                     $currentSettings[$field] = $val;
+                }
+            }
+
+            // Tratamento defensivo do campo de senha do Redis (SEC-04)
+            if (!empty($_POST['remove_password'])) {
+                $currentSettings['password'] = '';
+            } elseif (isset($_POST['password'])) {
+                $submittedPassword = Security::getSafePassword($_POST, 'password');
+                $trimmed = trim($submittedPassword);
+                // Preserva a senha existente caso venha vazia ou mascarada
+                if ($trimmed !== '' && !preg_match('/^[•*]+$/u', $trimmed)) {
+                    $currentSettings['password'] = $submittedPassword;
                 }
             }
 
@@ -428,7 +440,14 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
 
                     <div class="rcp-form-group">
                         <label class="rcp-label">Senha de Autenticação (AUTH)</label>
-                        <input type="password" name="password" class="rcp-input" value="<?= Security::e((string)($settings['password'] ?? '')) ?>" placeholder="Deixe em branco se não houver senha">
+                        <?php $hasRedisPassword = !empty($settings['password']); ?>
+                        <input type="password" name="password" class="rcp-input" value="" autocomplete="new-password" placeholder="<?= $hasRedisPassword ? '•••••••• (senha configurada — preencha apenas para alterar)' : 'Deixe em branco se não houver senha' ?>">
+                        <?php if ($hasRedisPassword): ?>
+                            <label class="rcp-checkbox-label" style="margin-top: 6px; font-size: 13px;">
+                                <input type="checkbox" name="remove_password" value="1">
+                                Remover senha salva do Redis
+                            </label>
+                        <?php endif; ?>
                     </div>
 
                     <div class="rcp-form-group">

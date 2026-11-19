@@ -83,6 +83,7 @@ $config = [
         'session_name' => 'LIGHTPRESSSESSID',
         'session_lifetime' => 86400, // 24 horas
         'session_idle_timeout' => 7200, // 2 horas de inatividade no servidor
+        'trust_cloudflare_headers' => false, // Requer proxy com Cloudflare Tunnel ou CDN
         'rate_limit' => [
             'login_max_attempts' => 5,
             'login_lockout_seconds' => 900, // 15 minutos

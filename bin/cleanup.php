@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /**
  * Rotina CLI de Limpeza e Manutenção Periódica - LightPress
  * Execução recomendada via Cron diariamente:

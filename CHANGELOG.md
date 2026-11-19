@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Hardening de Segurança Integral e Sanitização Estrita (Passo 2.4a — SEC-04, SEC-06, SEC-07, SEC-08) — 2026-11-19
+
+- **Ocultação e Preservação de Senha do Redis (`plugins/redis-cache-pro/settings.php`) (SEC-04):**
+  - **Eliminação de Exposição em HTML:** Removida a renderização da senha real do Redis no atributo `value` do formulário (`value=""`). Se existir uma senha previamente salva no banco, exibe máscara informativa no placeholder (`•••••••• (senha configurada — preencha apenas para alterar)`).
+  - **Checkbox Opcional de Remoção:** Adicionado o campo `name="remove_password"` exibido condicionalmente para permitir limpeza explícita da credencial quando desejado.
+  - **Processamento Defensivo contra Sobrescrita e TypeError:** Atualizada a leitura de `$_POST['password']` para `Security::getSafePassword($_POST, 'password')` (prevenindo quebras por envio de arrays `password[]=x`). Caso o campo venha vazio ou preenchido com caracteres de máscara (`••••••••`), a senha cadastrada é integralmente mantida.
+
+- **Paridade Nginx Tunnel e Flag Explícita Cloudflare (`nginx/speedracing-tunnel.conf`, `core/Security.php`, `config.php`) (SEC-06):**
+  - **Paridade no Bloco de Ativação:** Adicionado o bloco `location = /admin/activate.php` com `limit_req zone=speedracing_login burst=5 nodelay;` e encaminhamento FastCGI no `nginx/speedracing-tunnel.conf`, garantindo paridade com o arquivo `nginx/lightpress.conf`.
+  - **Flag de Confiança Cloudflare (`security.trust_cloudflare_headers`):** `Security::getClientIp()` passa a avaliar `$_SERVER['HTTP_CF_CONNECTING_IP']` estritamente quando a nova flag `trust_cloudflare_headers` estiver explicitamente ativa (configurada em `config.php` e documentada em `config.local.php.example`), evitando spoofing de IP quando atrás de proxies que não normalizam este cabeçalho.
+
+- **Guarda CLI contra Execução Web e Padronização de Sanitização (SEC-07):**
+  - **Barreira SAPI nos Scripts CLI (`bin/*.php`):** Adicionada a guarda defensiva `if (PHP_SAPI !== 'cli') { http_response_code(403); exit(1); }` nos 10 scripts de linha de comando: `audit-media-links.php`, `benchmark.php`, `catalog-media.php`, `cleanup.php`, `migrate-scheduled.php`, `migrate-wp.php`, `purge-cache.php`, `retry-cache-purge.php`, `seed.php` e `serve.php`.
+  - **Padronização em Formulários Administrativos:** Substituição de acessos diretos e chamadas `trim($_POST[...])` por `Security::getSafeString()` e `Security::getSafePassword()` em `users.php`, `profile.php`, `editor.php`, `page-edit.php`, `categories.php` e `settings.php`. Elimina erros fatais `TypeError` causados por envio malicioso de arrays sob `declare(strict_types=1)` e preserva espaços intencionais em senhas legítimas.
+
+- **Sanitização de Nós DOM, Proteção de Links e Templates Corporativos (`core/BlockCompiler.php`, `public/admin/media.php`, `themes/empresa/`) (SEC-08):**
+  - **Validação Estrita de Imagens com `sanitizeImageUrl()`:** O compilador DOM em `BlockCompiler::cleanDomNode()` agora valida nós `img[src]` e todos os candidatos de `srcset` exclusivamente através de `self::sanitizeImageUrl()`, rejeitando categoricamente esquemas como `mailto:` e `tel:` em imagens.
+  - **Injeção Compulsória de `noopener noreferrer`:** Links `<a>` com `target="_blank"` recebem compulsoriamente os atributos `noopener` e `noreferrer` em seu `rel`, preservando valores existentes como `nofollow` e neutralizando ataques de *reverse-tabnabbing*.
+  - **Delegação de Eventos na Biblioteca de Mídia (`media.php`):** Migração dos botões de cópia de `onclick="copyUrl('...', this)"` para atributos estruturados `data-copy-url="..."`, com ouvinte de eventos delegado em `document` (`e.target.closest('.btn-copy[data-copy-url]')`), eliminando quebras de sintaxe JavaScript por apóstrofos em nomes de arquivos e mantendo o funcionamento ininterrupto após buscas e paginações AJAX que alteram `#mediaGrid`.
+  - **Sanitização nos Templates Corporativos:** Aplicação de `BlockCompiler::sanitizeHtml()` em `themes/empresa/page.php` e `themes/empresa/home.php`, além da inserção de `rel="noopener noreferrer"` no link WhatsApp com `target="_blank"`.
+
 ### Otimizações Críticas de Banco de Dados e Eliminação de Locks de DDL (Passo 2.2 — ARCH-06, PERF-04, PERF-05) — 2026-11-19
 
 - **Isolamento de DDL no Roteamento 404 Público (ARCH-06):**

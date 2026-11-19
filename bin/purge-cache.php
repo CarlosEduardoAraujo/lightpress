@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit(1);
+}
+
 /**
  * Utilitário CLI para Invalidação e Teste de Cache (Cloudflare API v4 & Nginx FastCGI)
  * 
