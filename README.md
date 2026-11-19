@@ -1364,8 +1364,12 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 
 #### 8.21.17. Validação de URLs, Âncoras Internas e Defesa contra XSS em Temas (SEC-03 / CWE-79 / CWE-20)
 * **Diagnóstico da Vulnerabilidade:** No customizador de temas (`public/admin/themes.php`), opções com `type === 'url'` eram salvas sem validação de esquema de protocolo (`$cleanOptions[$key] = trim((string)$rawVal);`), abrindo brecha para links com o pseudoprotocolo `javascript:alert(1)` em botões e banners públicos (ex.: `whatsapp_url`, `partner_banner_link`, `hero_primary_cta_link`), resultando em potencial XSS armazenado. Opções com `type === 'image'` utilizavam `str_starts_with($img, '/') || filter_var($img, FILTER_VALIDATE_URL)`, aceitando caminhos protocol-relative maliciosos (`//evil.com/x.png`, `/\evil.com`) e esquemas não-HTTP aceitos pelo `filter_var` (`javascript://...`, `file://...`). Adicionalmente, na função JavaScript `applyMediaSelection()`, a miniatura de preview utilizava `innerHTML = '<img src="' + encodeURI(url) + '" ...>'`, vulnerável a DOM XSS via injeção de atributos caso `url` contivesse aspas.
-* **Suporte a Âncoras Internas Seguras (`core/BlockCompiler.php`):**
+* **Suporte a Âncoras Internas Seguras e Rejeição Estrita em Caminhos Relativos (`core/BlockCompiler.php`):**
   - O método `BlockCompiler::sanitizeUrl()` foi atualizado para validar e aceitar âncoras locais intra-página através da expressão regular estrita `/^#[a-zA-Z0-9_\-\.\:\/]*$/`, garantindo a legitimidade de links como `#servicos` e `#topo` sem permitir injeção de atributos ou execução de scripts.
+  - Bloqueio preventivo com `preg_match('/[\s<>"\'`]/', $url)` em `sanitizeUrl()` e `sanitizeImageUrl()`, descartando imediatamente com `''` qualquer caminho contendo aspas, crases, espaços ou delimitadores de tags (como `/contato' onclick=...` ou `/foto.png" onerror=...`).
+* **Prevenção de Multi-Escape e Idempotência Total (`core/BlockCompiler.php`, `core/Security.php`):**
+  - Decodificação prévia de entidades HTML via `htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE)` em `sanitizeUrl()` e `sanitizeImageUrl()`.
+  - Configuração explícita de `$double_encode = false` em `Security::e()` (`htmlspecialchars(..., 'UTF-8', false)`), garantindo que query strings com múltiplos parâmetros (ex.: `https://api.whatsapp.com/send?phone=...&text=Ola`) sejam preservadas com `&amp;` sem multiplicação de entidades (`&amp;amp;amp;`) independentemente do número de camadas de sanitização atravessadas.
 * **Defesa em Profundidade no Gerenciador de Temas (`core/ThemeManager.php`):**
   - Implementada sanitização transparente em `ThemeManager::getThemeOptions($slug)` baseada no tipo declarado no manifesto do tema (`theme.json`): campos `url` são automaticamente filtrados com `BlockCompiler::sanitizeUrl()` e campos `image` com `BlockCompiler::sanitizeImageUrl()`.
 * **Blindagem do Customizador de Temas (`public/admin/themes.php`):**
@@ -1375,7 +1379,7 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 * **Sanitização Adicional nos Templates Públicos:**
   - Aplicação defensiva de `BlockCompiler::sanitizeUrl()` e `BlockCompiler::sanitizeImageUrl()` nos templates oficiais de `portal-noticias` e `empresa`.
 * **Cobertura Automatizada de Segurança (`bin/test.php`):**
-  - Adicionadas 21 asserções no grupo `[9]` cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções de atributos `' onerror='alert(1)`, integridade de âncoras `#servicos`, e defesa em profundidade no banco de dados, totalizando 103 testes 100% aprovados.
+  - Adicionadas 30 asserções no grupo `[9]` cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções de atributos `' onerror='alert(1)`, caminhos com `/` contendo aspas ou delimitadores, idempotência com query strings sem multi-escape `&amp;amp;`, integridade de âncoras `#servicos`, e defesa em profundidade no banco de dados, totalizando 112 testes 100% aprovados.
 
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
@@ -1690,7 +1694,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Âncoras Internas Seguras (`core/BlockCompiler.php`):** Suporte a navegação intra-página (`#servicos`, `#topo`, etc.) com regex restritiva em `BlockCompiler::sanitizeUrl()`.
   - [x] **Defesa em Profundidade no `ThemeManager` (`core/ThemeManager.php`):** Sanitização transparente de valores de opções de temas por tipo (`url` e `image`).
   - [x] **Hardening do Customizador e Templates (`public/admin/themes.php`, `themes/`):** Sanitização em requisições POST, manipulação segura via `document.createElement` na prévia de imagens e aplicação de filtros em templates de `portal-noticias` e `empresa`.
-  - [x] **Cobertura em Suíte Central (`bin/test.php`):** Seção 9 com 21 asserções dedicadas aprovadas (totalizando 103/103 testes aprovados com 100% de sucesso).
+  - [x] **Cobertura em Suíte Central (`bin/test.php`):** Seção 9 com 30 asserções dedicadas aprovadas (totalizando 112/112 testes aprovados com 100% de sucesso).
 
 ---
 

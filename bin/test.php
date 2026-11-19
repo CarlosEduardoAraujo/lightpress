@@ -398,6 +398,23 @@ assertTest("SEC-03: ThemeManager::getThemeOptions neutraliza partner_banner_link
 // Restaurar opções limpas para portal-noticias
 ThemeManager::setThemeOptions('portal-noticias', []);
 
+// Refinamentos SEC-03: Rejeição estrita de aspas, espaços e < > em caminhos com /
+assertTest("SEC-03: sanitizeUrl rejeita /contato' onclick='alert(1)", BlockCompiler::sanitizeUrl("/contato' onclick='alert(1)") === '');
+assertTest("SEC-03: sanitizeUrl rejeita /uploads/foto.png\" onerror=\"alert(1)", BlockCompiler::sanitizeUrl('/uploads/foto.png" onerror="alert(1)') === '');
+assertTest("SEC-03: sanitizeUrl rejeita /caminho com espaco", BlockCompiler::sanitizeUrl('/caminho com espaco') === '');
+assertTest("SEC-03: sanitizeUrl rejeita /caminho<script>", BlockCompiler::sanitizeUrl('/caminho<script>') === '');
+assertTest("SEC-03: sanitizeImageUrl rejeita /uploads/' onerror='alert(1)", BlockCompiler::sanitizeImageUrl("/uploads/' onerror='alert(1)") === '');
+assertTest("SEC-03: sanitizeImageUrl rejeita /uploads/foto.png\" onerror=\"alert(1)", BlockCompiler::sanitizeImageUrl('/uploads/foto.png" onerror="alert(1)') === '');
+assertTest("SEC-03: sanitizeImageUrl rejeita /uploads/foto com espaco.png", BlockCompiler::sanitizeImageUrl('/uploads/foto com espaco.png') === '');
+
+// Refinamentos SEC-03: Prevenção de multi-escape (&amp;amp;) e Idempotência
+$queryUrl = 'https://api.whatsapp.com/send?phone=5511999999999&text=Ola';
+$s1 = BlockCompiler::sanitizeUrl($queryUrl);
+$s2 = BlockCompiler::sanitizeUrl($s1);
+$s3 = Security::e($s2);
+assertTest("SEC-03: Multi-passagem preserva query string sem multi-escape (&amp;amp;)", $s3 === 'https://api.whatsapp.com/send?phone=5511999999999&amp;text=Ola' && !str_contains($s3, '&amp;amp;'));
+assertTest("SEC-03: Security::e com double_encode=false não duplica &amp; em entidades existentes", Security::e("?a=1&amp;b=2") === "?a=1&amp;b=2");
+
 // -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------

@@ -719,13 +719,18 @@ class BlockCompiler
      */
     public static function sanitizeImageUrl(string $url): string
     {
-        $url = trim($url);
+        $url = htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE);
         if ($url === '') {
             return '';
         }
 
         // Bloquear caracteres de controle, quebras de linha e tabulações (bypasses em parsers)
         if (preg_match('/[\x00-\x1f\x7f]/', $url)) {
+            return '';
+        }
+
+        // Bloquear espaços, aspas, crases e delimitadores de tags (< >)
+        if (preg_match('/[\s<>"\'`]/', $url)) {
             return '';
         }
 
@@ -736,7 +741,7 @@ class BlockCompiler
 
         // Caminhos internos seguros iniciando com /
         if (str_starts_with($url, '/')) {
-            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
         }
 
         // Apenas http:// e https:// autorizados para imagens
@@ -744,7 +749,7 @@ class BlockCompiler
             if (!filter_var($url, FILTER_VALIDATE_URL)) {
                 return '';
             }
-            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
         }
 
         return '';
@@ -756,13 +761,18 @@ class BlockCompiler
      */
     public static function sanitizeUrl(string $url): string
     {
-        $url = trim($url);
+        $url = htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE);
         if ($url === '') {
             return '';
         }
 
         // Bloquear caracteres de controle, quebras de linha e tabulações (bypasses em parsers)
         if (preg_match('/[\x00-\x1f\x7f]/', $url)) {
+            return '';
+        }
+
+        // Bloquear espaços, aspas, crases e delimitadores de tags (< >)
+        if (preg_match('/[\s<>"\'`]/', $url)) {
             return '';
         }
 
@@ -774,14 +784,14 @@ class BlockCompiler
         // Âncoras internas seguras (#servicos, #topo, #secao-1)
         if (str_starts_with($url, '#')) {
             if (preg_match('/^#[a-zA-Z0-9_\-\.\:\/]*$/', $url)) {
-                return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
             }
             return '';
         }
 
         // Caminhos internos seguros iniciando com /
         if (str_starts_with($url, '/')) {
-            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
         }
 
         // Esquemas permitidos
@@ -793,7 +803,7 @@ class BlockCompiler
                         return '';
                     }
                 }
-                return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
             }
         }
 
