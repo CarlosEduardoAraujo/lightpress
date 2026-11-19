@@ -1362,6 +1362,21 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 * **Cobertura Automatizada e Validação de Boot Limpo (`bin/test-sec02-settings-encryption.php`):**
   - Suíte dedicada com 14 asserções validando injeção direta, fallback para `$GLOBALS`, precedência, roundtrip de cifragem/decifragem, persistência em SQLite e simulação de processo limpo via subprocesso PHP CLI validando que `Settings::get('redis_cache_pro_settings')` decifra com 100% de integridade já no primeiro boot.
 
+#### 8.21.17. Validação de URLs, Âncoras Internas e Defesa contra XSS em Temas (SEC-03 / CWE-79 / CWE-20)
+* **Diagnóstico da Vulnerabilidade:** No customizador de temas (`public/admin/themes.php`), opções com `type === 'url'` eram salvas sem validação de esquema de protocolo (`$cleanOptions[$key] = trim((string)$rawVal);`), abrindo brecha para links com o pseudoprotocolo `javascript:alert(1)` em botões e banners públicos (ex.: `whatsapp_url`, `partner_banner_link`, `hero_primary_cta_link`), resultando em potencial XSS armazenado. Opções com `type === 'image'` utilizavam `str_starts_with($img, '/') || filter_var($img, FILTER_VALIDATE_URL)`, aceitando caminhos protocol-relative maliciosos (`//evil.com/x.png`, `/\evil.com`) e esquemas não-HTTP aceitos pelo `filter_var` (`javascript://...`, `file://...`). Adicionalmente, na função JavaScript `applyMediaSelection()`, a miniatura de preview utilizava `innerHTML = '<img src="' + encodeURI(url) + '" ...>'`, vulnerável a DOM XSS via injeção de atributos caso `url` contivesse aspas.
+* **Suporte a Âncoras Internas Seguras (`core/BlockCompiler.php`):**
+  - O método `BlockCompiler::sanitizeUrl()` foi atualizado para validar e aceitar âncoras locais intra-página através da expressão regular estrita `/^#[a-zA-Z0-9_\-\.\:\/]*$/`, garantindo a legitimidade de links como `#servicos` e `#topo` sem permitir injeção de atributos ou execução de scripts.
+* **Defesa em Profundidade no Gerenciador de Temas (`core/ThemeManager.php`):**
+  - Implementada sanitização transparente em `ThemeManager::getThemeOptions($slug)` baseada no tipo declarado no manifesto do tema (`theme.json`): campos `url` são automaticamente filtrados com `BlockCompiler::sanitizeUrl()` e campos `image` com `BlockCompiler::sanitizeImageUrl()`.
+* **Blindagem do Customizador de Temas (`public/admin/themes.php`):**
+  - Sanitização obrigatória no processamento de requisições POST para tipos `url` e `image`.
+  - Melhoria de usabilidade no formulário administrativo, convertendo o input de URL de `<input type="url">` para `<input type="text" inputmode="url">` com placeholder explicativo, evitando falsos bloqueios da validação HTML5 do navegador ao submeter caminhos relativos ou âncoras.
+  - Eliminação de concatenações HTML inseguras no preview do modal de mídias, migrando `applyMediaSelection()` e `clearImageField()` para manipulação puramente programática de nós DOM (`document.createElement('img')`).
+* **Sanitização Adicional nos Templates Públicos:**
+  - Aplicação defensiva de `BlockCompiler::sanitizeUrl()` e `BlockCompiler::sanitizeImageUrl()` nos templates oficiais de `portal-noticias` e `empresa`.
+* **Cobertura Automatizada de Segurança (`bin/test.php`):**
+  - Adicionadas 21 asserções no grupo `[9]` cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções de atributos `' onerror='alert(1)`, integridade de âncoras `#servicos`, e defesa em profundidade no banco de dados, totalizando 103 testes 100% aprovados.
+
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:

@@ -19,6 +19,8 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Eliminação de manipulação insegura de strings HTML no JavaScript de pré-visualização de mídias, adotando criação programática de nós DOM (`document.createElement`).
 - **Sanitização nos Templates Oficiais (`themes/portal-noticias/`, `themes/empresa/`):**
   - Aplicação defensiva de `BlockCompiler::sanitizeUrl()` e `BlockCompiler::sanitizeImageUrl()` em botões de ação (CTA), redes sociais e banners parceiros nos cabeçalhos e páginas iniciais dos temas `portal-noticias` e `empresa`.
+- **Cobertura em Suíte Central de Testes Unitários (`bin/test.php`):**
+  - Criação da Seção 9 com 21 asserções dedicadas cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções `' onerror='alert(1)`, esquemas `file://` e `data:`, âncoras internas seguras e neutralização transparente no banco via `ThemeManager::getThemeOptions()`, elevando a suíte principal para 103 testes aprovados (100% de sucesso).
 
 ### Observabilidade Estrita de CI e Endurecimento da Suíte de Criptografia de Segredos em Repouso (SEC-02) — 2026-11-19
 
