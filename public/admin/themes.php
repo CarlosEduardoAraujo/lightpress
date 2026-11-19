@@ -8,6 +8,7 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\AdminNav;
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
 use LightPress\Core\ThemeManager;
@@ -58,15 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         } elseif ($type === 'textarea') {
                             $cleanOptions[$key] = trim((string)$rawVal);
                         } elseif ($type === 'url') {
-                            $cleanOptions[$key] = trim((string)$rawVal);
+                            $cleanOptions[$key] = BlockCompiler::sanitizeUrl((string)$rawVal);
                         } elseif ($type === 'image') {
-                            $img = trim((string)$rawVal);
-                            // Permite caminhos locais (/uploads/...) ou URLs absolutas
-                            if ($img === '' || str_starts_with($img, '/') || filter_var($img, FILTER_VALIDATE_URL)) {
-                                $cleanOptions[$key] = $img;
-                            } else {
-                                $cleanOptions[$key] = '';
-                            }
+                            $cleanOptions[$key] = BlockCompiler::sanitizeImageUrl((string)$rawVal);
                         } elseif ($type === 'select') {
                             $cleanOptions[$key] = trim((string)$rawVal);
                         } elseif ($type === 'boolean') {
@@ -206,7 +201,7 @@ require __DIR__ . '/header.php';
                                 <input type="text" class="form-control" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" value="<?= Security::e((string)$val) ?>">
 
                             <?php elseif ($type === 'url'): ?>
-                                <input type="url" class="form-control" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" value="<?= Security::e((string)$val) ?>" placeholder="https://...">
+                                <input type="text" inputmode="url" class="form-control" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" value="<?= Security::e(BlockCompiler::sanitizeUrl((string)$val)) ?>" placeholder="https://... ou /caminho ou #ancora">
 
                             <?php elseif ($type === 'textarea'): ?>
                                 <textarea class="form-control" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" rows="3"><?= Security::e((string)$val) ?></textarea>
@@ -241,12 +236,14 @@ require __DIR__ . '/header.php';
                                     <?php endif; ?>
                                 </select>
 
-                            <?php elseif ($type === 'image'): ?>
-                                <input type="hidden" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" value="<?= Security::e((string)$val) ?>">
+                            <?php elseif ($type === 'image'): 
+                                $safeImgVal = BlockCompiler::sanitizeImageUrl((string)$val);
+                            ?>
+                                <input type="hidden" id="opt_<?= Security::e($key) ?>" name="options[<?= Security::e($key) ?>]" value="<?= Security::e($safeImgVal) ?>">
                                 <div class="image-preview-wrapper">
                                     <div id="preview_box_<?= Security::e($key) ?>">
-                                        <?php if (!empty($val)): ?>
-                                            <img src="<?= Security::e((string)$val) ?>" class="image-preview-thumb" id="img_preview_<?= Security::e($key) ?>" alt="Preview">
+                                        <?php if (!empty($safeImgVal)): ?>
+                                            <img src="<?= Security::e($safeImgVal) ?>" class="image-preview-thumb" id="img_preview_<?= Security::e($key) ?>" alt="Preview">
                                         <?php else: ?>
                                             <div class="image-preview-empty" id="empty_preview_<?= Security::e($key) ?>">📷</div>
                                         <?php endif; ?>
@@ -402,7 +399,11 @@ require __DIR__ . '/header.php';
         document.getElementById(fieldId).value = '';
         var previewBox = document.getElementById('preview_box_' + fieldId.replace('opt_', ''));
         if (previewBox) {
-            previewBox.innerHTML = '<div class="image-preview-empty">📷</div>';
+            previewBox.innerHTML = '';
+            var emptyDiv = document.createElement('div');
+            emptyDiv.className = 'image-preview-empty';
+            emptyDiv.textContent = '📷';
+            previewBox.appendChild(emptyDiv);
         }
     }
 
@@ -507,7 +508,12 @@ require __DIR__ . '/header.php';
         var key = currentTargetFieldId.replace('opt_', '');
         var previewBox = document.getElementById('preview_box_' + key);
         if (previewBox) {
-            previewBox.innerHTML = '<img src="' + encodeURI(url) + '" class="image-preview-thumb" alt="Preview">';
+            previewBox.innerHTML = '';
+            var img = document.createElement('img');
+            img.src = url;
+            img.className = 'image-preview-thumb';
+            img.alt = 'Preview';
+            previewBox.appendChild(img);
         }
 
         closeMediaModal();

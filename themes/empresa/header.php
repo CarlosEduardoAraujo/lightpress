@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
 use LightPress\Core\Icon;
 use LightPress\Core\ObjectCache;
@@ -19,7 +20,7 @@ $navPages = ObjectCache::remember('corporate_nav_pages', 86400, function (): arr
 
 $siteName = $config['app']['name'] ?? 'Empresa';
 $headerCtaText = (string)ThemeManager::option('header_cta_text', 'Fale Conosco');
-$headerCtaLink = (string)ThemeManager::option('header_cta_link', '/contato/');
+$headerCtaLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('header_cta_link', '/contato/'));
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

@@ -1658,6 +1658,25 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Emissão Defensiva de Códigos HTTP em Testes (`core/Router.php`):** Ajuste em `Router::redirect()` para registrar `http_response_code($statusCode)` respeitando `!headers_sent()` durante a execução de suítes de teste sem interromper prematuramente o fluxo via `exit`.
   - [x] **Expansão da Cobertura de Testes Automatizados (`bin/test-feeds-news.php`):** Adição de 10 novas asserções cobrindo `/feed/` (HTTP 200 e XML RSS 2.0 válido), redirecionamento 301 de `/feed` para `/feed/`, redirecionamento 302 de `/admin/` para `/admin/login.php` e redirecionamento 301 de `/admin` para `/admin/` (totalizando 36/36 testes aprovados, somados aos 82/82 da suíte `bin/test.php`).
 
+* **FASE CONCLUÍDA — Resolução de Fallback Físico da API REST e Testes E2E Determinísticos (ARCH-03):**
+  - [x] **Resolução Canônica de Raiz (`public/api/v1/posts.php`):** Ajuste de profundidade de caminho para `$rootDir = dirname(__DIR__, 3);`, corrigindo o carregamento de `core/bootstrap.php` e do plugin `api-publisher` no fallback de micro-endpoint.
+  - [x] **Subprocesso CLI Determinístico com `proc_open` (`plugins/api-publisher/tests/test-api-e2e.php`):** Execução do micro-endpoint físico via processo filho independente com `PHP_BINARY`, capturando código HTTP e JSON de erro de forma cross-platform nos 3 cenários (inativo, método inválido e sem autenticação).
+  - [x] **100% de Aprovação nos Testes E2E:** 5/5 asserções aprovadas com zero falhas e suíte do plugin mantida com 12/12 PASS.
+
+* **FASE CONCLUÍDA — Observabilidade Estrita de CI e Endurecimento da Suíte de Criptografia de Segredos em Repouso (SEC-02):**
+  - [x] **Eliminação de Log Mudo na CI (`.github/workflows/ci.yml`):** Prevenção de encerramento precoce por `set -e` em `run_strict()` através de `out=$(...) || status=$?`, assegurando exibição total da saída do script antes do exit status e step `if: failure()` para emissão de `storage/logs/error.log`.
+  - [x] **Liberação de Locks SQLite no Linux (`bin/test-sec02-settings-encryption.php`):** Fechamento explícito de `$stmt` e `$tempPdo` antes de disparar o subprocesso de boot, eliminando colisão de locks POSIX na transição para `PRAGMA journal_mode = WAL;`.
+  - [x] **Subprocesso com `proc_open` e Diagnóstico Completo:** Separação de `stdout`, `stderr` e captura de `exitCode`, com detalhamento em caso de falha de asserção e prevenção de contaminação de stdout com `'debug' => false`.
+  - [x] **Higienização Transacional do Banco Compartilhado:** Bloco `try ... finally` na Seção 3 para restaurar ou expurgar `redis_cache_pro_settings` e limpeza de cache estático via `Settings::flushCache()`.
+  - [x] **Limpeza Integral de Artefatos WAL:** Remoção no `finally` de `.sqlite`, `-wal` e `-shm`.
+  - [x] **100% de Aprovação:** Suíte SEC-02 aprovada com 22/22 verificações e execução encadeada sem resíduos.
+
+* **FASE CONCLUÍDA — Validação de URLs, Âncoras Internas e Defesa contra XSS em Temas (SEC-03):**
+  - [x] **Âncoras Internas Seguras (`core/BlockCompiler.php`):** Suporte a navegação intra-página (`#servicos`, `#topo`, etc.) com regex restritiva em `BlockCompiler::sanitizeUrl()`.
+  - [x] **Defesa em Profundidade no `ThemeManager` (`core/ThemeManager.php`):** Sanitização transparente de valores de opções de temas por tipo (`url` e `image`).
+  - [x] **Hardening do Customizador e Templates (`public/admin/themes.php`, `themes/`):** Sanitização em requisições POST, manipulação segura via `document.createElement` na prévia de imagens e aplicação de filtros em templates de `portal-noticias` e `empresa`.
+  - [x] **Cobertura em Suíte Central (`bin/test.php`):** Seção 9 com 21 asserções dedicadas aprovadas (totalizando 103/103 testes aprovados com 100% de sucesso).
+
 ---
 
 ## 11. Metas Mensuráveis e Critérios de Aceitação

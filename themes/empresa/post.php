@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
@@ -8,7 +9,7 @@ use LightPress\Core\ThemeManager;
 
 require __DIR__ . '/header.php';
 
-$whatsapp = (string)ThemeManager::option('contact_whatsapp', '');
+$whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_whatsapp', ''));
 $email = (string)ThemeManager::option('contact_email', '');
 $phone = (string)ThemeManager::option('contact_phone', '');
 ?>

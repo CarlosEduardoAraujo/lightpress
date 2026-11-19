@@ -7,6 +7,35 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Validação de URLs, Âncoras Internas e Defesa contra XSS em Temas (SEC-03) — 2026-11-19
+
+- **Suporte a Âncoras Internas Seguras (`core/BlockCompiler.php`):**
+  - Implementação de validação regex estrita `/^#[a-zA-Z0-9_\-\.\:\/]*$/` em `BlockCompiler::sanitizeUrl()`, permitindo âncoras internas de navegação na mesma página (ex: `#servicos`, `#topo`, `#secao-1`) sem expor a injeções de esquemas inseguros (`javascript:`, `data:`, `vbscript:`).
+- **Defesa em Profundidade no Gerenciador de Temas (`core/ThemeManager.php`):**
+  - Sanitização automática em `ThemeManager::getThemeOptions()` de opções baseadas no tipo declarado no manifesto (`theme.json`): campos do tipo `url` são filtrados por `BlockCompiler::sanitizeUrl()` e campos do tipo `image` por `BlockCompiler::sanitizeImageUrl()`.
+- **Blindagem do Customizador de Temas (`public/admin/themes.php`):**
+  - Sanitização no tratamento de requisições `POST` para opções de tema do tipo `url` e `image`.
+  - Melhoria de usabilidade no input de URLs (`type="text" inputmode="url"` com placeholder explicativo) permitindo URLs completas, caminhos relativos e âncoras internas.
+  - Eliminação de manipulação insegura de strings HTML no JavaScript de pré-visualização de mídias, adotando criação programática de nós DOM (`document.createElement`).
+- **Sanitização nos Templates Oficiais (`themes/portal-noticias/`, `themes/empresa/`):**
+  - Aplicação defensiva de `BlockCompiler::sanitizeUrl()` e `BlockCompiler::sanitizeImageUrl()` em botões de ação (CTA), redes sociais e banners parceiros nos cabeçalhos e páginas iniciais dos temas `portal-noticias` e `empresa`.
+
+### Observabilidade Estrita de CI e Endurecimento da Suíte de Criptografia de Segredos em Repouso (SEC-02) — 2026-11-19
+
+- **Correção da Observabilidade e Eliminação do Log Mudo no GitHub Actions (`.github/workflows/ci.yml`):**
+  - **Diagnóstico da Causa Raiz:** No runner Ubuntu do GitHub Actions, o passo de execução opera sob `bash -eo pipefail`. Em `run_strict()`, a atribuição `out=$(php ... 2>&1)` fazia com que o shell abortasse imediatamente na substituição de comando quando o script retornava código de saída diferente de zero. As instruções subsequentes (`local status=$?`, `echo "$out"` e `::error::`) nunca eram executadas, gerando apenas `Error: Process completed with exit code 1.` sem qualquer detalhe de stack trace ou saída de erro.
+  - **Captura Resiliente com `|| status=$?`:** Redefinição da rotina com `local out=""`, `local status=0` e `out=$(php -d error_reporting=E_ALL -d display_errors=On "$script" "$@" 2>&1) || status=$?`. Essa construção desativa o aborto imediato do `set -e`, garantindo que toda a saída do script seja impressa no log antes da validação do exit code e de `E_DEPRECATED`.
+  - **Diagnóstico Defensivo Pós-Falha:** Adicionado step com condição `if: failure()` para imprimir na íntegra o arquivo `storage/logs/error.log` no console do runner, facilitando o diagnóstico rápido de erros de runtime.
+- **Endurecimento de Concorrência SQLite e Isolamento de Subprocesso (`bin/test-sec02-settings-encryption.php`):**
+  - **Liberação Explícita de Handles SQLite (Prevenção de Lock no Linux):** Identificado que o processo pai mantinha `$stmt` e `$tempPdo` abertos no banco temporário SQLite ao invocar o subprocesso. Sob Linux (locks POSIX via `fcntl`), a transição para `PRAGMA journal_mode = WAL;` disparada pelo `core/bootstrap.php` no subprocesso exige lock exclusivo sobre o arquivo, resultando em `SQLSTATE[HY000]: General error: 5 database is locked`. Fechamento explícito via `$stmt->closeCursor(); $stmt = null; $tempPdo = null;` antes do boot isolado.
+  - **Subprocesso Determinístico com `proc_open` e Separação de Streams:** Substituição de `shell_exec()` por `proc_open([PHP_BINARY, $tempScript, $testDbFile], ...)` com pipes independentes para `stdout`, `stderr` e captura explícita do `exitCode`. A asserção `assertTest` foi enriquecida com `$detail` contendo código de saída e conteúdo de `stderr`/`stdout`, eliminando falhas silenciosas.
+  - **Isolamento de Erros e Prevenção de Contaminação:** Injeção de `'debug' => false` e `'log_deprecations' => true` na configuração temporária do subprocesso para impedir que `display_errors` contamine a saída JSON em `stdout`.
+  - **Higienização Transacional do Banco Compartilhado (Seção 3):** Encapsulamento da Seção 3 em bloco `try ... finally` para restaurar o valor prévio de `redis_cache_pro_settings` (ou deletá-lo caso não existisse) e expurgar caches com `Settings::flushCache()`, impedindo vazamento de credenciais criptografadas de teste para testes subsequentes como `test-redis-cache-pro.php`.
+  - **Limpeza de Arquivos WAL Temporários:** Bloco `finally` atualizado para remover não apenas `$testDbFile`, mas também os arquivos associados `{$testDbFile}-wal` e `{$testDbFile}-shm`.
+- **Resultados e Validação:**
+  - Suíte `bin/test-sec02-settings-encryption.php` aprovada com **22 PASS, 0 FAIL**.
+  - Execução encadeada (`test-plugins.php` -> `test-sec02-settings-encryption.php` -> `test-redis-cache-pro.php`) aprovada com 100% de sucesso e zero contaminação de banco.
+
 ### Correção de Resolução de Caminhos no Fallback Físico da API REST e Blindagem de Testes E2E (ARCH-03) — 2026-11-19
 
 - **Correção da Resolução de Diretório Raiz no Micro-Endpoint Físico (`public/api/v1/posts.php`):**

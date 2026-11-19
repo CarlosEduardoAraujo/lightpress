@@ -1,13 +1,14 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
 use LightPress\Core\ThemeManager;
 
 require __DIR__ . '/header.php';
 
-$whatsapp = (string)ThemeManager::option('contact_whatsapp', '');
+$whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_whatsapp', ''));
 ?>
 
 <main class="corp-section">

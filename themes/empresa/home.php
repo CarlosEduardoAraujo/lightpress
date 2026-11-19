@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
@@ -12,9 +13,9 @@ $heroBadge = (string)ThemeManager::option('hero_badge', 'Inovação & Excelênci
 $heroTitle = (string)ThemeManager::option('hero_title', 'Transforme seu Negócio com Soluções de Alta Performance');
 $heroSubtitle = (string)ThemeManager::option('hero_subtitle', 'Oferecemos consultoria estratégica, tecnologia de ponta e soluções sob medida para acelerar os resultados da sua empresa.');
 $heroPrimText = (string)ThemeManager::option('hero_primary_cta_text', 'Solicitar Proposta');
-$heroPrimLink = (string)ThemeManager::option('hero_primary_cta_link', '/contato/');
+$heroPrimLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('hero_primary_cta_link', '/contato/'));
 $heroSecText = (string)ThemeManager::option('hero_secondary_cta_text', 'Nossos Serviços');
-$heroSecLink = (string)ThemeManager::option('hero_secondary_cta_link', '#servicos');
+$heroSecLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('hero_secondary_cta_link', '#servicos'));
 
 $servicesTitle = (string)ThemeManager::option('services_title', 'Nossas Soluções Especializadas');
 $servicesSub = (string)ThemeManager::option('services_subtitle', 'Desenvolvemos produtos e consultorias com rigor técnico, garantindo resultados mensuráveis.');
@@ -22,7 +23,7 @@ $servicesSub = (string)ThemeManager::option('services_subtitle', 'Desenvolvemos 
 $ctaTitle = (string)ThemeManager::option('cta_banner_title', 'Pronto para elevar o nível da sua operação?');
 $ctaSub = (string)ThemeManager::option('cta_banner_subtitle', 'Fale hoje mesmo com nossos especialistas e receba um diagnóstico técnico sem compromisso.');
 $ctaBtnText = (string)ThemeManager::option('cta_banner_btn_text', 'Falar com um Consultor');
-$ctaBtnLink = (string)ThemeManager::option('cta_banner_btn_link', '/contato/');
+$ctaBtnLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('cta_banner_btn_link', '/contato/'));
 ?>
 
 <main>

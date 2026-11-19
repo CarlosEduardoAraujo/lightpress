@@ -358,6 +358,47 @@ ThemeManager::activate('portal-noticias');
 assertTest("Reativação segura do tema portal-noticias", ThemeManager::getActiveTheme() === 'portal-noticias');
 
 // -------------------------------------------------------------
+// 9. Testes de Validação e Defesa contra XSS em Temas (SEC-03)
+// -------------------------------------------------------------
+echo "\n[9] Testando Validação de URLs, Âncoras e Defesa contra XSS em Temas (SEC-03)\n";
+
+// Validação de URLs pelo BlockCompiler::sanitizeUrl
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita javascript:alert(1)", BlockCompiler::sanitizeUrl('javascript:alert(1)') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita caminhos protocol-relative //evil.com", BlockCompiler::sanitizeUrl('//evil.com') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita caminhos com barra invertida /\\evil.com", BlockCompiler::sanitizeUrl('/\\evil.com') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita injeção de atributo ' onerror='alert(1)", BlockCompiler::sanitizeUrl("' onerror='alert(1)") === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita data: URI", BlockCompiler::sanitizeUrl('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl aceita âncora interna #servicos", BlockCompiler::sanitizeUrl('#servicos') === '#servicos');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl aceita âncora interna complexa #secao-1:topo", BlockCompiler::sanitizeUrl('#secao-1:topo') === '#secao-1:topo');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl aceita âncora simples #", BlockCompiler::sanitizeUrl('#') === '#');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl rejeita âncora com injeção #' onclick='alert(1)", BlockCompiler::sanitizeUrl("#' onclick='alert(1)") === '');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl aceita caminho relativo seguro /contato/", BlockCompiler::sanitizeUrl('/contato/') === '/contato/');
+assertTest("SEC-03: BlockCompiler::sanitizeUrl aceita URL externa legítima https://whatsapp.com/channel/abc", BlockCompiler::sanitizeUrl('https://whatsapp.com/channel/abc') === 'https://whatsapp.com/channel/abc');
+
+// Validação de Imagens pelo BlockCompiler::sanitizeImageUrl
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl rejeita //evil.com/x.png", BlockCompiler::sanitizeImageUrl('//evil.com/x.png') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl rejeita javascript://alert(1)", BlockCompiler::sanitizeImageUrl('javascript://alert(1)') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl rejeita data: image URI", BlockCompiler::sanitizeImageUrl('data:image/svg+xml;utf8,<svg onload=alert(1)>') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl rejeita esquema file:///etc/passwd", BlockCompiler::sanitizeImageUrl('file:///etc/passwd') === '');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl rejeita ' onerror='alert(1)", BlockCompiler::sanitizeImageUrl("' onerror='alert(1)") === '');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl aceita caminho local /uploads/2026/10/banner.avif", BlockCompiler::sanitizeImageUrl('/uploads/2026/10/banner.avif') === '/uploads/2026/10/banner.avif');
+assertTest("SEC-03: BlockCompiler::sanitizeImageUrl aceita URL absoluta https://example.com/foto.jpg", BlockCompiler::sanitizeImageUrl('https://example.com/foto.jpg') === 'https://example.com/foto.jpg');
+
+// Defesa em profundidade no ThemeManager::getThemeOptions
+ThemeManager::setThemeOptions('portal-noticias', [
+    'whatsapp_url' => 'javascript:alert(1)',
+    'partner_banner_image' => '//evil.com/banner.png',
+    'partner_banner_link' => "' onerror='alert(1)",
+]);
+$sanitizedOptions = ThemeManager::getThemeOptions('portal-noticias');
+assertTest("SEC-03: ThemeManager::getThemeOptions neutraliza whatsapp_url maliciosa no banco", ($sanitizedOptions['whatsapp_url'] ?? '') === '');
+assertTest("SEC-03: ThemeManager::getThemeOptions neutraliza partner_banner_image protocol-relative no banco", ($sanitizedOptions['partner_banner_image'] ?? '') === '');
+assertTest("SEC-03: ThemeManager::getThemeOptions neutraliza partner_banner_link injetado no banco", ($sanitizedOptions['partner_banner_link'] ?? '') === '');
+
+// Restaurar opções limpas para portal-noticias
+ThemeManager::setThemeOptions('portal-noticias', []);
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

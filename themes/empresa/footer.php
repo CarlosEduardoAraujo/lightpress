@@ -1,11 +1,12 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Security;
 use LightPress\Core\ThemeManager;
 
 $siteName = $config['app']['name'] ?? 'Empresa';
-$whatsapp = (string)ThemeManager::option('contact_whatsapp', '');
+$whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_whatsapp', ''));
 $email = (string)ThemeManager::option('contact_email', '');
 $phone = (string)ThemeManager::option('contact_phone', '');
 $copyright = (string)ThemeManager::option('footer_copyright_company', $siteName . ' Ltda.');

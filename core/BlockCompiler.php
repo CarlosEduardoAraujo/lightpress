@@ -771,6 +771,14 @@ class BlockCompiler
             return '';
         }
 
+        // Âncoras internas seguras (#servicos, #topo, #secao-1)
+        if (str_starts_with($url, '#')) {
+            if (preg_match('/^#[a-zA-Z0-9_\-\.\:\/]*$/', $url)) {
+                return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            }
+            return '';
+        }
+
         // Caminhos internos seguros iniciando com /
         if (str_starts_with($url, '/')) {
             return htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

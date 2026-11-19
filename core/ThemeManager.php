@@ -162,8 +162,10 @@ final class ThemeManager
     {
         $themes = self::getAvailableThemes();
         $defaults = [];
+        $metaOptions = [];
 
         if (isset($themes[$slug]['options']) && is_array($themes[$slug]['options'])) {
+            $metaOptions = $themes[$slug]['options'];
             foreach ($themes[$slug]['options'] as $key => $opt) {
                 if (isset($opt['default'])) {
                     $defaults[$key] = $opt['default'];
@@ -184,7 +186,19 @@ final class ThemeManager
             }
         }
 
-        return array_merge($defaults, $saved);
+        $merged = array_merge($defaults, $saved);
+
+        // Defesa em profundidade: sanitização baseada no tipo declarado no manifesto do tema
+        foreach ($merged as $key => $val) {
+            $optType = $metaOptions[$key]['type'] ?? null;
+            if ($optType === 'url') {
+                $merged[$key] = BlockCompiler::sanitizeUrl((string)$val);
+            } elseif ($optType === 'image') {
+                $merged[$key] = BlockCompiler::sanitizeImageUrl((string)$val);
+            }
+        }
+
+        return $merged;
     }
 
     /**

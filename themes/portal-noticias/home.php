@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\Security;
@@ -293,10 +294,10 @@ $secondaryLeads = !empty($featuredPosts) ? array_slice($featuredPosts, 1, 3) : [
     <aside class="lg:col-span-4 flex flex-col gap-space-lg">
         <!-- Banner Parceiro Oficial (Substitui Próximas Etapas) -->
         <?php 
-        $partnerBannerImg = (string)ThemeManager::option('partner_banner_image', '/uploads/2026/10/banner-vertical-qr-site.avif');
-        $partnerBannerUrl = (string)ThemeManager::option('partner_banner_link', '/contato/');
-        $whatsappUrl = (string)ThemeManager::option('whatsapp_url', 'https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c');
-        $instagramUrl = (string)ThemeManager::option('instagram_url', 'https://www.instagram.com/speedracing.com.br/');
+        $partnerBannerImg = BlockCompiler::sanitizeImageUrl((string)ThemeManager::option('partner_banner_image', '/uploads/2026/10/banner-vertical-qr-site.avif'));
+        $partnerBannerUrl = BlockCompiler::sanitizeUrl((string)ThemeManager::option('partner_banner_link', '/contato/'));
+        $whatsappUrl = BlockCompiler::sanitizeUrl((string)ThemeManager::option('whatsapp_url', 'https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c'));
+        $instagramUrl = BlockCompiler::sanitizeUrl((string)ThemeManager::option('instagram_url', 'https://www.instagram.com/speedracing.com.br/'));
         ?>
         <?php if (!empty($partnerBannerImg)): ?>
         <div class="rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] bg-pure-white dark:bg-carbon-surface shadow-xs p-space-sm flex flex-col items-center">

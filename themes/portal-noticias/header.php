@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
 use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
@@ -285,10 +286,10 @@ if (empty($trendingTags)) {
                     <span class="text-secondary-fixed-dim"><?= Security::e((string)ThemeManager::option('top_strip_text', 'Credibilidade no automobilismo desde 2002')) ?></span>
                 </div>
                 <div class="flex items-center gap-space-sm">
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="<?= Security::e((string)ThemeManager::option('whatsapp_url', 'https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c')) ?>" target="_blank" rel="noopener noreferrer"  aria-label="Receba notícias e atualizações pelo WhatsApp">
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="<?= Security::e(BlockCompiler::sanitizeUrl((string)ThemeManager::option('whatsapp_url', 'https://whatsapp.com/channel/0029VbDiks83GJP7Lbzm2d3c')) ?: '#') ?>" target="_blank" rel="noopener noreferrer"  aria-label="Receba notícias e atualizações pelo WhatsApp">
                         <?= Icon::svg('chat', 'text-surface-container-lowest', 16) ?><span class="hidden lg:inline">Canal WhatsApp</span>
                     </a>
-                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="<?= Security::e((string)ThemeManager::option('instagram_url', 'https://www.instagram.com/speedracing.com.br/')) ?>" target="_blank" rel="noopener noreferrer" aria-label="Siga no Instagram">
+                    <a class="text-surface-container-lowest hover:text-primary-fixed-dim transition-colors flex items-center justify-center min-w-[44px] min-h-[36px] px-2 py-1 gap-1.5" href="<?= Security::e(BlockCompiler::sanitizeUrl((string)ThemeManager::option('instagram_url', 'https://www.instagram.com/speedracing.com.br/')) ?: '#') ?>" target="_blank" rel="noopener noreferrer" aria-label="Siga no Instagram">
                         <?= Icon::svg('share', 'text-surface-container-lowest', 16) ?><span class="hidden lg:inline">Social</span>
                     </a>
                 </div>
