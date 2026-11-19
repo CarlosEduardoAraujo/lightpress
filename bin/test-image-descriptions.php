@@ -79,10 +79,24 @@ namespace {
     ObjectCache::$data['posts']['post_slug:noticia'] = ['image_alt' => 'Antigo'];
     \LightPress\Plugin\AiCopilot\MediaVision::saveMediaMeta('a', 'Alt atualizado', 'Nova legenda', '');
     check(ImageProcessor::getImageDescription($url) === 'Alt atualizado', 'Editar mídia atualiza cache e memória');
-    check(empty(ObjectCache::$data['posts']), 'Edição invalida posts antigos');
+    check(!empty(ObjectCache::$data['posts']), 'Edição preserva cache do grupo posts');
+    check(isset(ObjectCache::$data['posts']['post_slug:noticia']), 'Chave post_slug permanece intacta');
     foreach (['/', '/noticia/', '/relacionada/', '/categoria/stock-car/', '/tag/stock-car/', '/institucional/'] as $uri) {
         check(in_array($uri, CacheManager::$urls, true), 'Purga ' . $uri);
     }
+    // Validação PERF-01: Simulação com alto volume de artigos na categoria (evita tempestade de invalidação)
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare("INSERT INTO posts VALUES (?, ?, 'stock-car', 'Stock Car', '', '', 'published', '2026-01-01')");
+    for ($i = 10; $i < 1010; $i++) {
+        $stmt->execute([$i, 'noticia-extra-' . $i]);
+    }
+    $pdo->commit();
+    ImageProcessor::invalidateMediaMetadata('a');
+    check(count(CacheManager::$urls) <= 35, 'Tamanho do array de purga permanece controlado sob volume elevado (<= 35 URLs geradas)');
+    check(!in_array('/page/4/', CacheManager::$urls, true), 'Não purga paginação além da página 3');
+    check(!in_array('/blog/page/4/', CacheManager::$urls, true), 'Não purga blog além da página 3');
+    check(!in_array('/categoria/stock-car/page/4/', CacheManager::$urls, true), 'Não purga categoria além da página 3');
+    check(!in_array('/tag/stock-car/page/4/', CacheManager::$urls, true), 'Não purga tag além da página 3');
     $pdo->exec('DROP TABLE media_variants'); resetCache();
     check(ImageProcessor::getImageDescription('/uploads/foto-teste.avif') === 'Foto Teste', 'Falha de banco mantém renderização');
     check(empty(ObjectCache::$data), 'Falha de banco não persiste fallback');

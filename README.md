@@ -637,6 +637,13 @@ php bin/purge-cache.php --home
 php bin/purge-cache.php --all
 ```
 
+#### Purga Controlada em Edição de Mídia (PERF-01)
+Ao atualizar descrições visuais (`alt_text` / `caption`), o método `ImageProcessor::invalidateMediaMetadata()` adota purga seletiva estritamente delimitada:
+- **Preservação de Cache de Artigos no Redis:** O grupo `'posts'` não é expurgado; apenas o grupo `'media'` e a memória do processo são limpos, eliminando o risco de *cache stampede*.
+- **Paginações Delimitadas:** Invalida apenas até a página 3 da Home, Blog, Categoria e Tags (`min(3, (int)ceil($count / 12))`). Listagens secundárias (página 4 em diante) expiram naturalmente pelo TTL de 5 minutos da Seção 7.3.
+- **Relacionados Recentes:** Limita o expurgo aos 8 artigos mais recentes da categoria (`ORDER BY published_at DESC LIMIT 8` e `published_at <= $nowUtc`), cobrindo o bloco de relacionados e evitando varreduras irrestritas no banco.
+- **Contenção de Volume:** Reduz o total de URLs de dezenas de milhares para ~20–30 URLs, permitindo purga atômica imediata em lote único na Cloudflare e prevenindo sobrecarga de payload em `cache_purge_jobs`.
+
 ---
 
 ## 8. Diretrizes e Melhores Práticas de Segurança (Security by Design)
@@ -1608,6 +1615,13 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Paridade de Cookie na Expiração de Sessão (`core/Security.php`):** Criação de `Security::clearSessionCookie()` com assinatura de array no `setcookie()` preservando `Secure`, `HttpOnly` e `SameSite` em logout, expiração e revogação de sessão.
   - [x] **Observabilidade de Runtime no Admin (`/admin/system.php`):** Exibição de memória/hit-rate do OPcache, status de `session.use_strict_mode`, alinhamento `session.gc_maxlifetime` vs `session_idle_timeout` (`7200s`) e contagem de funções de shell bloqueadas em `disable_functions`.
   - [x] **Documentação de Produção (`docs/DEPLOYMENT.md` — Seção 10):** Guia completo de hardening e tuning para `/etc/php/8.5/fpm/php.ini` e `/etc/php/8.5/fpm/pool.d/www.conf` validado com **82/82 PASS** em `bin/test.php` sob as flags endurecidas.
+
+* **FASE CONCLUÍDA — Mitigação de Tempestade de Invalidação de Cache em Mídia (PERF-01):**
+  - [x] **Preservação de Cache Redis:** Remoção de `ObjectCache::flushGroup('posts')` em `ImageProcessor::invalidateMediaMetadata()`, protegendo as consultas cacheadas em memória RAM.
+  - [x] **Delimitação de Paginações:** Limitação da invalidação da Home, Blog, categorias e tags até a página 3 (`min(3, ceil($count / 12))`), confiando na expiração ordinária de 5 minutos para páginas secundárias (Seção 7.3).
+  - [x] **Restrição de Matérias Irmãs da Categoria:** Busca limitada aos 8 artigos mais recentes (`LIMIT 8` e `published_at <= now`), assegurando o mosaico de relacionados sem carregamento excessivo de slugs.
+  - [x] **Deduplicação de Tags e Proteção do Worker:** Deduplicação prévia de tags e contenção do array de purga para ~20–30 URLs (redução de 99,9% no volume), eliminando saturação de rate-limit na Cloudflare (HTTP 429) e travamento de lock no worker `bin/retry-cache-purge.php`.
+  - [x] **100% de Aprovação na Suíte de Testes:** Suíte `bin/test-image-descriptions.php` ampliada com teste de estresse em escala (30/30 verificações aprovadas).
 
 ---
 

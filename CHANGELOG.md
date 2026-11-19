@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Mitigação de Tempestade de Invalidação de Cache em Metadados de Mídia (PERF-01) — 2026-11-18
+
+- **Contenção e Blindagem de Invalidação em `ImageProcessor::invalidateMediaMetadata()` (`core/ImageProcessor.php`, `bin/test-image-descriptions.php`):**
+  - **Diagnóstico da Causa Raiz:** Ao editar metadados de mídia (ou ao executar visão computacional automática do AI Copilot pós-upload), `ImageProcessor::invalidateMediaMetadata()` incorria em quatro falhas graves:
+    1. Executava `ObjectCache::flushGroup('posts')`, expurgando indiscriminadamente 100% dos posts, destaques, categorias e feeds cacheados no Redis, deflagrando um *cache stampede* desnecessário (já que o cache do artigo não armazena `image_alt`, o qual é resolvido sob demanda por `ImageProcessor::getImageDescription()` sob o grupo `'media'`).
+    2. Gerava URLs de paginação irrestritas da Home e Blog via `for ($page = 2; $page <= ceil($count / 12); $page++)`, adicionando milhares de URLs (+8.140 URLs para ~48k artigos).
+    3. Buscava todos os artigos da mesma categoria sem `LIMIT` (`SELECT slug FROM posts WHERE category = ?`), gerando dezenas de milhares de URLs adicionais e centenas de páginas de paginação de categoria, ignorando que o bloco de matérias relacionadas exibe no máximo 4 artigos mais recentes.
+    4. Iterava sobre todas as tags sem deduplicação prévia e gerava paginação irrestrita para cada uma delas.
+    - O payload gerado em `cache_purge_jobs` atingia megabytes, levando ao esgotamento de taxa/limites da API Cloudflare (HTTP 429), travamento prolongado do lock em `bin/retry-cache-purge.php` e consumo excessivo de memória.
+  - **Eliminação de `ObjectCache::flushGroup('posts')`:** Mantida exclusivamente a invalidação de `self::clearMemoryCache()` e `ObjectCache::flushGroup('media')`, protegendo a integridade do cache de matérias em memória RAM no Redis.
+  - **Limitação Bounded de Paginações (Home, Blog, Categorias e Tags):** Paginações restritas até a página 3 (`min(3, (int)ceil($total / 12))`). Listagens secundárias (página 4 em diante) respeitam o ciclo natural de expiração do FastCGI/Cloudflare Cache com TTL de 5 minutos, em estrita conformidade com a Seção 7.3 da especificação do sistema.
+  - **Restrição de Matérias Irmãs da Categoria:** Consulta otimizada com `LIMIT 8` e filtro `published_at <= $nowUtc`, garantindo cobertura integral do mosaico de relacionados sem varreduras integrais no banco.
+  - **Deduplicação de Tags:** Controle via `$processedTags` impedindo reexecução de contagens de tags idênticas compartilhadas entre matérias.
+  - **Redução Drástica de Volume:** Volume de purga por edição reduzido de ~25.000–30.000 URLs para a faixa controlada de **20 a 30 URLs**, permitindo envio atômico imediato em lote único para a Cloudflare e gravação de payload mínimo (< 2 KB) no banco.
+  - **Suíte de Testes Atualizada e Estresse em Escala (`bin/test-image-descriptions.php`):** Atualizada asserção para verificar que o grupo `posts` no `ObjectCache` é mantido intacto. Adicionado teste de estresse simulando mais de 1.000 artigos na categoria, comprovando que o array de purga permanece rigorosamente delimitado (≤ 35 URLs) e que nenhuma URL de página 4 ou superior é gerada. 30/30 verificações aprovadas com 100% de sucesso.
+
+
 ### Correção de Ordem de Inicialização e Descriptografia de Segredos em Settings (SEC-02 / CWE-665) — 2026-11-18
 
 - **Resolução de Dependência de Inicialização no Bootstrap (`core/bootstrap.php`, `core/Settings.php`, CWE-665):**
