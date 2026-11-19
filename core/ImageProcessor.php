@@ -21,6 +21,12 @@ class ImageProcessor
      */
     private static array $memoryDescCache = [];
 
+    /** @var array<string, string> */
+    private static array $memoryThumbCache = [];
+
+    /** @var array<string, string> */
+    private static array $memoryIntermediateCache = [];
+
     private string $uploadDir;
     private string $stagingDir;
     private int $maxFileSize;
@@ -106,6 +112,18 @@ class ImageProcessor
             return ($targetExt === 'webp') ? self::toWebpUrl($url) : self::toAvifUrl($url);
         }
 
+        $staticKey = $url . '|' . $targetExt;
+        if (isset(self::$memoryThumbCache[$staticKey])) {
+            return self::$memoryThumbCache[$staticKey];
+        }
+
+        $cacheKey = 'img_thumb:' . md5($staticKey);
+        $cached = ObjectCache::get($cacheKey, 'media');
+        if ($cached !== false && is_string($cached)) {
+            self::$memoryThumbCache[$staticKey] = $cached;
+            return $cached;
+        }
+
         // Gera candidato padrão SpeedPress: -thumb.avif
         $replaced = preg_replace('~-(1024|1920)\.(webp|avif|jpe?g|png)$~i', "-thumb.{$targetExt}", $url);
         if ($replaced === null || $replaced === $url) {
@@ -118,31 +136,38 @@ class ImageProcessor
         $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
         $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
 
+        $resolved = '';
         if (file_exists($candidatePath)) {
-            return $candidate;
-        }
+            $resolved = $candidate;
+        } else {
+            // Se não encontrar o -thumb físico, busca por variantes proporcionais legadas do WordPress (-300x... ou -299x299)
+            $dir = dirname($candidatePath);
+            if (is_dir($dir)) {
+                $pathInfo = pathinfo($candidatePath);
+                $baseWithoutThumb = preg_replace('~-thumb$~', '', $pathInfo['filename']);
 
-        // Se não encontrar o -thumb físico, busca por variantes proporcionais legadas do WordPress (-300x... ou -299x299)
-        $dir = dirname($candidatePath);
-        if (is_dir($dir)) {
-            $pathInfo = pathinfo($candidatePath);
-            $baseWithoutThumb = preg_replace('~-thumb$~', '', $pathInfo['filename']);
-
-            // Testar se existe miniatura proporcional do WordPress (ex: -300x169.avif)
-            $matches = glob($dir . '/' . $baseWithoutThumb . '-300x*.' . $targetExt);
-            if (!empty($matches)) {
-                return dirname($candidate) . '/' . basename($matches[0]);
-            }
-
-            // Testar se existe miniatura quadrada do WordPress (ex: -299x299.avif)
-            $squareMatch = $dir . '/' . $baseWithoutThumb . '-299x299.' . $targetExt;
-            if (file_exists($squareMatch)) {
-                return dirname($candidate) . '/' . basename($squareMatch);
+                // Testar se existe miniatura proporcional do WordPress (ex: -300x169.avif)
+                $matches = glob($dir . '/' . $baseWithoutThumb . '-300x*.' . $targetExt);
+                if (!empty($matches)) {
+                    $resolved = dirname($candidate) . '/' . basename($matches[0]);
+                } else {
+                    // Testar se existe miniatura quadrada do WordPress (ex: -299x299.avif)
+                    $squareMatch = $dir . '/' . $baseWithoutThumb . '-299x299.' . $targetExt;
+                    if (file_exists($squareMatch)) {
+                        $resolved = dirname($candidate) . '/' . basename($squareMatch);
+                    }
+                }
             }
         }
 
         // Fallback transparente: retorna a imagem original em AVIF
-        return self::toAvifUrl($url);
+        if ($resolved === '') {
+            $resolved = self::toAvifUrl($url);
+        }
+
+        ObjectCache::set($cacheKey, (string)$resolved, 'media', 86400);
+        self::$memoryThumbCache[$staticKey] = (string)$resolved;
+        return (string)$resolved;
     }
 
     /**
@@ -164,6 +189,18 @@ class ImageProcessor
             return ($targetExt === 'webp') ? self::toWebpUrl($url) : self::toAvifUrl($url);
         }
 
+        $staticKey = $url . '|' . $targetExt;
+        if (isset(self::$memoryIntermediateCache[$staticKey])) {
+            return self::$memoryIntermediateCache[$staticKey];
+        }
+
+        $cacheKey = 'img_inter:' . md5($staticKey);
+        $cached = ObjectCache::get($cacheKey, 'media');
+        if ($cached !== false && is_string($cached)) {
+            self::$memoryIntermediateCache[$staticKey] = $cached;
+            return $cached;
+        }
+
         $replaced = preg_replace('~-(thumb|1920)\.(webp|avif|jpe?g|png)$~i', "-1024.{$targetExt}", $url);
         if ($replaced === null || $replaced === $url) {
             $replaced = preg_replace('~\.(webp|avif|jpe?g|png)$~i', "-1024.{$targetExt}", $url);
@@ -174,12 +211,11 @@ class ImageProcessor
         $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
         $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
 
-        if (file_exists($candidatePath)) {
-            return $candidate;
-        }
+        $resolved = file_exists($candidatePath) ? $candidate : self::toAvifUrl($url);
 
-        // Fallback para a imagem completa em AVIF
-        return self::toAvifUrl($url);
+        ObjectCache::set($cacheKey, (string)$resolved, 'media', 86400);
+        self::$memoryIntermediateCache[$staticKey] = (string)$resolved;
+        return (string)$resolved;
     }
 
     /**
@@ -188,6 +224,8 @@ class ImageProcessor
     public static function clearMemoryCache(): void
     {
         self::$memoryDescCache = [];
+        self::$memoryThumbCache = [];
+        self::$memoryIntermediateCache = [];
     }
 
     /** Resolve os metadados atuais; o segundo argumento preserva a API existente. */

@@ -16,9 +16,9 @@ $phone = (string)ThemeManager::option('contact_phone', '');
 
 <main class="corp-section">
     <div class="corp-container">
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 3.5rem; align-items: start;">
+        <div class="corp-layout-sidebar">
             <!-- Artigo Principal -->
-            <article>
+            <article <?= empty($isPreview) ? 'data-view-endpoint="/api/view/' . (int)$post['id'] . '"' : '' ?>>
                 <div style="margin-bottom: 2rem;">
                     <a href="/blog/" style="color: var(--corp-primary); text-decoration: none; font-weight: 700; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 0.3rem; margin-bottom: 0.75rem;">
                         &larr; Voltar para o Blog
@@ -36,7 +36,7 @@ $phone = (string)ThemeManager::option('contact_phone', '');
                     <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.88rem; color: var(--corp-text-muted); border-top: 1px solid var(--corp-border); border-bottom: 1px solid var(--corp-border); padding: 0.75rem 0;">
                         <span>Por <strong><?= Security::e($post['author_name'] ?? 'Equipe') ?></strong></span>
                         <span>&bull;</span>
-                        <span>Publicado em <?= date('d/m/Y', strtotime($post['published_at'])) ?></span>
+                        <span>Publicado em <?= date('d/m/Y', strtotime((string)($post['published_at'] ?? 'now')) ?: time()) ?></span>
                         <span>&bull;</span>
                         <span><?= (int)($readingTime ?? 3) ?> min de leitura</span>
                     </div>
@@ -87,7 +87,7 @@ $phone = (string)ThemeManager::option('contact_phone', '');
                                         <?= Security::e($rel['title']) ?>
                                     </h5>
                                     <span style="font-size: 0.78rem; color: var(--corp-text-muted);">
-                                        <?= date('d/m/Y', strtotime($rel['published_at'])) ?>
+                                        <?= date('d/m/Y', strtotime((string)($rel['published_at'] ?? 'now')) ?: time()) ?>
                                     </span>
                                 </a>
                             <?php endforeach; ?>

@@ -13,8 +13,8 @@ $whatsapp = BlockCompiler::sanitizeUrl((string)ThemeManager::option('contact_wha
 
 <main class="corp-section">
     <div class="corp-container">
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 3.5rem; align-items: start;">
-            <article>
+        <div class="corp-layout-sidebar">
+            <article <?= empty($isPreview) ? 'data-view-endpoint="/api/view/page/' . (int)$page['id'] . '"' : '' ?>>
                 <h1 style="font-size: 2.6rem; font-weight: 900; line-height: 1.2; letter-spacing: -0.02em; color: var(--corp-text); margin: 0 0 1.5rem;">
                     <?= Security::e($page['title']) ?>
                 </h1>

@@ -7,6 +7,32 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimizações de Performance em Listagens Públicas e Correção do Tema Corporativo (Passo 2.5 — PERF-07, ARCH-05) — 2026-11-19
+
+- **Cache em RAM de Trending Tags no Header (`templates/header.php`, `themes/portal-noticias/header.php`) (PERF-07):**
+  - **Eliminação de Consultas SQL Repetitivas:** A identificação das 6 tags em alta nas últimas 24 horas passa a ser armazenada em RAM via `ObjectCache::remember('header_trending_tags', 600, ..., 'posts')` com TTL de 10 minutos (600 segundos).
+  - **Invalidação Reativa e Atômica:** Associado ao grupo de cache `'posts'`, garantindo purga instantânea em $O(1)$ sempre que um artigo for publicado, editado ou excluído (`PostService`, `dashboard.php`, `editor.php`).
+
+- **Resolução de Miniaturas sem Locks e com Cache em Dois Níveis (`core/ImageProcessor.php`) (PERF-07):**
+  - **Cache Estático em Memória por Requisição:** Adicionadas as propriedades `$memoryThumbCache` e `$memoryIntermediateCache` com tipagem explícita `array<string, string>` para compatibilidade estrita com o PHPStan Nível 8. Múltiplas referências à mesma imagem no mesmo ciclo de renderização resolvem em $O(1)$ sem chamadas a disco ou cache externo.
+  - **Eliminação de Locks Distribuídos:** Substituição de `remember()` por `ObjectCache::get()` + `ObjectCache::set()` com TTL de 86400s no grupo `'media'`, eliminando a sobrecarga de 4 comandos Redis (`SET NX + DEL`) em misses de cache para verificações de arquivos (`file_exists()` e `glob()`).
+  - **Higiene e Compatibilidade:** Integração com `clearMemoryCache()` e preservação de paridade com mocks de testes unitários isolados.
+
+- **Pré-filtro FULLTEXT em Rotas de Tags com Sincronia Estrita (`public/index.php`) (PERF-07):**
+  - **Aceleração de Varredura em 48k+ Linhas:** Nas rotas `/tag/{tag}/` e `/tag/{tag}/page/{page}/`, termos com comprimento $\ge 3$ caracteres são extraídos com `preg_split('/[^\p{L}\p{N}]+/u', $tagClean)` e pré-filtrados via índice `idx_fulltext_search` com `MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)` antes da validação precisa com `FIND_IN_SET`.
+  - **Garantia de Paridade entre COUNT e SELECT:** A flag booleana `$useFulltext` rastreia exatamente qual ramo de consulta produziu a contagem de artigos, replicando idêntica cláusula no `SELECT ... LIMIT ? OFFSET ?` e eliminando descasamentos em paginações.
+  - **Fallback Transparente e Defensivo:** Termos curtos (< 3 caracteres, como "f1") ou palavras afetadas pela lista padrão de stopwords do InnoDB acionam automaticamente o fallback para `FIND_IN_SET` puro sem perda de resultados. Mantida a compatibilidade nativa com SQLite (`LIKE`).
+
+- **Conformidade Estrita com CSP e Restauração de Funcionalidades no Tema Corporativo (`themes/empresa/`) (ARCH-05):**
+  - **100% de Conformidade com CSP (`script-src 'self'`):** Removidos todos os `<script>` inline e o manipulador `onclick="toggleCorpTheme()"` de `themes/empresa/header.php`. O tema passa a carregar os módulos externos `/assets/js/theme-init.js` (anti-flash) e `/assets/js/app.js` com o botão canônico `#btnThemeToggle` e ícone `#themeIcon`.
+  - **Restauração da Telemetria de Visualizações:** Inserção do atributo `data-view-endpoint="/api/view/<?= (int)$post['id'] ?>"` em `themes/empresa/post.php` e `data-view-endpoint="/api/view/page/<?= (int)$page['id'] ?>"` em `themes/empresa/page.php`, integrando com a rotina assíncrona de `navigator.sendBeacon` do `app.js`.
+  - **Prevenção de `TypeError` em Datas Nulas:** Proteção com `strtotime((string)($p['published_at'] ?? 'now')) ?: time()` em todos os templates de exibição do tema (`post.php`, `home.php`, `blog.php`, `category.php`, `tag.php` e `search.php`), prevenindo erros fatais na pré-visualização de rascunhos.
+  - **Grid Responsivo Mobile:** Criação da classe `.corp-layout-sidebar` com regra responsiva `@media (max-width: 900px)` em `themes/empresa/assets/css/style.css` e sincronização para `public/assets/themes/empresa/css/style.css`, substituindo estilizações `style="display: grid; ..."` inline.
+
+- **Suíte de Testes Automatizada Dedicada e Integração Contínua (`bin/test-perf07-arch05.php`, `.github/workflows/ci.yml`):**
+  - Criação da suíte `bin/test-perf07-arch05.php` com `declare(strict_types=1);` cobrindo 29 asserções de cache de tags, resolução e memorização de miniaturas, pré-filtro FULLTEXT, ausência de inline scripts/handlers, responsividade e telemetria.
+  - Integração no fluxo de CI do GitHub Actions em PHP 8.4 e 8.5.
+
 ### Hardening de Segurança Integral e Sanitização Estrita (Passo 2.4a — SEC-04, SEC-06, SEC-07, SEC-08) — 2026-11-19
 
 - **Ocultação e Preservação de Senha do Redis (`plugins/redis-cache-pro/settings.php`) (SEC-04):**

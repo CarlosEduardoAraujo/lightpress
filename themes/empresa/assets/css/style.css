@@ -416,3 +416,18 @@ html.dark .corp-hero-badge {
     flex-wrap: wrap;
     gap: 1rem;
 }
+
+/* Layout Responsivo para Conteúdo com Barra Lateral (Post e Página) */
+.corp-layout-sidebar {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 3.5rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .corp-layout-sidebar {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+    }
+}

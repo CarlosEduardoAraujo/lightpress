@@ -154,7 +154,7 @@ $ctaBtnLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('cta_banne
                                 <h3 class="corp-blog-title"><?= Security::e($p['title']) ?></h3>
                                 <p class="corp-blog-excerpt"><?= Security::e(mb_strimwidth($p['summary'] ?? '', 0, 110, '...')) ?></p>
                                 <div class="corp-blog-meta">
-                                    Por <?= Security::e($p['author_name'] ?? 'Equipe') ?> &bull; <?= date('d/m/Y', strtotime($p['published_at'])) ?>
+                                    Por <?= Security::e($p['author_name'] ?? 'Equipe') ?> &bull; <?= date('d/m/Y', strtotime((string)($p['published_at'] ?? 'now')) ?: time()) ?>
                                 </div>
                             </div>
                         </a>

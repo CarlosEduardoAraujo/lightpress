@@ -3,6 +3,7 @@ declare(strict_types=1);
 use LightPress\Core\Database;
 use LightPress\Core\Icon;
 use LightPress\Core\ImageProcessor;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 use LightPress\Core\Seo;
 
@@ -18,52 +19,56 @@ $menuCategories = [
     ['slug' => 'motovelocidade', 'name' => 'Motovelocidade'],
 ];
 
-// Tags em alta no dia atual (dinâmicas a partir do banco de dados)
-$trendingTags = [];
-try {
-    // 1. Buscar tags das notícias publicadas nas últimas 24 horas
-    $twentyFourHoursAgo = gmdate('Y-m-d H:i:s', time() - 86400);
-    $recentTagsRaw = Database::fetchAll(
-        "SELECT tags FROM posts 
-         WHERE status = 'published' 
-           AND published_at >= ? 
-           AND tags IS NOT NULL AND tags != '' 
-         LIMIT 50",
-        [$twentyFourHoursAgo]
-    );
-
-    // Se hoje tiver poucas matérias com tags, busca das últimas 50 matérias publicadas
-    if (count($recentTagsRaw) < 3) {
+// Tags em alta no dia atual (dinâmicas a partir do banco de dados com cache em RAM)
+$trendingTags = ObjectCache::remember('header_trending_tags', 600, function (): array {
+    $tags = [];
+    try {
+        // 1. Buscar tags das notícias publicadas nas últimas 24 horas
+        $twentyFourHoursAgo = gmdate('Y-m-d H:i:s', time() - 86400);
         $recentTagsRaw = Database::fetchAll(
             "SELECT tags FROM posts 
              WHERE status = 'published' 
+               AND published_at >= ? 
                AND tags IS NOT NULL AND tags != '' 
-             ORDER BY published_at DESC LIMIT 50"
+             LIMIT 50",
+            [$twentyFourHoursAgo]
         );
-    }
 
-    $tagCounts = [];
-    foreach ($recentTagsRaw as $row) {
-        $parts = array_map('trim', explode(',', $row['tags']));
-        foreach ($parts as $p) {
-            if ($p === '' || mb_strlen($p) < 2) continue;
-            $key = mb_strtolower($p);
-            if (!isset($tagCounts[$key])) {
-                $tagCounts[$key] = ['name' => $p, 'count' => 0];
-            }
-            $tagCounts[$key]['count']++;
+        // Se hoje tiver poucas matérias com tags, busca das últimas 50 matérias publicadas
+        if (count($recentTagsRaw) < 3) {
+            $recentTagsRaw = Database::fetchAll(
+                "SELECT tags FROM posts 
+                 WHERE status = 'published' 
+                   AND tags IS NOT NULL AND tags != '' 
+                 ORDER BY published_at DESC LIMIT 50"
+            );
         }
+
+        $tagCounts = [];
+        foreach ($recentTagsRaw as $row) {
+            $parts = array_map('trim', explode(',', $row['tags']));
+            foreach ($parts as $p) {
+                if ($p === '' || mb_strlen($p) < 2) continue;
+                $key = mb_strtolower($p);
+                if (!isset($tagCounts[$key])) {
+                    $tagCounts[$key] = ['name' => $p, 'count' => 0];
+                }
+                $tagCounts[$key]['count']++;
+            }
+        }
+
+        // Ordenar pelas tags mais frequentes
+        uasort($tagCounts, fn($a, $b) => $b['count'] <=> $a['count']);
+        $topTags = array_slice($tagCounts, 0, 6);
+        foreach ($topTags as $t) {
+            $tags[] = $t['name'];
+        }
+    } catch (\Throwable) {
+        // Fallback silencioso
     }
 
-    // Ordenar pelas tags mais frequentes
-    uasort($tagCounts, fn($a, $b) => $b['count'] <=> $a['count']);
-    $topTags = array_slice($tagCounts, 0, 6);
-    foreach ($topTags as $t) {
-        $trendingTags[] = $t['name'];
-    }
-} catch (\Throwable $e) {
-    // Fallback silencioso
-}
+    return !empty($tags) ? $tags : ['Fórmula 1', 'Stock Car', 'NASCAR', 'IndyCar', 'Le Mans'];
+}, 'posts');
 
 if (empty($trendingTags)) {
     $trendingTags = ['Fórmula 1', 'Stock Car', 'NASCAR', 'IndyCar', 'Le Mans'];

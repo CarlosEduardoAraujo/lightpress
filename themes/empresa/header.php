@@ -48,13 +48,9 @@ $headerCtaLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('header
     <!-- CSS Corporativo -->
     <link rel="stylesheet" href="<?= Security::e(ThemeManager::asset('css/style.css')) ?>">
 
-    <script>
-        // Anti-flash do modo escuro
-        (function() {
-            var theme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            if (theme === 'dark') document.documentElement.classList.add('dark');
-        })();
-    </script>
+    <!-- Scripts de Inicialização de Tema e App (Compatibilidade Estrita com CSP sem unsafe-inline) -->
+    <script src="/assets/js/theme-init.js" defer></script>
+    <script src="/assets/js/app.js" defer></script>
     <?php \LightPress\Core\Hook::doAction('frontend_head'); ?>
 </head>
 <body>
@@ -77,8 +73,8 @@ $headerCtaLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('header
                 </nav>
 
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <button type="button" onclick="toggleCorpTheme()" title="Alternar Modo Escuro" class="corp-btn corp-btn-secondary" style="padding: 0.5rem 0.75rem; font-size: 1rem;">
-                        <span id="themeToggleIcon">🌙</span>
+                    <button type="button" id="btnThemeToggle" title="Alternar Modo Escuro" class="corp-btn corp-btn-secondary" style="padding: 0.5rem 0.75rem; font-size: 1rem;">
+                        <span id="themeIcon">🌙</span>
                     </button>
                     <?php if (!empty($headerCtaText)): ?>
                         <a href="<?= Security::e($headerCtaLink) ?>" class="corp-btn corp-btn-primary">
@@ -89,16 +85,3 @@ $headerCtaLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('header
             </div>
         </div>
     </header>
-
-    <script>
-        function toggleCorpTheme() {
-            var isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            document.getElementById('themeToggleIcon').innerText = isDark ? '☀️' : '🌙';
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            var isDark = document.documentElement.classList.contains('dark');
-            var icon = document.getElementById('themeToggleIcon');
-            if (icon) icon.innerText = isDark ? '☀️' : '🌙';
-        });
-    </script>
