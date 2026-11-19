@@ -5,6 +5,19 @@ declare(strict_types=1);
  * LightPress / SpeedPress - Ponto Único de Entrada Público (Front Controller)
  */
 
+// Fast-Path de Alta Performance para POST /api/view/{id} e POST /api/view/page/{id} (PERF-03)
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $rawPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    if (is_string($rawPath) && preg_match('~^/api/view/(?:(page)/)?([0-9]+)/?$~', $rawPath, $matches)) {
+        if (($matches[1] ?? '') === 'page') {
+            $_GET['type'] = 'page';
+        }
+        $_GET['id'] = (int)$matches[2];
+        require __DIR__ . '/api/view.php';
+        exit;
+    }
+}
+
 // Injeção de Cabeçalhos HTTP de Segurança Defensivos
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -917,7 +930,7 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
 // Rota 7: Contador de Visualizações de Páginas Institucionais (POST /api/view/page/{id} com ou sem barra final)
 $pageViewHandler = function (array $params): void {
     $_GET['type'] = 'page';
-    $_GET['id'] = $params['id'] ?? 0;
+    $_GET['id'] = (int)($params['id'] ?? 0);
     require __DIR__ . '/api/view.php';
 };
 $router->post('/api/view/page/{id}', $pageViewHandler);
@@ -925,7 +938,7 @@ $router->post('/api/view/page/{id}/', $pageViewHandler);
 
 // Rota 7b: Contador de Visualizações de Notícias e Artigos (POST /api/view/{id} com ou sem barra final)
 $viewHandler = function (array $params): void {
-    $_GET['id'] = $params['id'] ?? 0;
+    $_GET['id'] = (int)($params['id'] ?? 0);
     require __DIR__ . '/api/view.php';
 };
 $router->post('/api/view/{id}', $viewHandler);

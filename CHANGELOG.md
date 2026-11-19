@@ -7,6 +7,26 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Alta Performance no Contador de Visualizações (PERF-03) — 2026-11-19
+
+- **Fast-Path no Front Controller (`public/index.php`):**
+  - **Bypass Cirúrgico de Bootstrap:** Implementação de fast-path de altíssima performance no topo de `public/index.php`, posicionado antes da emissão dos cabeçalhos HTML/CSP de ~300 bytes e antes do carregamento de `core/bootstrap.php`.
+  - **Validação de Rota por Âncora Exata:** Roteamento com regex exata `~^/api/view/(?:(page)/)?([0-9]+)/?$~` para interceptar exclusivamente requisições `POST` em `/api/view/{id}` e `/api/view/page/{id}` com ou sem barra final, despachando diretamente para `public/api/view.php` com `exit;`.
+  - **Eliminação de Overhead Massivo:** Evita completamente a inicialização de configurações do banco (`Settings::applyToConfig()`), o gerenciador de temas (`ThemeManager`), a descoberta e carregamento de todos os plugins (`PluginManager`), a execução de hooks e a auto-promoção de matérias agendadas (`PostService::promoteScheduledPosts()`) no endpoint PHP com maior volume de requisições por segundo em produção.
+  - **Fallback Defensivo Preservado no Router:** As rotas no roteador foram mantidas com cast tipado `(int)($params['id'] ?? 0)` para instalações em subdiretórios (`base_path`) ou cenários de fallback.
+- **Micro-Bootstrap Autônomo e Resiliente (`public/api/view.php`):**
+  - **Inicialização Enxuta:** Substituição do `require core/bootstrap.php` por micro-bootstrap autônomo carregando apenas `config.php`, `core/Database.php` e `core/Security.php`.
+  - **Eliminação da Dupla Conexão PDO (`$alreadyBootstrapped`):** Identificação de ambientes já inicializados (reaproveitando `$GLOBALS['config']` ou `$config` local). Impede que `Database::init()` seja executado desnecessariamente, eliminando o reset `self::$instance = null` e a reabertura de uma segunda conexão PDO (`PDO #2`).
+  - **Higiene Standalone e Hardening de Erros:** No modo autônomo, define `$GLOBALS['config'] = $config;`, configura `ini_set('display_errors', '0')` e `ini_set('log_errors', '1')` para blindar o corpo JSON contra avisos transitórios, aplica guarda fail-fast de segurança para `hmac_secret` em ambiente de produção e executa `Database::init()` apenas uma vez.
+  - **Limpeza de Dependências:** Remoção de importação não utilizada de `LightPress\Core\Schema` e padronização PSR-12 das declarações `use` no topo do arquivo.
+- **Nova Suíte de Testes com Subprocessos Isolados (`bin/test-perf03-view-fastpath.php`):**
+  - **Isolamento Completo com `proc_open`:** Criação de suíte de testes ponta a ponta com 24 asserções executadas em processos PHP novos sobre SQLite em WAL mode.
+  - **Prova Inequívoca de Zero Overhead:** Comprovação via `register_shutdown_function` no processo filho de que nenhuma classe de temas, plugins ou configurações dinâmicas é carregada na memória: `!class_exists(Settings::class)`, `!class_exists(ThemeManager::class)`, `!class_exists(PluginManager::class)` e `!class_exists(RedisClient::class)`.
+  - **Validação de Negócio e Concorrência:** Testes cobrindo resposta HTTP 204 No Content com incremento atômico em `post_stats.views` e `pages.views`, janela de deduplicação de 30 segundos por IP/item, rejeição de requisições sem origem ou cross-origin (HTTP 403), proteção contra alvos em rascunho ou inexistentes (HTTP 404), variações com barra final e preservação de conexão no fallback.
+  - **Higiene de Recursos SQLite:** Fechamento explícito de handles PDO do processo pai antes de invocar subprocessos e limpeza integral de arquivos temporários (`.sqlite`, `-wal`, `-shm`).
+- **Integração Contínua (`.github/workflows/ci.yml`):**
+  - Inclusão da suíte `bin/test-perf03-view-fastpath.php` no pipeline de CI com verificação estrita (`run_strict`) sob PHP 8.4 e 8.5.
+
 ### Fechamento da Fase 1: Captura Transacional no Editor e Preservação de Destaques (ARCH-02) — 2026-11-19
 
 - **Captura de Variáveis na Transação do Editor (`public/admin/editor.php`):**

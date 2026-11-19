@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+use LightPress\Core\Database;
+use LightPress\Core\Security;
+
 /**
  * Micro-endpoint assíncrono para contabilização de visualizações (views)
  * Rota: POST /api/view/{id} ou /api/view.php?id={id} (para posts)
@@ -20,18 +23,56 @@ header('X-Content-Type-Options: nosniff');
 header('Content-Type: application/json; charset=utf-8');
 
 // Apenas método POST é autorizado
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method Not Allowed']);
     exit;
 }
 
-// Carregar bootstrap do core
-$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
+// Micro-bootstrap leve e autônomo para alta concorrência (PERF-03)
+date_default_timezone_set('UTC');
 
-use LightPress\Core\Database;
-use LightPress\Core\Schema;
-use LightPress\Core\Security;
+require_once dirname(__DIR__, 2) . '/core/Database.php';
+require_once dirname(__DIR__, 2) . '/core/Security.php';
+
+// Se já houver $config e Database previamente inicializados (ex.: fallback do Router ou suíte de testes)
+$alreadyBootstrapped = (isset($GLOBALS['config']) && is_array($GLOBALS['config']))
+    || (isset($config) && is_array($config) && !empty($config));
+
+if ($alreadyBootstrapped) {
+    /** @var array<string, mixed> $config */
+    $config = $GLOBALS['config'] ?? $config;
+} else {
+    $configFile = dirname(__DIR__, 2) . '/config.php';
+    if (!file_exists($configFile)) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Configuration file missing']);
+        exit;
+    }
+    /** @var array<string, mixed> $config */
+    $config = require $configFile;
+    $GLOBALS['config'] = $config;
+
+    // Configuração defensiva de exibição e log de erros
+    if (empty($config['app']['debug'])) {
+        ini_set('display_errors', '0');
+    }
+    ini_set('log_errors', '1');
+
+    // Guarda fail-fast de hmac_secret em ambiente de produção (idêntica ao bootstrap.php)
+    if (PHP_SAPI !== 'cli' && ($config['app']['env'] ?? '') === 'production') {
+        $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
+        if (empty($hmacSecret) || $hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32) {
+            http_response_code(500);
+            error_log('[LightPress Security] Chave hmac_secret ausente, padrão ou menor que 32 caracteres em ambiente de produção.');
+            echo json_encode(['error' => 'Server configuration error']);
+            exit;
+        }
+    }
+
+    // Inicializa a camada de banco de dados apenas no modo standalone
+    Database::init($config['database'] ?? []);
+}
 
 // 1. Validação de Origem (Prevenção contra requisições cross-site)
 $canonicalOrigin = $config['app']['canonical_origin'] ?? 'http://localhost:8080';

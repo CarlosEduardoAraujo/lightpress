@@ -463,10 +463,13 @@ lightpress/
 
 Como o Nginx entrega a página do cache estático sem invocar o interpretador PHP, a contagem de visualizações não pode depender da renderização síncrona da página:
 
-1. **Rota Assíncrona Leve (`POST /api/view/{id}`):**
-   * Usar uma única rota canônica (`POST /api/view/{id}`), sem iniciar sessão, emitir cookie ou usar privilégios da conta eventualmente autenticada. O endpoint fica fora do cache e retorna `Cache-Control: no-store`.
+1. **Rota Assíncrona Leve e Fast-Path (`POST /api/view/{id}` e `POST /api/view/page/{id}` — PERF-03):**
+   * **Fast-Path no Front Controller (`public/index.php`):** Como o beacon de visualização é o endpoint PHP de maior volume de requisições por segundo em produção (disparado a cada leitura no frontend mesmo em páginas em cache no Nginx), o Front Controller intercepta o método `POST` sob a regex exata `~^/api/view/(?:(page)/)?([0-9]+)/?$~` no topo do arquivo — antes de emitir cabeçalhos HTML/CSP e antes do carregamento de `core/bootstrap.php`. Ele preenche `$_GET['id']` (e `$_GET['type'] = 'page'` quando aplicável) e despacha diretamente para `require __DIR__ . '/api/view.php'; exit;`.
+   * **Bypass Completo de Overhead:** O fast-path evita 100% da inicialização de banco em `bootstrap.php`, carregamento de `Settings::applyToConfig()`, `ThemeManager`, `PluginManager`, execução de hooks e queries de auto-promoção de agendados (`PostService::promoteScheduledPosts()`).
+   * **Micro-Bootstrap Autônomo e Resiliente (`public/api/view.php`):** Inicialização enxuta carregando exclusivamente `config.php`, `core/Database.php` e `core/Security.php`. Detecta se o ambiente já foi previamente inicializado (`$alreadyBootstrapped`) para reaproveitar a conexão PDO ativa sem chamar `Database::init()` (eliminando o reset `self::$instance = null` e a dupla conexão PDO). Em modo standalone, define `$GLOBALS['config'] = $config;`, silencia warnings transitórios em produção (`display_errors = 0`, `log_errors = 1`), aplica a guarda fail-fast de segurança de `hmac_secret` e executa `Database::init()` apenas uma vez.
+   * Usar rotas canônicas sem sessão, cookies ou privilégios de autenticação. Retorna sempre `Cache-Control: no-store` e HTTP 204 No Content para requisições bem-sucedidas.
    * Validar método, ID inteiro positivo, origem conforme a seção 8.3 e visibilidade pública atual do artigo. IDs inexistentes, rascunhos e arquivados não recebem incrementos e retornam a mesma resposta 404.
-   * Depois do controle de abuso, executar incremento atômico via PDO: `UPDATE post_stats SET views = views + 1 WHERE post_id = ?`. A verificação de visibilidade, a deduplicação e o incremento devem participar da mesma transação; adquirir bloqueio compartilhado na linha do artigo, permitindo contadores concorrentes enquanto serializa a operação com a gravação exclusiva de uma despublicação.
+   * Depois do controle de abuso, executar incremento atômico via PDO: `UPDATE post_stats SET views = views + 1 WHERE post_id = ?` (ou `UPDATE pages SET views = views + 1 WHERE id = ?`). A verificação de visibilidade, a deduplicação e o incremento devem participar da mesma transação; adquirir bloqueio compartilhado na linha do artigo, permitindo contadores concorrentes enquanto serializa a operação com a gravação exclusiva de uma despublicação.
    * Essa operação não escreve em `posts`, não altera a data de edição e não dispara a invalidação do cache editorial. Uma linha de estatísticas ausente para um artigo existente deve ser registrada como falha de integridade, sem reportar o incremento como concluído.
 2. **Disparo pelo Frontend:**
    * O template inclui um pequeno script em JS que utiliza `navigator.sendBeacon('/api/view/' + postId)` ou `fetch('/api/view/' + postId, { method: 'POST', keepalive: true })`.
@@ -1699,6 +1702,14 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Defesa em Profundidade no `ThemeManager` (`core/ThemeManager.php`):** Sanitização transparente de valores de opções de temas por tipo (`url` e `image`).
   - [x] **Hardening do Customizador e Templates (`public/admin/themes.php`, `themes/`):** Sanitização em requisições POST, manipulação segura via `document.createElement` na prévia de imagens e aplicação de filtros em templates de `portal-noticias` e `empresa`.
   - [x] **Cobertura em Suíte Central (`bin/test.php`):** Seção 9 com 32 asserções dedicadas aprovadas (totalizando 114/114 testes aprovados com 100% de sucesso).
+
+* **FASE CONCLUÍDA — Fast-Path de Alta Performance no Contador de Visualizações (PERF-03):**
+  - [x] **Fast-Path no Front Controller (`public/index.php`):** Interceptação imediata de requisições `POST` no topo do arquivo via regex exata `~^/api/view/(?:(page)/)?([0-9]+)/?$~`, antes da emissão de cabeçalhos HTML/CSP e antes do carregamento de `core/bootstrap.php`.
+  - [x] **Eliminação de Overhead de Bootstrap e Promoção de Posts:** Elimina 100% da carga de `Settings::applyToConfig()`, `ThemeManager`, `PluginManager`, execução de hooks e `PostService::promoteScheduledPosts()` no endpoint de maior taxa de RPS da aplicação.
+  - [x] **Micro-Bootstrap Autônomo e Resiliente (`public/api/view.php`):** Carregamento pontual de `config.php`, `core/Database.php` e `core/Security.php`.
+  - [x] **Eliminação da Dupla Conexão PDO:** Detecção de ambiente pré-inicializado (`$alreadyBootstrapped`) reutilizando a conexão ativa sem chamar `Database::init()`, evitando reset da instância estática (`PDO #2`). Em modo standalone, define `$GLOBALS['config'] = $config;`, silencia exibição de erros na tela (`display_errors = 0`, `log_errors = 1`), valida chave `hmac_secret` e inicializa o banco uma única vez.
+  - [x] **Suíte com Subprocessos Isolados (`bin/test-perf03-view-fastpath.php`):** 24 testes executados em processos PHP novos com SQLite em WAL mode, comprovando incremento atômico, deduplicação de 30s, códigos 204, 403 e 404, rotas com barra final e ausência absoluta na memória de classes de configurações (`Settings`), temas (`ThemeManager`) e plugins (`PluginManager`, `RedisClient`).
+  - [x] **Integração Contínua e Zero Regressão:** Suíte adicionada à matriz de CI (`.github/workflows/ci.yml`) sob PHP 8.4 e 8.5 com 100% de sucesso.
 
 ---
 
