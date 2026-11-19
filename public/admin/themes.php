@@ -382,9 +382,20 @@ require __DIR__ . '/header.php';
     var currentTargetFieldId = null;
     var modalMediaList = [];
     var selectedMediaItem = null;
+    var searchDebounceTimer = null;
+
+    function isSafeMediaUrl(url) {
+        if (typeof url !== 'string' || url.trim() === '') return false;
+        var u = url.trim();
+        return (u.startsWith('/') && !u.startsWith('//') && !u.startsWith('/\\'))
+            || u.startsWith('https://')
+            || u.startsWith('http://');
+    }
 
     function openMediaModalFor(fieldId) {
         currentTargetFieldId = fieldId;
+        var searchInput = document.getElementById('modalSearchInput');
+        if (searchInput) searchInput.value = '';
         document.getElementById('mediaModal').style.display = 'flex';
         loadMediaCatalog();
     }
@@ -399,7 +410,7 @@ require __DIR__ . '/header.php';
         document.getElementById(fieldId).value = '';
         var previewBox = document.getElementById('preview_box_' + fieldId.replace('opt_', ''));
         if (previewBox) {
-            previewBox.innerHTML = '';
+            previewBox.replaceChildren();
             var emptyDiv = document.createElement('div');
             emptyDiv.className = 'image-preview-empty';
             emptyDiv.textContent = '📷';
@@ -407,66 +418,103 @@ require __DIR__ . '/header.php';
         }
     }
 
-    function loadMediaCatalog() {
-        var loadingEl = document.getElementById('modalLoading');
-        loadingEl.style.display = 'inline';
-        fetch('/admin/media.php?format=json')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                loadingEl.style.display = 'none';
-                if (data.ok && Array.isArray(data.items)) {
-                    modalMediaList = data.items;
-                    renderModalGrid(modalMediaList);
-                }
-            })
-            .catch(function(err) {
-                loadingEl.style.display = 'none';
-                console.error('Erro ao carregar catálogo de mídias:', err);
-            });
+    function selectModalMediaCard(item, cardEl) {
+        document.querySelectorAll('#modalGrid .modal-media-item').forEach(function(el) {
+            el.classList.remove('selected');
+        });
+        if (cardEl) {
+            cardEl.classList.add('selected');
+            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        selectedMediaItem = item;
+        document.getElementById('btnSelectMedia').disabled = false;
     }
 
-    function renderModalGrid(items) {
+    function loadMediaCatalog(query, autoSelectId) {
+        var loadingEl = document.getElementById('modalLoading');
         var grid = document.getElementById('modalGrid');
-        grid.innerHTML = '';
+        loadingEl.textContent = 'Carregando...';
+        loadingEl.style.display = 'inline';
+
+        var url = '/admin/api/media.php' + (query ? '?q=' + encodeURIComponent(query) : '');
+        fetch(url, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            loadingEl.style.display = 'none';
+            if (data && data.ok && Array.isArray(data.media)) {
+                modalMediaList = data.media;
+                renderModalGrid(modalMediaList, autoSelectId);
+            } else {
+                renderModalMessage(grid, (data && data.error) ? data.error : 'Erro ao carregar mídias.', true);
+            }
+        })
+        .catch(function(err) {
+            loadingEl.style.display = 'none';
+            console.error('Erro ao carregar catálogo de mídias:', err);
+            renderModalMessage(grid, 'Falha de comunicação ao carregar a biblioteca de mídias.', true);
+        });
+    }
+
+    function renderModalMessage(grid, text, isError) {
+        grid.replaceChildren();
+        var p = document.createElement('p');
+        p.style.gridColumn = '1 / -1';
+        p.style.textAlign = 'center';
+        p.style.padding = '2rem';
+        p.style.color = isError ? '#dc2626' : 'var(--text-muted)';
+        p.textContent = text;
+        grid.appendChild(p);
+    }
+
+    function renderModalGrid(items, autoSelectId) {
+        var grid = document.getElementById('modalGrid');
+        grid.replaceChildren();
         if (!items || items.length === 0) {
-            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2rem;">Nenhuma foto encontrada.</p>';
+            renderModalMessage(grid, 'Nenhuma foto encontrada.', false);
             return;
         }
 
         items.forEach(function(item) {
             var card = document.createElement('div');
             card.className = 'modal-media-item';
+            card.dataset.id = String(item.id || '');
+            card.title = item.original_name || 'Mídia';
+
             var img = document.createElement('img');
-            img.src = item.thumb_url || item.full_url;
+            var candidateUrl = item.thumb_url || item.full_url || '';
+            img.src = isSafeMediaUrl(candidateUrl) ? candidateUrl : '';
+            img.alt = item.original_name || 'Mídia';
             img.loading = 'lazy';
             card.appendChild(img);
 
             card.onclick = function() {
-                document.querySelectorAll('.modal-media-item').forEach(function(el) { el.classList.remove('selected'); });
-                card.classList.add('selected');
-                selectedMediaItem = item;
-                document.getElementById('btnSelectMedia').disabled = false;
+                selectModalMediaCard(item, card);
             };
 
             card.ondblclick = function() {
-                selectedMediaItem = item;
+                selectModalMediaCard(item, card);
                 applyMediaSelection();
             };
 
             grid.appendChild(card);
+
+            if (autoSelectId && String(item.id) === String(autoSelectId)) {
+                selectModalMediaCard(item, card);
+            }
         });
     }
 
     function filterMediaItems(query) {
-        query = query.toLowerCase().trim();
-        if (!query) {
-            renderModalGrid(modalMediaList);
-            return;
-        }
-        var filtered = modalMediaList.filter(function(it) {
-            return (it.original_name || '').toLowerCase().includes(query);
-        });
-        renderModalGrid(filtered);
+        var clean = (query || '').trim();
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(function() {
+            loadMediaCatalog(clean);
+        }, 300);
     }
 
     function uploadFromModal(input) {
@@ -478,23 +526,30 @@ require __DIR__ . '/header.php';
 
         var loadingEl = document.getElementById('modalLoading');
         loadingEl.style.display = 'inline';
-        loadingEl.innerText = 'Enviando foto...';
+        loadingEl.textContent = 'Enviando foto...';
 
         fetch('/admin/media.php', {
             method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             body: formData
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             input.value = '';
-            if (data.ok && data.media) {
-                loadMediaCatalog();
+            loadingEl.textContent = 'Carregando...';
+            if (data && data.ok && data.media) {
+                loadMediaCatalog('', data.media.id);
             } else {
-                alert('Erro no envio da imagem: ' + (data.error || 'Falha ao processar'));
+                alert('Erro no envio da imagem: ' + ((data && data.error) ? data.error : 'Falha ao processar'));
                 loadingEl.style.display = 'none';
             }
         })
         .catch(function(err) {
+            input.value = '';
+            loadingEl.textContent = 'Carregando...';
             alert('Erro no envio da imagem: ' + err.message);
             loadingEl.style.display = 'none';
         });
@@ -503,16 +558,17 @@ require __DIR__ . '/header.php';
     function applyMediaSelection() {
         if (!selectedMediaItem || !currentTargetFieldId) return;
         var url = selectedMediaItem.full_url || selectedMediaItem.thumb_url;
+        if (!isSafeMediaUrl(url)) return;
         document.getElementById(currentTargetFieldId).value = url;
 
         var key = currentTargetFieldId.replace('opt_', '');
         var previewBox = document.getElementById('preview_box_' + key);
         if (previewBox) {
-            previewBox.innerHTML = '';
+            previewBox.replaceChildren();
             var img = document.createElement('img');
             img.src = url;
             img.className = 'image-preview-thumb';
-            img.alt = 'Preview';
+            img.alt = selectedMediaItem.original_name || 'Preview';
             previewBox.appendChild(img);
         }
 
