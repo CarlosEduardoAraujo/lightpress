@@ -7,6 +7,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Fechamento da Fase 1: Captura Transacional no Editor e Preservação de Destaques (ARCH-02) — 2026-11-19
+
+- **Captura de Variáveis na Transação do Editor (`public/admin/editor.php`):**
+  - **Inicialização Prévia de `$cleanSlug`:** Inicialização explícita de `$cleanSlug = '';` antes de `Database::transaction()`.
+  - **Inclusão na Cláusula `use (...)`:** Inclusão de `$action`, `$publishedAtRaw` e `&$cleanSlug` na closure da transação.
+  - **Restauração do Fluxo Editorial para Autores:** Permite que autores sem permissão de publicação direta transitem rascunhos para `pending_review` via `$action === 'submit_review'` ao clicar em *"Enviar para Revisão Editorial"*.
+  - **Avaliação de Data de Publicação e Desagendamento:** Garante a leitura correta de `$publishedAtRaw` para despublicação/reversão a rascunho quando a data é removida pelo editor.
+  - **Invalidação de Cache Pós-Commit:** Torna `$cleanSlug` acessível fora da transação, garantindo a purga seletiva de cache (`ObjectCache::delete("post_slug:{$cleanSlug}", 'posts')`) quando o slug for alterado durante a edição.
+- **Preservação de Destaques em Publicações e Revisões (`core/PostService.php`):**
+  - **Inclusão de `is_featured` no SELECT FOR UPDATE:** Adicionada a coluna `is_featured` na consulta pessimista de linha em `PostService::publishOrUpdate()`.
+  - **Eliminação de Warnings e Prevenção de Perda de Destaque:** Elimina avisos PHP de `Undefined array key "is_featured"` e impede que a aprovação de uma revisão cujo payload `$data` não inclua a chave `is_featured` zere silenciosamente o destaque (`is_featured = 1`) da matéria na Home.
+- **Cobertura Automatizada e Teste Funcional (`bin/test.php`):**
+  - Adicionado o grupo `[11] Testando ARCH-02: Preservação de is_featured e Transação do Editor` com 8 asserções validando estaticamente a captura das variáveis na closure, a consulta SQL com `is_featured` e teste funcional de ponta a ponta com SQLite verificando a persistência, preservação e alternância de `is_featured`.
+  - Total da suíte central de testes unitários ampliado para **131 testes 100% aprovados**.
+
+### Correção do Modal da Biblioteca de Mídias em Temas (ARCH-04) — 2026-11-19
+
+- **Restauração e Padronização do Catálogo de Mídias no Customizador (`public/admin/themes.php`):**
+  - **Correção de Endpoint Inexistente:** Substituição da requisição legada `fetch('/admin/media.php?format=json')` pelo endpoint canônico da API interna `fetch('/admin/api/media.php' + query)` com envio obrigatório de cabeçalhos AJAX (`Accept: application/json` e `X-Requested-With: XMLHttpRequest`), eliminando a falha `SyntaxError: Unexpected token '<'` provocada pelo retorno de documento HTML.
+  - **Alinhamento do Contrato JSON:** Correção do mapeamento de propriedades na resposta, passando a consumir `data.media` em vez do campo inexistente `data.items`.
+  - **Headers AJAX em Uploads Assíncronos:** Inclusão explícita de `Accept: application/json` e `X-Requested-With: XMLHttpRequest` em `uploadFromModal()`, ativando a flag `$isAjax` em `public/admin/media.php` para garantir retorno estrito em JSON `{ ok: true, media: ... }`.
+  - **Busca Server-Side com Debounce:** Implementação de `searchDebounceTimer` com atraso de 300ms na função `filterMediaItems()`, repassando a consulta `?q=...` para a API assíncrona e viabilizando a busca em acervos com mais de 30.000 fotos (superando a limitação client-side prévia de 60 itens em memória).
+  - **Construção Segura do DOM e Blindagem Anti-XSS:** Remoção completa de `grid.innerHTML` e manipulação direta de strings HTML. Adoção de `grid.replaceChildren()`, `document.createElement()`, `textContent` e do validador `isSafeMediaUrl()` para verificar e aceitar apenas caminhos locais seguros (`/` sem protocolo relativo `//` ou `/\\`) e URLs `https://` ou `http://`.
+  - **Auto-Seleção Pós-Upload e Limpeza de Formulário:** Ao concluir o upload de uma imagem, a listagem é atualizada com `loadMediaCatalog('', data.media.id)`, marcando visualmente o card recém-adicionado como selecionado, ativando o botão de confirmação e limpando o valor do `input[type=file]`.
+  - **Sanitização de Preview:** Atualização das funções `applyMediaSelection()` e `clearImageField()` para manipulação segura via `replaceChildren()`, prevenindo quebras de layout e injeção de atributos.
+- **Cobertura Automatizada de Regressão (`bin/test.php`):**
+  - Adicionado o grupo `[10] Testando Integridade do Modal de Mídias (ARCH-04 em public/admin/themes.php)` com 9 asserções cobrindo endpoint canônico, ausência de rotas inexistentes, leitura de `data.media`, cabeçalhos AJAX, ausência de innerHTML, validador de URL seguro e debounce.
+
 ### Validação de URLs, Âncoras Internas e Defesa contra XSS em Temas (SEC-03) — 2026-11-19
 
 - **Suporte a Âncoras Internas Seguras e Rejeição de Injeções em Caminhos Relativos (`core/BlockCompiler.php`):**
