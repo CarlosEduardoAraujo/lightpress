@@ -12,9 +12,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Suporte a Âncoras Internas Seguras e Rejeição de Injeções em Caminhos Relativos (`core/BlockCompiler.php`):**
   - Implementação de validação regex estrita `/^#[a-zA-Z0-9_\-\.\:\/]*$/` em `BlockCompiler::sanitizeUrl()`, permitindo âncoras internas de navegação na mesma página (ex: `#servicos`, `#topo`, `#secao-1`) sem expor a injeções de esquemas inseguros (`javascript:`, `data:`, `vbscript:`).
   - Bloqueio sumário via `preg_match('/[\s<>"\'`]/', $url)` em `sanitizeUrl()` e `sanitizeImageUrl()`, rejeitando imediatamente com `''` tentativas de injeção iniciadas por `/` (ex.: `/contato' onclick=...` ou `/foto.png" onerror=...`).
-- **Prevenção de Multi-Escape e Idempotência Total (`core/BlockCompiler.php`, `core/Security.php`):**
+- **Prevenção de Multi-Escape, Idempotência e Tratamento de RCDATA em `<textarea>` (`core/Security.php`, `core/BlockCompiler.php`, `public/admin/editor.php`, `public/admin/page-edit.php`):**
   - Decodificação prévia de entidades HTML via `htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE)` no início de `sanitizeUrl()` e `sanitizeImageUrl()`.
-  - Configuração explícita de `$double_encode = false` em `Security::e()`, garantindo que URLs legítimas com query strings contendo múltiplos parâmetros (`?phone=...&text=Ola`) sejam preservadas perfeitamente como `&amp;` sem multiplicação de entidades (`&amp;amp;amp;`).
+  - Configuração de `$double_encode = false` por padrão em `Security::e(?string $value, bool $doubleEncode = false)`, garantindo que URLs com múltiplos parâmetros (`?phone=...&text=Ola`) sejam preservadas sem multi-escape (`&amp;amp;amp;`).
+  - Suporte ao parâmetro explícito `$doubleEncode = true` em `Security::e()` para contextos RCDATA como `<textarea id="rawHtmlArea">` em `editor.php` e `page-edit.php`, prevenindo que navegadores decodifiquem prematuramente entidades literais em snippets de código ao alternar para o modo de edição de código-fonte (`</> HTML`).
 - **Defesa em Profundidade no Gerenciador de Temas (`core/ThemeManager.php`):**
   - Sanitização automática em `ThemeManager::getThemeOptions()` de opções baseadas no tipo declarado no manifesto (`theme.json`): campos do tipo `url` são filtrados por `BlockCompiler::sanitizeUrl()` e campos do tipo `image` por `BlockCompiler::sanitizeImageUrl()`.
 - **Blindagem do Customizador de Temas (`public/admin/themes.php`):**
@@ -24,7 +25,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Sanitização nos Templates Oficiais (`themes/portal-noticias/`, `themes/empresa/`):**
   - Aplicação defensiva de `BlockCompiler::sanitizeUrl()` e `BlockCompiler::sanitizeImageUrl()` em botões de ação (CTA), redes sociais e banners parceiros nos cabeçalhos e páginas iniciais dos temas `portal-noticias` e `empresa`.
 - **Cobertura em Suíte Central de Testes Unitários (`bin/test.php`):**
-  - Criação da Seção 9 com 30 asserções dedicadas cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções `' onerror='alert(1)`, esquemas `file://` e `data:`, caminhos com `/` maliciosos, prevenção de multi-escape `&amp;amp;`, âncoras internas seguras e neutralização transparente no banco via `ThemeManager::getThemeOptions()`, elevando a suíte principal para 112 testes aprovados (100% de sucesso).
+  - Criação da Seção 9 com 32 asserções dedicadas cobrindo descarte de `javascript:alert(1)`, caminhos protocol-relative `//` e `/\`, injeções `' onerror='alert(1)`, esquemas `file://` e `data:`, caminhos com `/` maliciosos, prevenção de multi-escape `&amp;amp;`, proteção de RCDATA em textareas, âncoras internas seguras e neutralização transparente no banco via `ThemeManager::getThemeOptions()`, elevando a suíte principal para 114 testes aprovados (100% de sucesso).
 
 ### Observabilidade Estrita de CI e Endurecimento da Suíte de Criptografia de Segredos em Repouso (SEC-02) — 2026-11-19
 

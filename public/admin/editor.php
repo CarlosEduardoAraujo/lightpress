@@ -728,7 +728,7 @@ require __DIR__ . '/header.php';
                         <div class="editor-canvas" id="editorCanvas" contenteditable="true" spellcheck="true" placeholder="Cole ou digite aqui o texto da notícia (suporta Ctrl+V direto do Google Docs, Word ou web)..."><?= $initialHtml ?></div>
                         
                         <!-- Textarea de Fallback / Código HTML Direto -->
-                        <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e($initialHtml) ?></textarea>
+                        <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e($initialHtml, true) ?></textarea>
                     </div>
                 </div>
 

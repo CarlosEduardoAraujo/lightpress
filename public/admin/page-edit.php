@@ -370,7 +370,7 @@ require __DIR__ . '/header.php';
                         <div class="editor-canvas" id="editorCanvas" contenteditable="true" spellcheck="true" placeholder="Cole ou digite aqui o conteúdo institucional da página (suporta Ctrl+V direto do Google Docs, Word ou web)..."><?= BlockCompiler::sanitizeHtml((string)($page['content_html'] ?? '')) ?></div>
                         
                         <!-- Textarea de Fallback / Código HTML Direto -->
-                        <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e($page['content_html'] ?? '') ?></textarea>
+                        <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e((string)($page['content_html'] ?? ''), true) ?></textarea>
                     </div>
                 </div>
 

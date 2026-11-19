@@ -414,6 +414,8 @@ $s2 = BlockCompiler::sanitizeUrl($s1);
 $s3 = Security::e($s2);
 assertTest("SEC-03: Multi-passagem preserva query string sem multi-escape (&amp;amp;)", $s3 === 'https://api.whatsapp.com/send?phone=5511999999999&amp;text=Ola' && !str_contains($s3, '&amp;amp;'));
 assertTest("SEC-03: Security::e com double_encode=false não duplica &amp; em entidades existentes", Security::e("?a=1&amp;b=2") === "?a=1&amp;b=2");
+assertTest("SEC-03: Security::e com double_encode=true escapa entidades para contextos como <textarea> (RCDATA)", Security::e("<code>&lt;div&gt;</code>", true) === "&lt;code&gt;&amp;lt;div&amp;gt;&lt;/code&gt;");
+assertTest("SEC-03: Security::e padrão com double_encode=false preserva entidades prévias", Security::e("<code>&lt;div&gt;</code>") === "&lt;code&gt;&lt;div&gt;&lt;/code&gt;");
 
 // -------------------------------------------------------------
 // Relatório Final

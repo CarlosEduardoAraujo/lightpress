@@ -47,10 +47,12 @@ class Security
     }
     /**
      * Escape seguro contra XSS para saídas contextuais em templates HTML.
+     * Por padrão, $doubleEncode = false previne multi-escape em URLs e saídas já tratadas.
+     * Passe $doubleEncode = true para contextos como <textarea> contendo código HTML fonte.
      */
-    public static function e(?string $value): string
+    public static function e(?string $value, bool $doubleEncode = false): string
     {
-        return htmlspecialchars($value ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+        return htmlspecialchars($value ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', $doubleEncode);
     }
 
     /**
