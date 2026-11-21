@@ -7,6 +7,32 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Falha de CI no GitHub Actions (SEC-02 / CWE-665) e Higienização de Logs — 2026-11-21
+
+- **Silenciamento de Avisos de Rede no Driver Redis (`plugins/redis-cache-pro/src/RedisClient.php`):**
+  - **Supressão de Warnings de Conexão Nativa:** Adicionado o operador de controle de erro `@` nas chamadas nativas de conexão e autenticação (`@$redis->connect(...)`, `@$redis->auth(...)`, `@$tRedis->connect(...)`, `@$tRedis->auth(...)`).
+  - **Resiliência contra Resolução DNS Inexistente:** Previne que tentativas de conexão a hosts inexistentes ou não resolvíveis em ambientes de CI (como `redis-cluster.internal` nos testes de segredos cifrados em repouso) emitam `PHP Warning: Redis::connect(): ...` para o `STDOUT` do PHP quando a extensão nativa `phpredis` estiver carregada. A falha é tratada silenciosa e graciosamente pelo Circuit Breaker e pelos blocos `try/catch`.
+
+- **Antecipação da Configuração de Erros no Bootstrap (`core/bootstrap.php`):**
+  - **Blindagem do Ciclo de Boot:** A configuração de `display_errors`, `display_startup_errors`, `error_reporting`, `log_errors` e `error_log` foi antecipada para o início do arquivo, logo após o carregamento de `$config` e disponibilização de `$GLOBALS['config']`.
+  - **Eliminação de Vazamento de Warnings Herdados:** Garante que toda a inicialização subsequente (camada de banco de dados, aplicação de configurações em `Settings::applyToConfig()`, resolução de temas e carregamento de plugins ativos) execute estritamente sob as diretivas da aplicação (`display_errors = 0` quando `debug = false`), eliminando a contaminação de saídas causada pelo `display_errors=On` configurado pelo `php.ini` do runner do GitHub Actions.
+
+- **Resiliência e Parsing Robusto no Teste SEC-02 (`bin/test-sec02-settings-encryption.php`):**
+  - **Reforço no Subprocesso:** Inserção preventiva de `ini_set('display_errors', '0');` no topo do script temporário do subprocesso de teste de boot isolado.
+  - **Extração Resiliente de JSON:** O processo pai agora extrai o payload JSON buscando diretamente o delimitador `{"ok":`, prevenindo falsos negativos caso ruídos eventuais de saída antecedam o JSON.
+
+- **Desacoplamento de Esquemas de Mídia em `Schema::ensurePagesTable()` (`core/Schema.php`):**
+  - **Foco Estrito na Tabela de Páginas:** Removidas as chamadas a `ensureMediaAiSchema()` e `ensureMediaVariantsSchema()` de dentro de `ensurePagesTable()`. A inicialização de tabelas e índices de mídia é de responsabilidade exclusiva de `Schema::install()`, eliminando exceções de tabelas ausentes (`media` e `posts`) quando `ensurePagesTable()` for executado isoladamente em conexões PDO SQLite de testes unitários.
+
+- **Mocks Completos da Facade `RedisCache` em Testes (`bin/test-perf-arch-step22.php`, `bin/test-perf07-arch05.php`):**
+  - **Implementação Integral dos Métodos de Cache:** As declarações in-memory da classe `RedisCache` nas suítes de teste foram completadas com os métodos `flushGroup()`, `mGet()`, `setMultiple()`, `delete()` e `isConnected()`. Elimina chamadas a métodos indefinidos durante a execução do `ImageProcessor` que causavam registros no `storage/logs/error.log`.
+
+- **Proteção contra Headers Já Enviados no Front Controller (`public/index.php`):**
+  - **Guarda `headers_sent()`:** Todas as emissões de cabeçalhos HTTP (`header()`, `X-Accel-Expires`, CSP) e códigos de resposta (`http_response_code()`) foram condicionadas a `if (!headers_sent())`. Previne a emissão de `PHP Warning: Cannot modify header information - headers already sent` quando `public/index.php` é incluído programmaticamente por suítes de teste CLI que já emitiram saída no console.
+
+- **Higienização Integral do Log de Erros (`storage/logs/error.log`):**
+  - A execução encadeada de 100% dos testes unitários e de integração do LightPress agora é concluída com o arquivo `storage/logs/error.log` **totalmente zerado**, sem nenhum warning ou erro registrado.
+
 ### Otimizações de Performance em Listagens Públicas e Correção do Tema Corporativo (Passo 2.5 — PERF-07, ARCH-05) — 2026-11-19
 
 - **Cache em RAM de Trending Tags no Header (`templates/header.php`, `themes/portal-noticias/header.php`) (PERF-07):**

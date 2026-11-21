@@ -19,11 +19,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 }
 
 // Injeção de Cabeçalhos HTTP de Segurança Defensivos
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: SAMEORIGIN');
-header('Referrer-Policy: strict-origin-when-cross-origin');
-header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'self';");
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-ancestors 'self';");
+}
 
 // Inicialização do Core
 $config = require dirname(__DIR__) . '/core/bootstrap.php';
@@ -296,7 +298,9 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     }, 'categories');
 
     if (!$category) {
-        http_response_code(404);
+        if (!headers_sent()) {
+            http_response_code(404);
+        }
         require ThemeManager::getTemplateFile('404.php');
         return;
     }
@@ -343,7 +347,9 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     }, 'categories');
 
     if (!$category) {
-        http_response_code(404);
+        if (!headers_sent()) {
+            http_response_code(404);
+        }
         require ThemeManager::getTemplateFile('404.php');
         return;
     }
@@ -732,8 +738,10 @@ $renderRssFeed = function (
     string $description,
     array $posts
 ) use ($config): void {
-    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Feed RSS (LP-09)
-    header('Content-Type: application/rss+xml; charset=utf-8');
+    if (!headers_sent()) {
+        header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Feed RSS (LP-09)
+        header('Content-Type: application/rss+xml; charset=utf-8');
+    }
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
     $escapeCdata = function (string $text): string {
@@ -832,7 +840,9 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
     );
 
     if (!$category) {
-        http_response_code(404);
+        if (!headers_sent()) {
+            http_response_code(404);
+        }
         require ThemeManager::getTemplateFile('404.php');
         return;
     }
@@ -863,8 +873,10 @@ $router->get('/categoria/{slug}/feed/', $categoryFeedHandler);
 
 // Rota 6c: Google News XML Sitemap (/sitemap-news.xml - Janela estrita de 48 horas)
 $router->get('/sitemap-news.xml', function () use ($config): void {
-    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI
-    header('Content-Type: application/xml; charset=utf-8');
+    if (!headers_sent()) {
+        header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI
+        header('Content-Type: application/xml; charset=utf-8');
+    }
     $nowUtc = gmdate('Y-m-d H:i:s');
     $twoDaysAgoUtc = gmdate('Y-m-d H:i:s', time() - 172800); // 48 horas obrigatórias pelo Googlebot-News
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
@@ -916,8 +928,10 @@ $router->get('/sitemap-news.xml', function () use ($config): void {
 
 // Rota 6d: Sitemap XML Principal (Sitemap Index com inclusão prioritária do News Sitemap)
 $router->get('/sitemap.xml', function () use ($config): void {
-    header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Sitemap XML (LP-09)
-    header('Content-Type: application/xml; charset=utf-8');
+    if (!headers_sent()) {
+        header('X-Accel-Expires: 300'); // 5 minutos de cache FastCGI para Sitemap XML (LP-09)
+        header('Content-Type: application/xml; charset=utf-8');
+    }
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
@@ -961,8 +975,10 @@ $router->get('/sitemap.xml', function () use ($config): void {
 
 // Sub-sitemap: Páginas Principais (Home, Categorias e Páginas Institucionais)
 $router->get('/sitemap-main.xml', function () use ($config): void {
-    header('X-Accel-Expires: 300');
-    header('Content-Type: application/xml; charset=utf-8');
+    if (!headers_sent()) {
+        header('X-Accel-Expires: 300');
+        header('Content-Type: application/xml; charset=utf-8');
+    }
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
     $categories = Database::fetchAll("SELECT slug FROM categories WHERE is_active = 1 ORDER BY name ASC");
@@ -1002,8 +1018,10 @@ $router->get('/sitemap-main.xml', function () use ($config): void {
 
 // Sub-sitemap: Partições de Artigos (/sitemap-posts-{part}.xml)
 $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config): void {
-    header('X-Accel-Expires: 300');
-    header('Content-Type: application/xml; charset=utf-8');
+    if (!headers_sent()) {
+        header('X-Accel-Expires: 300');
+        header('Content-Type: application/xml; charset=utf-8');
+    }
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
@@ -1191,14 +1209,18 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     }
 
     $cacheTtl = (time() - $lastActionTime <= 86400) ? 86400 : 864000;
-    header("X-Accel-Expires: {$cacheTtl}");
+    if (!headers_sent()) {
+        header("X-Accel-Expires: {$cacheTtl}");
+    }
     $pageTitle = (!empty($post['seo_title']) ? $post['seo_title'] : $post['title']) . ' - ' . $config['app']['name'];
     require ThemeManager::getTemplateFile('post.php');
 });
 
 // Configurar manipulador 404
 $router->setNotFound(function () use ($config): void {
-    http_response_code(404);
+    if (!headers_sent()) {
+        http_response_code(404);
+    }
     $template404 = ThemeManager::getTemplateFile('404.php');
     if (file_exists($template404)) {
         require $template404;

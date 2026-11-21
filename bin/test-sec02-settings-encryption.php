@@ -226,6 +226,8 @@ $testScriptContent = <<<PHP
 <?php
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+
 \$rootDir = '{$projectRoot}';
 chdir(\$rootDir);
 \$_SERVER['DOCUMENT_ROOT'] = \$rootDir;
@@ -346,7 +348,14 @@ try {
         $exitCode = proc_close($process);
     }
 
-    $result = json_decode((string)$stdout, true);
+    $trimmedStdout = trim((string)$stdout);
+    $result = json_decode($trimmedStdout, true);
+    if (!is_array($result)) {
+        $jsonStart = strpos($trimmedStdout, '{"ok":');
+        if ($jsonStart !== false) {
+            $result = json_decode(substr($trimmedStdout, $jsonStart), true);
+        }
+    }
     $detail = "ExitCode: {$exitCode}"
         . ($stderr !== '' ? " | Stderr: " . trim($stderr) : '')
         . ($stdout !== '' ? " | Stdout: " . trim($stdout) : '');

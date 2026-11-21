@@ -53,8 +53,6 @@ class Schema
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
         }
 
-        self::ensureMediaAiSchema($conn, $drv);
-        self::ensureMediaVariantsSchema($conn, $drv);
         self::ensureViewDedupeSchema($conn, $drv);
 
         // Se a tabela estiver vazia, cria as páginas institucionais padrão

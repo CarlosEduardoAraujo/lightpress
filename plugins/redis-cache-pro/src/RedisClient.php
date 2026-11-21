@@ -184,9 +184,9 @@ class RedisClient
 
             // Conexão via Unix Domain Socket ou TCP
             if (str_starts_with($host, '/')) {
-                $connected = $redis->connect($host);
+                $connected = @$redis->connect($host);
             } else {
-                $connected = $redis->connect($host, $port, $timeout);
+                $connected = @$redis->connect($host, $port, $timeout);
             }
 
             if (!$connected) {
@@ -197,7 +197,7 @@ class RedisClient
             // Autenticação com senha
             $password = trim((string)$this->config['password']);
             if ($password !== '') {
-                if (!$redis->auth($password)) {
+                if (!@$redis->auth($password)) {
                     $this->tripCircuitBreaker("Falha na autenticação do Redis.");
                     return false;
                 }
@@ -260,14 +260,14 @@ class RedisClient
             $timeout = (float)$this->config['timeout'];
 
             if (str_starts_with($host, '/')) {
-                $tRedis->connect($host);
+                @$tRedis->connect($host);
             } else {
-                $tRedis->connect($host, $port, $timeout);
+                @$tRedis->connect($host, $port, $timeout);
             }
 
             $password = trim((string)$this->config['password']);
             if ($password !== '') {
-                $tRedis->auth($password);
+                @$tRedis->auth($password);
             }
 
             $tRedis->select($db);

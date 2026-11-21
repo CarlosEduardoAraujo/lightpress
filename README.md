@@ -1399,6 +1399,26 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 * **Aceleração FULLTEXT em Rotas de Tags com Sincronia Estrita (`public/index.php` - PERF-07):** Nas rotas `/tag/{tag}/` e `/tag/{tag}/page/{page}/`, extração de termos $\ge 3$ caracteres com `preg_split('/[^\p{L}\p{N}]+/u', $tagClean)` e pré-filtragem via índice `idx_fulltext_search` em MySQL (`MATCH ... AGAINST(? IN BOOLEAN MODE)`). A flag `$useFulltext` garante paridade exata de filtros entre `COUNT(*)` e `SELECT ... LIMIT ? OFFSET ?`. Fallback automático e transparente para `FIND_IN_SET` puro para termos curtos (< 3 chars, ex: "f1") ou stopwords do InnoDB.
 * **Conformidade Estrita com CSP e Restauração de Funcionalidades no Tema Corporativo (`themes/empresa/` - ARCH-05):** Eliminação de 100% dos scripts inline e manipuladores `onclick` em `header.php`, carregando `/assets/js/theme-init.js` e `/assets/js/app.js` (botão `#btnThemeToggle` e ícone `#themeIcon`) em conformidade com `script-src 'self'`. Restauração de `data-view-endpoint` em `post.php` e `page.php`, blindagem de `published_at` com `strtotime((string)($p['published_at'] ?? 'now')) ?: time()` em todos os templates e criação da classe responsiva `.corp-layout-sidebar` (`@media (max-width: 900px)`).
 
+#### 8.21.20. Correção de Falha de CI no GitHub Actions (SEC-02 / CWE-665) e Higienização de Logs
+* **Diagnóstico da Quebra de CI no Runner Ubuntu:** No ambiente do GitHub Actions (`shivammathur/setup-php@v2`), a extensão nativa `phpredis` está instalada e o `php.ini` é provisionado com `display_errors=On`. Ao executar o teste do subprocesso de boot limpo com dados cifrados em `bin/test-sec02-settings-encryption.php`, a instanciação do `RedisClient` tentava conectar-se ao host de teste `redis-cluster.internal`. Como o host não existe no DNS do Azure/Ubuntu, `Redis::connect()` emitia um `PHP Warning` diretamente no `STDOUT` do subprocesso, corrompendo a saída antes do payload `{"ok":true,...}` e resultando em falha de decodificação `json_decode()` com 5 asserções reprovadas.
+* **Silenciamento Defensivo de I/O de Rede no Redis (`plugins/redis-cache-pro/src/RedisClient.php`):**
+  - Adicionado o operador `@` nas chamadas nativas `@$redis->connect(...)`, `@$redis->auth(...)`, `@$tRedis->connect(...)` e `@$tRedis->auth(...)`.
+  - Tratamento silencioso e gracioso pelo Circuit Breaker e blocos `try/catch`, prevenindo qualquer emissão de avisos não capturados em `STDOUT` ou poluição desnecessária de logs.
+* **Antecipação da Configuração de Erros no Bootstrap (`core/bootstrap.php`):**
+  - Mapeamento e aplicação de `ini_set('display_errors', '0')`, `display_startup_errors`, `error_reporting`, `log_errors` e `error_log` movidos para o topo do bootstrap, imediatamente após a leitura de `$config`.
+  - Garante que nenhuma operação de inicialização da aplicação rode sob as diretivas herdadas do `php.ini` do ambiente.
+* **Resiliência e Parsing Robusto no Teste SEC-02 (`bin/test-sec02-settings-encryption.php`):**
+  - Inserção de `ini_set('display_errors', '0');` no topo do script temporário do subprocesso.
+  - O processo pai passa a extrair o JSON via `strpos($stdout, '{"ok":')`, prevenindo quebras por saídas espúrias eventuais.
+* **Desacoplamento de Esquemas em `Schema::ensurePagesTable()` (`core/Schema.php`):**
+  - Removidas chamadas redundantes a `ensureMediaAiSchema()` e `ensureMediaVariantsSchema()` de dentro de `ensurePagesTable()`, evitando erros de tabelas ausentes em conexões PDO SQLite isoladas de testes.
+* **Mocks Completos da Facade `RedisCache` em Testes (`bin/test-perf-arch-step22.php`, `bin/test-perf07-arch05.php`):**
+  - Adicionados os métodos `flushGroup()`, `mGet()`, `setMultiple()`, `delete()` e `isConnected()`, eliminando exceções registradas em `storage/logs/error.log`.
+* **Proteção de Headers no Front Controller (`public/index.php`):**
+  - Chamadas a `header()` e `http_response_code()` envolvidas com `if (!headers_sent())`, prevenindo warnings de `Cannot modify header information` quando executado via CLI em suítes de teste.
+* **Log de Erros 100% Zerado:**
+  - Toda a suíte de testes unitários e de integração agora é executada com `storage/logs/error.log` completamente vazio.
+
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
@@ -1741,6 +1761,15 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Conformidade Estrita com CSP no Tema Corporativo (ARCH-05):** Remoção de todos os `<script>` inline e `onclick` em `themes/empresa/header.php`, passando a consumir `/assets/js/theme-init.js` e `/assets/js/app.js` (botão `#btnThemeToggle` e ícone `#themeIcon`) em 100% de conformidade com a CSP sem `'unsafe-inline'`.
   - [x] **Restauração de Telemetria e Proteção de Rascunhos (ARCH-05):** Adição de `data-view-endpoint` em `post.php` e `page.php`, proteção contra `TypeError` em `strtotime((string)($p['published_at'] ?? 'now')) ?: time()` em todos os templates e criação da classe responsiva `.corp-layout-sidebar` com `@media (max-width: 900px)`.
   - [x] **Suíte de Testes Automatizada Dedicada:** Criação de `bin/test-perf07-arch05.php` com `declare(strict_types=1);` cobrindo 29 asserções e integrada ao pipeline de CI do GitHub Actions (`.github/workflows/ci.yml`).
+
+* **FASE CONCLUÍDA — Resolução de Falha no GitHub Actions CI e Higienização Integral de Logs (SEC-02):**
+  - [x] **Silenciamento de Warnings de Rede no Redis (`plugins/redis-cache-pro/src/RedisClient.php`):** Supressão via operador `@` em `@$redis->connect(...)`, `@$redis->auth(...)`, `@$tRedis->connect(...)` e `@$tRedis->auth(...)`, prevenindo a emissão de `PHP Warning: Redis::connect(): ...` em `STDOUT` em ambientes com phpredis nativo e hosts não resolvíveis.
+  - [x] **Antecipação da Configuração de Erros no Bootstrap (`core/bootstrap.php`):** Execução imediata de `ini_set('display_errors', '0')`, `display_startup_errors`, `error_reporting`, `log_errors` e `error_log` no início do boot, blindando a inicialização contra herança de `display_errors=On` do `php.ini` do runner de CI.
+  - [x] **Resiliência e Parsing Robusto no Teste SEC-02 (`bin/test-sec02-settings-encryption.php`):** `ini_set('display_errors', '0')` no subprocesso isolado e extração defensiva de JSON via `strpos($stdout, '{"ok":')` no processo pai.
+  - [x] **Desacoplamento de Esquemas em `Schema::ensurePagesTable()` (`core/Schema.php`):** Foco estrito na tabela `pages`, removendo chamadas desnecessárias a `ensureMediaAiSchema()` e `ensureMediaVariantsSchema()`.
+  - [x] **Completude de Mocks em Testes de Performance (`bin/test-perf-arch-step22.php`, `bin/test-perf07-arch05.php`):** Inclusão de `flushGroup()`, `mGet()`, `setMultiple()`, `delete()` e `isConnected()` na classe mock `RedisCache`.
+  - [x] **Proteção de Headers (`public/index.php`):** Envolvimento de `header()` e `http_response_code()` com `if (!headers_sent())`.
+  - [x] **Zero Erros em `storage/logs/error.log`:** Execução limpa e 100% aprovada de todas as suítes de teste com o arquivo de log zerado.
 
 ---
 

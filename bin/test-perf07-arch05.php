@@ -12,7 +12,7 @@ if (!class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false)) {
     namespace LightPress\Plugin\RedisCachePro;
     class RedisCache {
         public static array $store = [];
-        public static function get(string $key, string $group, bool &$found): mixed {
+        public static function get(string $key, string $group = 'default', mixed &$found = null): mixed {
             if (isset(self::$store[$group][$key])) {
                 $found = true;
                 return self::$store[$group][$key];
@@ -20,8 +20,25 @@ if (!class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false)) {
             $found = false;
             return false;
         }
-        public static function set(string $key, mixed $value, string $group, int $ttl = 0): bool {
+        public static function mGet(array $keys, string $group = 'default'): array {
+            $results = [];
+            foreach ($keys as $k) {
+                $results[$k] = self::$store[$group][$k] ?? false;
+            }
+            return $results;
+        }
+        public static function set(string $key, mixed $value, string $group = 'default', int $ttl = 0): bool {
             self::$store[$group][$key] = $value;
+            return true;
+        }
+        public static function setMultiple(array $items, string $group = 'default', int $ttl = 0): bool {
+            foreach ($items as $k => $v) {
+                self::$store[$group][$k] = $v;
+            }
+            return true;
+        }
+        public static function delete(string $key, string $group = 'default'): bool {
+            unset(self::$store[$group][$key]);
             return true;
         }
         public static function remember(string $key, int $ttl, callable $callback, string $group = 'default'): mixed {
@@ -36,8 +53,15 @@ if (!class_exists('LightPress\\Plugin\\RedisCachePro\\RedisCache', false)) {
             unset(self::$store[$group]);
             return true;
         }
-        public static function flush(): bool {
-            self::$store = [];
+        public static function flush(string $group = ''): bool {
+            if ($group !== '') {
+                unset(self::$store[$group]);
+            } else {
+                self::$store = [];
+            }
+            return true;
+        }
+        public static function isConnected(): bool {
             return true;
         }
     }
