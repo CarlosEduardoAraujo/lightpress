@@ -247,6 +247,7 @@ class Schema
         }
 
         self::ensureMediaAiSchema($pdo, 'mysql');
+        self::ensureMediaFulltextSchema($pdo, 'mysql');
         self::ensureMediaVariantsSchema($pdo, 'mysql');
         self::ensureViewDedupeSchema($pdo, 'mysql');
     }
@@ -681,6 +682,25 @@ class Schema
             }
         } catch (\Throwable $e) {
             error_log('[Schema] ensureMediaVariantsSchema error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Garante a criação do índice FULLTEXT na tabela media para busca instantânea.
+     * Executado em setup/instalação CLI após a garantia das colunas alt_text, caption e ai_tags.
+     */
+    public static function ensureMediaFulltextSchema(PDO $pdo, string $driver = 'mysql'): void
+    {
+        if ($driver !== 'mysql') {
+            return;
+        }
+        try {
+            $hasFulltext = $pdo->query("SHOW INDEX FROM media WHERE Key_name = 'idx_media_fulltext'")->fetch();
+            if (!$hasFulltext) {
+                $pdo->exec("ALTER TABLE media ADD FULLTEXT INDEX idx_media_fulltext (original_name, alt_text, caption, ai_tags)");
+            }
+        } catch (\Throwable $e) {
+            error_log('[Schema] ensureMediaFulltextSchema error: ' . $e->getMessage());
         }
     }
 }

@@ -40,6 +40,7 @@ $tokenToggle = $_POST['_csrf_token'] ?? '';
 if ($toggleFeaturedId > 0 && Security::verifyCsrfToken($tokenToggle)) {
     if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)) {
         Database::query("UPDATE posts SET is_featured = CASE WHEN is_featured = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleFeaturedId]);
+        ObjectCache::flushGroup('posts');
         $cacheMgr->purgeUrls(['/']);
         
         $queryParams = $_GET;
@@ -92,7 +93,7 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
             });
 
             // Invalidação imediata do cache de objetos Redis (CH-02)
-            ObjectCache::delete("post_slug:{$targetPost['slug']}", 'posts');
+            ObjectCache::delete("post_slug:{$targetPost['slug']}", 'post_items');
             ObjectCache::flushGroup('posts');
 
             // Disparar hook de exclusão de post

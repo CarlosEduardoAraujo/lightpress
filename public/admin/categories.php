@@ -77,6 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ObjectCache::delete('all_active_categories', 'categories');
                             ObjectCache::delete('api_categories_list', 'categories');
                             ObjectCache::flushGroup('categories');
+                            if ($oldSlug !== $slug) {
+                                ObjectCache::flushGroup('post_items');
+                                ObjectCache::flushGroup('posts');
+                            }
                             $cacheMgr->purgeUrls([
                                 '/',
                                 '/categoria/' . $oldSlug . '/',
@@ -125,6 +129,7 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
         ObjectCache::delete('all_active_categories', 'categories');
         ObjectCache::delete('api_categories_list', 'categories');
         ObjectCache::flushGroup('categories');
+        ObjectCache::flushGroup('posts');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/']);
     }
     header("Location: /admin/categories.php");
@@ -147,6 +152,8 @@ if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
         ObjectCache::delete('all_active_categories', 'categories');
         ObjectCache::delete('api_categories_list', 'categories');
         ObjectCache::flushGroup('categories');
+        ObjectCache::flushGroup('post_items');
+        ObjectCache::flushGroup('posts');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/', '/categoria/geral/']);
         header("Location: /admin/categories.php");
         exit;

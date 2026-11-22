@@ -526,7 +526,8 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                 <?php
                 $groups = [
                     'settings'   => 'Configurações Globais do LightPress',
-                    'posts'      => 'Matérias, Notícias e Slugs',
+                    'posts'      => 'Listagens, Home e Feeds Agregados',
+                    'post_items' => 'Matérias Individuais (TTL estratificado até 10 dias)',
                     'categories' => 'Categorias e Seções Editoriais',
                     'users'      => 'Sessões e Perfis de Autores',
                     'transient'  => 'Consultas Externas e Transientes Voláteis',

@@ -128,6 +128,36 @@ it('Invalidação de Grupo (flushGroup) isola apenas o grupo afetado', function(
     expectEqual('cat_ativa', $c);
 });
 
+it('AUD-PERF-03: Segregação post_items vs posts preserva matérias individuais após flushGroup(posts)', function() use ($client) {
+    // 1. Armazena um artigo individual no grupo 'post_items' com TTL longo
+    $articleData = ['id' => 123, 'slug' => 'gp-interlagos-2026', 'title' => 'GP do Brasil'];
+    $client->set('post_slug:gp-interlagos-2026', $articleData, 'post_items', 864000);
+
+    // 2. Armazena listagens e feeds agregados no grupo 'posts'
+    $client->set('home_feed_posts_p1', [['id' => 123]], 'posts', 300);
+    $client->set('home_featured_posts', [['id' => 123]], 'posts', 300);
+
+    // 3. Simula publicação de uma nova matéria que invalida as listagens agregadas
+    $client->flushGroup('posts');
+
+    // 4. Feeds devem ser invalidados (MISS)
+    $foundList = false;
+    $client->get('home_feed_posts_p1', 'posts', $foundList);
+    expectEqual(false, $foundList, 'Feed no grupo posts deve sofrer MISS');
+
+    // 5. Matéria individual no grupo 'post_items' deve permanecer INTACTA (HIT)
+    $foundItem = false;
+    $itemVal = $client->get('post_slug:gp-interlagos-2026', 'post_items', $foundItem);
+    expectEqual(true, $foundItem, 'Artigo em post_items deve ser preservado com HIT');
+    expectEqual('GP do Brasil', $itemVal['title'] ?? '', 'Conteúdo do artigo deve permanecer íntegro');
+
+    // 6. Atualização pontual do artigo invalida especificamente no grupo 'post_items'
+    $client->delete('post_slug:gp-interlagos-2026', 'post_items');
+    $foundAfterDelete = false;
+    $client->get('post_slug:gp-interlagos-2026', 'post_items', $foundAfterDelete);
+    expectEqual(false, $foundAfterDelete, 'Edição pontual deve invalidar apenas a chave do artigo');
+});
+
 it('Invalidação Global (flush) invalida todo o namespace em O(1)', function() use ($client) {
     $client->set('chave_a', 'valor_a', 'settings');
     $client->set('chave_b', 'valor_b', 'categories');

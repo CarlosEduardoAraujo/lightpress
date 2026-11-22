@@ -136,16 +136,19 @@ Hook::addAction('post_saved', function (int $postId, array $postData = []): void
     try {
         RedisCache::flushGroup('posts');
         if (!empty($postData['slug'])) {
-            RedisCache::delete("post_slug:{$postData['slug']}", 'posts');
+            RedisCache::delete("post_slug:{$postData['slug']}", 'post_items');
         }
-        RedisCache::delete("post:{$postId}", 'posts');
+        RedisCache::delete("post:{$postId}", 'post_items');
     } catch (Throwable) {}
 });
 
-Hook::addAction('post_deleted', function (int $postId): void {
+Hook::addAction('post_deleted', function (int $postId, array $postData = []): void {
     try {
         RedisCache::flushGroup('posts');
-        RedisCache::delete("post:{$postId}", 'posts');
+        if (!empty($postData['slug'])) {
+            RedisCache::delete("post_slug:{$postData['slug']}", 'post_items');
+        }
+        RedisCache::delete("post:{$postId}", 'post_items');
     } catch (Throwable) {}
 });
 

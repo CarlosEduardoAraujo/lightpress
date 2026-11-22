@@ -8,6 +8,7 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth(null, null, $config, true);
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "UPDATE users SET name = ?, bio = ? WHERE id = ?",
                         [$name, $bio, (int)$currentUser['id']]
                     );
+                    ObjectCache::flushGroup('post_items');
                     $_SESSION['user_name'] = $name;
                     $message = "Perfil atualizado com sucesso!";
                     $currentUser['name'] = $name;

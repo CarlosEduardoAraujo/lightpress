@@ -111,6 +111,11 @@ class PostService
                 return 0;
             }
 
+            foreach ($duePosts as $p) {
+                if (!empty($p['slug'])) {
+                    ObjectCache::delete("post_slug:{$p['slug']}", 'post_items');
+                }
+            }
             ObjectCache::flushGroup('posts');
 
             $cacheManager = new CacheManager();
@@ -291,8 +296,9 @@ class PostService
         $isFirstPublish = false;
         $current = null;
         $jobId = 0;
+        $resolvedSlug = '';
 
-        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current, &$jobId): bool {
+        $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current, &$jobId, &$resolvedSlug): bool {
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
                 "SELECT id, user_id, slug, category, status, is_featured, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
@@ -341,6 +347,7 @@ class PostService
             $title = trim($data['title'] ?? '');
             $baseSlug = !empty($data['slug']) ? Security::slugify($data['slug']) : $current['slug'];
             $slug = $this->resolveUniqueSlug($baseSlug, $postId);
+            $resolvedSlug = $slug;
             $summary = $data['summary'] ?? null;
             $category = !empty($data['category']) ? Security::slugify($data['category']) : $current['category'];
             $tags = $data['tags'] ?? null;
@@ -505,6 +512,12 @@ class PostService
 
         // Executa a purga física do cache estritamente após o commit (LP-09 / P2)
         if ($success) {
+            if (!empty($resolvedSlug)) {
+                ObjectCache::delete("post_slug:{$resolvedSlug}", 'post_items');
+            }
+            if (!empty($current['slug']) && $current['slug'] !== $resolvedSlug) {
+                ObjectCache::delete("post_slug:{$current['slug']}", 'post_items');
+            }
             ObjectCache::flushGroup('posts');
             if (!empty($affectedUrls)) {
                 try {

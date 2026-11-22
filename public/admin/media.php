@@ -12,6 +12,7 @@ use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
+use LightPress\Core\Settings;
 
 $currentUser = Security::requireAuth();
 
@@ -118,56 +119,130 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
         if (!$canDelete) {
             $error = "Você não tem permissão para excluir esta imagem da biblioteca.";
         } else {
-            // Verificar se alguma das variantes ou o media_id está em uso no banco (P2 / Item 6)
+            // Verificar se alguma das variantes ou o media_id está em uso no banco
             $isInUse = false;
 
-            // 1. Verificar em vínculos normalizados na tabela media_refs
-            $inMediaRefs = (int)Database::fetchValue("SELECT COUNT(*) FROM media_refs WHERE media_id = ?", [$mediaId]);
+            // 1. Checagem O(1) indexada na tabela normalizada media_refs
+            $inMediaRefs = (int)Database::fetchValue("SELECT 1 FROM media_refs WHERE media_id = ? LIMIT 1", [$mediaId]);
             if ($inMediaRefs > 0) {
                 $isInUse = true;
             }
 
-            // 2. Verificar variantes em posts, pages e post_revisions
+            // 2. Checagem O(1) indexada em posts.featured_media_id (índice idx_featured_media)
             if (!$isInUse) {
-                $variants = json_decode($mediaItem['variants_manifest'], true) ?? [];
-                foreach ($variants as $res => $formats) {
-                    if (!is_array($formats)) continue;
-                    foreach ($formats as $fmt => $info) {
-                        $url = $info['url'] ?? '';
-                        if (!empty($url)) {
-                            // Suporte a busca direta e com barras escapadas (\/uploads\/...) em serializações JSON legadas
-                            $escapedUrl = str_replace('/', '\/', $url);
-                            $likeUrl = '%' . Security::escapeLike($url) . '%';
-                            $likeEscapedUrl = '%' . Security::escapeLike($escapedUrl) . '%';
+                $inFeaturedMedia = (int)Database::fetchValue("SELECT 1 FROM posts WHERE featured_media_id = ? LIMIT 1", [$mediaId]);
+                if ($inFeaturedMedia > 0) {
+                    $isInUse = true;
+                }
+            }
 
-                            $inPostsFeatured = (int)Database::fetchValue(
-                                "SELECT COUNT(*) FROM posts WHERE featured_image = ? OR content_json LIKE ? OR content_json LIKE ?",
-                                [$url, $likeUrl, $likeEscapedUrl]
-                            );
-                            if ($inPostsFeatured > 0) { $isInUse = true; break 2; }
-
-                            $inPostsContent = (int)Database::fetchValue(
-                                "SELECT COUNT(*) FROM posts WHERE content_html LIKE ?",
-                                [$likeUrl]
-                            );
-                            if ($inPostsContent > 0) { $isInUse = true; break 2; }
-
-                            $inPages = (int)Database::fetchValue(
-                                "SELECT COUNT(*) FROM pages WHERE featured_image = ? OR content_html LIKE ?",
-                                [$url, $likeUrl]
-                            );
-                            if ($inPages > 0) { $isInUse = true; break 2; }
-
-                            // Verificar nas revisões históricas de matérias (post_revisions), cobrindo serializações com e sem escape de barra
-                            $inRevisions = (int)Database::fetchValue(
-                                "SELECT COUNT(*) FROM post_revisions 
-                                 WHERE content_html LIKE ? 
-                                    OR payload_json LIKE ? 
-                                    OR payload_json LIKE ?",
-                                [$likeUrl, $likeUrl, $likeEscapedUrl]
-                            );
-                            if ($inRevisions > 0) { $isInUse = true; break 2; }
+            // 3. Extrair URLs exatas e caminhos únicos normalizados de todas as variantes
+            $variants = json_decode((string)($mediaItem['variants_manifest'] ?? ''), true) ?? [];
+            $allUrls = [];
+            $uniquePaths = [];
+            foreach ($variants as $res => $formats) {
+                if (!is_array($formats)) continue;
+                foreach ($formats as $fmt => $info) {
+                    $url = $info['url'] ?? '';
+                    if (!empty($url) && is_string($url)) {
+                        $allUrls[] = $url;
+                        $parsed = parse_url($url, PHP_URL_PATH);
+                        $clean = ltrim(is_string($parsed) ? $parsed : $url, '/');
+                        if ($clean !== '') {
+                            $uniquePaths[$clean] = true;
+                            $allUrls[] = $clean;
+                            $allUrls[] = '/' . $clean;
                         }
+                    }
+                }
+            }
+            $allUrls = array_values(array_unique(array_filter($allUrls)));
+            $uniquePaths = array_keys($uniquePaths);
+
+            // 4. Checagem indexada em posts.featured_image
+            if (!$isInUse && !empty($allUrls)) {
+                $placeholders = implode(',', array_fill(0, count($allUrls), '?'));
+                $inPostsFeatured = (int)Database::fetchValue(
+                    "SELECT 1 FROM posts WHERE featured_image IN ({$placeholders}) LIMIT 1",
+                    $allUrls
+                );
+                if ($inPostsFeatured > 0) { $isInUse = true; }
+            }
+
+            // 5. Checagem em pages.featured_image
+            if (!$isInUse && !empty($allUrls)) {
+                $placeholders = implode(',', array_fill(0, count($allUrls), '?'));
+                $inPages = (int)Database::fetchValue(
+                    "SELECT 1 FROM pages WHERE featured_image IN ({$placeholders}) LIMIT 1",
+                    $allUrls
+                );
+                if ($inPages > 0) { $isInUse = true; }
+            }
+
+            // 6. Checagem em users.avatar
+            if (!$isInUse && !empty($allUrls)) {
+                $placeholders = implode(',', array_fill(0, count($allUrls), '?'));
+                $inUsersAvatar = (int)Database::fetchValue(
+                    "SELECT 1 FROM users WHERE avatar IN ({$placeholders}) LIMIT 1",
+                    $allUrls
+                );
+                if ($inUsersAvatar > 0) { $isInUse = true; }
+            }
+
+            // 7. Checagem em configurações dinâmicas (site_favicon, theme_options_*) em RAM
+            if (!$isInUse && !empty($allUrls)) {
+                $allSettings = Settings::getAll();
+                foreach ($allUrls as $u) {
+                    foreach ($allSettings as $settingKey => $settingVal) {
+                        if (is_string($settingVal) && ($settingVal === $u || str_contains($settingVal, $u))) {
+                            $isInUse = true;
+                            break 2;
+                        }
+                    }
+                }
+            }
+
+            // 8. Checagem preventiva em páginas institucionais com conjunto normalizado uniquePaths (poucas linhas, < 1ms)
+            if (!$isInUse && !empty($uniquePaths)) {
+                $likeClauses = [];
+                $likeParams = [];
+                foreach ($uniquePaths as $path) {
+                    $likeClauses[] = "content_html LIKE ?";
+                    $likeParams[] = '%' . Security::escapeLike($path) . '%';
+                }
+                $orContent = implode(' OR ', $likeClauses);
+                $inPagesContent = (int)Database::fetchValue(
+                    "SELECT 1 FROM pages WHERE ({$orContent}) LIMIT 1",
+                    $likeParams
+                );
+                if ($inPagesContent > 0) { $isInUse = true; }
+            }
+
+            // 9. Fallback legado para posts.content_html e post_revisions:
+            // Executado EXCLUSIVAMENTE se media_refs não estiver populada no banco de dados
+            if (!$isInUse && !empty($uniquePaths)) {
+                $hasMediaRefsPopulated = (int)Database::fetchValue("SELECT 1 FROM media_refs LIMIT 1") > 0;
+                if (!$hasMediaRefsPopulated) {
+                    $likeClauses = [];
+                    $likeParams = [];
+                    foreach ($uniquePaths as $path) {
+                        $likeClauses[] = "content_html LIKE ?";
+                        $likeParams[] = '%' . Security::escapeLike($path) . '%';
+                    }
+                    $orContent = implode(' OR ', $likeClauses);
+
+                    $inPostsContent = (int)Database::fetchValue(
+                        "SELECT 1 FROM posts WHERE ({$orContent}) LIMIT 1",
+                        $likeParams
+                    );
+                    if ($inPostsContent > 0) { $isInUse = true; }
+
+                    if (!$isInUse) {
+                        $inRevsContent = (int)Database::fetchValue(
+                            "SELECT 1 FROM post_revisions WHERE ({$orContent}) LIMIT 1",
+                            $likeParams
+                        );
+                        if ($inRevsContent > 0) { $isInUse = true; }
                     }
                 }
             }
@@ -214,30 +289,82 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
 
 // 3. Filtro de Busca e Paginação de Mídias
 $filterSearch = Security::getSafeString($_GET, 'q');
-$whereClauses = [];
-$params = [];
+$driver = Database::getDriver();
 
 if (!empty($filterSearch)) {
-    $whereClauses[] = "(m.original_name LIKE ? OR m.alt_text LIKE ? OR m.ai_tags LIKE ? OR m.caption LIKE ? OR m.variants_manifest LIKE ? OR m.id = ?)";
-    $escapedFilter = '%' . Security::escapeLike($filterSearch) . '%';
-    $params[] = $escapedFilter;
-    $params[] = $escapedFilter;
-    $params[] = $escapedFilter;
-    $params[] = $escapedFilter;
-    $params[] = $escapedFilter;
-    $params[] = $filterSearch;
+    $buildMediaWhere = function (bool $tryFulltext) use ($filterSearch, $driver): array {
+        $clauses = [];
+        $p = [];
+        if (str_contains($filterSearch, '/')) {
+            $cleanPath = ltrim((string)(parse_url($filterSearch, PHP_URL_PATH) ?? $filterSearch), '/');
+            $prefixedPath = str_starts_with($cleanPath, 'uploads/') ? $cleanPath : 'uploads/' . $cleanPath;
+            $clauses[] = "(m.id IN (SELECT media_id FROM media_variants WHERE url_path LIKE ?) OR m.original_name LIKE ? OR m.id = ?)";
+            $p[] = Security::escapeLike($prefixedPath) . '%';
+            $p[] = '%' . Security::escapeLike($filterSearch) . '%';
+            $p[] = $filterSearch;
+            return [$clauses, $p];
+        }
+
+        $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $filterSearch) ?: []);
+        $fulltextWords = [];
+        $shortWords = [];
+        foreach ($words as $w) {
+            if (mb_strlen($w) >= 3) {
+                $fulltextWords[] = "+{$w}*";
+            } elseif (mb_strlen($w) >= 2) {
+                $shortWords[] = $w;
+            }
+        }
+        $boolQuery = implode(' ', $fulltextWords);
+
+        if ($tryFulltext && $driver === 'mysql' && !empty($boolQuery)) {
+            $clauses[] = "(MATCH(m.original_name, m.alt_text, m.caption, m.ai_tags) AGAINST(? IN BOOLEAN MODE) OR m.id = ?)";
+            $p[] = $boolQuery;
+            $p[] = $filterSearch;
+
+            // Refinamento para termos curtos concomitantes (ex.: "f1 brasil")
+            foreach ($shortWords as $sw) {
+                $safeSw = '%' . Security::escapeLike($sw) . '%';
+                $clauses[] = "(m.original_name LIKE ? OR m.alt_text LIKE ? OR m.caption LIKE ? OR m.ai_tags LIKE ?)";
+                $p[] = $safeSw; $p[] = $safeSw; $p[] = $safeSw; $p[] = $safeSw;
+            }
+        } else {
+            $safeSearch = '%' . Security::escapeLike($filterSearch) . '%';
+            $clauses[] = "(m.original_name LIKE ? OR m.alt_text LIKE ? OR m.caption LIKE ? OR m.ai_tags LIKE ? OR m.id = ?)";
+            $p[] = $safeSearch; $p[] = $safeSearch; $p[] = $safeSearch; $p[] = $safeSearch;
+            $p[] = $filterSearch;
+        }
+        return [$clauses, $p];
+    };
+
+    [$whereClauses, $params] = $buildMediaWhere(true);
+    $whereSql = "WHERE " . implode(" AND ", $whereClauses);
+
+    $totalCount = 0;
+    try {
+        $totalCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m {$whereSql}", $params);
+        if ($totalCount === 0 && $driver === 'mysql') {
+            [$fallbackClauses, $fallbackParams] = $buildMediaWhere(false);
+            $fallbackWhere = "WHERE " . implode(" AND ", $fallbackClauses);
+            $fallbackCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m {$fallbackWhere}", $fallbackParams);
+            if ($fallbackCount > 0) {
+                $totalCount = $fallbackCount;
+                $whereClauses = $fallbackClauses;
+                $params = $fallbackParams;
+                $whereSql = $fallbackWhere;
+            }
+        }
+    } catch (\Throwable) {
+        [$whereClauses, $params] = $buildMediaWhere(false);
+        $whereSql = "WHERE " . implode(" AND ", $whereClauses);
+        $totalCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m {$whereSql}", $params);
+    }
+} else {
+    $whereClauses = [];
+    $params = [];
+    $whereSql = "";
+    $totalCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m", []);
 }
-
-$whereSql = !empty($whereClauses) ? "WHERE " . implode(" AND ", $whereClauses) : "";
-
-// Paginação
-$page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 48; // Múltiplo amigável de 2, 3, 4 e 6 para grid responsivo
-
-$totalCount = (int)Database::fetchValue(
-    "SELECT COUNT(*) FROM media m {$whereSql}",
-    $params
-);
 
 $totalPages = max(1, (int)ceil($totalCount / $perPage));
 if ($page > $totalPages) {

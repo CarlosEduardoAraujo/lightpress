@@ -426,9 +426,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($wasPublished) {
                         try {
-                            ObjectCache::delete("post_slug:{$prevSlug}", 'posts');
+                            ObjectCache::delete("post_slug:{$prevSlug}", 'post_items');
                             if (!empty($cleanSlug) && $cleanSlug !== $prevSlug) {
-                                ObjectCache::delete("post_slug:{$cleanSlug}", 'posts');
+                                ObjectCache::delete("post_slug:{$cleanSlug}", 'post_items');
                             }
                             ObjectCache::flushGroup('posts');
 

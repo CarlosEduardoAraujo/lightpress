@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS media (
     INDEX idx_media_user (user_id),
     INDEX idx_media_created (created_at DESC),
     INDEX idx_media_original_name (original_name(191)),
+    FULLTEXT INDEX idx_media_fulltext (original_name, alt_text, caption, ai_tags),
     CONSTRAINT fk_media_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

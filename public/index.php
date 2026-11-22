@@ -1121,7 +1121,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     }
 
     // Consulta atômica do artigo com cache em memória RAM (Redis/ObjectCache)
-    $post = ObjectCache::get("post_slug:{$slug}", 'posts');
+    $post = ObjectCache::get("post_slug:{$slug}", 'post_items');
     if ($post === false || !is_array($post)) {
         $p = Database::fetchOne(
             "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
@@ -1148,7 +1148,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
             }
 
             $postTtl = (time() - $lastTime <= 86400) ? 86400 : 864000;
-            ObjectCache::set("post_slug:{$slug}", $p, 'posts', $postTtl);
+            ObjectCache::set("post_slug:{$slug}", $p, 'post_items', $postTtl);
             $post = $p;
         } else {
             $post = null;

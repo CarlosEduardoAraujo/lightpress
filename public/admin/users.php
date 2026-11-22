@@ -11,6 +11,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Authorization;
 use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth(Authorization::ACTION_MANAGE_USERS);
@@ -116,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
                             });
 
+                            ObjectCache::flushGroup('post_items');
                             $message = "Perfil de '{$name}' atualizado com sucesso!";
                             $editUser = Database::fetchOne("SELECT * FROM users WHERE id = ? LIMIT 1", [$targetId]);
                         } catch (\Throwable $e) {

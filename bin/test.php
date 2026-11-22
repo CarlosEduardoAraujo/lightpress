@@ -648,6 +648,74 @@ $adminPagesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/pages.php')
 assertTest("AUD-SEC-03: admin/pages.php invalida all_published_page_slugs", str_contains($adminPagesPhp, "ObjectCache::delete('all_published_page_slugs', 'pages')"));
 
 // -------------------------------------------------------------
+// [14] AUD-PERF-02 & AUD-PERF-03: Otimização de Mídia e Segregação de Cache
+// -------------------------------------------------------------
+echo "\n[14] Testando AUD-PERF-02 e AUD-PERF-03: Otimização de Mídia e Segregação de Cache Redis\n";
+
+// 1. AUD-PERF-02: Schema e migração FULLTEXT em media
+$schemaSql = file_get_contents(dirname(__DIR__) . '/bin/schema.sql');
+assertTest("AUD-PERF-02: bin/schema.sql define FULLTEXT INDEX idx_media_fulltext", str_contains($schemaSql, 'FULLTEXT INDEX idx_media_fulltext (original_name, alt_text, caption, ai_tags)'));
+
+$schemaPhp = file_get_contents(dirname(__DIR__) . '/core/Schema.php');
+assertTest("AUD-PERF-02: core/Schema.php possui ensureMediaFulltextSchema", str_contains($schemaPhp, 'function ensureMediaFulltextSchema'));
+assertTest("AUD-PERF-02: core/Schema.php invoca ensureMediaFulltextSchema após ensureMediaAiSchema", strpos($schemaPhp, 'ensureMediaFulltextSchema') > strpos($schemaPhp, 'ensureMediaAiSchema'));
+
+// 2. AUD-PERF-02: public/admin/media.php e public/admin/api/media.php
+$mediaPhp = file_get_contents(dirname(__DIR__) . '/public/admin/media.php');
+assertTest("AUD-PERF-02: media.php importa Settings", str_contains($mediaPhp, 'use LightPress\Core\Settings;'));
+assertTest("AUD-PERF-02: media.php checa media_refs com SELECT 1 LIMIT 1", str_contains($mediaPhp, 'SELECT 1 FROM media_refs WHERE media_id = ? LIMIT 1'));
+assertTest("AUD-PERF-02: media.php checa posts.featured_media_id com SELECT 1 LIMIT 1", str_contains($mediaPhp, 'SELECT 1 FROM posts WHERE featured_media_id = ? LIMIT 1'));
+assertTest("AUD-PERF-02: media.php checa posts.featured_image com IN (...) LIMIT 1", str_contains($mediaPhp, 'posts WHERE featured_image IN'));
+assertTest("AUD-PERF-02: media.php checa pages.featured_image com IN (...) LIMIT 1", str_contains($mediaPhp, 'pages WHERE featured_image IN'));
+assertTest("AUD-PERF-02: media.php checa users.avatar com IN (...) LIMIT 1", str_contains($mediaPhp, 'users WHERE avatar IN'));
+assertTest("AUD-PERF-02: media.php checa Settings::getAll()", str_contains($mediaPhp, 'Settings::getAll()'));
+assertTest("AUD-PERF-02: media.php utiliza uniquePaths normalizados", str_contains($mediaPhp, '$uniquePaths'));
+assertTest("AUD-PERF-02: media.php não possui SELECT COUNT(*) com LIKE em content_json na exclusão", !str_contains($mediaPhp, 'SELECT COUNT(*) FROM posts WHERE featured_image = ? OR content_json LIKE ?'));
+assertTest("AUD-PERF-02: media.php possui busca em media_variants com uploads/", str_contains($mediaPhp, "prefixedPath = str_starts_with(\$cleanPath, 'uploads/') ? \$cleanPath : 'uploads/' . \$cleanPath"));
+assertTest("AUD-PERF-02: media.php possui MATCH AGAINST BOOLEAN MODE com try/catch e fallback LIKE", str_contains($mediaPhp, 'MATCH(m.original_name, m.alt_text, m.caption, m.ai_tags) AGAINST(? IN BOOLEAN MODE)'));
+
+$apiMediaPhp = file_get_contents(dirname(__DIR__) . '/public/admin/api/media.php');
+assertTest("AUD-PERF-02: api/media.php possui MATCH AGAINST BOOLEAN MODE com fallback", str_contains($apiMediaPhp, 'MATCH(original_name, alt_text, caption, ai_tags) AGAINST(? IN BOOLEAN MODE)'));
+assertTest("AUD-PERF-02: api/media.php possui busca B-Tree em media_variants com uploads/", str_contains($apiMediaPhp, "prefixedPath = str_starts_with(\$cleanPath, 'uploads/') ? \$cleanPath : 'uploads/' . \$cleanPath"));
+
+// 3. AUD-PERF-03: Segregação post_items vs posts
+$indexPhp = file_get_contents(dirname(__DIR__) . '/public/index.php');
+assertTest("AUD-PERF-03: public/index.php busca post_slug no grupo post_items", str_contains($indexPhp, 'ObjectCache::get("post_slug:{$slug}", \'post_items\')'));
+assertTest("AUD-PERF-03: public/index.php grava post_slug no grupo post_items", str_contains($indexPhp, 'ObjectCache::set("post_slug:{$slug}", $p, \'post_items\', $postTtl)'));
+
+$postServicePhp = file_get_contents(dirname(__DIR__) . '/core/PostService.php');
+assertTest("AUD-PERF-03: PostService captura resolvedSlug por referência", str_contains($postServicePhp, '&$resolvedSlug'));
+assertTest("AUD-PERF-03: PostService invalida post_slug no grupo post_items após commit", str_contains($postServicePhp, 'ObjectCache::delete("post_slug:{$resolvedSlug}", \'post_items\')'));
+assertTest("AUD-PERF-03: PostService invalida posts agendados promovidos em post_items", str_contains($postServicePhp, 'ObjectCache::delete("post_slug:{$p[\'slug\']}", \'post_items\')'));
+
+$dashboardPhp = file_get_contents(dirname(__DIR__) . '/public/admin/dashboard.php');
+assertTest("AUD-PERF-03: dashboard.php invalida posts ao alternar destaque toggle_featured_id", str_contains($dashboardPhp, "ObjectCache::flushGroup('posts');"));
+assertTest("AUD-PERF-03: dashboard.php invalida post_slug em post_items na exclusão", str_contains($dashboardPhp, 'ObjectCache::delete("post_slug:{$targetPost[\'slug\']}", \'post_items\')'));
+
+$editorPhp = file_get_contents(dirname(__DIR__) . '/public/admin/editor.php');
+assertTest("AUD-PERF-03: editor.php invalida post_slug em post_items ao rebaixar post", str_contains($editorPhp, 'ObjectCache::delete("post_slug:{$prevSlug}", \'post_items\')'));
+
+$categoriesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/categories.php');
+assertTest("AUD-PERF-03: categories.php invalida post_items e posts ao alterar slug de categoria", str_contains($categoriesPhp, "ObjectCache::flushGroup('post_items');") && str_contains($categoriesPhp, "if (\$oldSlug !== \$slug)"));
+
+$usersPhp = file_get_contents(dirname(__DIR__) . '/public/admin/users.php');
+assertTest("AUD-PERF-03: users.php importa ObjectCache", str_contains($usersPhp, 'use LightPress\Core\ObjectCache;'));
+assertTest("AUD-PERF-03: users.php invalida post_items ao atualizar autor", str_contains($usersPhp, "ObjectCache::flushGroup('post_items');"));
+
+$profilePhp = file_get_contents(dirname(__DIR__) . '/public/admin/profile.php');
+assertTest("AUD-PERF-03: profile.php importa ObjectCache", str_contains($profilePhp, 'use LightPress\Core\ObjectCache;'));
+assertTest("AUD-PERF-03: profile.php invalida post_items ao atualizar perfil", str_contains($profilePhp, "ObjectCache::flushGroup('post_items');"));
+
+$themeManagerPhp = file_get_contents(dirname(__DIR__) . '/core/ThemeManager.php');
+assertTest("AUD-PERF-03: ThemeManager invalida post_items ao alterar opções de tema", str_contains($themeManagerPhp, "ObjectCache::flushGroup('post_items');"));
+
+$rcpSettingsPhp = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/settings.php');
+assertTest("AUD-PERF-03: redis-cache-pro settings.php lista post_items no Big Key Hunter / Grupos", str_contains($rcpSettingsPhp, "'post_items' =>"));
+
+$rcpMainPhp = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/redis-cache-pro.php');
+assertTest("AUD-PERF-03: redis-cache-pro.php invalida post_items nos hooks post_saved e post_deleted", str_contains($rcpMainPhp, 'post_items'));
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

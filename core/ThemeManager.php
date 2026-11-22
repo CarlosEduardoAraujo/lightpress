@@ -231,6 +231,7 @@ final class ThemeManager
         // Limpar caches em memória e Redis
         ObjectCache::flushGroup('settings');
         ObjectCache::flushGroup('posts');
+        ObjectCache::flushGroup('post_items');
         ObjectCache::flushGroup('pages');
         self::$cachedOptions = null;
 
