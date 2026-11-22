@@ -7,6 +7,38 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Auditoria de Segurança e Otimizações de Caching (AUD-SEC-03, AUD-SEC-04) — 2026-11-22
+
+- **Re-sanitização Mandatória na Restauração de Revisões por Autor (`public/admin/revisions.php` — AUD-SEC-04 / CWE-79):**
+  - **Defesa em Profundidade:** Aplicação de `BlockCompiler::sanitizeHtml()` sobre `$rev['content_html']` e `$payload['content_html']` imediatamente após a recuperação do snapshot de `post_revisions`.
+  - **Mitigação de XSS Armazenado:** Impede que revisões legadas, migradas de outros CMSs ou criadas em períodos pré-hardening reinsiram códigos maliciosos (`<script>`, eventos JS inline, `javascript:`) na coluna `content_html` da tabela `posts` ou em novos snapshots editoriais.
+
+- **Blindagem Contra Reverse Tabnabbing no Tema Corporativo (`themes/empresa/post.php`, `themes/empresa/footer.php` — AUD-SEC-04):**
+  - **Injeção de `rel="noopener noreferrer"`:** Links externos com `target="_blank"` referentes ao WhatsApp nos templates de artigo (`post.php`) e rodapé (`footer.php`) passam a declarar estritamente `rel="noopener noreferrer"`.
+  - **Conformidade de Navegação Segura:** Neutraliza ataques de *Reverse Tabnabbing* via `window.opener` em navegadores antigos e previne vazamento do cabeçalho HTTP `Referer`.
+
+- **Eliminação de DoS por Poluição de RAM no Redis e Cache Negativo de 24h (`public/index.php` — AUD-SEC-03 / CWE-400):**
+  - **Eliminação de Cache Negativo de 24 Horas:** Substituição das chaves dinâmicas individuais `category:{$categorySlug}` e `page_slug:{$slug}` (que gravavam `null` com TTL de 86.400s no Redis para cada URL 404 única) por mapas compactos em chave única: `all_active_categories` (grupo `'categories'`) e `all_published_page_slugs` (grupo `'pages'`).
+  - **Lookup em RAM O(1) e Zero Poluição de Chaves:** A validação de categorias e páginas institucionais passa a ser resolvida em memória local $O(1)$. Slugs inexistentes (varreduras de bots ou requisições aleatórias) retornam 404 imediatamente sem tocar o MySQL e com **zero** criação de chaves no Redis, neutralizando o esgotamento de `maxmemory` e a expulsão (*eviction*) de posts válidos.
+  - **Reutilização no Feed RSS de Categorias:** O manipulador `$categoryFeedHandler` (`/categoria/{slug}/feed*`) passa a utilizar o mapa `all_active_categories`, eliminando a consulta SQL direta ao banco a cada requisição de RSS.
+
+- **Otimização de Performance e Blindagem em APIs Públicas (`public/api/` — AUD-SEC-03):**
+  - **API de Categorias (`public/api/categories.php`):** Cache de 300 segundos via `ObjectCache::remember('api_categories_list', 300, ..., 'categories')`, eliminando overhead de *full scan* e agregação `LEFT JOIN posts ... GROUP BY c.id` a cada requisição GET. Invalidação reativa atômica nos eventos de cadastro, edição, toggle e exclusão em `public/admin/categories.php`.
+  - **API de Busca com Índice FULLTEXT Booleano (`public/api/search.php`):** Eliminação de *Full Table Scan* provocado por `title LIKE '%termo%' OR summary LIKE '%termo%'`. Migração para busca booleana de alta performance via índice `idx_fulltext_search (title, summary, tags)` (`MATCH AGAINST(? IN BOOLEAN MODE)`) no MySQL, com fallback resiliente para `LIKE` no SQLite. Cache em memória de 60 segundos por termo/limite (`api_search:{hash}`, grupo `'posts'`).
+
+- **Invalidação Reativa e Atômica nos Módulos Administrativos (`public/admin/` — AUD-SEC-03):**
+  - **Gestão de Categorias (`public/admin/categories.php`):** Purga explícita de `all_active_categories` e `api_categories_list` além de `ObjectCache::flushGroup('categories')` em todas as mutações editoriais (criação, edição, alternância de status e exclusão).
+  - **Gestão de Páginas (`public/admin/page-edit.php`, `public/admin/pages.php`):** Purga explícita de `all_published_page_slugs` além de `ObjectCache::flushGroup('pages')` na inserção, atualização e exclusão de páginas.
+
+- **Defesa de Infraestrutura e Rate Limiting no Nginx (`nginx/` — AUD-SEC-03):**
+  - **Cache de Respostas 404 no FastCGI (`nginx/speedracing-tunnel.conf`):** Ativação de `fastcgi_cache_valid 404 1m;` em paridade com `lightpress.conf`, assegurando que varreduras massivas de 404 sejam absorvidas e respondidas diretamente pelo Nginx em disco durante 1 minuto, sem onerar o socket do PHP-FPM.
+  - **Rate Limiting Defensivo para APIs Públicas (`nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf`):** Configuração das zonas `speedracing_api` e `lp_api` (`rate=60r/m` por IP real com `burst=20 nodelay`) no bloco `location ^~ /api/`, garantindo excelente experiência para usuários legítimos no autocomplete enquanto bloqueia ataques de flood e negação de serviço.
+
+- **Expansão da Suíte de Testes Automatizados (`bin/test.php`, `bin/test-revision-safety.php`):**
+  - **Seção [13] AUD-SEC-03 em `bin/test.php`:** Inclusão de 21 novas asserções estáticas e de runtime validando a eliminação de chaves dinâmicas, integridade dos mapas compactos, uso do índice FULLTEXT, cache de APIs, diretivas do Nginx e invalidações no admin, elevando a suíte para **187 testes 100% aprovados**.
+  - **Asserções AUD-SEC-04:** Verificação de `rel="noopener noreferrer"` no tema empresa e de `BlockCompiler::sanitizeHtml` na restauração de revisões.
+  - **Teste Funcional de Injeção em Revisões (`bin/test-revision-safety.php`):** Validação de ponta a ponta garantindo que cargas maliciosas sejam desinfetadas na restauração de rascunhos.
+
 ### Correção de Falha de CI no GitHub Actions (SEC-02 / CWE-665) e Higienização de Logs — 2026-11-21
 
 - **Silenciamento de Avisos de Rede no Driver Redis (`plugins/redis-cache-pro/src/RedisClient.php`):**

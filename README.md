@@ -1419,6 +1419,26 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 * **Log de Erros 100% Zerado:**
   - Toda a suíte de testes unitários e de integração agora é executada com `storage/logs/error.log` completamente vazio.
 
+#### 8.21.21. Auditoria de Segurança e Otimizações de Caching (AUD-SEC-03, AUD-SEC-04)
+* **Re-sanitização Mandatória na Restauração de Revisões por Autor (`public/admin/revisions.php` - AUD-SEC-04 / CWE-79):**
+  - Aplicação defensiva de `BlockCompiler::sanitizeHtml()` sobre `$rev['content_html']` e `$payload['content_html']` no fluxo de restauração de histórico editorial executado por usuários com perfil de autor.
+  - Neutraliza vetores de XSS armazenado caso um snapshot histórico ou migrado contenha tags perigosas (`<script>`, eventos inline ou esquemas `javascript:`), garantindo que a coluna `content_html` da tabela `posts` e novos snapshots permaneçam 100% esterilizados.
+* **Blindagem Contra Reverse Tabnabbing no Tema Empresa (`themes/empresa/` - AUD-SEC-04):**
+  - Inserção compulsória do atributo `rel="noopener noreferrer"` nas tags `<a href="..." target="_blank">` referentes ao atendimento via WhatsApp em `themes/empresa/post.php` e `themes/empresa/footer.php`.
+  - Elimina riscos de exploração do objeto `window.opener` (*Reverse Tabnabbing*) em navegadores antigos e veda vazamento de cabeçalhos `Referer` para destinos externos.
+* **Eliminação de DoS por Poluição de RAM no Redis (Cache Negativo 24h) e Rotas Públicas (`public/index.php` - AUD-SEC-03 / CWE-400):**
+  - Substituição das chaves dinâmicas individuais `category:{$categorySlug}` e `page_slug:{$slug}` (que gravavam `null` por 86.400s no Redis para cada URL 404 única) por mapas compactos em chave única: `all_active_categories` (grupo `'categories'`) e `all_published_page_slugs` (grupo `'pages'`).
+  - Lookup em memória RAM $O(1)$ sem persistência de chaves de valor `null` no Redis para requisições com slugs inexistentes, eliminando o esgotamento de `maxmemory` e a expulsão (*eviction*) de posts válidos. O feed RSS de categorias (`/categoria/{slug}/feed*`) passa a reutilizar o mapa consolidado, eliminando consultas SQL diretas.
+* **Otimização de Performance e Blindagem em APIs Públicas (`public/api/` - AUD-SEC-03):**
+  - **API de Categorias (`public/api/categories.php`):** Cache de 300 segundos com `ObjectCache::remember('api_categories_list', 300, ..., 'categories')`, eliminando varreduras de tabela e agregações `LEFT JOIN ... GROUP BY` por requisição GET. Invalidação reativa atômica nos módulos de gestão (`public/admin/categories.php`).
+  - **API de Busca com FULLTEXT Booleano (`public/api/search.php`):** Eliminação de *Full Table Scan* provocado por `title LIKE '%termo%' OR summary LIKE '%termo%'`. Execução de busca acelerada via índice `idx_fulltext_search (title, summary, tags)` (`MATCH AGAINST(? IN BOOLEAN MODE)`) no MySQL, mantendo fallback resiliente para `LIKE` no SQLite. Cache em memória de 60 segundos por termo/limite (`api_search:{hash}`, grupo `'posts'`).
+* **Blindagem de Infraestrutura e Rate Limiting no Nginx (`nginx/` - AUD-SEC-03):**
+  - **Cache de 404 no FastCGI (`nginx/speedracing-tunnel.conf`):** Ativação de `fastcgi_cache_valid 404 1m;` em paridade com `lightpress.conf`, absorvendo varreduras massivas de 404 diretamente no Nginx por 1 minuto sem onerar o socket do PHP-FPM.
+  - **Rate Limiting Defensivo para APIs (`nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf`):** Configuração das zonas `speedracing_api` e `lp_api` (`rate=60r/m` com `burst=20 nodelay`) no bloco `location ^~ /api/`, assegurando proteção contra negação de serviço e flood de requisições.
+* **Cobertura Automatizada de Segurança e Resiliência (`bin/test.php`, `bin/test-revision-safety.php`):**
+  - Expansão da suíte para **187 testes automatizados** 100% aprovados, incluindo a nova seção `[13]` com 21 asserções dedicadas para AUD-SEC-03 (eliminação de chaves dinâmicas, validação de mapas em runtime, índice FULLTEXT, caches e diretivas Nginx).
+  - Implementação de teste de integração em `bin/test-revision-safety.php` verificando o expurgo de cargas úteis com scripts e eventos maliciosos durante a restauração de rascunhos.
+
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
