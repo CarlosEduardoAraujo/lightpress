@@ -291,6 +291,10 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
 $filterSearch = Security::getSafeString($_GET, 'q');
 $driver = Database::getDriver();
 
+// Paginação
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 48; // Múltiplo amigável de 2, 3, 4 e 6 para grid responsivo
+
 if (!empty($filterSearch)) {
     $buildMediaWhere = function (bool $tryFulltext) use ($filterSearch, $driver): array {
         $clauses = [];
@@ -395,12 +399,14 @@ $isVisionEnabled = $isAiCopilotActive && (\LightPress\Core\Settings::get('ai_cop
 $visionMode = (string)\LightPress\Core\Settings::get('ai_copilot_vision_mode', 'auto');
 
 // Função auxiliar para montar URLs com parâmetros de busca e paginação
-function buildMediaUrl(array $overrides = []): string {
-    $current = $_GET;
-    unset($current['_csrf_token'], $current['delete_id']);
-    $merged = array_merge($current, $overrides);
-    $cleaned = array_filter($merged, function($v) { return $v !== '' && $v !== null && $v !== 0; });
-    return '/admin/media.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
+if (!function_exists('buildMediaUrl')) {
+    function buildMediaUrl(array $overrides = []): string {
+        $current = $_GET;
+        unset($current['_csrf_token'], $current['delete_id']);
+        $merged = array_merge($current, $overrides);
+        $cleaned = array_filter($merged, function($v) { return $v !== '' && $v !== null && $v !== 0; });
+        return '/admin/media.php' . (!empty($cleaned) ? '?' . http_build_query($cleaned) : '');
+    }
 }
 $pageTitle = 'Biblioteca de Mídias';
 $activePage = 'media';
