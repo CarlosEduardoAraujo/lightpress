@@ -8,6 +8,7 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
+use LightPress\Core\BlockCompiler;
 use LightPress\Core\Database;
 use LightPress\Core\ImageProcessor;
 use LightPress\Core\PostService;
@@ -86,7 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_revision_id']
                     throw new RuntimeException("Revisão não encontrada.", 404);
                 }
 
+                // AUD-SEC-04: Defesa em profundidade - re-sanitizar HTML histórico antes de restaurar
+                $rev['content_html'] = BlockCompiler::sanitizeHtml((string)($rev['content_html'] ?? ''));
+
                 $payload = json_decode($rev['payload_json'], true) ?? [];
+                if (isset($payload['content_html']) && is_string($payload['content_html'])) {
+                    $payload['content_html'] = BlockCompiler::sanitizeHtml($payload['content_html']);
+                }
                 $canPublish = Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST);
 
                 if (!$canPublish) {

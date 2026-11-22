@@ -30,7 +30,7 @@ $copyright = (string)ThemeManager::option('footer_copyright_company', $siteName 
                             <div>✉️ E-mail: <strong><?= Security::e($email) ?></strong></div>
                         <?php endif; ?>
                         <?php if (!empty($whatsapp)): ?>
-                            <div>💬 WhatsApp: <a href="<?= Security::e($whatsapp) ?>" target="_blank" style="color: var(--corp-primary); font-weight: 700;">Atendimento Direto</a></div>
+                            <div>💬 WhatsApp: <a href="<?= Security::e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" style="color: var(--corp-primary); font-weight: 700;">Atendimento Direto</a></div>
                         <?php endif; ?>
                     </div>
                 </div>

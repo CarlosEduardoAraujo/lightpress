@@ -65,7 +65,7 @@ $phone = (string)ThemeManager::option('contact_phone', '');
 
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                         <?php if (!empty($whatsapp)): ?>
-                            <a href="<?= Security::e($whatsapp) ?>" target="_blank" class="corp-btn corp-btn-primary" style="width: 100%; box-sizing: border-box;">
+                            <a href="<?= Security::e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" class="corp-btn corp-btn-primary" style="width: 100%; box-sizing: border-box;">
                                 💬 Conversar no WhatsApp
                             </a>
                         <?php endif; ?>

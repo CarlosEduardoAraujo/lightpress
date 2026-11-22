@@ -570,6 +570,83 @@ assertTest("SEC-08: themes/empresa/page.php aplica BlockCompiler::sanitizeHtml",
 $empresaHome = file_get_contents(dirname(__DIR__) . '/themes/empresa/home.php');
 assertTest("SEC-08: themes/empresa/home.php aplica BlockCompiler::sanitizeHtml", str_contains($empresaHome, 'BlockCompiler::sanitizeHtml'));
 
+// AUD-SEC-04: Blindagem contra reverse tabnabbing e re-sanitização em restauração de revisões
+$empresaPost = file_get_contents(dirname(__DIR__) . '/themes/empresa/post.php');
+assertTest("AUD-SEC-04: themes/empresa/post.php link target=_blank possui rel noopener noreferrer", str_contains($empresaPost, 'target="_blank" rel="noopener noreferrer"'));
+
+$empresaFooter = file_get_contents(dirname(__DIR__) . '/themes/empresa/footer.php');
+assertTest("AUD-SEC-04: themes/empresa/footer.php link target=_blank possui rel noopener noreferrer", str_contains($empresaFooter, 'target="_blank" rel="noopener noreferrer"'));
+
+$revisionsPhp = file_get_contents(dirname(__DIR__) . '/public/admin/revisions.php');
+assertTest("AUD-SEC-04: revisions.php importa BlockCompiler", str_contains($revisionsPhp, 'use LightPress\Core\BlockCompiler;'));
+assertTest("AUD-SEC-04: revisions.php aplica BlockCompiler::sanitizeHtml antes de restaurar revisão", str_contains($revisionsPhp, 'BlockCompiler::sanitizeHtml((string)($rev[\'content_html\'] ?? \'\'))'));
+
+// -------------------------------------------------------------
+// [13] Testando AUD-SEC-03: Eliminação de Cache Negativo e Rate Limiting em APIs
+// -------------------------------------------------------------
+echo "\n[13] Testando AUD-SEC-03: Eliminação de Cache Negativo e Rate Limiting em APIs\n";
+
+$indexPhp = file_get_contents(dirname(__DIR__) . '/public/index.php');
+assertTest("AUD-SEC-03: public/index.php não utiliza chaves individuais category:{\$categorySlug}", !str_contains($indexPhp, 'category:{$categorySlug}'));
+assertTest("AUD-SEC-03: public/index.php não utiliza chaves individuais page_slug:{\$slug}", !str_contains($indexPhp, 'page_slug:{$slug}'));
+assertTest("AUD-SEC-03: public/index.php utiliza mapa consolidado all_active_categories", str_contains($indexPhp, 'all_active_categories'));
+assertTest("AUD-SEC-03: public/index.php utiliza mapa consolidado all_published_page_slugs", str_contains($indexPhp, 'all_published_page_slugs'));
+
+// Validação em runtime dos mapas compactos
+$categoriesMap = \LightPress\Core\ObjectCache::remember('all_active_categories', 86400, function (): array {
+    $rows = \LightPress\Core\Database::fetchAll("SELECT * FROM categories WHERE is_active = 1");
+    $map = [];
+    foreach ($rows as $row) {
+        $map[$row['slug']] = $row;
+    }
+    return $map;
+}, 'categories');
+assertTest("AUD-SEC-03: all_active_categories retorna array indexado por slug", is_array($categoriesMap));
+assertTest("AUD-SEC-03: all_active_categories rejeita slug inexistente com null em RAM", ($categoriesMap['categoria-fantasma-404'] ?? null) === null);
+
+$publishedPageSlugs = \LightPress\Core\ObjectCache::remember('all_published_page_slugs', 86400, function (): array {
+    $rows = \LightPress\Core\Database::fetchAll("SELECT id, slug FROM pages WHERE status = 'published'");
+    $map = [];
+    foreach ($rows as $row) {
+        $map[$row['slug']] = (int)$row['id'];
+    }
+    return $map;
+}, 'pages');
+assertTest("AUD-SEC-03: all_published_page_slugs retorna mapa de slugs publicados", is_array($publishedPageSlugs));
+assertTest("AUD-SEC-03: all_published_page_slugs não contém slug 404", !isset($publishedPageSlugs['pagina-fantasma-404']));
+
+// Testando public/api/search.php
+$searchApi = file_get_contents(dirname(__DIR__) . '/public/api/search.php');
+assertTest("AUD-SEC-03: search.php utiliza índice FULLTEXT em BOOLEAN MODE", str_contains($searchApi, 'MATCH(title, summary, tags) AGAINST(? IN BOOLEAN MODE)'));
+assertTest("AUD-SEC-03: search.php utiliza ObjectCache::remember para resultados", str_contains($searchApi, 'ObjectCache::remember'));
+assertTest("AUD-SEC-03: search.php possui fallback seguro via LIKE", str_contains($searchApi, 'title LIKE ? OR summary LIKE ?'));
+
+// Testando public/api/categories.php
+$catApi = file_get_contents(dirname(__DIR__) . '/public/api/categories.php');
+assertTest("AUD-SEC-03: categories.php utiliza ObjectCache::remember com chave api_categories_list", str_contains($catApi, "ObjectCache::remember('api_categories_list'"));
+
+// Testando Nginx speedracing-tunnel.conf
+$speedracingConf = file_get_contents(dirname(__DIR__) . '/nginx/speedracing-tunnel.conf');
+assertTest("AUD-SEC-03: speedracing-tunnel.conf possui fastcgi_cache_valid 404 1m", str_contains($speedracingConf, 'fastcgi_cache_valid 404 1m;'));
+assertTest("AUD-SEC-03: speedracing-tunnel.conf define limit_req_zone speedracing_api", str_contains($speedracingConf, 'zone=speedracing_api:10m rate=60r/m;'));
+assertTest("AUD-SEC-03: speedracing-tunnel.conf possui location ^~ /api/ com limit_req", str_contains($speedracingConf, 'location ^~ /api/') && str_contains($speedracingConf, 'limit_req zone=speedracing_api burst=20 nodelay;'));
+
+// Testando Nginx lightpress.conf
+$lpConf = file_get_contents(dirname(__DIR__) . '/nginx/lightpress.conf');
+assertTest("AUD-SEC-03: lightpress.conf define limit_req_zone lp_api", str_contains($lpConf, 'zone=lp_api:10m rate=60r/m;'));
+assertTest("AUD-SEC-03: lightpress.conf possui location ^~ /api/ com limit_req", str_contains($lpConf, 'location ^~ /api/') && str_contains($lpConf, 'limit_req zone=lp_api burst=20 nodelay;'));
+
+// Testando invalidações de cache no admin
+$adminCatPhp = file_get_contents(dirname(__DIR__) . '/public/admin/categories.php');
+assertTest("AUD-SEC-03: admin/categories.php invalida all_active_categories", str_contains($adminCatPhp, "ObjectCache::delete('all_active_categories', 'categories')"));
+assertTest("AUD-SEC-03: admin/categories.php invalida api_categories_list", str_contains($adminCatPhp, "ObjectCache::delete('api_categories_list', 'categories')"));
+
+$adminPageEditPhp = file_get_contents(dirname(__DIR__) . '/public/admin/page-edit.php');
+assertTest("AUD-SEC-03: admin/page-edit.php invalida all_published_page_slugs", str_contains($adminPageEditPhp, "ObjectCache::delete('all_published_page_slugs', 'pages')"));
+
+$adminPagesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/pages.php');
+assertTest("AUD-SEC-03: admin/pages.php invalida all_published_page_slugs", str_contains($adminPagesPhp, "ObjectCache::delete('all_published_page_slugs', 'pages')"));
+
 // -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------

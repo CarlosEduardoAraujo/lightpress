@@ -79,3 +79,49 @@ checkRevisionSafety('Historical target restored while newer draft is superseded'
     Database::fetchValue('SELECT status FROM post_revisions WHERE id=?', [$initial]) === 'applied'
     && Database::fetchValue('SELECT status FROM post_revisions WHERE id=?', [$active]) === 'superseded'
     && (int)Database::fetchValue('SELECT version FROM posts WHERE id=?', [$id]) === 3);
+
+// Test AUD-SEC-04: Historical revision restoration with un-sanitized HTML payload
+$maliciousHtml = "<script>alert('xss')</script><p>Artigo restaurado</p><img src=\"javascript:alert(1)\" onerror=\"alert(2)\">";
+$sanitizedHtml = \LightPress\Core\BlockCompiler::sanitizeHtml($maliciousHtml);
+checkRevisionSafety('AUD-SEC-04: BlockCompiler::sanitizeHtml strips <script>, onerror and javascript: schemes',
+    !str_contains($sanitizedHtml, '<script>')
+    && !str_contains($sanitizedHtml, 'javascript:')
+    && !str_contains($sanitizedHtml, 'onerror')
+    && str_contains($sanitizedHtml, '<p>Artigo restaurado</p>'));
+
+// Test author restoration flow: when an author restores a draft revision containing raw HTML
+Database::query("INSERT INTO users(name,username,email,password_hash,role,is_active) VALUES('Author','author','author@example.invalid','author','author',1)");
+$authorId = (int)Database::lastInsertId();
+
+$dataAuthor = ['title' => 'Author post', 'slug' => 'author-post', 'content_html' => '<p>Original</p>', 'content_json' => '[]', 'published_at' => null, 'is_featured' => 0];
+$initialRevAuthor = 0;
+$authorPostId = $service->createPost($dataAuthor, $authorId, $initialRevAuthor);
+
+// Simulate raw/legacy un-sanitized historical revision in post_revisions
+Database::query("INSERT INTO post_revisions(post_id, editor_id, base_version, status, payload_json, content_html) VALUES (?, ?, 1, 'draft', ?, ?)", [
+    $authorPostId,
+    $authorId,
+    json_encode(['title' => 'Author post', 'slug' => 'author-post', 'content_html' => $maliciousHtml], JSON_THROW_ON_ERROR),
+    $maliciousHtml
+]);
+$legacyRevId = (int)Database::lastInsertId();
+
+// Execute author restoration logic with AUD-SEC-04 defensive re-sanitization
+$revToRestore = Database::fetchOne("SELECT * FROM post_revisions WHERE id = ? AND post_id = ? LIMIT 1", [$legacyRevId, $authorPostId]);
+$revToRestore['content_html'] = \LightPress\Core\BlockCompiler::sanitizeHtml((string)($revToRestore['content_html'] ?? ''));
+$payloadToRestore = json_decode($revToRestore['payload_json'], true) ?? [];
+if (isset($payloadToRestore['content_html']) && is_string($payloadToRestore['content_html'])) {
+    $payloadToRestore['content_html'] = \LightPress\Core\BlockCompiler::sanitizeHtml($payloadToRestore['content_html']);
+}
+
+// Updating draft as an author does in revisions.php
+Database::query(
+    "UPDATE posts SET content_html = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [$revToRestore['content_html'], $authorPostId]
+);
+
+$restoredPostHtml = Database::fetchValue("SELECT content_html FROM posts WHERE id = ?", [$authorPostId]);
+checkRevisionSafety('AUD-SEC-04: Author restoration persists sanitized HTML in posts table',
+    !str_contains((string)$restoredPostHtml, '<script>')
+    && !str_contains((string)$restoredPostHtml, 'onerror')
+    && str_contains((string)$restoredPostHtml, '<p>Artigo restaurado</p>'));
