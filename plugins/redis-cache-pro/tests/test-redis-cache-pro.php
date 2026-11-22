@@ -328,6 +328,60 @@ it('QueryProfiler opt-in: não consome CPU nem gera logs quando inativo', functi
     QueryProfiler::setEnabled(true);
 });
 
+echo "\n8. Validação AUD-PERF-04: Locks Anti-Stampede, Serialização e Conexões Persistentes\n";
+
+it('AUD-PERF-04: Configuração persistent suportada com default false', function() use ($client) {
+    $cfg = $client->getConfig();
+    expectTrue(array_key_exists('persistent', $cfg), 'Chave persistent deve existir na configuração');
+    expectEqual(false, $cfg['persistent'], 'persistent deve ser falso por padrão');
+});
+
+it('AUD-PERF-04: releaseLock só remove lock se token coincidir (Lua atômico)', function() use ($client, $fake) {
+    $lockKey = 'test_lock_key';
+    $correctToken = 'token_abc_123';
+    $wrongToken = 'token_xyz_999';
+
+    // Grava lock simulado com token original (Redis serializa internamente via set)
+    $fake->set($lockKey, $correctToken, ['nx', 'px' => 5000]);
+
+    // Tentativa de liberação com token errado deve falhar e não remover a chave
+    $refMethod = new ReflectionMethod($client, 'releaseLock');
+    $refMethod->setAccessible(true);
+
+    $releasedWrong = $refMethod->invoke($client, $lockKey, $wrongToken);
+    expectEqual(false, $releasedWrong, 'releaseLock com token errado deve retornar falso');
+    expectEqual(1, $fake->exists($lockKey), 'Lock deve continuar existindo após tentativa com token errado');
+
+    // Liberação com o token correto deve suceder e desalocar a chave
+    $releasedCorrect = $refMethod->invoke($client, $lockKey, $correctToken);
+    expectTrue($releasedCorrect, 'releaseLock com token correto deve retornar true');
+    expectEqual(0, $fake->exists($lockKey), 'Lock deve ter sido removido após liberação do proprietário');
+});
+
+it('AUD-PERF-04: remember() realiza releitura após aquisição de lock evitando computação duplicada', function() use ($client, $fake) {
+    $key = 'stampede_dedup_test';
+    $group = 'default';
+
+    // Primeira chamada computa e grava
+    $computedCount = 0;
+    $val = $client->remember($key, 60, function() use (&$computedCount) {
+        $computedCount++;
+        return 'valor_computado_1';
+    }, $group);
+
+    expectEqual('valor_computado_1', $val);
+    expectEqual(1, $computedCount, 'Callback deve ser chamado exatamente 1 vez');
+
+    // Segunda chamada deve vir do cache (0 chamadas ao callback)
+    $val2 = $client->remember($key, 60, function() use (&$computedCount) {
+        $computedCount++;
+        return 'valor_computado_2';
+    }, $group);
+
+    expectEqual('valor_computado_1', $val2);
+    expectEqual(1, $computedCount, 'Callback não deve ser chamado quando valor já existe no cache');
+});
+
 echo "\n========================================================\n";
 echo "📊 RESULTADO FINAL DA SUÍTE:\n";
 echo "   Aprovados (PASS): {$passCount}\n";

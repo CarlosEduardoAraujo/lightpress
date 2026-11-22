@@ -22,10 +22,16 @@ require __DIR__ . '/header.php';
             </div>
         <?php else: ?>
             <div class="corp-grid-3">
-                <?php foreach ($posts as $p): ?>
+                <?php 
+                ImageProcessor::preloadDescriptions(array_filter(array_column($posts, 'featured_image')));
+                foreach ($posts as $idx => $p): 
+                ?>
                     <a href="/<?= Security::e($p['slug']) ?>/" class="corp-blog-card">
-                        <?php if (!empty($p['featured_image'])): ?>
-                            <img src="<?= Security::e(ImageProcessor::toAvifUrl($p['featured_image'])) ?>" class="corp-blog-thumb" alt="<?= Security::e($p['title']) ?>" loading="lazy">
+                        <?php if (!empty($p['featured_image'])): 
+                            $cardImg = ImageProcessor::getResponsiveCardData($p['featured_image'], $p['title'], !empty($p['featured_media_id']) ? (string)$p['featured_media_id'] : null);
+                            $loadingAttr = ($idx === 0) ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
+                        ?>
+                            <img src="<?= Security::e($cardImg['src']) ?>"<?= !empty($cardImg['srcset']) ? ' srcset="' . Security::e($cardImg['srcset']) . '" sizes="' . Security::e($cardImg['sizes']) . '"' : '' ?> class="corp-blog-thumb" alt="<?= Security::e($cardImg['alt']) ?>" title="<?= Security::e($cardImg['title']) ?>" <?= $loadingAttr ?>>
                         <?php else: ?>
                             <div class="corp-blog-thumb" style="display: flex; align-items: center; justify-content: center; font-size: 2rem;">📄</div>
                         <?php endif; ?>

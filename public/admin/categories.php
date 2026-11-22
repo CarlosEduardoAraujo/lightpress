@@ -76,16 +76,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             // Expurga cache da Home e das categorias antiga e nova
                             ObjectCache::delete('all_active_categories', 'categories');
                             ObjectCache::delete('api_categories_list', 'categories');
+                            ObjectCache::delete('sitemap_main_categories', 'categories');
                             ObjectCache::flushGroup('categories');
                             if ($oldSlug !== $slug) {
                                 ObjectCache::flushGroup('post_items');
                                 ObjectCache::flushGroup('posts');
                             }
-                            $cacheMgr->purgeUrls([
+                            $purgeUrls = [
                                 '/',
+                                '/sitemap.xml',
+                                '/sitemap-main.xml',
                                 '/categoria/' . $oldSlug . '/',
-                                '/categoria/' . $slug . '/'
-                            ]);
+                                '/categoria/' . $oldSlug . '/feed.xml',
+                                '/categoria/' . $oldSlug . '/feed',
+                                '/categoria/' . $oldSlug . '/feed/',
+                                '/categoria/' . $slug . '/',
+                                '/categoria/' . $slug . '/feed.xml',
+                                '/categoria/' . $slug . '/feed',
+                                '/categoria/' . $slug . '/feed/',
+                            ];
+                            $jobId = $cacheMgr->recordPurgeJob(null, 'category_update', $purgeUrls);
+                            $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+                            if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                                $cacheMgr->completePurgeJob($jobId);
+                            }
 
                             $message = "Categoria '{$name}' atualizada com sucesso!";
                             $editCategory = null;
@@ -107,8 +121,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                         ObjectCache::delete('all_active_categories', 'categories');
                         ObjectCache::delete('api_categories_list', 'categories');
+                        ObjectCache::delete('sitemap_main_categories', 'categories');
                         ObjectCache::flushGroup('categories');
-                        $cacheMgr->purgeUrls(['/']);
+                        $purgeUrls = ['/', '/sitemap.xml', '/sitemap-main.xml'];
+                        $jobId = $cacheMgr->recordPurgeJob(null, 'category_create', $purgeUrls);
+                        $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+                        if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                            $cacheMgr->completePurgeJob($jobId);
+                        }
                         $message = "Categoria '{$name}' cadastrada com sucesso!";
                     } catch (\Throwable $e) {
                         $error = "Erro ao cadastrar categoria.";
@@ -128,9 +148,23 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
         Database::query("UPDATE categories SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", [$toggleCatId]);
         ObjectCache::delete('all_active_categories', 'categories');
         ObjectCache::delete('api_categories_list', 'categories');
+        ObjectCache::delete('sitemap_main_categories', 'categories');
         ObjectCache::flushGroup('categories');
         ObjectCache::flushGroup('posts');
-        $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/']);
+        $purgeUrls = [
+            '/',
+            '/sitemap.xml',
+            '/sitemap-main.xml',
+            '/categoria/' . $cat['slug'] . '/',
+            '/categoria/' . $cat['slug'] . '/feed.xml',
+            '/categoria/' . $cat['slug'] . '/feed',
+            '/categoria/' . $cat['slug'] . '/feed/',
+        ];
+        $jobId = $cacheMgr->recordPurgeJob(null, 'category_toggle', $purgeUrls);
+        $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+        if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+            $cacheMgr->completePurgeJob($jobId);
+        }
     }
     header("Location: /admin/categories.php");
     exit;
@@ -151,10 +185,28 @@ if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
         
         ObjectCache::delete('all_active_categories', 'categories');
         ObjectCache::delete('api_categories_list', 'categories');
+        ObjectCache::delete('sitemap_main_categories', 'categories');
         ObjectCache::flushGroup('categories');
         ObjectCache::flushGroup('post_items');
         ObjectCache::flushGroup('posts');
-        $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/', '/categoria/geral/']);
+        $purgeUrls = [
+            '/',
+            '/sitemap.xml',
+            '/sitemap-main.xml',
+            '/categoria/' . $cat['slug'] . '/',
+            '/categoria/' . $cat['slug'] . '/feed.xml',
+            '/categoria/' . $cat['slug'] . '/feed',
+            '/categoria/' . $cat['slug'] . '/feed/',
+            '/categoria/geral/',
+            '/categoria/geral/feed.xml',
+            '/categoria/geral/feed',
+            '/categoria/geral/feed/',
+        ];
+        $jobId = $cacheMgr->recordPurgeJob(null, 'category_delete', $purgeUrls);
+        $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+        if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+            $cacheMgr->completePurgeJob($jobId);
+        }
         header("Location: /admin/categories.php");
         exit;
     }

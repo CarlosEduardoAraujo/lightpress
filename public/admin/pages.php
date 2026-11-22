@@ -37,10 +37,16 @@ if ($isDelPage) {
             Database::query("DELETE FROM pages WHERE id = ?", [$deleteId]);
             ObjectCache::delete("page_slug:{$target['slug']}", 'pages');
             ObjectCache::delete('all_published_page_slugs', 'pages');
+            ObjectCache::delete('sitemap_main_pages', 'pages');
             ObjectCache::flushGroup('pages');
             try {
                 $cacheMgr = new CacheManager($config);
-                $cacheMgr->purgeUrls(["/{$target['slug']}/", "/sitemap.xml"]);
+                $purgeUrls = ["/{$target['slug']}/", "/sitemap.xml", "/sitemap-main.xml"];
+                $jobId = $cacheMgr->recordPurgeJob($deleteId, 'page_delete', $purgeUrls);
+                $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+                if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                    $cacheMgr->completePurgeJob($jobId);
+                }
             } catch (\Throwable) {}
             header("Location: /admin/pages.php?deleted=1");
             exit;

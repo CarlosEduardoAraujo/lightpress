@@ -171,10 +171,12 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $perPage = 12;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
-        [$nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+            [$nowUtc]
+        );
+    }, 'posts');
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
 
     if ($page > $totalPages) {
@@ -212,7 +214,7 @@ $router->get('/blog/', function () use ($config, $router): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
 
-    $totalPosts = (int)ObjectCache::remember('blog_total_posts_count', 300, function () use ($nowUtc): int {
+    $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
         return (int)Database::fetchValue(
             "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
             [$nowUtc]
@@ -248,10 +250,12 @@ $router->get('/blog/page/{page}/', function (array $params) use ($config, $route
     $perPage = 12;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
-        [$nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+            [$nowUtc]
+        );
+    }, 'posts');
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
 
     if ($page > $totalPages) {
@@ -814,14 +818,16 @@ $generalFeedHandler = function () use ($config, $renderRssFeed): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $posts = Database::fetchAll(
-        "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status = 'published' AND p.published_at <= ? 
-         ORDER BY p.published_at DESC LIMIT 50",
-        [$nowUtc]
-    );
+    $posts = ObjectCache::remember('feed_rss_general_posts', 300, function () use ($nowUtc): array {
+        return Database::fetchAll(
+            "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status = 'published' AND p.published_at <= ? 
+             ORDER BY p.published_at DESC LIMIT 50",
+            [$nowUtc]
+        );
+    }, 'posts');
 
     $desc = !empty($config['app']['description']) ? $config['app']['description'] : 'Feed de notícias do ' . $config['app']['name'];
     $renderRssFeed($config['app']['name'], "{$canonicalOrigin}/", "{$canonicalOrigin}/feed.xml", $desc, $posts);
@@ -862,14 +868,16 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $posts = Database::fetchAll(
-        "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ? 
-         ORDER BY p.published_at DESC LIMIT 50",
-        [$slug, $nowUtc]
-    );
+    $posts = ObjectCache::remember('feed_rss_cat_' . md5($slug), 300, function () use ($slug, $nowUtc): array {
+        return Database::fetchAll(
+            "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ? 
+             ORDER BY p.published_at DESC LIMIT 50",
+            [$slug, $nowUtc]
+        );
+    }, 'posts');
 
     $title = "{$category['name']} - {$config['app']['name']}";
     $channelLink = "{$canonicalOrigin}/categoria/{$category['slug']}/";
@@ -893,15 +901,17 @@ $router->get('/sitemap-news.xml', function () use ($config): void {
     $twoDaysAgoUtc = gmdate('Y-m-d H:i:s', time() - 172800); // 48 horas obrigatórias pelo Googlebot-News
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $posts = Database::fetchAll(
-        "SELECT slug, title, featured_image, published_at 
-         FROM posts 
-         WHERE status = 'published' 
-           AND published_at <= ? 
-           AND published_at >= ? 
-         ORDER BY published_at DESC LIMIT 1000",
-        [$nowUtc, $twoDaysAgoUtc]
-    );
+    $posts = ObjectCache::remember('sitemap_news_posts', 300, function () use ($nowUtc, $twoDaysAgoUtc): array {
+        return Database::fetchAll(
+            "SELECT slug, title, featured_image, published_at 
+             FROM posts 
+             WHERE status = 'published' 
+               AND published_at <= ? 
+               AND published_at >= ? 
+             ORDER BY published_at DESC LIMIT 1000",
+            [$nowUtc, $twoDaysAgoUtc]
+        );
+    }, 'posts');
 
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>
@@ -947,15 +957,21 @@ $router->get('/sitemap.xml', function () use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $countRow = Database::fetchOne(
-        "SELECT COUNT(*) AS total, MAX(updated_at) AS latest_mod 
-         FROM posts 
-         WHERE status = 'published' AND published_at <= ?",
-        [$nowUtc]
-    );
+    $sitemapIndexData = ObjectCache::remember('sitemap_index_stats', 300, function () use ($nowUtc): array {
+        $countRow = Database::fetchOne(
+            "SELECT COUNT(*) AS total, MAX(updated_at) AS latest_mod 
+             FROM posts 
+             WHERE status = 'published' AND published_at <= ?",
+            [$nowUtc]
+        );
+        return [
+            'total' => (int)($countRow['total'] ?? 0),
+            'latest_mod' => $countRow['latest_mod'] ?? gmdate('Y-m-d H:i:s'),
+        ];
+    }, 'posts');
 
-    $totalPosts = (int)($countRow['total'] ?? 0);
-    $latestMod = $countRow['latest_mod'] ?? gmdate('Y-m-d H:i:s');
+    $totalPosts = (int)($sitemapIndexData['total'] ?? 0);
+    $latestMod = $sitemapIndexData['latest_mod'] ?? gmdate('Y-m-d H:i:s');
     $latestIso = date('c', strtotime($latestMod));
 
     $postsPerPage = 5000;
@@ -993,8 +1009,13 @@ $router->get('/sitemap-main.xml', function () use ($config): void {
     }
     $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-    $categories = Database::fetchAll("SELECT slug FROM categories WHERE is_active = 1 ORDER BY name ASC");
-    $pages = Database::fetchAll("SELECT slug, updated_at FROM pages WHERE status = 'published' ORDER BY id ASC");
+    $categories = ObjectCache::remember('sitemap_main_categories', 300, function (): array {
+        return Database::fetchAll("SELECT slug FROM categories WHERE is_active = 1 ORDER BY name ASC");
+    }, 'categories');
+
+    $pages = ObjectCache::remember('sitemap_main_pages', 300, function (): array {
+        return Database::fetchAll("SELECT slug, updated_at FROM pages WHERE status = 'published' ORDER BY id ASC");
+    }, 'pages');
 
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>
@@ -1040,10 +1061,12 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
     $part = min(10000, max(1, (int)($params['part'] ?? 1)));
     $limit = 5000;
 
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
-        [$nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
+            [$nowUtc]
+        );
+    }, 'posts');
     $totalParts = max(1, (int)ceil($totalPosts / $limit));
 
     if ($part > $totalParts) {
@@ -1053,14 +1076,16 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
 
     $offset = ($part - 1) * $limit;
 
-    $posts = Database::fetchAll(
-        "SELECT slug, updated_at 
-         FROM posts 
-         WHERE status = 'published' AND published_at <= ? 
-         ORDER BY published_at DESC 
-         LIMIT ? OFFSET ?",
-        [$nowUtc, $limit, $offset]
-    );
+    $posts = ObjectCache::remember('sitemap_posts_part_' . $part, 300, function () use ($nowUtc, $limit, $offset): array {
+        return Database::fetchAll(
+            "SELECT slug, updated_at 
+             FROM posts 
+             WHERE status = 'published' AND published_at <= ? 
+             ORDER BY published_at DESC, id DESC 
+             LIMIT ? OFFSET ?",
+            [$nowUtc, $limit, $offset]
+        );
+    }, 'posts');
 
     echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     ?>

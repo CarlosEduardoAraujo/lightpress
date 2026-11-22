@@ -35,8 +35,12 @@ class Database
         }
 
         if (empty(self::$config)) {
-            $globalConfig = require dirname(__DIR__) . '/config.php';
-            self::$config = $globalConfig['database'] ?? [];
+            if (!empty($GLOBALS['config']['database']) && is_array($GLOBALS['config']['database'])) {
+                self::$config = $GLOBALS['config']['database'];
+            } else {
+                $globalConfig = file_exists(dirname(__DIR__) . '/config.php') ? require dirname(__DIR__) . '/config.php' : [];
+                self::$config = $globalConfig['database'] ?? [];
+            }
         }
 
         $driver = self::$config['driver'] ?? 'mysql';
@@ -131,8 +135,12 @@ class Database
     public static function getDriver(): string
     {
         if (empty(self::$config)) {
-            $globalConfig = require dirname(__DIR__) . '/config.php';
-            self::$config = $globalConfig['database'] ?? [];
+            if (!empty($GLOBALS['config']['database']) && is_array($GLOBALS['config']['database'])) {
+                self::$config = $GLOBALS['config']['database'];
+            } else {
+                $globalConfig = file_exists(dirname(__DIR__) . '/config.php') ? require dirname(__DIR__) . '/config.php' : [];
+                self::$config = $globalConfig['database'] ?? [];
+            }
         }
         return self::$config['driver'] ?? 'mysql';
     }

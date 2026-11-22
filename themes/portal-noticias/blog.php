@@ -51,11 +51,17 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
         </div>
     <?php else: ?>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-lg">
-            <?php foreach ($posts as $p): ?>
+            <?php 
+            ImageProcessor::preloadDescriptions(array_filter(array_column($posts, 'featured_image')));
+            foreach ($posts as $idx => $p): 
+            ?>
                 <article class="flex flex-col bg-pure-white dark:bg-carbon-surface rounded-xl overflow-hidden shadow-xs border border-subtle-border dark:border-[#2a303c] hover:shadow-md transition-shadow group">
                     <a href="/<?= Security::e($p['slug']) ?>/" class="block overflow-hidden relative aspect-video bg-surface-container-high dark:bg-[#1a202c]">
-                        <?php if (!empty($p['featured_image'])): ?>
-                            <img src="<?= Security::e(ImageProcessor::toAvifUrl($p['featured_image'])) ?>" alt="<?= Security::e($p['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+                        <?php if (!empty($p['featured_image'])): 
+                            $cardImg = ImageProcessor::getResponsiveCardData($p['featured_image'], $p['title'], !empty($p['featured_media_id']) ? (string)$p['featured_media_id'] : null);
+                            $loadingAttr = ($idx === 0) ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
+                        ?>
+                            <img src="<?= Security::e($cardImg['src']) ?>"<?= !empty($cardImg['srcset']) ? ' srcset="' . Security::e($cardImg['srcset']) . '" sizes="' . Security::e($cardImg['sizes']) . '"' : '' ?> alt="<?= Security::e($cardImg['alt']) ?>" title="<?= Security::e($cardImg['title']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" <?= $loadingAttr ?>>
                         <?php else: ?>
                             <div class="w-full h-full flex items-center justify-center text-secondary dark:text-secondary-fixed-dim">
                                 <?= Icon::svg('article', 'w-10 h-10', 40) ?>

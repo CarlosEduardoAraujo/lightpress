@@ -7,6 +7,45 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Feeds, Sitemaps, Miniaturas Responsivas e Resiliência de Purga (AUD-PERF-04) — 2026-11-22
+
+- **ObjectCache em Feeds RSS, Sitemaps XML e Paginação (`public/index.php` — AUD-PERF-04):**
+  - **Feeds RSS Cacheados:** Implementado cache de 300 segundos via `ObjectCache::remember(..., 300, ..., 'posts')` em `/feed.xml`, `/feed`, `/categoria/{slug}/feed.xml` e `/categoria/{slug}/feed`, eliminando recomputações de 50 artigos e parsing de `content_html` em cache miss concorrente de leitores RSS e bots.
+  - **Sitemaps XML por Domínio:** Cache segregado em `/sitemap.xml` para contagem de artigos (grupo `'posts'`), categorias ativas (grupo `'categories'`) e páginas institucionais (grupo `'pages'`). Rotas `/sitemap-main.xml` e `/sitemap-news.xml` devidamente cacheadas por 300s.
+  - **Partições de Sitemap com Desempate Estável:** Em `/sitemap-posts-{part}.xml`, aplicação de cache por partição (TTL 300s, grupo `'posts'`) e ordenação determinística `ORDER BY published_at DESC, id DESC`, assegurando fronteiras estáveis entre páginas.
+  - **Eliminação de COUNT(*) Repetido:** Rotas `/page/{page}/` e `/blog/page/{page}/` agora reaproveitam a contagem consolidada em RAM sob a chave `home_total_posts_count` (grupo `'posts'`, TTL 300s).
+
+- **Miniaturas Responsivas com Descritores Únicos de Largura (`core/ImageProcessor.php` — AUD-PERF-04):**
+  - **Novo Helper `getResponsiveCardData()`:** Reconstrução da renderização de imagens de destaque em cards (`themes/portal-noticias/blog.php`, `themes/empresa/home.php`, `blog.php`, `category.php`, `tag.php`, `search.php`), substituindo a entrega da imagem original (até 1920px) por variantes compactas com descritores reais.
+  - **Eliminação de Larguras Duplicadas no `srcset`:** As variantes são agrupadas exclusivamente pela dimensão física em pixels (`$variantsByWidth[$width]`), com desempate pela hierarquia de formatos modernos (`AVIF > WebP > JPEG`). Evita duplicidades (ex.: `photo-thumb.avif 300w, photo-thumb.webp 300w`) e cumpre estritamente a especificação HTML.
+  - **Resolução de Miniaturas Legadas no Manifesto:** `toThumbUrl()` e `getResponsiveCardData()` consultam variantes cadastradas no manifesto `variants_manifest` (ex.: recortes `300x180` ou `300x225`), garantindo entrega da miniatura no atributo `src` mesmo quando há apenas uma variante disponível.
+  - **Priorização de LCP Mobile:** Primeiro card do blog configurado com `loading="eager" fetchpriority="high"` e os subsequentes com `loading="lazy"`.
+
+- **Invalidação Abrangente e Purga Dinâmica Equilibrada (`core/PostService.php`, `public/admin/` — AUD-PERF-04):**
+  - **Helper Centralizado `PostService::buildPostPurgeUrls()`:** Constrói a lista unificada de URLs a purgar na publicação, agendamento ou alteração de matérias, cobrindo canônicos, feeds, sitemaps e listagens paginadas.
+  - **Limite Editorial de Purga de Paginação:** Enumeração dinâmica de páginas para Home, Blog, Categorias e Tags considerando o maior total entre o estado anterior e posterior (`max($prev, $new)`), limitada estrategicamente às primeiras 5 páginas (`PostService::MAX_PAGINATION_PURGE_PAGES = 5`). Cobre até 60 matérias recentes sem sobrecarregar chamadas à API da Cloudflare, deixando listagens profundas serem atualizadas pela expiração natural do TTL (300s).
+  - **Purga de Tags Removidas:** Inclusão de `tags` na query `SELECT ... FOR UPDATE` de `publishOrUpdate()`, permitindo detectar tags excluídas e purgar suas páginas `/tag/{slug}/`.
+  - **Fronteira Máxima de Sitemaps:** Ao despublicar ou arquivar artigos, a purga abrange todas as partições até `max($prevParts, $newParts)`.
+  - **Conclusão Imediata de Jobs de Purga:** Adição de `completePurgeJob($jobId)` em `public/admin/page-edit.php` (criação e edição), `public/admin/pages.php` (exclusão) e `public/admin/categories.php` (criação, edição, toggle e exclusão), impedindo re-execução desnecessária pelo cron.
+
+- **Atomicidade Estrita na Auto-Promoção de Agendados (`core/PostService.php` — AUD-PERF-04):**
+  - **Gravação Transacional de Purge Jobs:** Em `promoteScheduledPosts()`, o registro dos jobs via `$cacheManager->recordPurgeJob()` foi movido para o interior da transação `Database::transaction()`.
+  - **Garantia de Consistência:** Impede que matérias fiquem com status `published` sem job persistente em `cache_purge_jobs` caso o processo seja interrompido ou a purga de rede falhe. A execução física de `purgeUrls()` ocorre estritamente pós-commit.
+
+- **Resiliência e Correções no Redis Cache Pro (`plugins/redis-cache-pro/` — AUD-PERF-04):**
+  - **Prevenção de Desativação Acidental:** `settings.php` implementa campo `form_type` e whitelists segregadas para configurações de conexão e de alertas, preservando `enabled`, `stampede_protection` e `persistent`.
+  - **Paridade Binária no Lock Anti-Stampede:** `RedisClient` passa `$lockToken` bruto para `set()` (já empacotado pelo cliente) e aplica `packLockToken()` exclusivamente para o argumento `ARGV[1]` do script Lua em `releaseLock()`, viabilizando a liberação antecipada do lock pelo proprietário sob serializadores PHP/igbinary.
+  - **Suporte a Conexões Persistentes:** Adicionada diretiva `persistent` com fallback via `pconnect`.
+  - **Tempo Monotônico:** Substituição de `microtime(true)` por `hrtime(true)` no orçamento de espera de locks anti-stampede.
+
+- **Unificação de Estilos e Correção de Legendas CSS (`src/input.css`, temas — AUD-PERF-04):**
+  - **Escopo Estrito de Figcaption:** Alterada a regra `.article-body figcaption { display: none; }` para `.article-body-post figcaption { display: none; }`. Preserva a visibilidade de legendas em páginas institucionais (`.article-body-page`) enquanto evita duplicidade nos artigos.
+  - **Build Automatizado de CSS:** Sincronização via `npm run build:css` para os três destinos estáticos (`public/assets/style.css`, `public/assets/themes/portal-noticias/css/style.css` e `themes/portal-noticias/assets/css/style.css`).
+  - **Remoção de `<style>` Inline e Código Morto:** Higienização de `templates/post.php`, `templates/page.php`, `themes/portal-noticias/post.php`, `themes/portal-noticias/page.php` e `header.php`.
+
+- **Expansão da Suíte de Testes Automatizada (`bin/test.php`):**
+  - **Seções [15] e [16] em `bin/test.php`:** Adicionadas 77 novas asserções cobrindo caches de sitemaps/feeds, miniaturas responsivas sem duplicidade de larguras, paginação dinâmica com teto editorial de 5 páginas, atomicidade transacional de agendados, integridade do settings do Redis e escopo de figcaption. Suíte total ampliada para **296 testes 100% aprovados**.
+
 ### Otimização de Performance de Banco de Dados, I/O em Mídia e Segregação de Cache Redis (AUD-PERF-02, AUD-PERF-03) — 2026-11-22
 
 - **Eliminação de Varreduras MEDIUMTEXT e Otimização O(1) na Exclusão de Mídia (`public/admin/media.php` — AUD-PERF-02):**

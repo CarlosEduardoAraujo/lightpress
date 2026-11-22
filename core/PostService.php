@@ -19,6 +19,13 @@ class PostService
         'feed.xml', 'sitemap', 'sitemap.xml', 'sitemap-main.xml', 'page', 'categoria', 'tag', 'noticia', 'blog'
     ];
 
+    /**
+     * Limite máximo de páginas enumeradas por listagem na purga imediata de cache HTTP (FastCGI/Cloudflare).
+     * Cobre as primeiras 5 páginas (até 60 matérias por listagem); páginas posteriores
+     * têm seu cache atualizado pela expiração natural do TTL (300s).
+     */
+    public const MAX_PAGINATION_PURGE_PAGES = 5;
+
     private CacheManager $cacheManager;
 
     public function __construct(?CacheManager $cacheManager = null)
@@ -88,7 +95,10 @@ class PostService
 
             // Transação atômica com FOR UPDATE para bloquear e promover exclusivamente os artigos vencidos
             // evitando qualquer duplicidade em acessos concorrentes ou crons simultâneos
-            $duePosts = Database::transaction(function (\PDO $pdo) use ($nowUtc): array {
+            $cacheManager = new CacheManager();
+            $promotedJobs = [];
+
+            $duePosts = Database::transaction(function (\PDO $pdo) use ($nowUtc, $cacheManager, &$promotedJobs): array {
                 $posts = Database::fetchAll(
                     "SELECT id, slug, title, summary, category, tags, featured_image, content_html, published_at
                      FROM posts 
@@ -104,6 +114,20 @@ class PostService
                 $inClause = implode(',', array_map('intval', $ids));
                 Database::query("UPDATE posts SET status = 'published' WHERE id IN ({$inClause})");
 
+                $totalPublished = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP");
+                $maxParts = max(1, (int)ceil($totalPublished / 5000));
+
+                // Registra os jobs de purga de forma estritamente atômica dentro da mesma transação
+                foreach ($posts as $p) {
+                    $affectedUrls = self::buildPostPurgeUrls($p, null, $maxParts);
+                    $jobId = $cacheManager->recordPurgeJob((int)$p['id'], 'promote_scheduled', $affectedUrls);
+                    $promotedJobs[] = [
+                        'post' => $p,
+                        'jobId' => $jobId,
+                        'affectedUrls' => $affectedUrls,
+                    ];
+                }
+
                 return $posts;
             });
 
@@ -118,18 +142,17 @@ class PostService
             }
             ObjectCache::flushGroup('posts');
 
-            $cacheManager = new CacheManager();
-            foreach ($duePosts as $p) {
+            // Executa a purga física do cache estritamente após o commit da transação
+            foreach ($promotedJobs as $item) {
+                $p = $item['post'];
+                $jobId = $item['jobId'];
+                $affectedUrls = $item['affectedUrls'];
+
                 try {
-                    $cacheManager->purgeUrls([
-                        '/',
-                        '/blog/',
-                        "/{$p['slug']}/",
-                        "/categoria/{$p['category']}/",
-                        '/feed',
-                        '/feed.xml',
-                        '/sitemap.xml',
-                    ]);
+                    $purgeResults = $cacheManager->purgeUrls($affectedUrls);
+                    if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                        $cacheManager->completePurgeJob($jobId);
+                    }
                 } catch (\Throwable $e) {
                     error_log("[PostService Cache Purge Error] promoteScheduledPosts: " . $e->getMessage());
                 }
@@ -299,11 +322,17 @@ class PostService
         $resolvedSlug = '';
 
         $success = Database::transaction(function (\PDO $pdo) use ($postId, $data, $editorId, $knownVersion, $knownRevisionId, $appliedRevisionId, &$affectedUrls, &$isNowPublished, &$isFirstPublish, &$current, &$jobId, &$resolvedSlug): bool {
+            $prevPublishedCount = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP");
+
             // Bloqueio pessimista de linha com FOR UPDATE
             $current = Database::fetchOne(
-                "SELECT id, user_id, slug, category, status, is_featured, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
+                "SELECT id, user_id, slug, category, tags, status, is_featured, version, published_at FROM posts WHERE id = ?" . (Database::getDriver() === 'mysql' ? ' FOR UPDATE' : ''),
                 [$postId]
             );
+
+            $prevCatCount = (!empty($current) && !empty($current['category'])) 
+                ? (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= CURRENT_TIMESTAMP", [$current['category']]) 
+                : 0;
 
             if (!$current) {
                 throw new RuntimeException("Publicação não encontrada.", 404);
@@ -477,32 +506,30 @@ class PostService
             ImageProcessor::syncRefs($postId, $revId > 0 ? $revId : null, $contentHtml, $featuredImage);
 
             // Invalidação e registro de purga de cache (LP-09)
-            $affectedUrls = [
-                '/',
-                '/blog/',
-                "/{$slug}/",
-                "/{$current['slug']}/",
-                "/noticia/{$slug}/",
-                "/noticia/{$current['slug']}/",
-                "/categoria/{$category}/",
-                "/categoria/{$current['category']}/",
-                '/feed.xml',
-                '/feed',
-                '/sitemap.xml',
-                '/page/2/',
-                '/blog/page/2/',
-                "/categoria/{$category}/page/2/",
-            ];
+            $newPublishedCount = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP");
+            $newCatCount = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= CURRENT_TIMESTAMP", [$category]);
 
-            if (!empty($tags)) {
-                $tagItems = explode(',', (string)$tags);
-                foreach ($tagItems as $t) {
-                    $tSlug = Security::slugify(trim($t));
-                    if (!empty($tSlug)) {
-                        $affectedUrls[] = '/tag/' . $tSlug . '/';
-                    }
-                }
+            $maxHome = max($prevPublishedCount, $newPublishedCount);
+            $maxParts = max(1, (int)ceil($maxHome / 5000));
+            $maxCat = max($prevCatCount, $newCatCount);
+
+            $paginationTotals = [
+                'home' => $maxHome,
+                'categories' => [
+                    $category => $maxCat,
+                ],
+            ];
+            if (!empty($current['category']) && $current['category'] !== $category) {
+                $newPrevCatCount = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= CURRENT_TIMESTAMP", [$current['category']]);
+                $paginationTotals['categories'][$current['category']] = max($prevCatCount, $newPrevCatCount);
             }
+
+            $postDataForPurge = array_merge($current, $data, [
+                'slug' => $slug,
+                'category' => $category,
+                'tags' => $tags,
+            ]);
+            $affectedUrls = self::buildPostPurgeUrls($postDataForPurge, $current, $maxParts, $paginationTotals);
 
             // Registra job de purga atomicamente dentro da transação
             $jobId = $this->cacheManager->recordPurgeJob($postId, 'publish_update', $affectedUrls);
@@ -540,6 +567,181 @@ class PostService
         }
 
         return $success;
+    }
+
+    /**
+     * Conta de forma eficiente os artigos publicados associados a uma tag específica.
+     */
+    public static function countPublishedTagPosts(string $tagSlug): int
+    {
+        $nowUtc = gmdate('Y-m-d H:i:s');
+        $tagRaw = $tagSlug;
+        $tagClean = trim(str_replace('-', ' ', $tagSlug));
+
+        try {
+            if (Database::getDriver() === 'sqlite') {
+                $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
+                $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
+                return (int)Database::fetchValue(
+                    "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
+                    array_merge([$nowUtc], $tagCriteria)
+                );
+            } else {
+                return (int)Database::fetchValue(
+                    "SELECT COUNT(*) FROM posts p 
+                     WHERE p.status = 'published' AND p.published_at <= ? 
+                       AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
+                    [$nowUtc, $tagClean, $tagRaw]
+                );
+            }
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Constrói a lista abrangente de URLs afetadas pela publicação, agendamento ou alteração de um post.
+     * Cobre rotas raiz, paginação dinâmica profunda (home, blog, categorias e tags), feeds e sitemaps.
+     *
+     * @param array $post Dados do post (atuais ou novos)
+     * @param array|null $previous Dados anteriores do post (para detectar renomeação de slug/categoria/tags)
+     * @param int|null $maxParts Número máximo de partições de sitemap de posts
+     * @param array|null $paginationTotals Totais de posts para cálculo de paginação [home => int, categories => [...], tags => [...]]
+     * @return array<int, string>
+     */
+    public static function buildPostPurgeUrls(
+        array $post, 
+        ?array $previous = null, 
+        ?int $maxParts = null,
+        ?array $paginationTotals = null
+    ): array {
+        $slug = (string)($post['slug'] ?? '');
+        $category = (string)($post['category'] ?? '');
+        $tags = (string)($post['tags'] ?? '');
+        $perPage = 12;
+
+        $totals = $paginationTotals ?? ($post['pagination_totals'] ?? []);
+        $maxAllowedPages = (int)($totals['max_pages'] ?? self::MAX_PAGINATION_PURGE_PAGES);
+
+        // 1. Home e Blog: total de matérias publicadas considerando totais informados ou banco
+        $homeTotal = $totals['home'] ?? $totals['total'] ?? null;
+        if ($homeTotal === null) {
+            try {
+                $homeTotal = (int)Database::fetchValue(
+                    "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP"
+                );
+            } catch (\Throwable) {
+                $homeTotal = 0;
+            }
+        }
+        $homeTotal = (int)$homeTotal;
+
+        if ($maxParts === null) {
+            $maxParts = max(1, (int)ceil($homeTotal / 5000));
+        }
+
+        $sitemapPartUrls = [];
+        for ($pIdx = 1; $pIdx <= $maxParts; $pIdx++) {
+            $sitemapPartUrls[] = "/sitemap-posts-{$pIdx}.xml";
+        }
+
+        $urls = [
+            '/',
+            '/blog/',
+            '/feed.xml',
+            '/feed',
+            '/feed/',
+            '/sitemap.xml',
+            '/sitemap-news.xml',
+            '/sitemap-main.xml',
+        ];
+
+        // Paginação dinâmica de Home e Blog (limitada a MAX_PAGINATION_PURGE_PAGES)
+        $homePages = max(1, (int)ceil($homeTotal / $perPage));
+        $maxHomePages = min($maxAllowedPages, $homePages);
+        for ($p = 2; $p <= $maxHomePages; $p++) {
+            $urls[] = "/page/{$p}/";
+            $urls[] = "/blog/page/{$p}/";
+        }
+
+        if (!empty($slug)) {
+            $urls[] = "/{$slug}/";
+            $urls[] = "/noticia/{$slug}/";
+        }
+
+        if (!empty($previous['slug']) && $previous['slug'] !== $slug) {
+            $prevSlug = (string)$previous['slug'];
+            $urls[] = "/{$prevSlug}/";
+            $urls[] = "/noticia/{$prevSlug}/";
+        }
+
+        // Categorias afetadas (atual e anterior)
+        $categoriesToPurge = array_unique(array_filter([
+            $category,
+            (string)($previous['category'] ?? '')
+        ]));
+
+        foreach ($categoriesToPurge as $cat) {
+            $urls[] = "/categoria/{$cat}/";
+            $urls[] = "/categoria/{$cat}/feed.xml";
+            $urls[] = "/categoria/{$cat}/feed";
+            $urls[] = "/categoria/{$cat}/feed/";
+
+            // Paginação dinâmica da categoria (limitada a MAX_PAGINATION_PURGE_PAGES)
+            $catTotal = $totals['categories'][$cat] ?? $totals['category'] ?? null;
+            if ($catTotal === null) {
+                try {
+                    $catTotal = (int)Database::fetchValue(
+                        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= CURRENT_TIMESTAMP",
+                        [$cat]
+                    );
+                } catch (\Throwable) {
+                    $catTotal = 0;
+                }
+            }
+            $catPages = max(1, (int)ceil((int)$catTotal / $perPage));
+            $maxCatPages = min($maxAllowedPages, $catPages);
+            for ($p = 2; $p <= $maxCatPages; $p++) {
+                $urls[] = "/categoria/{$cat}/page/{$p}/";
+            }
+        }
+
+        // Tags afetadas (atuais e anteriores)
+        $tagSlugsToPurge = [];
+        if (!empty($tags)) {
+            foreach (explode(',', (string)$tags) as $t) {
+                $s = Security::slugify(trim($t));
+                if (!empty($s)) {
+                    $tagSlugsToPurge[$s] = true;
+                }
+            }
+        }
+        if (!empty($previous['tags'])) {
+            foreach (explode(',', (string)$previous['tags']) as $ot) {
+                $os = Security::slugify(trim($ot));
+                if (!empty($os)) {
+                    $tagSlugsToPurge[$os] = true;
+                }
+            }
+        }
+
+        foreach (array_keys($tagSlugsToPurge) as $tSlug) {
+            $urls[] = '/tag/' . $tSlug . '/';
+
+            // Paginação dinâmica da tag (limitada a MAX_PAGINATION_PURGE_PAGES)
+            $tTotal = $totals['tags'][$tSlug] ?? $totals['tag'] ?? null;
+            if ($tTotal === null) {
+                $tTotal = self::countPublishedTagPosts($tSlug);
+            }
+            $tPages = max(1, (int)ceil((int)$tTotal / $perPage));
+            $maxTagPages = min($maxAllowedPages, $tPages);
+            for ($p = 2; $p <= $maxTagPages; $p++) {
+                $urls[] = "/tag/{$tSlug}/page/{$p}/";
+            }
+        }
+
+        $allUrls = array_merge($urls, $sitemapPartUrls);
+        return array_values(array_unique($allUrls));
     }
 
     /**

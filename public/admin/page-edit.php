@@ -98,10 +98,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Invalidação de Cache de Objetos e Purga no Nginx
                         ObjectCache::delete("page_slug:{$slug}", 'pages');
                         ObjectCache::delete('all_published_page_slugs', 'pages');
+                        ObjectCache::delete('sitemap_main_pages', 'pages');
                         ObjectCache::flushGroup('pages');
                         try {
                             $cacheMgr = new CacheManager($config);
-                            $cacheMgr->purgeUrls(["/{$slug}/", "/sitemap.xml"]);
+                            $purgeUrls = ["/{$slug}/", "/sitemap.xml", "/sitemap-main.xml"];
+                            $jobId = $cacheMgr->recordPurgeJob($newId, 'page_create', $purgeUrls);
+                            $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+                            if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                                $cacheMgr->completePurgeJob($jobId);
+                            }
                         } catch (\Throwable $e) {}
 
                         header("Location: /admin/page-edit.php?id={$newId}&saved=1");
@@ -121,15 +127,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ObjectCache::delete("page_slug:{$page['slug']}", 'pages');
                         }
                         ObjectCache::delete('all_published_page_slugs', 'pages');
+                        ObjectCache::delete('sitemap_main_pages', 'pages');
                         ObjectCache::flushGroup('pages');
 
                         try {
                             $cacheMgr = new CacheManager($config);
-                            $purgeUrls = ["/{$slug}/", "/sitemap.xml"];
+                            $purgeUrls = ["/{$slug}/", "/sitemap.xml", "/sitemap-main.xml"];
                             if (!empty($page['slug']) && $page['slug'] !== $slug) {
                                 $purgeUrls[] = "/{$page['slug']}/";
                             }
-                            $cacheMgr->purgeUrls($purgeUrls);
+                            $jobId = $cacheMgr->recordPurgeJob($pageId, 'page_update', $purgeUrls);
+                            $purgeResults = $cacheMgr->purgeUrls($purgeUrls);
+                            if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                                $cacheMgr->completePurgeJob($jobId);
+                            }
                         } catch (\Throwable $e) {}
 
                         header("Location: /admin/page-edit.php?id={$pageId}&saved=1");

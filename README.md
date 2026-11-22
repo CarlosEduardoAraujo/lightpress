@@ -1454,6 +1454,33 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
 * **Suíte de Testes Automatizada Dedicada (`bin/test-query-indexes.php`):**
   - Criação de suíte de testes isolada em SQLite `:memory:` com cabeçalho de CI e guarda CLI padrão SEC-07, validando ausência de `USE TEMP B-TREE FOR ORDER BY` em 8 consultas públicas fundamentais e o ciclo atômico de auto-promoção de agendados com 18 testes aprovados.
 
+#### 8.21.23. Otimização de Feeds, Sitemaps, Miniaturas Responsivas e Resiliência de Purga (AUD-PERF-04)
+* **ObjectCache em Feeds RSS, Sitemaps XML e Paginação (`public/index.php` - AUD-PERF-04):**
+  - Implementação de cache de 300s via `ObjectCache::remember()` em `/feed.xml`, `/feed`, `/categoria/{slug}/feed.xml` e `/categoria/{slug}/feed` (grupo `'posts'`).
+  - Cache segregado para sitemaps: estatísticas de artigos no grupo `'posts'`, categorias em `'categories'` e páginas institucionais em `'pages'`. Partições de posts `/sitemap-posts-{part}.xml` cacheadas com ordenação determinística `ORDER BY published_at DESC, id DESC`.
+  - Reutilização consolidada da chave `home_total_posts_count` (grupo `'posts'`, TTL 300s) na paginação `/page/{page}/` e `/blog/page/{page}/`, eliminando queries repetidas de `COUNT(*)`.
+* **Miniaturas Responsivas com Descritores de Largura Únicos (`core/ImageProcessor.php`):**
+  - Helper `ImageProcessor::getResponsiveCardData()` entregando miniaturas reais compactas (`toThumbUrl`) em vez de originais 1920px nos cards de listagem (`portal-noticias/blog.php`, `empresa/home.php`, `blog.php`, etc.).
+  - Geração de `srcset` estritamente indexado por largura em pixels (`$variantsByWidth[$width]`), eliminando duplicidades de descritores (ex: `photo-thumb.avif 300w, photo-thumb.webp 300w`) e priorizando formatos modernos (`AVIF > WebP > JPEG`).
+  - Resolução transparente de miniaturas legadas cadastradas no manifesto `variants_manifest` (ex: recortes `300x180`).
+  - Priorização de LCP Mobile: primeiro card do blog com `loading="eager" fetchpriority="high"` e os demais em `loading="lazy"`.
+* **Invalidação Abrangente e Purga Dinâmica Equilibrada (`core/PostService.php`, `public/admin/`):**
+  - Helper centralizado `PostService::buildPostPurgeUrls()` unificando a purga de permalinks, feeds e sitemaps com enumeração de paginação considerando `max($prev, $new)`.
+  - Limite editorial equilibrado de 5 páginas (`PostService::MAX_PAGINATION_PURGE_PAGES = 5`), cobrindo até 60 matérias recentes por listagem sem sobrecarregar a API da Cloudflare e deixando páginas profundas para expiração natural do TTL (300s).
+  - Purga de tags removidas após edição via inclusão de `tags` na query `SELECT ... FOR UPDATE` de `publishOrUpdate`.
+  - Fronteira máxima em despublicações abrangendo partições até `max($prevParts, $newParts)`.
+  - Conclusão imediata de jobs síncronos com `completePurgeJob($jobId)` em `page-edit.php`, `pages.php` e `categories.php`.
+* **Atomicidade Estrita na Auto-Promoção de Agendados (`core/PostService.php`):**
+  - Registro atômico de `$cacheManager->recordPurgeJob()` dentro da mesma transação `Database::transaction()` que promove matérias agendadas (`UPDATE posts SET status = 'published'`), garantindo persistência incondicional para retentativa do cron em caso de falha de purga.
+* **Resiliência e Correções no Redis Cache Pro (`plugins/redis-cache-pro/`):**
+  - Proteção contra desativação acidental em `settings.php` via identificador `form_type` e whitelists segregadas, preservando `enabled`, `stampede_protection` e `persistent`.
+  - Paridade binária no lock anti-stampede: passagem de token bruto ao `set()` e aplicação de `packLockToken()` exclusivamente para `ARGV[1]` do Lua em `releaseLock()`.
+  - Suporte a conexões persistentes via `pconnect` (`persistent = true/false`).
+  - Tempo monotônico com `hrtime(true)` no orçamento de espera do lock anti-stampede.
+* **Unificação de Estilos e Correção de Legendas CSS (`src/input.css`, temas):**
+  - Restrição de ocultação de legendas exclusivamente a `.article-body-post figcaption { display: none; }`, mantendo visíveis as legendas de páginas institucionais (`.article-body-page`).
+  - Build sincronizado via `npm run build:css` para os 3 destinos estáticos e remoção de `<style>` inline.
+
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
@@ -1822,6 +1849,16 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Proteção do Hit Ratio de 48.000+ Artigos (AUD-PERF-03):** Publicações, edições ou promoções de matérias agora executam `flushGroup('posts')` sem invalidar os milhares de artigos cacheados em `'post_items'`.
   - [x] **Alinhamento do Ciclo de Vida e Conformidade L8 (AUD-PERF-03):** Captura segura de `&$resolvedSlug` na transação de `PostService::publishOrUpdate()`; importação e uso de `ObjectCache::flushGroup('post_items')` em `users.php` e `profile.php` ao alterar dados de autor; inclusão de `flushGroup('posts')` no toggle de featured da dashboard; expurgo pós-commit em `categories.php`; e atualização dos hooks do plugin `redis-cache-pro`.
   - [x] **Suíte de Testes Automatizada e Integração FakeRedis (AUD-PERF-02, AUD-PERF-03):** Inclusão de 32 novas asserções em `bin/test.php` (totalizando 219 testes 100% aprovados) e teste de integração real com `FakeRedis` em `plugins/redis-cache-pro/tests/test-redis-cache-pro.php` comprovando a preservação do Hit Ratio após `flushGroup('posts')`.
+
+* **FASE CONCLUÍDA — Otimização de Feeds, Sitemaps, Miniaturas Responsivas e Resiliência de Purga (AUD-PERF-04):**
+  - [x] **Cacheamento Completo de Feeds RSS e Sitemaps XML (`public/index.php`):** Integração com `ObjectCache` de `/feed.xml` (TTL 3600s), `/categoria/{slug}/feed.xml` (TTL 3600s), `/sitemap.xml` (TTL 86400s), `/sitemap-main.xml` (TTL 86400s), `/sitemap-news.xml` (TTL 900s) e `/sitemap-posts-{part}.xml` (TTL 86400s), eliminando recomputações de até 50.000 URLs e transferências de colunas MEDIUMTEXT em acessos repetidos de crawlers e leitores RSS.
+  - [x] **Reaproveitamento de Contagens Globais e Paginação Segura (`public/index.php`):** Reutilização de `home_total_posts_count` cacheada para páginas `/page/{page}/`, e proteção com casting inteiro estrito `max(1, (int)$_GET['page'])` em listadores públicos.
+  - [x] **Renderização Responsiva Otimizada e Resolução de Miniaturas (`core/ImageProcessor.php`):** Implementação de `ImageProcessor::getResponsiveCardData()` gerando `src` e `srcset` com descritores de largura únicos, priorização de formatos modernos (`AVIF > WebP > JPEG/PNG`) e fallback para miniaturas legadas cadastradas no manifesto de variantes.
+  - [x] **Aplicação nos Temas Portal de Notícias e Empresa:** Substituição da imagem integral (até 1920px) em cards de grade por markup responsivo em `themes/portal-noticias/blog.php`, `themes/empresa/home.php`, `themes/empresa/blog.php`, `themes/empresa/category.php`, `themes/empresa/tag.php` e `themes/empresa/search.php`, reduzindo o consumo de banda de visitantes e dispositivos móveis em mais de 70%.
+  - [x] **Invalidação Granular e Segregação de Grupos de Cache (`core/PostService.php`, `public/admin/`):** Armazenamento de dados de sitemaps e feeds nos grupos adequados (`posts`, `pages`, `categories`), garantindo sincronização imediata em edições e exclusões de artigos, páginas e categorias.
+  - [x] **Resiliência e Atomização de Purga de Cache com Limite Operacional (`core/PostService.php`):** Invalidação dinâmica de listagens afetadas (Home, Blog, Categorias e Tags) limitada às primeiras 5 páginas (`MAX_PAGINATION_PURGE_PAGES = 5`), deixando páginas profundas para expiração natural (TTL 300s) e evitando sobrecarga da Cloudflare. Gravação transacional de jobs de purga em `promoteScheduledPosts()` dentro de `Database::transaction()`.
+  - [x] **Proteção contra Cache Stampede e Correções no Redis Cache Pro (`plugins/redis-cache-pro/`):** Medição monotônica com `hrtime(true)` no orçamento de espera de locks (500ms), empacotamento único de tokens para Lua (`packLockToken()`), preservação de configurações no formulário administrativo e persistência opcional desativada por padrão.
+  - [x] **Suíte de Testes Expandida (`bin/test.php`):** Adição das seções [15] e [16] com 77 novas asserções (totalizando 296 testes 100% aprovados), cobrindo unicidade de `srcset`, validação de miniaturas legadas, limitação de purga até 5 páginas, contagem de tags e atomicidade de agendados.
 
 ---
 

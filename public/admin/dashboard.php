@@ -59,19 +59,32 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
     
     if ($targetPost) {
         if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $targetPost)) {
-            $affectedUrls = [
+            $totalPublished = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP");
+            $maxParts = max(1, (int)ceil(($totalPublished + 1) / 5000));
+            $sitemapPartUrls = [];
+            for ($pIdx = 1; $pIdx <= $maxParts; $pIdx++) {
+                $sitemapPartUrls[] = "/sitemap-posts-{$pIdx}.xml";
+            }
+
+            $affectedUrls = array_merge([
                 '/',
                 '/blog/',
                 '/' . $targetPost['slug'] . '/',
                 '/noticia/' . $targetPost['slug'] . '/',
                 '/categoria/' . $targetPost['category'] . '/',
+                '/categoria/' . $targetPost['category'] . '/page/2/',
+                '/categoria/' . $targetPost['category'] . '/feed.xml',
+                '/categoria/' . $targetPost['category'] . '/feed',
+                '/categoria/' . $targetPost['category'] . '/feed/',
                 '/feed.xml',
                 '/feed',
+                '/feed/',
                 '/sitemap.xml',
+                '/sitemap-news.xml',
+                '/sitemap-main.xml',
                 '/page/2/',
                 '/blog/page/2/',
-                '/categoria/' . $targetPost['category'] . '/page/2/',
-            ];
+            ], $sitemapPartUrls);
 
             if (!empty($targetPost['tags'])) {
                 $tagItems = explode(',', (string)$targetPost['tags']);

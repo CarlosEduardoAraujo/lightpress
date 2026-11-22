@@ -122,6 +122,7 @@ class RedisClient
             'port'                 => 6379,
             'password'             => '',
             'database'             => 0,
+            'persistent'           => false, // Suporte a conexões persistentes via pconnect
             'split_transients_db'  => null, // Ex: 1 para transients
             'timeout'              => 1.0,  // Segundos
             'read_timeout'         => 1.0,
@@ -182,11 +183,19 @@ class RedisClient
             $port = (int)$this->config['port'];
             $timeout = (float)$this->config['timeout'];
 
-            // Conexão via Unix Domain Socket ou TCP
+            $isPersistent = (bool)($this->config['persistent'] ?? false);
+            $db = (int)$this->config['database'];
+            $persistentId = "lp_redis_db_{$db}";
+
+            // Conexão via Unix Domain Socket ou TCP (com suporte a conexões persistentes)
             if (str_starts_with($host, '/')) {
-                $connected = @$redis->connect($host);
+                $connected = $isPersistent
+                    ? @$redis->pconnect($host, null, $timeout, $persistentId)
+                    : @$redis->connect($host);
             } else {
-                $connected = @$redis->connect($host, $port, $timeout);
+                $connected = $isPersistent
+                    ? @$redis->pconnect($host, $port, $timeout, $persistentId)
+                    : @$redis->connect($host, $port, $timeout);
             }
 
             if (!$connected) {
@@ -203,9 +212,8 @@ class RedisClient
                 }
             }
 
-            // Seleção de Banco
-            $db = (int)$this->config['database'];
-            if ($db > 0) {
+            // Seleção de Banco (garantida mesmo em conexão persistente reutilizada)
+            if ($db >= 0) {
                 $redis->select($db);
             }
 
@@ -259,10 +267,22 @@ class RedisClient
             $port = (int)$this->config['port'];
             $timeout = (float)$this->config['timeout'];
 
+            $isPersistent = (bool)($this->config['persistent'] ?? false);
+            $persistentId = "lp_redis_db_{$db}_trans";
+
             if (str_starts_with($host, '/')) {
-                @$tRedis->connect($host);
+                $connected = $isPersistent
+                    ? @$tRedis->pconnect($host, null, $timeout, $persistentId)
+                    : @$tRedis->connect($host);
             } else {
-                @$tRedis->connect($host, $port, $timeout);
+                $connected = $isPersistent
+                    ? @$tRedis->pconnect($host, $port, $timeout, $persistentId)
+                    : @$tRedis->connect($host, $port, $timeout);
+            }
+
+            if (!$connected) {
+                $this->redisTransients = null;
+                return;
             }
 
             $password = trim((string)$this->config['password']);
@@ -776,6 +796,34 @@ class RedisClient
     }
 
     /**
+     * Empacota o token de lock garantindo compatibilidade binária exata no Lua.
+     */
+    private function packLockToken(string $token): string
+    {
+        if ($this->redis !== null && method_exists($this->redis, '_pack')) {
+            return (string)$this->redis->_pack($token);
+        }
+        return $token;
+    }
+
+    /**
+     * Liberação atômica condicional do lock via script Lua.
+     */
+    private function releaseLock(string $lockKey, string $lockToken): bool
+    {
+        if ($this->redis === null || !$this->isConnected()) {
+            return false;
+        }
+        try {
+            $lua = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end';
+            $packed = $this->packLockToken($lockToken);
+            return (bool)$this->redis->eval($lua, [$lockKey, $packed], 1);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Método Remember: busca a chave ou computa o callback protegendo contra Cache Stampede.
      *
      * @template T
@@ -792,11 +840,13 @@ class RedisClient
 
         // Se Proteção contra Stampede estiver ativa, adquire lock atômico
         $lockKey = 'lock:' . $this->buildKey($key, $group);
+        $lockToken = bin2hex(random_bytes(16));
+        $lockTtlMs = (int)($this->config['stampede_lock_ms'] ?? 5000);
         $hasLock = false;
 
         if (!empty($this->config['stampede_protection']) && $this->isConnected()) {
             try {
-                $hasLock = (bool)$this->redis->set($lockKey, '1', ['nx', 'px' => (int)$this->config['stampede_lock_ms']]);
+                $hasLock = (bool)$this->redis->set($lockKey, $lockToken, ['nx', 'px' => $lockTtlMs]);
             } catch (Throwable) {
                 $hasLock = true;
             }
@@ -804,12 +854,47 @@ class RedisClient
             $hasLock = true;
         }
 
-        // Se não conseguiu o lock, espera brevemente (50ms) e tenta obter o valor recalculado
+        // Se não conseguiu o lock, entra no laço de polling com relógio monotônico hrtime(true)
         if (!$hasLock) {
-            usleep(50000); // 50ms
-            $val = $this->get($key, $group, $found);
+            $deadline = hrtime(true) + 500_000_000; // Orçamento monotônico de 500ms
+            $sleepUs = 25000;
+            while (hrtime(true) < $deadline) {
+                usleep($sleepUs);
+                $sleepUs = min(75000, $sleepUs + 15000);
+                try {
+                    $val = $this->get($key, $group, $found);
+                    if ($found) {
+                        return $val;
+                    }
+                    if (!$this->redis->exists($lockKey)) {
+                        $hasLock = (bool)$this->redis->set($lockKey, $lockToken, ['nx', 'px' => $lockTtlMs]);
+                        if ($hasLock) {
+                            $val = $this->get($key, $group, $found);
+                            if ($found) {
+                                $this->releaseLock($lockKey, $lockToken);
+                                return $val;
+                            }
+                            break;
+                        }
+                    }
+                } catch (Throwable) {
+                    break;
+                }
+            }
             if ($found) {
                 return $val;
+            }
+            if (!$hasLock && $this->isConnected()) {
+                try {
+                    $hasLock = (bool)$this->redis->set($lockKey, $lockToken, ['nx', 'px' => $lockTtlMs]);
+                    if ($hasLock) {
+                        $val = $this->get($key, $group, $found);
+                        if ($found) {
+                            $this->releaseLock($lockKey, $lockToken);
+                            return $val;
+                        }
+                    }
+                } catch (Throwable) {}
             }
         }
 
@@ -818,10 +903,8 @@ class RedisClient
             $this->set($key, $freshVal, $group, $ttl);
             return $freshVal;
         } finally {
-            if ($hasLock && $this->isConnected()) {
-                try {
-                    $this->redis->del($lockKey);
-                } catch (Throwable) {}
+            if ($hasLock) {
+                $this->releaseLock($lockKey, $lockToken);
             }
         }
     }

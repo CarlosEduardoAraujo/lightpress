@@ -27,6 +27,12 @@ class ImageProcessor
     /** @var array<string, string> */
     private static array $memoryIntermediateCache = [];
 
+    /** @var array<string, array> */
+    private static array $memoryManifestCache = [];
+
+    /** @var array<string, array{src: string, srcset: string, sizes: string, alt: string, title: string}> */
+    private static array $memoryCardCache = [];
+
     private string $uploadDir;
     private string $stagingDir;
     private int $maxFileSize;
@@ -39,8 +45,9 @@ class ImageProcessor
     public function __construct(?array $config = null)
     {
         if ($config === null) {
-            $globalConfig = require dirname(__DIR__) . '/config.php';
-            $config = $globalConfig;
+            $config = (!empty($GLOBALS['config']) && is_array($GLOBALS['config']))
+                ? $GLOBALS['config']
+                : (file_exists(dirname(__DIR__) . '/config.php') ? require dirname(__DIR__) . '/config.php' : []);
         }
 
         $media = $config['media'] ?? [];
@@ -140,22 +147,34 @@ class ImageProcessor
         if (file_exists($candidatePath)) {
             $resolved = $candidate;
         } else {
-            // Se não encontrar o -thumb físico, busca por variantes proporcionais legadas do WordPress (-300x... ou -299x299)
+            // Substituir o scan de diretório por checagens determinísticas via file_exists()
             $dir = dirname($candidatePath);
-            if (is_dir($dir)) {
-                $pathInfo = pathinfo($candidatePath);
-                $baseWithoutThumb = preg_replace('~-thumb$~', '', $pathInfo['filename']);
+            $pathInfo = pathinfo($candidatePath);
+            $baseWithoutThumb = preg_replace('~-thumb$~', '', $pathInfo['filename']);
+            $urlDir = dirname($candidate);
 
-                // Testar se existe miniatura proporcional do WordPress (ex: -300x169.avif)
-                $matches = glob($dir . '/' . $baseWithoutThumb . '-300x*.' . $targetExt);
-                if (!empty($matches)) {
-                    $resolved = dirname($candidate) . '/' . basename($matches[0]);
-                } else {
-                    // Testar se existe miniatura quadrada do WordPress (ex: -299x299.avif)
-                    $squareMatch = $dir . '/' . $baseWithoutThumb . '-299x299.' . $targetExt;
-                    if (file_exists($squareMatch)) {
-                        $resolved = dirname($candidate) . '/' . basename($squareMatch);
-                    }
+            // Testar variantes proporcionais/quadradas comuns do WordPress via checagem direta O(1)
+            $legacyPatterns = [
+                "-300x169.{$targetExt}",
+                "-299x299.{$targetExt}",
+                "-300x200.{$targetExt}",
+                "-300x300.{$targetExt}",
+            ];
+            foreach ($legacyPatterns as $suffix) {
+                $testPath = $dir . '/' . $baseWithoutThumb . $suffix;
+                if (file_exists($testPath)) {
+                    $resolved = $urlDir . '/' . $baseWithoutThumb . $suffix;
+                    break;
+                }
+            }
+
+            // Se não encontrou no disco, consulta o manifesto em memória ou no banco para obter variante registrada
+            if ($resolved === '') {
+                $path = self::descriptionPath($url);
+                $manifest = self::getManifestForPath($path);
+                $thumbCand = self::findThumbnailInManifest($manifest, $targetExt);
+                if ($thumbCand !== null && !empty($thumbCand['url'])) {
+                    $resolved = $thumbCand['url'];
                 }
             }
         }
@@ -211,7 +230,21 @@ class ImageProcessor
         $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
         $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
 
-        $resolved = file_exists($candidatePath) ? $candidate : self::toAvifUrl($url);
+        $resolved = '';
+        if (file_exists($candidatePath)) {
+            $resolved = $candidate;
+        } else {
+            $path = self::descriptionPath($url);
+            $manifest = self::getManifestForPath($path);
+            $interCand = self::findIntermediateInManifest($manifest, $targetExt);
+            if ($interCand !== null && !empty($interCand['url'])) {
+                $resolved = $interCand['url'];
+            }
+        }
+
+        if ($resolved === '') {
+            $resolved = self::toAvifUrl($url);
+        }
 
         ObjectCache::set($cacheKey, (string)$resolved, 'media', 86400);
         self::$memoryIntermediateCache[$staticKey] = (string)$resolved;
@@ -226,6 +259,8 @@ class ImageProcessor
         self::$memoryDescCache = [];
         self::$memoryThumbCache = [];
         self::$memoryIntermediateCache = [];
+        self::$memoryManifestCache = [];
+        self::$memoryCardCache = [];
     }
 
     /** Resolve os metadados atuais; o segundo argumento preserva a API existente. */
@@ -259,6 +294,348 @@ class ImageProcessor
         }
     }
 
+    /**
+     * Retorna estrutura de dados para renderização otimizada de cards responsivos.
+     * Inclui src da miniatura, srcset com variantes reais e larguras comprovadas,
+     * tamanhos responsivos e descrição textual com fallback para o título.
+     *
+     * @return array{src: string, srcset: string, sizes: string, alt: string, title: string}
+     */
+    public static function getResponsiveCardData(string $imageUrl, string $title, ?string $mediaId = null): array
+    {
+        if (empty($imageUrl)) {
+            return [
+                'src' => '',
+                'srcset' => '',
+                'sizes' => '',
+                'alt' => $title,
+                'title' => $title,
+            ];
+        }
+
+        $staticKey = $imageUrl . '|' . ($mediaId ?? '');
+        if (isset(self::$memoryCardCache[$staticKey])) {
+            $data = self::$memoryCardCache[$staticKey];
+            $data['title'] = $title;
+            if (empty($data['alt'])) {
+                $data['alt'] = $title;
+            }
+            return $data;
+        }
+
+        $cacheKey = 'img_card_data:' . md5($staticKey);
+        $cached = ObjectCache::get($cacheKey, 'media');
+        if (is_array($cached) && !empty($cached['src'])) {
+            self::$memoryCardCache[$staticKey] = $cached;
+            $cached['title'] = $title;
+            if (empty($cached['alt'])) {
+                $cached['alt'] = $title;
+            }
+            return $cached;
+        }
+
+        $desc = self::getImageDescription($imageUrl, null, $mediaId);
+        $alt = ($desc !== '') ? $desc : $title;
+
+        $path = self::descriptionPath($imageUrl);
+        $manifest = self::getManifestForPath($path, $mediaId);
+
+        $thumbCand = self::findThumbnailInManifest($manifest, 'avif');
+        $thumbUrl = ($thumbCand !== null && !empty($thumbCand['url'])) ? $thumbCand['url'] : self::toThumbUrl($imageUrl);
+
+        $interCand = self::findIntermediateInManifest($manifest, 'avif');
+        $interUrl = ($interCand !== null && !empty($interCand['url'])) ? $interCand['url'] : self::toIntermediateUrl($imageUrl);
+
+        $variantsByWidth = [];
+        if ($manifest !== null) {
+            $allVars = self::extractManifestVariants($manifest);
+            foreach ($allVars as $v) {
+                $w = $v['width'];
+                if ($w > 0 && $w <= 1200) {
+                    $fmt = strtolower($v['format']);
+                    $prio = match($fmt) {
+                        'avif' => 3,
+                        'webp' => 2,
+                        default => 1,
+                    };
+                    if (!isset($variantsByWidth[$w]) || $prio > $variantsByWidth[$w]['priority']) {
+                        $variantsByWidth[$w] = [
+                            'url' => $v['url'],
+                            'priority' => $prio,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if ($thumbCand !== null && !empty($thumbCand['width']) && $thumbCand['width'] > 0) {
+            $w = (int)$thumbCand['width'];
+            $fmt = strtolower($thumbCand['format']);
+            $prio = match($fmt) {
+                'avif' => 3,
+                'webp' => 2,
+                default => 1,
+            };
+            if (!isset($variantsByWidth[$w]) || $prio >= $variantsByWidth[$w]['priority']) {
+                $variantsByWidth[$w] = ['url' => $thumbUrl, 'priority' => $prio];
+            }
+        }
+        if ($interCand !== null && !empty($interCand['width']) && $interCand['width'] > 0 && $interUrl !== $thumbUrl) {
+            $w = (int)$interCand['width'];
+            $fmt = strtolower($interCand['format']);
+            $prio = match($fmt) {
+                'avif' => 3,
+                'webp' => 2,
+                default => 1,
+            };
+            if (!isset($variantsByWidth[$w]) || $prio >= $variantsByWidth[$w]['priority']) {
+                $variantsByWidth[$w] = ['url' => $interUrl, 'priority' => $prio];
+            }
+        }
+
+        // Se o manifesto não cobriu ao menos duas larguras distintas, inspeciona os arquivos físicos
+        if (count($variantsByWidth) < 2 && !empty($thumbUrl)) {
+            $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+            $thumbPath = rtrim($docRoot, '/\\') . '/' . ltrim($thumbUrl, '/\\');
+            if (file_exists($thumbPath)) {
+                $size = @getimagesize($thumbPath);
+                if ($size && !empty($size[0])) {
+                    $w = (int)$size[0];
+                    if (!isset($variantsByWidth[$w])) {
+                        $variantsByWidth[$w] = ['url' => $thumbUrl, 'priority' => 1];
+                    }
+                }
+            }
+
+            if (!empty($interUrl) && $interUrl !== $thumbUrl) {
+                $interPath = rtrim($docRoot, '/\\') . '/' . ltrim($interUrl, '/\\');
+                if (file_exists($interPath)) {
+                    $size = @getimagesize($interPath);
+                    if ($size && !empty($size[0])) {
+                        $w = (int)$size[0];
+                        if (!isset($variantsByWidth[$w])) {
+                            $variantsByWidth[$w] = ['url' => $interUrl, 'priority' => 1];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Só gera srcset se houver ao menos 2 larguras distintas comprovadas (garante descritores de largura únicos)
+        $srcsetParts = [];
+        if (count($variantsByWidth) >= 2) {
+            ksort($variantsByWidth, SORT_NUMERIC);
+            foreach ($variantsByWidth as $width => $entry) {
+                $srcsetParts[] = "{$entry['url']} {$width}w";
+            }
+        }
+
+        $srcsetString = implode(', ', $srcsetParts);
+        $sizesString = !empty($srcsetString) ? '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 380px' : '';
+
+        $result = [
+            'src' => $thumbUrl,
+            'srcset' => $srcsetString,
+            'sizes' => $sizesString,
+            'alt' => $alt,
+            'title' => $title,
+        ];
+
+        ObjectCache::set($cacheKey, $result, 'media', 86400);
+        self::$memoryCardCache[$staticKey] = $result;
+
+        return $result;
+    }
+
+    public static function setMemoryManifest(string $path, array $manifest): void
+    {
+        $cleanPath = ltrim((string)(parse_url($path, PHP_URL_PATH) ?? $path), '/');
+        self::$memoryManifestCache[$cleanPath] = $manifest;
+    }
+
+    public static function getManifestForPath(string $path, ?string $mediaId = null): ?array
+    {
+        $cleanPath = ltrim((string)(parse_url($path, PHP_URL_PATH) ?? $path), '/');
+        if (isset(self::$memoryManifestCache[$cleanPath])) {
+            return self::$memoryManifestCache[$cleanPath];
+        }
+        if (!empty($mediaId) && isset(self::$memoryManifestCache[$mediaId])) {
+            return self::$memoryManifestCache[$mediaId];
+        }
+        try {
+            $manifestRow = Database::fetchOne(
+                "SELECT m.variants_manifest 
+                 FROM media_variants mv 
+                 JOIN media m ON m.id = mv.media_id 
+                 WHERE mv.url_path = ? LIMIT 1",
+                [$cleanPath]
+            );
+            if (!empty($manifestRow['variants_manifest'])) {
+                $decoded = json_decode((string)$manifestRow['variants_manifest'], true);
+                if (is_array($decoded)) {
+                    self::$memoryManifestCache[$cleanPath] = $decoded;
+                    return $decoded;
+                }
+            }
+        } catch (\Throwable) {}
+
+        if (!empty($mediaId)) {
+            try {
+                $mRow = Database::fetchOne("SELECT variants_manifest FROM media WHERE id = ? LIMIT 1", [$mediaId]);
+                if (!empty($mRow['variants_manifest'])) {
+                    $decoded = json_decode((string)$mRow['variants_manifest'], true);
+                    if (is_array($decoded)) {
+                        self::$memoryManifestCache[$cleanPath] = $decoded;
+                        return $decoded;
+                    }
+                }
+            } catch (\Throwable) {}
+        }
+        return null;
+    }
+
+    /**
+     * Extrai variantes normalizadas de um manifesto (seja estruturado por tipo ou por dimensões legadas).
+     *
+     * @return array<int, array{key: string, url: string, width: int, format: string}>
+     */
+    public static function extractManifestVariants(?array $manifest): array
+    {
+        if (empty($manifest)) {
+            return [];
+        }
+        $rawList = (isset($manifest['variants']) && is_array($manifest['variants'])) 
+            ? $manifest['variants'] 
+            : $manifest;
+
+        $extracted = [];
+        foreach ($rawList as $key => $item) {
+            $strKey = (string)$key;
+            if (!is_array($item)) {
+                if (is_string($item) && $item !== '') {
+                    $extracted[] = [
+                        'key' => $strKey,
+                        'url' => '/' . ltrim($item, '/'),
+                        'width' => 0,
+                        'format' => strtolower(pathinfo($item, PATHINFO_EXTENSION)),
+                    ];
+                }
+                continue;
+            }
+            if (!empty($item['url'])) {
+                $extracted[] = [
+                    'key' => $strKey,
+                    'url' => '/' . ltrim((string)$item['url'], '/'),
+                    'width' => (int)($item['width'] ?? 0),
+                    'format' => strtolower(pathinfo((string)$item['url'], PATHINFO_EXTENSION)),
+                ];
+            }
+            foreach (['avif', 'webp', 'jpg', 'jpeg', 'png'] as $fmt) {
+                if (isset($item[$fmt]) && is_array($item[$fmt]) && !empty($item[$fmt]['url'])) {
+                    $extracted[] = [
+                        'key' => $strKey,
+                        'url' => '/' . ltrim((string)$item[$fmt]['url'], '/'),
+                        'width' => (int)($item[$fmt]['width'] ?? 0),
+                        'format' => $fmt,
+                    ];
+                }
+            }
+        }
+        return $extracted;
+    }
+
+    /**
+     * Localiza a melhor miniatura no manifesto.
+     */
+    public static function findThumbnailInManifest(?array $manifest, string $preferredFormat = 'avif'): ?array
+    {
+        $variants = self::extractManifestVariants($manifest);
+        if (empty($variants)) {
+            return null;
+        }
+
+        $candidates = [];
+        foreach ($variants as $v) {
+            $isThumbKey = in_array(strtolower($v['key']), ['thumb', 'thumbnail'], true);
+            $isThumbDim = ($v['width'] > 0 && $v['width'] <= 500);
+            $hasThumbPattern = (bool)preg_match('~(-thumb|-\d+x\d+)\.~i', $v['url']);
+            if ($isThumbKey || $isThumbDim || str_contains($v['key'], 'x') || $hasThumbPattern) {
+                if ($v['width'] > 600) {
+                    continue;
+                }
+                $candidates[] = $v;
+            }
+        }
+
+        if (empty($candidates)) {
+            foreach ($variants as $v) {
+                if ($v['width'] > 0 && $v['width'] <= 600) {
+                    $candidates[] = $v;
+                }
+            }
+        }
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        foreach ($candidates as $cand) {
+            if ($cand['format'] === $preferredFormat) {
+                return $cand;
+            }
+        }
+
+        if ($preferredFormat === 'avif') {
+            foreach ($candidates as $cand) {
+                if ($cand['format'] === 'webp') {
+                    return $cand;
+                }
+            }
+        }
+
+        return $candidates[0];
+    }
+
+    /**
+     * Localiza a melhor variante intermediária no manifesto.
+     */
+    public static function findIntermediateInManifest(?array $manifest, string $preferredFormat = 'avif'): ?array
+    {
+        $variants = self::extractManifestVariants($manifest);
+        if (empty($variants)) {
+            return null;
+        }
+
+        $candidates = [];
+        foreach ($variants as $v) {
+            $isInterKey = in_array(strtolower($v['key']), ['intermediate', 'medium', '1024'], true);
+            $isInterDim = ($v['width'] >= 600 && $v['width'] <= 1400);
+            if ($isInterKey || $isInterDim || str_contains($v['url'], '-1024')) {
+                $candidates[] = $v;
+            }
+        }
+
+        if (empty($candidates)) {
+            return null;
+        }
+
+        foreach ($candidates as $cand) {
+            if ($cand['format'] === $preferredFormat) {
+                return $cand;
+            }
+        }
+
+        if ($preferredFormat === 'avif') {
+            foreach ($candidates as $cand) {
+                if ($cand['format'] === 'webp') {
+                    return $cand;
+                }
+            }
+        }
+
+        return $candidates[0];
+    }
+
     private static function descriptionPath(string $url): string
     {
         return ltrim((string)(parse_url($url, PHP_URL_PATH) ?? $url), '/');
@@ -278,7 +655,7 @@ class ImageProcessor
 
     private static function mediaDescription(array $media): string
     {
-        foreach (['alt_text', 'caption'] as $field) {
+        foreach (['alt_text', 'caption', 'ai_tags'] as $field) {
             $text = trim((string)($media[$field] ?? ''));
             if ($text !== '') {
                 return $text;
@@ -346,7 +723,7 @@ class ImageProcessor
             $paths = array_values(array_unique(array_column($pending, 'path')));
             $marks = implode(',', array_fill(0, count($paths), '?'));
             $rows = Database::fetchAll(
-                "SELECT mv.url_path, m.id, m.alt_text, m.caption, m.original_name, m.variants_manifest
+                "SELECT mv.url_path, m.id, m.alt_text, m.caption, m.ai_tags, m.original_name, m.variants_manifest
                  FROM media_variants mv JOIN media m ON m.id = mv.media_id
                  WHERE mv.url_path IN ({$marks})", $paths
             );
@@ -358,6 +735,12 @@ class ImageProcessor
                 $path = $request['path'];
                 if (isset($byPath[$path])) {
                     $vm = $byPath[$path];
+                    if (!empty($vm['variants_manifest'])) {
+                        $manifest = json_decode((string)$vm['variants_manifest'], true);
+                        if (is_array($manifest)) {
+                            self::$memoryManifestCache[$path] = $manifest;
+                        }
+                    }
                     if ($request['id'] === '' || (string)$vm['id'] === (string)$request['id']) {
                         $resolved[$key] = self::mediaDescription($vm);
                         continue;
@@ -379,7 +762,7 @@ class ImageProcessor
             if (!empty($stage2Ids)) {
                 $idMarks = implode(',', array_fill(0, count($stage2Ids), '?'));
                 $idRows = Database::fetchAll(
-                    "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE id IN ({$idMarks})",
+                    "SELECT id, alt_text, caption, ai_tags, original_name, variants_manifest FROM media WHERE id IN ({$idMarks})",
                     $stage2Ids
                 );
                 $mediaById = array_column($idRows, null, 'id');
@@ -392,6 +775,12 @@ class ImageProcessor
                 if ($reqId !== '') {
                     $candidate = $mediaById[$reqId] ?? null;
                     if ($candidate !== null && self::manifestMatches($candidate, $path)) {
+                        if (!empty($candidate['variants_manifest'])) {
+                            $manifest = json_decode((string)$candidate['variants_manifest'], true);
+                            if (is_array($manifest)) {
+                                self::$memoryManifestCache[$path] = $manifest;
+                            }
+                        }
                         $resolved[$key] = self::mediaDescription($candidate);
                         continue;
                     }
@@ -416,7 +805,7 @@ class ImageProcessor
                 $names = array_values(array_unique($names));
                 $nameMarks = implode(',', array_fill(0, count($names), '?'));
                 $candidates = Database::fetchAll(
-                    "SELECT id, alt_text, caption, original_name, variants_manifest FROM media WHERE original_name IN ({$nameMarks})",
+                    "SELECT id, alt_text, caption, ai_tags, original_name, variants_manifest FROM media WHERE original_name IN ({$nameMarks})",
                     $names
                 );
 
@@ -438,6 +827,12 @@ class ImageProcessor
                         $media = reset($matches);
                     }
                     if ($media) {
+                        if (!empty($media['variants_manifest'])) {
+                            $manifest = json_decode((string)$media['variants_manifest'], true);
+                            if (is_array($manifest)) {
+                                self::$memoryManifestCache[$path] = $manifest;
+                            }
+                        }
                         $resolved[$key] = self::mediaDescription($media);
                     }
                 }

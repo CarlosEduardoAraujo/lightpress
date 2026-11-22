@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "SpeedRacing - Portal de Automobilismo",
   "scripts": {
-    "build:css": "tailwindcss -i ./src/input.css -o ./public/assets/style.css --minify",
+    "build:css": "tailwindcss -i ./src/input.css -o ./public/assets/style.css --minify && node -e \"const fs = require('fs'); ['public/assets/themes/portal-noticias/css/style.css', 'themes/portal-noticias/assets/css/style.css'].forEach(d => { fs.mkdirSync(require('path').dirname(d), { recursive: true }); fs.copyFileSync('public/assets/style.css', d); });\"",
     "watch:css": "tailwindcss -i ./src/input.css -o ./public/assets/style.css --watch"
   },
   "devDependencies": {

@@ -716,6 +716,215 @@ $rcpMainPhp = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/red
 assertTest("AUD-PERF-03: redis-cache-pro.php invalida post_items nos hooks post_saved e post_deleted", str_contains($rcpMainPhp, 'post_items'));
 
 // -------------------------------------------------------------
+// [15] AUD-PERF-04: Otimização de Banco de Dados, Front-end, Tráfego de Rede e Recursos
+// -------------------------------------------------------------
+echo "\n[15] Testando AUD-PERF-04: Feeds, Sitemaps, Miniaturas Responsivas, Redis e Recursos\n";
+
+$indexPhp = file_get_contents(dirname(__DIR__) . '/public/index.php');
+assertTest("AUD-PERF-04: public/index.php cacheia feed_rss_general_posts no grupo posts", str_contains($indexPhp, "'feed_rss_general_posts'"));
+assertTest("AUD-PERF-04: public/index.php cacheia feed de categoria no grupo posts", str_contains($indexPhp, "'feed_rss_cat_'"));
+assertTest("AUD-PERF-04: public/index.php cacheia sitemap_index_stats no grupo posts", str_contains($indexPhp, "'sitemap_index_stats'"));
+assertTest("AUD-PERF-04: public/index.php cacheia sitemap_main_categories no grupo categories", str_contains($indexPhp, "'sitemap_main_categories'") && str_contains($indexPhp, "'categories'"));
+assertTest("AUD-PERF-04: public/index.php cacheia sitemap_main_pages no grupo pages", str_contains($indexPhp, "'sitemap_main_pages'") && str_contains($indexPhp, "'pages'"));
+assertTest("AUD-PERF-04: public/index.php cacheia sitemap_news_posts no grupo posts", str_contains($indexPhp, "'sitemap_news_posts'"));
+assertTest("AUD-PERF-04: public/index.php possui ORDER BY published_at DESC, id DESC no sitemap de posts", str_contains($indexPhp, 'ORDER BY published_at DESC, id DESC'));
+assertTest("AUD-PERF-04: public/index.php cacheia partições de sitemap de posts no grupo posts", str_contains($indexPhp, "'sitemap_posts_part_' . \$part"));
+assertTest("AUD-PERF-04: public/index.php reutiliza home_total_posts_count na paginação /page/{page}/", str_contains($indexPhp, "\$totalPages = max(1, (int)ceil(\$totalPosts / \$perPage));"));
+
+$postServicePhp = file_get_contents(dirname(__DIR__) . '/core/PostService.php');
+assertTest("AUD-PERF-04: PostService expande sitemap_posts para lista concreta", str_contains($postServicePhp, '/sitemap-posts-') && str_contains($postServicePhp, "\$maxParts"));
+assertTest("AUD-PERF-04: PostService purga sitemap-news.xml e sitemap-main.xml", str_contains($postServicePhp, "'/sitemap-news.xml'") && str_contains($postServicePhp, "'/sitemap-main.xml'"));
+assertTest("AUD-PERF-04: PostService purga feed.xml e variações", str_contains($postServicePhp, "'/feed.xml'") && str_contains($postServicePhp, "'/feed'"));
+
+$adminCategoriesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/categories.php');
+assertTest("AUD-PERF-04: categories.php invalida sitemap_main_categories", str_contains($adminCategoriesPhp, "sitemap_main_categories"));
+assertTest("AUD-PERF-04: categories.php purga sitemap.xml e sitemap-main.xml", str_contains($adminCategoriesPhp, "'/sitemap-main.xml'"));
+
+$adminPageEditPhp = file_get_contents(dirname(__DIR__) . '/public/admin/page-edit.php');
+assertTest("AUD-PERF-04: page-edit.php invalida sitemap_main_pages", str_contains($adminPageEditPhp, "sitemap_main_pages"));
+assertTest("AUD-PERF-04: page-edit.php purga sitemap-main.xml", str_contains($adminPageEditPhp, '/sitemap-main.xml'));
+
+$imageProcessorPhp = file_get_contents(dirname(__DIR__) . '/core/ImageProcessor.php');
+assertTest("AUD-PERF-04: ImageProcessor construtor reutiliza \$GLOBALS['config']", str_contains($imageProcessorPhp, "\$GLOBALS['config']"));
+assertTest("AUD-PERF-04: ImageProcessor::toThumbUrl não utiliza glob()", !str_contains($imageProcessorPhp, 'glob('));
+assertTest("AUD-PERF-04: ImageProcessor::loadDescriptions inclui ai_tags", str_contains($imageProcessorPhp, 'ai_tags'));
+assertTest("AUD-PERF-04: ImageProcessor possui getResponsiveCardData", str_contains($imageProcessorPhp, 'function getResponsiveCardData'));
+
+$databasePhp = file_get_contents(dirname(__DIR__) . '/core/Database.php');
+assertTest("AUD-PERF-04: Database preserva precedência de self::\$config e checa \$GLOBALS['config']['database']", str_contains($databasePhp, "\$GLOBALS['config']['database']"));
+
+$cacheManagerPhp = file_get_contents(dirname(__DIR__) . '/core/CacheManager.php');
+assertTest("AUD-PERF-04: CacheManager checa \$GLOBALS['config'] antes de require", str_contains($cacheManagerPhp, "\$GLOBALS['config']"));
+
+$rcpClientPhp = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/src/RedisClient.php');
+assertTest("AUD-PERF-04: RedisClient suporta persistent via pconnect", str_contains($rcpClientPhp, "'persistent'") && str_contains($rcpClientPhp, 'pconnect('));
+assertTest("AUD-PERF-04: RedisClient utiliza _pack() quando disponível para empacotar tokens de lock", str_contains($rcpClientPhp, "packLockToken"));
+assertTest("AUD-PERF-04: RedisClient utiliza hrtime(true) monotônico no remember()", str_contains($rcpClientPhp, "hrtime(true)"));
+assertTest("AUD-PERF-04: RedisClient libera lock atomicamente via script Lua", str_contains($rcpClientPhp, 'redis.call("get", KEYS[1]) == ARGV[1]'));
+
+$inputCss = file_get_contents(dirname(__DIR__) . '/src/input.css');
+assertTest("AUD-PERF-04: src/input.css contém .article-body compartilhado", str_contains($inputCss, '.article-body {'));
+assertTest("AUD-PERF-04: src/input.css contém .article-body-post", str_contains($inputCss, '.article-body-post'));
+assertTest("AUD-PERF-04: src/input.css contém .article-body-page", str_contains($inputCss, '.article-body-page'));
+
+$templatesPostPhp = file_get_contents(dirname(__DIR__) . '/templates/post.php');
+assertTest("AUD-PERF-04: templates/post.php não contém <style> inline", !str_contains($templatesPostPhp, '<style>'));
+assertTest("AUD-PERF-04: templates/post.php possui contêiner .article-body-post preservando classes flex", str_contains($templatesPostPhp, 'class="article-body article-body-post flex flex-col gap-space-md"'));
+
+$themesPostPhp = file_get_contents(dirname(__DIR__) . '/themes/portal-noticias/post.php');
+assertTest("AUD-PERF-04: themes/portal-noticias/post.php não contém <style> inline", !str_contains($themesPostPhp, '<style>'));
+assertTest("AUD-PERF-04: themes/portal-noticias/post.php possui contêiner .article-body-post preservando classes flex", str_contains($themesPostPhp, 'class="article-body article-body-post flex flex-col gap-space-md"'));
+
+$templatesPagePhp = file_get_contents(dirname(__DIR__) . '/templates/page.php');
+assertTest("AUD-PERF-04: templates/page.php não contém <style> inline", !str_contains($templatesPagePhp, '<style>'));
+assertTest("AUD-PERF-04: templates/page.php possui contêiner .article-body-page", str_contains($templatesPagePhp, 'class="article-body article-body-page mt-2"'));
+
+$themesPagePhp = file_get_contents(dirname(__DIR__) . '/themes/portal-noticias/page.php');
+assertTest("AUD-PERF-04: themes/portal-noticias/page.php não contém <style> inline", !str_contains($themesPagePhp, '<style>'));
+assertTest("AUD-PERF-04: themes/portal-noticias/page.php possui contêiner .article-body-page", str_contains($themesPagePhp, 'class="article-body article-body-page mt-2"'));
+
+$themesHeaderPhp = file_get_contents(dirname(__DIR__) . '/themes/portal-noticias/header.php');
+assertTest("AUD-PERF-04: themes/portal-noticias/header.php não possui código morto if (false)", !str_contains($themesHeaderPhp, 'if (false)'));
+
+$portalBlogPhp = file_get_contents(dirname(__DIR__) . '/themes/portal-noticias/blog.php');
+assertTest("AUD-PERF-04: themes/portal-noticias/blog.php utiliza getResponsiveCardData", str_contains($portalBlogPhp, 'ImageProcessor::getResponsiveCardData'));
+assertTest("AUD-PERF-04: themes/portal-noticias/blog.php prioriza primeiro card com eager/high", str_contains($portalBlogPhp, "loading=\"eager\" fetchpriority=\"high\""));
+
+$empresaHomePhp = file_get_contents(dirname(__DIR__) . '/themes/empresa/home.php');
+assertTest("AUD-PERF-04: themes/empresa/home.php utiliza getResponsiveCardData", str_contains($empresaHomePhp, 'ImageProcessor::getResponsiveCardData'));
+
+$packageJson = file_get_contents(dirname(__DIR__) . '/package.json');
+assertTest("AUD-PERF-04: package.json build:css sincroniza os 3 destinos estáticos", str_contains($packageJson, 'public/assets/themes/portal-noticias/css/style.css') && str_contains($packageJson, 'themes/portal-noticias/assets/css/style.css'));
+
+// Teste funcional do helper ImageProcessor::getResponsiveCardData
+\LightPress\Core\ImageProcessor::clearMemoryCache();
+$emptyCard = \LightPress\Core\ImageProcessor::getResponsiveCardData('', 'Título Padrão');
+assertTest("AUD-PERF-04: getResponsiveCardData com URL vazia retorna estrutura segura", $emptyCard['src'] === '' && $emptyCard['srcset'] === '' && $emptyCard['title'] === 'Título Padrão');
+
+// -------------------------------------------------------------
+// [16] Testando Regressões dos 8 Bugs Identificados na Revisão
+// -------------------------------------------------------------
+echo "\n[16] Testando Correção dos 8 Bugs Críticos da Revisão Técnica\n";
+
+// Bug 1: settings.php preserva enabled e stampede_protection e segrega formulários
+$rcpSettingsPhp = file_get_contents(dirname(__DIR__) . '/plugins/redis-cache-pro/settings.php');
+assertTest("BUG-01: settings.php possui identificador de formulário form_type", str_contains($rcpSettingsPhp, 'name="form_type" value="settings"') && str_contains($rcpSettingsPhp, 'name="form_type" value="alerts"'));
+assertTest("BUG-01: settings.php não sobrescreve enabled com false ao salvar", !str_contains($rcpSettingsPhp, "\$newConfig['enabled'] = isset(\$_POST['enabled'])"));
+assertTest("BUG-01: settings.php restringe atualização booleana aos campos do formulário submetido", str_contains($rcpSettingsPhp, "\$isAlertsForm ="));
+
+// Bug 2: RedisClient passa token bruto ao set() e empacota apenas para o Lua
+assertTest("BUG-02: RedisClient passa lockToken bruto ao set()", str_contains($rcpClientPhp, "->redis->set(\$lockKey, \$lockToken, ['nx', 'px' => \$lockTtlMs])"));
+assertTest("BUG-02: RedisClient não passa packLockToken diretamente dentro de redis->set", !str_contains($rcpClientPhp, "->redis->set(\$lockKey, \$this->packLockToken("));
+assertTest("BUG-02: RedisClient empacota token apenas para o script Lua em releaseLock", str_contains($rcpClientPhp, "\$packed = \$this->packLockToken(\$lockToken);") && str_contains($rcpClientPhp, "[\$lockKey, \$packed]"));
+
+// Bug 3: ImageProcessor reconhece miniaturas legadas do manifesto e usa em src de cards
+\LightPress\Core\ImageProcessor::clearMemoryCache();
+\LightPress\Core\ImageProcessor::setMemoryManifest('uploads/2026/05/foto-legada.jpg', [
+    'variants' => [
+        '300x180' => [
+            'url' => '/uploads/2026/05/foto-legada-300x180.webp',
+            'width' => 300,
+            'height' => 180,
+        ]
+    ]
+]);
+$legacyThumb = \LightPress\Core\ImageProcessor::toThumbUrl('/uploads/2026/05/foto-legada.jpg');
+assertTest("BUG-03: ImageProcessor::toThumbUrl resolve miniatura legada 300x180 do manifesto", $legacyThumb === '/uploads/2026/05/foto-legada-300x180.webp');
+
+$legacyCard = \LightPress\Core\ImageProcessor::getResponsiveCardData('/uploads/2026/05/foto-legada.jpg', 'Foto Legada');
+assertTest("BUG-03: getResponsiveCardData utiliza miniatura legada em src", $legacyCard['src'] === '/uploads/2026/05/foto-legada-300x180.webp');
+assertTest("BUG-03: getResponsiveCardData não declara srcset espúrio quando há apenas uma variante", $legacyCard['srcset'] === '');
+
+// Revisão 4 - Bug 1: Não duplicar larguras no srcset
+\LightPress\Core\ImageProcessor::clearMemoryCache();
+\LightPress\Core\ImageProcessor::setMemoryManifest('uploads/2026/05/foto-dupla.jpg', [
+    'variants' => [
+        'thumb' => [
+            'avif' => ['url' => '/uploads/2026/05/foto-dupla-thumb.avif', 'width' => 300],
+            'webp' => ['url' => '/uploads/2026/05/foto-dupla-thumb.webp', 'width' => 300],
+        ],
+        'intermediate' => [
+            'avif' => ['url' => '/uploads/2026/05/foto-dupla-1024.avif', 'width' => 1024],
+            'webp' => ['url' => '/uploads/2026/05/foto-dupla-1024.webp', 'width' => 1024],
+        ],
+    ]
+]);
+$cardDuplo = \LightPress\Core\ImageProcessor::getResponsiveCardData('/uploads/2026/05/foto-dupla.jpg', 'Foto Dupla');
+assertTest("BUG-01-REV4: getResponsiveCardData não duplica descritores de largura no srcset", substr_count($cardDuplo['srcset'], '300w') === 1 && substr_count($cardDuplo['srcset'], '1024w') === 1);
+assertTest("BUG-01-REV4: getResponsiveCardData prioriza formato AVIF quando disponível", str_contains($cardDuplo['srcset'], 'foto-dupla-thumb.avif 300w') && str_contains($cardDuplo['srcset'], 'foto-dupla-1024.avif 1024w'));
+
+// Bug 4: PostService promoteScheduledPosts purga todas as partições e persiste jobs de retry
+$postServicePhp = file_get_contents(dirname(__DIR__) . '/core/PostService.php');
+assertTest("BUG-04: PostService::promoteScheduledPosts calcula maxParts dinamicamente", str_contains($postServicePhp, "max(1, (int)ceil(\$totalPublished / 5000))"));
+assertTest("BUG-04: PostService::promoteScheduledPosts utiliza buildPostPurgeUrls", str_contains($postServicePhp, "buildPostPurgeUrls(\$p, null, \$maxParts)"));
+assertTest("BUG-04: PostService::promoteScheduledPosts registra e completa purge job", str_contains($postServicePhp, "recordPurgeJob((int)\$p['id'], 'promote_scheduled'") && str_contains($postServicePhp, "completePurgeJob(\$jobId)"));
+
+// Revisão 4 - Bug 3: Atomicidade do registro de purge job dentro da transação de promoção
+assertTest("BUG-03-REV4: promoteScheduledPosts registra recordPurgeJob atomicamente dentro de Database::transaction", str_contains($postServicePhp, "Database::transaction(function (\\PDO \$pdo) use (\$nowUtc, \$cacheManager, &\$promotedJobs)"));
+
+// Bug 5: PostService publishOrUpdate seleciona tags em current e purga tags removidas
+assertTest("BUG-05: PostService publishOrUpdate inclui tags no SELECT FOR UPDATE", str_contains($postServicePhp, "SELECT id, user_id, slug, category, tags, status, is_featured, version, published_at FROM posts WHERE id = ?"));
+$samplePurgeUrls = \LightPress\Core\PostService::buildPostPurgeUrls(
+    ['slug' => 'nova-materia', 'category' => 'formula-1', 'tags' => 'tag1,tag2'],
+    ['slug' => 'materia-antiga', 'category' => 'f1', 'tags' => 'tag-removida,tag1'],
+    2
+);
+assertTest("BUG-05: buildPostPurgeUrls inclui URLs de tags novas", in_array('/tag/tag2/', $samplePurgeUrls, true));
+assertTest("BUG-05: buildPostPurgeUrls inclui URLs de tags removidas", in_array('/tag/tag-removida/', $samplePurgeUrls, true));
+
+// Revisão 4 - Bug 2: Paginação profunda dinâmica em home, blog, categorias e tags
+$urlsWithPagination = \LightPress\Core\PostService::buildPostPurgeUrls(
+    ['slug' => 'gp-monaco', 'category' => 'f1', 'tags' => 'racing'],
+    null,
+    null,
+    [
+        'home' => 48,
+        'categories' => ['f1' => 48],
+        'tags' => ['racing' => 24],
+    ]
+);
+assertTest("BUG-02-REV4: buildPostPurgeUrls inclui página 4 da home quando há 48 matérias", in_array('/page/4/', $urlsWithPagination, true));
+assertTest("BUG-02-REV4: buildPostPurgeUrls inclui página 4 do blog quando há 48 matérias", in_array('/blog/page/4/', $urlsWithPagination, true));
+assertTest("BUG-02-REV4: buildPostPurgeUrls inclui página 4 da categoria quando há 48 matérias", in_array('/categoria/f1/page/4/', $urlsWithPagination, true));
+assertTest("BUG-02-REV4: buildPostPurgeUrls inclui página 2 da tag quando há 24 matérias", in_array('/tag/racing/page/2/', $urlsWithPagination, true));
+
+// Revisão 5 - Limite de purga de paginação entre 5 e 10 páginas para eficiência editorial
+assertTest("BUG-REV5: PostService possui MAX_PAGINATION_PURGE_PAGES definido entre 5 e 10", \LightPress\Core\PostService::MAX_PAGINATION_PURGE_PAGES >= 5 && \LightPress\Core\PostService::MAX_PAGINATION_PURGE_PAGES <= 10);
+
+$urlsLargePagination = \LightPress\Core\PostService::buildPostPurgeUrls(
+    ['slug' => 'gp-monaco', 'category' => 'f1', 'tags' => 'racing'],
+    null,
+    null,
+    [
+        'home' => 120, // 10 páginas
+        'categories' => ['f1' => 120], // 10 páginas
+        'tags' => ['racing' => 120], // 10 páginas
+    ]
+);
+assertTest("BUG-REV5: buildPostPurgeUrls inclui primeiras páginas até o limite (página 5)", in_array('/page/5/', $urlsLargePagination, true) && in_array('/blog/page/5/', $urlsLargePagination, true) && in_array('/categoria/f1/page/5/', $urlsLargePagination, true) && in_array('/tag/racing/page/5/', $urlsLargePagination, true));
+assertTest("BUG-REV5: buildPostPurgeUrls NÃO envia páginas acima do limite (página 6+)", !in_array('/page/6/', $urlsLargePagination, true) && !in_array('/blog/page/6/', $urlsLargePagination, true) && !in_array('/categoria/f1/page/6/', $urlsLargePagination, true) && !in_array('/tag/racing/page/6/', $urlsLargePagination, true));
+assertTest("BUG-REV5: buildPostPurgeUrls preserva invalidação direta de artigo, feeds e sitemaps", in_array('/gp-monaco/', $urlsLargePagination, true) && in_array('/feed.xml', $urlsLargePagination, true) && in_array('/sitemap.xml', $urlsLargePagination, true) && in_array('/sitemap-news.xml', $urlsLargePagination, true) && in_array('/sitemap-main.xml', $urlsLargePagination, true));
+
+// Bug 6: PostService purga partições considerando max(anterior, novo)
+assertTest("BUG-06: PostService calcula maxParts com max(prevPublishedCount, newPublishedCount)", str_contains($postServicePhp, "max(\$prevPublishedCount, \$newPublishedCount)"));
+assertTest("BUG-06: buildPostPurgeUrls enumera todas as partições de sitemap especificadas", in_array('/sitemap-posts-1.xml', $samplePurgeUrls, true) && in_array('/sitemap-posts-2.xml', $samplePurgeUrls, true));
+
+// Bug 7: completePurgeJob é chamado com sucesso nas rotas de páginas e categorias
+$pageEditPhp = file_get_contents(dirname(__DIR__) . '/public/admin/page-edit.php');
+$pagesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/pages.php');
+$categoriesPhp = file_get_contents(dirname(__DIR__) . '/public/admin/categories.php');
+
+assertTest("BUG-07: page-edit.php conclui jobs de purga em page_create e page_update", substr_count($pageEditPhp, "completePurgeJob(\$jobId)") === 2);
+assertTest("BUG-07: pages.php conclui job de purga em page_delete", str_contains($pagesPhp, "completePurgeJob(\$jobId)"));
+assertTest("BUG-07: categories.php conclui jobs de purga em todas as 4 operações de categoria", substr_count($categoriesPhp, "completePurgeJob(\$jobId)") === 4);
+
+// Bug 8: Escopo de figcaption no CSS restrito estritamente a .article-body-post
+assertTest("BUG-08: src/input.css suprime figcaption apenas em .article-body-post", str_contains($inputCss, ".article-body-post figcaption {\n    display: none;\n}"));
+assertTest("BUG-08: src/input.css NÃO suprime figcaption genérico de .article-body", !str_contains($inputCss, ".article-body figcaption {"));
+$compiledCss = file_get_contents(dirname(__DIR__) . '/public/assets/style.css');
+assertTest("BUG-08: CSS compilado contém .article-body-post figcaption{display:none}", str_contains($compiledCss, ".article-body-post figcaption{display:none}"));
+
+// -------------------------------------------------------------
 // Relatório Final
 // -------------------------------------------------------------
 echo "\n========================================================\n";

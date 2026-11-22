@@ -24,6 +24,39 @@ class FakeRedis
         return true;
     }
 
+    public function connect(string $host, ?int $port = null, float $timeout = 0.0): bool
+    {
+        return !$this->shouldFailPing;
+    }
+
+    public function pconnect(string $host, ?int $port = null, float $timeout = 0.0, ?string $persistentId = null): bool
+    {
+        return $this->connect($host, $port, $timeout);
+    }
+
+    public function _pack(mixed $val): string
+    {
+        return serialize($val);
+    }
+
+    public function eval(string $script, array $args = [], int $numKeys = 0): mixed
+    {
+        if (str_contains($script, 'redis.call("get", KEYS[1]) == ARGV[1]')) {
+            $key = $args[0] ?? '';
+            $token = $args[1] ?? '';
+            $entry = $this->entry($key);
+            if ($entry !== null) {
+                $raw = $entry['raw'] ?? $this->_pack($entry['value']);
+                if ((string)$raw === (string)$token) {
+                    $this->del($key);
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        return false;
+    }
+
     private function &store(): array
     {
         if (!isset(self::$databases[$this->db])) {
@@ -126,6 +159,7 @@ class FakeRedis
         $store = &$this->store();
         $store[$key] = [
             'value'    => $value,
+            'raw'      => $this->_pack($value),
             'expires'  => $ttl ? microtime(true) * 1000 + $ttl : 0,
             'revision' => bin2hex(random_bytes(8)),
             'type'     => is_array($value) ? 'hash' : 'string',

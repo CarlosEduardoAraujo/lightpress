@@ -24,8 +24,9 @@ class CacheManager
     public function __construct(?array $config = null)
     {
         if ($config === null) {
-            $globalConfig = require dirname(__DIR__) . '/config.php';
-            $config = $globalConfig;
+            $config = (!empty($GLOBALS['config']) && is_array($GLOBALS['config']))
+                ? $GLOBALS['config']
+                : (file_exists(dirname(__DIR__) . '/config.php') ? require dirname(__DIR__) . '/config.php' : []);
         }
 
         $this->config = $config;

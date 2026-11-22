@@ -40,3 +40,264 @@ html.dark ::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     background-clip: content-box;
 }
+
+/* ==========================================================================
+   Estilos Semânticos Compartilhados para o Corpo do Artigo / Página
+   ========================================================================== */
+.article-body {
+    font-family: 'Work Sans', sans-serif;
+    font-size: 1.125rem;
+    line-height: 1.85;
+    color: #141d23;
+}
+html.dark .article-body {
+    color: #d1d5db;
+}
+.article-body p {
+    margin-bottom: 1.5rem;
+}
+.article-body a {
+    color: #E10600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+    transition: color 0.15s ease;
+}
+.article-body a:hover {
+    color: #af101a;
+}
+html.dark .article-body a:hover {
+    color: #ffb4a8;
+}
+.article-body strong, .article-body b {
+    font-weight: 700;
+    color: #111418;
+}
+html.dark .article-body strong, html.dark .article-body b {
+    color: #FFFFFF;
+}
+.article-body figure {
+    margin: 2.25rem 0;
+}
+.article-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    display: block;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #E5E7EB;
+}
+html.dark .article-body img {
+    border-color: #2a303c;
+}
+.article-body-post figcaption {
+    display: none;
+}
+.article-body ul {
+    list-style-type: disc;
+    margin: 1.5rem 0;
+    padding-left: 1.75rem;
+}
+.article-body ol {
+    list-style-type: decimal;
+    margin: 1.5rem 0;
+    padding-left: 1.75rem;
+}
+.article-body li {
+    margin-bottom: 0.5rem;
+    line-height: 1.75;
+}
+.article-body hr {
+    margin: 2.5rem 0;
+    border: none;
+    border-top: 1px solid #E5E7EB;
+}
+html.dark .article-body hr {
+    border-top: 1px solid #2a303c;
+}
+
+/* Tabelas semânticas e responsivas */
+.article-body table {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0;
+    border: 1px solid #E5E7EB;
+    font-size: 0.95rem;
+}
+html.dark .article-body table {
+    border-color: #2a303c;
+}
+@media (max-width: 768px) {
+    .article-body table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+.article-body th {
+    background: #f8fafc;
+    color: #111418;
+    font-weight: 700;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid #E10600;
+    border-right: 1px solid #E5E7EB;
+    white-space: nowrap;
+}
+html.dark .article-body th {
+    background: #1a233a;
+    color: #FFFFFF;
+    border-bottom-color: #E10600;
+    border-right-color: #2a303c;
+}
+.article-body td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #E5E7EB;
+    border-right: 1px solid #E5E7EB;
+    color: inherit;
+}
+html.dark .article-body td {
+    border-bottom-color: #2a303c;
+    border-right-color: #2a303c;
+}
+.article-body tr:nth-child(even) {
+    background: #F9FAFB;
+}
+html.dark .article-body tr:nth-child(even) {
+    background: #151d30;
+}
+.article-body tr:hover {
+    background: #f1f5f9;
+}
+html.dark .article-body tr:hover {
+    background: #1e293b;
+}
+.article-body caption {
+    caption-side: bottom;
+    padding: 0.5rem;
+    font-size: 0.825rem;
+    color: #64748b;
+    font-style: italic;
+    text-align: left;
+}
+html.dark .article-body caption {
+    color: #94a3b8;
+}
+
+/* ==========================================================================
+   Estilos Específicos para Notícias / Matérias (.article-body-post)
+   ========================================================================== */
+.article-body-post > p:first-of-type::first-letter {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.5rem;
+    float: left;
+    margin-right: 0.75rem;
+    line-height: 0.85;
+    color: #E10600;
+    font-weight: 700;
+}
+.article-body-post h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    color: #111418;
+}
+html.dark .article-body-post h2 {
+    color: #FFFFFF;
+}
+.article-body-post h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: #111418;
+}
+html.dark .article-body-post h3 {
+    color: #FFFFFF;
+}
+.article-body-post h4 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.75rem;
+    margin-bottom: 0.5rem;
+    color: #111418;
+}
+html.dark .article-body-post h4 {
+    color: #FFFFFF;
+}
+.article-body-post blockquote {
+    margin: 2rem 0;
+    padding: 1.25rem 1.75rem;
+    border-left: 4px solid #E10600;
+    background: #F9FAFB;
+    border-radius: 0 0.75rem 0.75rem 0;
+    font-style: italic;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    color: #111418;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+html.dark .article-body-post blockquote {
+    background: #1A1E24;
+    color: #FFFFFF;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+}
+
+/* ==========================================================================
+   Estilos Específicos para Páginas Institucionais (.article-body-page)
+   ========================================================================== */
+.article-body-page h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    color: #111418;
+    border-left: 4px solid #E10600;
+    padding-left: 0.75rem;
+}
+html.dark .article-body-page h2 {
+    color: #FFFFFF;
+}
+.article-body-page h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: #111418;
+}
+html.dark .article-body-page h3 {
+    color: #FFFFFF;
+}
+.article-body-page blockquote {
+    margin: 1.75rem 0;
+    padding: 1rem 1.5rem;
+    border-left: 4px solid #E10600;
+    background: #f8fafc;
+    border-radius: 0 0.5rem 0.5rem 0;
+    font-style: italic;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #334155;
+}
+html.dark .article-body-page blockquote {
+    background: #1c222c;
+    color: #cbd5e1;
+}

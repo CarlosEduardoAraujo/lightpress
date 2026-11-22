@@ -98,21 +98,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $currentRaw = Settings::get('redis_cache_pro_settings', '[]');
             $currentSettings = json_decode($currentRaw, true) ?: [];
 
-            // Campos da tela (campo 'password' tratado defensivamente abaixo - SEC-04)
-            $fields = [
-                'host', 'port', 'database', 'split_transients_db',
-                'timeout', 'prefix', 'maxttl', 'stampede_protection', 'serializer',
-                'compression', 'warmup_posts', 'warmup_categories', 'warmup_custom_urls',
-                'webhook_url', 'alert_email', 'memory_threshold', 'notify_circuit_breaker',
-                'notify_memory_spike', 'enabled'
-            ];
+            // Identifica qual formulário foi submetido (Configurações vs Alertas)
+            $isAlertsForm = (isset($_POST['form_type']) && $_POST['form_type'] === 'alerts')
+                || (isset($_POST['webhook_url']) || isset($_POST['alert_email']) || isset($_POST['memory_threshold']));
+
+            if ($isAlertsForm) {
+                // Formulário de Canais de Alerta: atualiza apenas campos de alerta
+                $fields = [
+                    'webhook_url', 'alert_email', 'memory_threshold',
+                    'notify_circuit_breaker', 'notify_memory_spike'
+                ];
+                $boolFields = ['notify_circuit_breaker', 'notify_memory_spike'];
+            } else {
+                // Formulário de Conexão e Pre-warming: atualiza apenas campos de conexão
+                $fields = [
+                    'host', 'port', 'database', 'split_transients_db',
+                    'timeout', 'prefix', 'maxttl', 'serializer',
+                    'compression', 'warmup_posts', 'warmup_categories',
+                    'warmup_custom_urls', 'persistent'
+                ];
+                $boolFields = ['warmup_categories', 'persistent'];
+            }
 
             foreach ($fields as $field) {
                 if (isset($_POST[$field])) {
                     $val = $_POST[$field];
                     if (in_array($field, ['port', 'database', 'warmup_posts', 'memory_threshold'], true)) {
                         $val = (int)$val;
-                    } elseif (in_array($field, ['stampede_protection', 'warmup_categories', 'notify_circuit_breaker', 'notify_memory_spike', 'enabled'], true)) {
+                    } elseif (in_array($field, $boolFields, true)) {
                         $val = !empty($val);
                     } elseif ($field === 'timeout') {
                         $val = (float)$val;
@@ -120,18 +133,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $val = $val !== '' ? (int)$val : null;
                     }
                     $currentSettings[$field] = $val;
+                } else {
+                    // Apenas zera campos booleanos que pertencem ao formulário efetivamente enviado
+                    if (in_array($field, $boolFields, true)) {
+                        $currentSettings[$field] = false;
+                    }
                 }
             }
 
-            // Tratamento defensivo do campo de senha do Redis (SEC-04)
-            if (!empty($_POST['remove_password'])) {
-                $currentSettings['password'] = '';
-            } elseif (isset($_POST['password'])) {
-                $submittedPassword = Security::getSafePassword($_POST, 'password');
-                $trimmed = trim($submittedPassword);
-                // Preserva a senha existente caso venha vazia ou mascarada
-                if ($trimmed !== '' && !preg_match('/^[•*]+$/u', $trimmed)) {
-                    $currentSettings['password'] = $submittedPassword;
+            // Tratamento defensivo do campo de senha do Redis (apenas se enviado no formulário de conexão)
+            if (!$isAlertsForm) {
+                if (!empty($_POST['remove_password'])) {
+                    $currentSettings['password'] = '';
+                } elseif (isset($_POST['password'])) {
+                    $submittedPassword = Security::getSafePassword($_POST, 'password');
+                    $trimmed = trim($submittedPassword);
+                    // Preserva a senha existente caso venha vazia ou mascarada
+                    if ($trimmed !== '' && !preg_match('/^[•*]+$/u', $trimmed)) {
+                        $currentSettings['password'] = $submittedPassword;
+                    }
                 }
             }
 
@@ -421,6 +441,7 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                     <span class="rcp-card-title">Configurações de Conexão & Pre-warming</span>
                 </div>
                 <form id="rcp-settings-form">
+                    <input type="hidden" name="form_type" value="settings">
                     <div class="rcp-form-group">
                         <label class="rcp-label">Servidor Redis (Host / Socket)</label>
                         <input type="text" name="host" class="rcp-input" value="<?= Security::e((string)($settings['host'] ?? '127.0.0.1')) ?>" required>
@@ -436,6 +457,14 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                             <label class="rcp-label">Database Index</label>
                             <input type="number" name="database" class="rcp-input" min="0" max="15" value="<?= Security::e((string)($settings['database'] ?? 0)) ?>" required>
                         </div>
+                    </div>
+
+                    <div class="rcp-form-group">
+                        <label class="rcp-checkbox-label">
+                            <input type="checkbox" name="persistent" value="1" <?= !empty($settings['persistent']) ? 'checked' : '' ?>>
+                            <strong>Conexão Persistente (pconnect)</strong>
+                        </label>
+                        <span class="rcp-help">Mantém o socket TCP aberto entre requisições sob PHP-FPM, reduzindo handshakes de rede.</span>
                     </div>
 
                     <div class="rcp-form-group">
@@ -576,6 +605,7 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
                     <span class="rcp-card-title">Canais de Notificação de Incidentes</span>
                 </div>
                 <form id="rcp-alerts-form">
+                    <input type="hidden" name="form_type" value="alerts">
                     <div class="rcp-form-group">
                         <label class="rcp-label">URL do Webhook (Discord / Slack / Teams / n8n)</label>
                         <input type="url" name="webhook_url" class="rcp-input" placeholder="https://discord.com/api/webhooks/..." value="<?= Security::e((string)($settings['webhook_url'] ?? '')) ?>">
