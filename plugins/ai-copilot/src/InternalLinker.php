@@ -51,7 +51,7 @@ final class InternalLinker
             $rows = Database::fetchAll(
                 "SELECT id, title, slug, summary, published_at 
                  FROM posts 
-                 WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ? 
+                 WHERE status = 'published' AND id != ? AND published_at <= ?
                  ORDER BY published_at DESC 
                  LIMIT ?",
                 [$currentPostId, $nowUtc, $limit]
@@ -67,7 +67,7 @@ final class InternalLinker
                     "SELECT id, title, slug, summary, published_at,
                             MATCH(title, summary, tags) AGAINST(? IN NATURAL LANGUAGE MODE) AS score
                      FROM posts
-                     WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
+                     WHERE status = 'published' AND id != ? AND published_at <= ?
                        AND MATCH(title, summary, tags) AGAINST(? IN NATURAL LANGUAGE MODE) > 0
                      ORDER BY score DESC, published_at DESC
                      LIMIT ?",
@@ -96,7 +96,7 @@ final class InternalLinker
 
         $sql = "SELECT id, title, slug, summary, published_at 
                 FROM posts 
-                WHERE status IN ('published', 'scheduled') AND id != ? AND published_at <= ?";
+                WHERE status = 'published' AND id != ? AND published_at <= ?";
 
         if (!empty($subConds)) {
             $sql .= " AND (" . implode(' OR ', $subConds) . ")";

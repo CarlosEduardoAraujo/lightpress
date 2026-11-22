@@ -80,7 +80,7 @@ $router->get('/', function () use ($config, $router): void {
                     "SELECT p.id, p.slug, p.title, p.summary, p.category, p.featured_image, p.published_at, u.name AS author_name
                      FROM posts p
                      LEFT JOIN users u ON u.id = p.user_id
-                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                     WHERE p.status = 'published' AND p.published_at <= ?
                      ORDER BY p.published_at DESC LIMIT 3",
                     [$nowUtc]
                 );
@@ -106,7 +106,7 @@ $router->get('/', function () use ($config, $router): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, LENGTH(p.content_html) AS content_len, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.is_featured = 1 AND p.published_at <= ?
+             WHERE p.status = 'published' AND p.is_featured = 1 AND p.published_at <= ?
              ORDER BY p.published_at DESC LIMIT 4",
             [$nowUtc]
         );
@@ -120,7 +120,7 @@ $router->get('/', function () use ($config, $router): void {
                 "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, LENGTH(p.content_html) AS content_len, u.name AS author_name
                  FROM posts p
                  LEFT JOIN users u ON u.id = p.user_id
-                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? {$excludeSql}
+                 WHERE p.status = 'published' AND p.published_at <= ? {$excludeSql}
                  ORDER BY p.published_at DESC LIMIT {$needed}",
                 [$nowUtc]
             );
@@ -132,7 +132,7 @@ $router->get('/', function () use ($config, $router): void {
     // Total de posts para cálculo de paginação
     $totalPosts = (int)ObjectCache::remember('home_total_posts_count', 300, function () use ($nowUtc): int {
         return (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
             [$nowUtc]
         );
     }, 'posts');
@@ -145,7 +145,7 @@ $router->get('/', function () use ($config, $router): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             WHERE p.status = 'published' AND p.published_at <= ?
              ORDER BY p.published_at DESC LIMIT ?",
             [$nowUtc, $perPage]
         );
@@ -172,7 +172,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
         [$nowUtc]
     );
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
@@ -191,7 +191,7 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         WHERE p.status = 'published' AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$nowUtc, (int)$perPage, (int)$offset]
     );
@@ -214,7 +214,7 @@ $router->get('/blog/', function () use ($config, $router): void {
 
     $totalPosts = (int)ObjectCache::remember('blog_total_posts_count', 300, function () use ($nowUtc): int {
         return (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
             [$nowUtc]
         );
     }, 'posts');
@@ -226,7 +226,7 @@ $router->get('/blog/', function () use ($config, $router): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             WHERE p.status = 'published' AND p.published_at <= ?
              ORDER BY p.published_at DESC LIMIT ?",
             [$nowUtc, $perPage]
         );
@@ -249,7 +249,7 @@ $router->get('/blog/page/{page}/', function (array $params) use ($config, $route
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
         [$nowUtc]
     );
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
@@ -268,7 +268,7 @@ $router->get('/blog/page/{page}/', function (array $params) use ($config, $route
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         WHERE p.status = 'published' AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$nowUtc, (int)$perPage, (int)$offset]
     );
@@ -309,7 +309,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
         [$categorySlug, $nowUtc]
     );
     $totalPages = (int)ceil($totalPosts / $perPage);
@@ -319,7 +319,7 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ?",
         [$categorySlug, $nowUtc, (int)$perPage]
     );
@@ -361,7 +361,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     }
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
         [$categorySlug, $nowUtc]
     );
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
@@ -380,7 +380,7 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
         "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
          ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
         [$categorySlug, $nowUtc, (int)$perPage, (int)$offset]
     );
@@ -427,7 +427,7 @@ $router->get('/busca/', function () use ($config): void {
                     $totalPosts = (int)Database::fetchValue(
                         "SELECT COUNT(*)
                          FROM posts p
-                         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                         WHERE p.status = 'published' AND p.published_at <= ?
                            AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)",
                         [$nowUtc, $boolQuery]
                     );
@@ -443,7 +443,7 @@ $router->get('/busca/', function () use ($config): void {
             $totalPosts = (int)Database::fetchValue(
                 "SELECT COUNT(*)
                  FROM posts p
-                 WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                 WHERE p.status = 'published' AND p.published_at <= ? 
                    AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)",
                 [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
             );
@@ -466,7 +466,7 @@ $router->get('/busca/', function () use ($config): void {
                     "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
                      FROM posts p
                      LEFT JOIN users u ON u.id = p.user_id
-                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ?
+                     WHERE p.status = 'published' AND p.published_at <= ?
                        AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
                      ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
                     [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
@@ -476,7 +476,7 @@ $router->get('/busca/', function () use ($config): void {
                     "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
                      FROM posts p
                      LEFT JOIN users u ON u.id = p.user_id
-                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                     WHERE p.status = 'published' AND p.published_at <= ? 
                        AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
                      ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
                     [$nowUtc, $searchTerm, $searchTerm, $searchTerm, (int)$perPage, (int)$offset]
@@ -532,7 +532,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
         $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
         $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
         $totalPosts = (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+            "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
             array_merge([$nowUtc], $tagCriteria)
         );
     } else {
@@ -551,7 +551,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
             try {
                 $totalPosts = (int)Database::fetchValue(
                     "SELECT COUNT(*) FROM posts p 
-                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                     WHERE p.status = 'published' AND p.published_at <= ? 
                        AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
                        AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
                     [$nowUtc, $boolQuery, $tagClean, $tagRaw]
@@ -569,7 +569,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
             $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
             $tagCriteria = [$tagClean, $tagRaw];
             $totalPosts = (int)Database::fetchValue(
-                "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+                "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
                 array_merge([$nowUtc], $tagCriteria)
             );
         }
@@ -585,7 +585,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
+             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
              ORDER BY p.published_at DESC LIMIT ?",
             array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
         );
@@ -594,7 +594,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+             WHERE p.status = 'published' AND p.published_at <= ? 
                AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
                AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
              ORDER BY p.published_at DESC LIMIT ?",
@@ -605,7 +605,7 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
+             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
              ORDER BY p.published_at DESC LIMIT ?",
             array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
         );
@@ -639,7 +639,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
         $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
         $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
         $totalPosts = (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+            "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
             array_merge([$nowUtc], $tagCriteria)
         );
     } else {
@@ -658,7 +658,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
             try {
                 $totalPosts = (int)Database::fetchValue(
                     "SELECT COUNT(*) FROM posts p 
-                     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+                     WHERE p.status = 'published' AND p.published_at <= ? 
                        AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
                        AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
                     [$nowUtc, $boolQuery, $tagClean, $tagRaw]
@@ -676,7 +676,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
             $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
             $tagCriteria = [$tagClean, $tagRaw];
             $totalPosts = (int)Database::fetchValue(
-                "SELECT COUNT(*) FROM posts p WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}",
+                "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
                 array_merge([$nowUtc], $tagCriteria)
             );
         }
@@ -699,7 +699,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
+             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
              ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
             array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
         );
@@ -708,7 +708,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+             WHERE p.status = 'published' AND p.published_at <= ? 
                AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
                AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
              ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
@@ -719,7 +719,7 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
             "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
              FROM posts p
              LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND {$tagCondition}
+             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
              ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
             array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
         );
@@ -818,7 +818,7 @@ $generalFeedHandler = function () use ($config, $renderRssFeed): void {
         "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+         WHERE p.status = 'published' AND p.published_at <= ? 
          ORDER BY p.published_at DESC LIMIT 50",
         [$nowUtc]
     );
@@ -866,7 +866,7 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
         "SELECT p.slug, p.title, p.summary, p.content_html, p.featured_image, p.category, p.published_at, u.name AS author_name 
          FROM posts p
          LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ? 
+         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ? 
          ORDER BY p.published_at DESC LIMIT 50",
         [$slug, $nowUtc]
     );
@@ -896,7 +896,7 @@ $router->get('/sitemap-news.xml', function () use ($config): void {
     $posts = Database::fetchAll(
         "SELECT slug, title, featured_image, published_at 
          FROM posts 
-         WHERE status IN ('published', 'scheduled') 
+         WHERE status = 'published' 
            AND published_at <= ? 
            AND published_at >= ? 
          ORDER BY published_at DESC LIMIT 1000",
@@ -950,7 +950,7 @@ $router->get('/sitemap.xml', function () use ($config): void {
     $countRow = Database::fetchOne(
         "SELECT COUNT(*) AS total, MAX(updated_at) AS latest_mod 
          FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+         WHERE status = 'published' AND published_at <= ?",
         [$nowUtc]
     );
 
@@ -1041,7 +1041,7 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
     $limit = 5000;
 
     $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?",
+        "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?",
         [$nowUtc]
     );
     $totalParts = max(1, (int)ceil($totalPosts / $limit));
@@ -1056,7 +1056,7 @@ $router->get('/sitemap-posts-{part}.xml', function (array $params) use ($config)
     $posts = Database::fetchAll(
         "SELECT slug, updated_at 
          FROM posts 
-         WHERE status IN ('published', 'scheduled') AND published_at <= ? 
+         WHERE status = 'published' AND published_at <= ? 
          ORDER BY published_at DESC 
          LIMIT ? OFFSET ?",
         [$nowUtc, $limit, $offset]
@@ -1127,7 +1127,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
             "SELECT p.*, u.name as author_name, u.avatar as author_avatar, u.bio as author_bio
              FROM posts p
              JOIN users u ON u.id = p.user_id
-             WHERE p.slug = ? AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+             WHERE p.slug = ? AND p.status = 'published' AND p.published_at <= ?
              LIMIT 1",
             [$slug, $nowUtc]
         );
@@ -1196,7 +1196,7 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
         return Database::fetchAll(
             "SELECT id, slug, title, summary, category, featured_image, published_at 
              FROM posts 
-             WHERE category = ? AND status IN ('published', 'scheduled') AND id != ? AND published_at <= ?
+             WHERE category = ? AND status = 'published' AND id != ? AND published_at <= ?
              ORDER BY published_at DESC LIMIT 4",
             [$post['category'], (int)$post['id'], $nowUtc]
         );

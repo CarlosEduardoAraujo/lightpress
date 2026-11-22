@@ -57,7 +57,7 @@ $posts = ObjectCache::remember("api_search:{$searchHash}", 60, function () use (
                 $posts = Database::fetchAll(
                     "SELECT id, slug, title, summary, category, featured_image, published_at
                      FROM posts
-                     WHERE status IN ('published', 'scheduled') AND published_at <= ?
+                     WHERE status = 'published' AND published_at <= ?
                        AND MATCH(title, summary, tags) AGAINST(? IN BOOLEAN MODE)
                      ORDER BY published_at DESC
                      LIMIT ?",
@@ -77,7 +77,7 @@ $posts = ObjectCache::remember("api_search:{$searchHash}", 60, function () use (
         $posts = Database::fetchAll(
             "SELECT id, slug, title, summary, category, featured_image, published_at
              FROM posts
-             WHERE status IN ('published', 'scheduled') AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
+             WHERE status = 'published' AND published_at <= ? AND (title LIKE ? OR summary LIKE ?)
              ORDER BY published_at DESC
              LIMIT ?",
             [$nowUtc, $searchTerm, $searchTerm, $limit]

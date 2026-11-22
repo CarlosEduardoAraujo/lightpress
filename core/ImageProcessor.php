@@ -486,7 +486,7 @@ class ImageProcessor
             $posts = Database::fetchAll("SELECT slug, category, tags FROM posts WHERE {$condition}", $params);
             $urls = ['/', '/blog/'];
             $nowUtc = gmdate('Y-m-d H:i:s');
-            $count = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ?", [$nowUtc]);
+            $count = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ?", [$nowUtc]);
             // Limitar a purga de paginações às primeiras páginas (secundárias possuem TTL natural de 5 min)
             $maxPages = min(3, (int)ceil($count / 12));
             for ($page = 2; $page <= $maxPages; $page++) {
@@ -496,7 +496,7 @@ class ImageProcessor
             foreach (array_unique(array_column($posts, 'category')) as $category) {
                 // Outras notícias da categoria podem exibir a foto nos relacionados (limite aos mais recentes).
                 $siblings = Database::fetchAll(
-                    "SELECT slug FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ? ORDER BY published_at DESC LIMIT 8",
+                    "SELECT slug FROM posts WHERE category = ? AND status = 'published' AND published_at <= ? ORDER BY published_at DESC LIMIT 8",
                     [$category, $nowUtc]
                 );
                 foreach ($siblings as $sibling) {
@@ -504,7 +504,7 @@ class ImageProcessor
                 }
                 $urls[] = '/categoria/' . $category . '/';
                 $catCount = (int)Database::fetchValue(
-                    "SELECT COUNT(*) FROM posts WHERE category = ? AND status IN ('published', 'scheduled') AND published_at <= ?",
+                    "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
                     [$category, $nowUtc]
                 );
                 $maxCatPages = min(3, (int)ceil($catCount / 12));
@@ -529,7 +529,7 @@ class ImageProcessor
                             $tagParams = [$cleanTag];
                         }
                         $tagCount = (int)Database::fetchValue(
-                            "SELECT COUNT(*) FROM posts WHERE status IN ('published', 'scheduled') AND published_at <= ? AND {$tagWhere}",
+                            "SELECT COUNT(*) FROM posts WHERE status = 'published' AND published_at <= ? AND {$tagWhere}",
                             array_merge([$nowUtc], $tagParams)
                         );
                         $maxTagPages = min(3, (int)ceil($tagCount / 12));

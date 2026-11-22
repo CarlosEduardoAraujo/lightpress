@@ -15,13 +15,13 @@ use LightPress\Core\Security;
 $currentUser = Security::requireAuth(null, null, $config);
 
 $nowUtc = gmdate('Y-m-d H:i:s');
-// Top 20 Notícias Mais Lidas (inclui agendadas cujo horário já foi atingido)
+// Top 20 Notícias Mais Lidas
 $topPosts = Database::fetchAll(
     "SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.published_at, u.name as author_name, s.views
      FROM posts p
      JOIN post_stats s ON s.post_id = p.id
      JOIN users u ON u.id = p.user_id
-     WHERE p.status IN ('published', 'scheduled') AND p.published_at <= ? AND s.views > 0
+     WHERE p.status = 'published' AND p.published_at <= ? AND s.views > 0
      ORDER BY s.views DESC
      LIMIT 20",
     [$nowUtc]
@@ -34,11 +34,12 @@ $categoryStats = Database::fetchAll(
             COALESCE(SUM(s.views), 0) as total_views,
             ROUND(COALESCE(AVG(s.views), 0)) as avg_views
      FROM categories c
-     LEFT JOIN posts p ON p.category = c.slug AND p.status IN ('published', 'scheduled') AND p.published_at <= '{$nowUtc}'
+     LEFT JOIN posts p ON p.category = c.slug AND p.status = 'published' AND p.published_at <= ?
      LEFT JOIN post_stats s ON s.post_id = p.id
      WHERE c.is_active = 1
      GROUP BY c.id
-     ORDER BY total_views DESC"
+     ORDER BY total_views DESC",
+    [$nowUtc]
 );
 
 // Desempenho da Equipe de Redação (Autores)

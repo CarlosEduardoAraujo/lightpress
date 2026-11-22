@@ -30,7 +30,7 @@ $categories = ObjectCache::remember('api_categories_list', 300, function () use 
     $rows = Database::fetchAll(
         "SELECT c.id, c.slug, c.name, COUNT(p.id) as total_posts 
          FROM categories c
-         LEFT JOIN posts p ON p.category = c.slug AND p.status IN ('published', 'scheduled') AND p.published_at <= ?
+         LEFT JOIN posts p ON p.category = c.slug AND p.status = 'published' AND p.published_at <= ?
          WHERE c.is_active = 1
          GROUP BY c.id
          ORDER BY c.name ASC",

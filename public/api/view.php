@@ -127,10 +127,10 @@ try {
                 return false;
             }
         } else {
-            // Verificar se o artigo existe e está plenamente publicado (ou agendado com horário atingido)
+            // Verificar se o artigo existe e está plenamente publicado
             $post = Database::fetchOne(
                 "SELECT id FROM posts 
-                 WHERE id = ? AND status IN ('published', 'scheduled') AND published_at IS NOT NULL AND published_at <= ?
+                 WHERE id = ? AND status = 'published' AND published_at IS NOT NULL AND published_at <= ?
                  LIMIT 1",
                 [$targetId, $nowUtc]
             );
