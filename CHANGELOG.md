@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Índices B-Tree e Eliminação de Filesort em Consultas Públicas (AUD-PERF-01) — 2026-11-22
+
+- **Eliminação de `Using filesort` em Consultas Públicas (`public/index.php`, `public/api/posts.php`, `public/api/categories.php`, `public/api/search.php` — AUD-PERF-01):**
+  - **Causa Raiz Neutralizada:** Substituição do predicado defensivo `status IN ('published', 'scheduled') AND published_at <= ?` por `status = 'published' AND published_at <= ?`. O uso de `IN` forçava o otimizador InnoDB/MariaDB e SQLite a realizar um range scan em duas partições de status e ordenar dezenas de milhares de registros em memória/disco (`Using filesort` / `USE TEMP B-TREE FOR ORDER BY`) antes de aplicar o `LIMIT`.
+  - **Index Scans Diretos e Custo $O(\log N + \text{LIMIT})$:** Todas as consultas públicas de listagem (Home, Blog, Categorias, Tags, Feeds RSS, Sitemaps XML e APIs) passam a operar por leitura direta e sequencial nas folhas ordenadas dos índices `idx_home (status, published_at DESC)`, `idx_featured (is_featured, status, published_at DESC)` e `idx_category (category, status, published_at DESC)`, encerrando a leitura imediatamente ao atingir o limite solicitado sem consumir CPU com ordenação temporária.
+  - **Alinhamento com a Arquitetura de Auto-Promoção:** Como o sistema já dispõe de promoção confiável e atômica de matérias agendadas via cron a cada 1 minuto (`bin/retry-cache-purge.php`), checagem on-request em `public/index.php` e purga seletiva de cache de borda e FastCGI Nginx, o status `published` garante publicação tempestiva (janela máxima de até 60s) plenamente compatível com o TTL de 300 segundos do cache.
+
+- **Higiene SQL e Alinhamento em Componentes Internos (`public/admin/stats.php`, `public/api/view.php`, `core/ImageProcessor.php`, `plugins/ai-copilot/src/InternalLinker.php` — AUD-PERF-01):**
+  - **Padronização de Prepared Statements em Estatísticas:** Na consulta `$categoryStats` em `public/admin/stats.php`, eliminação da interpolação direta `AND p.published_at <= '{$nowUtc}'` em favor de placeholder preparado `?` com passagem segura de parâmetro `[$nowUtc]`.
+  - **Consistência em Fast-Path de Visualizações e Purga:** Em `public/api/view.php`, alinhamento do filtro de existência para `status = 'published'`, garantindo sincronismo perfeito com a visibilidade de artigos na rota pública. Adequação de queries auxiliares em `ImageProcessor` e `InternalLinker`.
+  - **Resíduos Zerados:** Varredura em 100% do repositório confirmando zero ocorrências de `IN ('published', 'scheduled')` em código executável.
+
+- **Nova Suíte de Testes Automatizada de Planos de Execução (`bin/test-query-indexes.php`):**
+  - **Validação Empírica de Índices:** Suíte isolada em SQLite `:memory:` com cabeçalho rigoroso de CI (`declare(strict_types=1);` e guarda CLI padrão SEC-07), validando via `EXPLAIN QUERY PLAN` a ausência de `USE TEMP B-TREE FOR ORDER BY` e o uso correto dos índices nas 8 consultas de listagem mais críticas do portal.
+  - **Validação de Ciclo de Auto-Promoção:** Teste funcional comprovando que matérias agendadas com horário atingido são promovidas atomicamente para `status = 'published'` por `PostService::promoteScheduledPosts(true)` e tornam-se imediatamente visíveis na listagem pública.
+
 ### Auditoria de Segurança e Otimizações de Caching (AUD-SEC-03, AUD-SEC-04) — 2026-11-22
 
 - **Re-sanitização Mandatória na Restauração de Revisões por Autor (`public/admin/revisions.php` — AUD-SEC-04 / CWE-79):**

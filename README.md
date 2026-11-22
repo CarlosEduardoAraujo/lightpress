@@ -1439,6 +1439,19 @@ Em conformidade com a auditoria de segurança aprofundada de 13 de novembro de 2
   - Expansão da suíte para **187 testes automatizados** 100% aprovados, incluindo a nova seção `[13]` com 21 asserções dedicadas para AUD-SEC-03 (eliminação de chaves dinâmicas, validação de mapas em runtime, índice FULLTEXT, caches e diretivas Nginx).
   - Implementação de teste de integração em `bin/test-revision-safety.php` verificando o expurgo de cargas úteis com scripts e eventos maliciosos durante a restauração de rascunhos.
 
+#### 8.21.22. Otimização de Índices e Eliminação de Filesort em Consultas Públicas (AUD-PERF-01)
+* **Eliminação de `Using filesort` em Consultas Públicas (`public/index.php`, `public/api/` - AUD-PERF-01):**
+  - Substituição da condição defensiva `status IN ('published', 'scheduled') AND published_at <= ?` por `status = 'published' AND published_at <= ?` em todas as consultas públicas de listagem (Home, Blog, Categorias, Tags, Feeds RSS, Sitemaps XML e APIs).
+  - A eliminação do operador multi-valor `IN` permite que o otimizador InnoDB/MariaDB e SQLite utilize index scans sequenciais diretos nas árvores B+ dos índices `idx_home (status, published_at DESC)`, `idx_featured (is_featured, status, published_at DESC)` e `idx_category (category, status, published_at DESC)`.
+  - Custo de consulta reduzido para $O(\log N + \text{LIMIT})$, eliminando 100% da criação de tabelas temporárias e ordenações em memória/disco (`Using filesort` / `USE TEMP B-TREE FOR ORDER BY`).
+* **Harmonização com a Infraestrutura de Auto-Promoção Atômica:**
+  - Pleno aproveitamento de `PostService::promoteScheduledPosts()`, acionado a cada 1 minuto via cron worker (`bin/retry-cache-purge.php`) e on-request com cooldown de 60s em `public/index.php`.
+  - Matérias agendadas com horário atingido são promovidas atomicamente para `published` com purga imediata de cache Nginx e borda Cloudflare, garantindo publicação tempestiva sem penalizar o banco de dados.
+* **Higiene SQL e Padronização de Prepared Statements (`public/admin/stats.php`):**
+  - Na consulta `$categoryStats`, substituição da interpolação direta `AND p.published_at <= '{$nowUtc}'` por prepared statement parametrizado com placeholder `?` (`[$nowUtc]`).
+* **Suíte de Testes Automatizada Dedicada (`bin/test-query-indexes.php`):**
+  - Criação de suíte de testes isolada em SQLite `:memory:` com cabeçalho de CI e guarda CLI padrão SEC-07, validando ausência de `USE TEMP B-TREE FOR ORDER BY` em 8 consultas públicas fundamentais e o ciclo atômico de auto-promoção de agendados com 18 testes aprovados.
+
 ### 8.22. Migração para Canal Oficial no WhatsApp e Privacy by Design
 
 Para aprimorar o engajamento com a audiência e fortalecer a privacidade dos leitores (*Privacy by Design*), o portal descontinuou a captura de e-mails para newsletter diária em favor do Canal Oficial no WhatsApp:
@@ -1790,6 +1803,13 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Completude de Mocks em Testes de Performance (`bin/test-perf-arch-step22.php`, `bin/test-perf07-arch05.php`):** Inclusão de `flushGroup()`, `mGet()`, `setMultiple()`, `delete()` e `isConnected()` na classe mock `RedisCache`.
   - [x] **Proteção de Headers (`public/index.php`):** Envolvimento de `header()` e `http_response_code()` com `if (!headers_sent())`.
   - [x] **Zero Erros em `storage/logs/error.log`:** Execução limpa e 100% aprovada de todas as suítes de teste com o arquivo de log zerado.
+
+* **FASE CONCLUÍDA — Otimização de Índices B-Tree e Eliminação de Filesort em Listagens (AUD-PERF-01):**
+  - [x] **Eliminação de Filesort em Consultas Públicas (`public/index.php`, `public/api/`):** Substituição da condição defensiva `status IN ('published', 'scheduled')` por `status = 'published'` estrito em todas as consultas públicas de listagem (Home, Blog, Categorias, Tags, Feeds, Sitemaps e Micro-APIs).
+  - [x] **Aproveitamento Ótimo de Índices B-Tree:** As consultas passam a utilizar index scans diretos e sequenciais em `idx_home (status, published_at DESC)`, `idx_featured (is_featured, status, published_at DESC)` e `idx_category (category, status, published_at DESC)` com custo $O(\log N + \text{LIMIT})$, eliminando 100% das etapas de `Using filesort` e buffers temporários de ordenação.
+  - [x] **Harmonização com a Infraestrutura de Auto-Promoção Atômica:** Integração transparente com `PostService::promoteScheduledPosts()`, acionado a cada 1 minuto pelo cron worker (`bin/retry-cache-purge.php`) e com cooldown de 60s em `public/index.php`.
+  - [x] **Higiene SQL e Prepared Statements (`public/admin/stats.php`):** Substituição de interpolação direta de datas por prepared statement parametrizado na consulta `$categoryStats`.
+  - [x] **Suíte de Testes Automatizada Dedicada (`bin/test-query-indexes.php`):** Criação de teste isolado em SQLite `:memory:` com cabeçalho de CI e guarda CLI (SEC-07), validando ausência de `USE TEMP B-TREE FOR ORDER BY` em 8 consultas públicas e o ciclo atômico de auto-promoção de agendados com 18 testes aprovados.
 
 ---
 
