@@ -74,6 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             });
 
                             // Expurga cache da Home e das categorias antiga e nova
+                            ObjectCache::delete('all_active_categories', 'categories');
+                            ObjectCache::delete('api_categories_list', 'categories');
                             ObjectCache::flushGroup('categories');
                             $cacheMgr->purgeUrls([
                                 '/',
@@ -99,6 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             "INSERT INTO categories (name, slug, is_active) VALUES (?, ?, 1)",
                             [$name, $slug]
                         );
+                        ObjectCache::delete('all_active_categories', 'categories');
+                        ObjectCache::delete('api_categories_list', 'categories');
                         ObjectCache::flushGroup('categories');
                         $cacheMgr->purgeUrls(['/']);
                         $message = "Categoria '{$name}' cadastrada com sucesso!";
@@ -118,6 +122,8 @@ if ($toggleCatId > 0 && Security::verifyCsrfToken($csrfToggle)) {
     $cat = Database::fetchOne("SELECT slug, is_active FROM categories WHERE id = ? LIMIT 1", [$toggleCatId]);
     if ($cat && $cat['slug'] !== 'geral') {
         Database::query("UPDATE categories SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", [$toggleCatId]);
+        ObjectCache::delete('all_active_categories', 'categories');
+        ObjectCache::delete('api_categories_list', 'categories');
         ObjectCache::flushGroup('categories');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/']);
     }
@@ -138,6 +144,8 @@ if ($delCatId > 0 && Security::verifyCsrfToken($csrfDel)) {
             Database::query("DELETE FROM categories WHERE id = ?", [$delCatId]);
         });
         
+        ObjectCache::delete('all_active_categories', 'categories');
+        ObjectCache::delete('api_categories_list', 'categories');
         ObjectCache::flushGroup('categories');
         $cacheMgr->purgeUrls(['/', '/categoria/' . $cat['slug'] . '/', '/categoria/geral/']);
         header("Location: /admin/categories.php");

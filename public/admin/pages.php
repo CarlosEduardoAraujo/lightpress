@@ -36,6 +36,7 @@ if ($isDelPage) {
         if ($target) {
             Database::query("DELETE FROM pages WHERE id = ?", [$deleteId]);
             ObjectCache::delete("page_slug:{$target['slug']}", 'pages');
+            ObjectCache::delete('all_published_page_slugs', 'pages');
             ObjectCache::flushGroup('pages');
             try {
                 $cacheMgr = new CacheManager($config);

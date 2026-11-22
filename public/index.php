@@ -289,13 +289,16 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
     $nowUtc = gmdate('Y-m-d H:i:s');
     $perPage = 12;
 
-    $category = ObjectCache::remember("category:{$categorySlug}", 86400, function () use ($categorySlug): ?array {
-        $cat = Database::fetchOne(
-            "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
-            [$categorySlug]
-        );
-        return $cat ?: null;
+    $activeCategories = ObjectCache::remember('all_active_categories', 86400, function (): array {
+        $rows = Database::fetchAll("SELECT * FROM categories WHERE is_active = 1");
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['slug']] = $row;
+        }
+        return $map;
     }, 'categories');
+
+    $category = $activeCategories[$categorySlug] ?? null;
 
     if (!$category) {
         if (!headers_sent()) {
@@ -338,13 +341,16 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     $perPage = 12;
     $nowUtc = gmdate('Y-m-d H:i:s');
 
-    $category = ObjectCache::remember("category:{$categorySlug}", 86400, function () use ($categorySlug): ?array {
-        $cat = Database::fetchOne(
-            "SELECT * FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
-            [$categorySlug]
-        );
-        return $cat ?: null;
+    $activeCategories = ObjectCache::remember('all_active_categories', 86400, function (): array {
+        $rows = Database::fetchAll("SELECT * FROM categories WHERE is_active = 1");
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['slug']] = $row;
+        }
+        return $map;
     }, 'categories');
+
+    $category = $activeCategories[$categorySlug] ?? null;
 
     if (!$category) {
         if (!headers_sent()) {
@@ -834,10 +840,16 @@ $categoryFeedHandler = function (array $params) use ($config, $renderRssFeed): v
         return;
     }
 
-    $category = Database::fetchOne(
-        "SELECT id, name, slug FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
-        [$slug]
-    );
+    $activeCategories = ObjectCache::remember('all_active_categories', 86400, function (): array {
+        $rows = Database::fetchAll("SELECT * FROM categories WHERE is_active = 1");
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['slug']] = $row;
+        }
+        return $map;
+    }, 'categories');
+
+    $category = $activeCategories[$slug] ?? null;
 
     if (!$category) {
         if (!headers_sent()) {
@@ -1144,16 +1156,26 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     }
 
     if (!$post) {
-        // Tentar encontrar uma Página Institucional ativa (Equipe, Contato, Termos, Privacidade, etc.)
-        try {
-            $page = ObjectCache::remember("page_slug:{$slug}", 86400, function () use ($slug): ?array {
-                $pg = Database::fetchOne(
-                    "SELECT * FROM pages WHERE slug = ? AND status = 'published' LIMIT 1",
-                    [$slug]
-                );
-                return $pg ?: null;
+        // Tentar encontrar uma Página Institucional ativa via mapa compacto de slugs publicados
+        // Evita poluição de RAM no Redis com cache negativo para 404 (AUD-SEC-03)
+        $publishedSlugs = ObjectCache::remember('all_published_page_slugs', 86400, function (): array {
+            $rows = Database::fetchAll("SELECT id, slug FROM pages WHERE status = 'published'");
+            $map = [];
+            foreach ($rows as $row) {
+                $map[$row['slug']] = (int)$row['id'];
+            }
+            return $map;
+        }, 'pages');
+
+        if (isset($publishedSlugs[$slug])) {
+            $pageId = $publishedSlugs[$slug];
+            $page = ObjectCache::remember("page_id:{$pageId}", 86400, function () use ($pageId): ?array {
+                return Database::fetchOne(
+                    "SELECT * FROM pages WHERE id = ? AND status = 'published' LIMIT 1",
+                    [$pageId]
+                ) ?: null;
             }, 'pages');
-        } catch (\Throwable) {
+        } else {
             $page = null;
         }
 

@@ -97,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         // Invalidação de Cache de Objetos e Purga no Nginx
                         ObjectCache::delete("page_slug:{$slug}", 'pages');
+                        ObjectCache::delete('all_published_page_slugs', 'pages');
                         ObjectCache::flushGroup('pages');
                         try {
                             $cacheMgr = new CacheManager($config);
@@ -119,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (!empty($page['slug']) && $page['slug'] !== $slug) {
                             ObjectCache::delete("page_slug:{$page['slug']}", 'pages');
                         }
+                        ObjectCache::delete('all_published_page_slugs', 'pages');
                         ObjectCache::flushGroup('pages');
 
                         try {
