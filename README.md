@@ -182,7 +182,7 @@ Além do DDL editorial acima, a implementação deve criar estruturas persistent
 | Estrutura | Campos e invariantes |
 | :--- | :--- |
 | `categories` | Slug único e estável, nome de exibição e estado ativo; categoria inicial `geral`. Validar a existência da categoria ao salvar artigos e revisões |
-| `media` | Identificador aleatório único, proprietário, manifesto de variantes validado no servidor, datas e estado de finalização; cliente não pode substituir o manifesto por URLs arbitrárias |
+| `media` | Identificador aleatório único, proprietário, manifesto de variantes validado no servidor, datas e estado de finalização; índice B-Tree em `original_name(191)` e índice FULLTEXT `idx_media_fulltext (original_name, alt_text, caption, ai_tags)` |
 | `media_variants` | Mapeamento direto B-Tree O(1) de URLs de variantes para `media_id`; elimina buscas com `LIKE '%...%'` sobre JSON e viabiliza resolução instantânea (< 0.1ms) com integridade referencial em cascata |
 | `media_refs` | Vínculos de mídia a artigos/revisões com unicidade por referência; impedir limpeza de mídia ainda referenciada pelo conteúdo ou histórico |
 | `view_dedupe` | Chave primária `(post_id, ip_hash)`, prazo `expires_at`, índice por expiração e exclusão em cascata com o artigo; HMAC representado por 64 caracteres hexadecimais |
@@ -289,6 +289,8 @@ A interface da Biblioteca de Mídias foi projetada para lidar de forma ultra rá
 * **Paginação Fluida Assíncrona:** Grade configurada para 48 itens por página (harmônica para layouts responsivos de 2, 3, 4 e 6 colunas) com navegação numerada instantânea via AJAX.
 * **Ordenação Flexível:** Seletor de ordenação com padrão decrescente (recentes primeiro), permitindo alternar entre mídias recém-enviadas e ordem cronológica ascendente (antigas primeiro).
 * **Busca Global Integrada no Editor de Notícias (`public/admin/editor.php`):** O modal de seleção de fotos no editor de matérias consulta a mesma API assíncrona (`/admin/api/media.php?q=...`), permitindo que repórteres e editores pesquisem instantaneamente qualquer foto do acervo completo enquanto escrevem.
+* **Busca Booleana FULLTEXT e Resolução B-Tree (AUD-PERF-02):** Consultas utilizam o índice dedicado `idx_media_fulltext` em modo booleano com suporte a termos compostos e buscas mistas (ex.: `"f1 brasil"` combinando FULLTEXT e filtro curto `AND LIKE`), além de resolução $O(\log N)$ para caminhos de arquivo em `media_variants` sem parsing de JSON e fallback defensivo com zero downtime.
+* **Exclusão de Mídia O(1) com Proteção de I/O (AUD-PERF-02):** Validação de integridade referencial instantânea via `media_refs`, `posts.featured_media_id`, `posts.featured_image`, `users.avatar` e `settings`, eliminando varreduras de `MEDIUMTEXT` na exclusão. Checagem leve em `pages.content_html` (< 1ms) com `$uniquePaths` parando na primeira ocorrência (`LIMIT 1`).
 
 ### 4.9. Resolução de `alt`/`title`, vínculos de mídia e cache
 
@@ -1810,6 +1812,16 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Harmonização com a Infraestrutura de Auto-Promoção Atômica:** Integração transparente com `PostService::promoteScheduledPosts()`, acionado a cada 1 minuto pelo cron worker (`bin/retry-cache-purge.php`) e com cooldown de 60s em `public/index.php`.
   - [x] **Higiene SQL e Prepared Statements (`public/admin/stats.php`):** Substituição de interpolação direta de datas por prepared statement parametrizado na consulta `$categoryStats`.
   - [x] **Suíte de Testes Automatizada Dedicada (`bin/test-query-indexes.php`):** Criação de teste isolado em SQLite `:memory:` com cabeçalho de CI e guarda CLI (SEC-07), validando ausência de `USE TEMP B-TREE FOR ORDER BY` em 8 consultas públicas e o ciclo atômico de auto-promoção de agendados com 18 testes aprovados.
+
+* **FASE CONCLUÍDA — Otimização de Performance de Banco de Dados, I/O em Mídia e Segregação de Cache Redis (AUD-PERF-02, AUD-PERF-03):**
+  - [x] **Eliminação de Varreduras MEDIUMTEXT na Exclusão de Mídia (AUD-PERF-02):** Substituição do laço de até 24 consultas `SELECT COUNT(*)` com `LIKE '%/uploads/%'` em `posts.content_json`, `posts.content_html`, `pages.content_html` e `post_revisions` por verificações relacionais $O(1)$ indexadas (`media_refs`, `posts.featured_media_id`, `posts.featured_image IN (...)`, `pages.featured_image`, `users.avatar` e `settings` em RAM).
+  - [x] **Checagem Leve em Páginas e Desligamento Seletivo de Fallback (AUD-PERF-02):** Checagem permanente em `pages.content_html` via `SELECT 1 ... LIMIT 1` com caminhos normalizados `$uniquePaths` (< 1ms), mantendo páginas institucionais blindadas, e desligamento de queries pesadas com `LIKE` em `posts.content_html`/`post_revisions` quando `media_refs` estiver populado.
+  - [x] **Busca Resiliente na Biblioteca com FULLTEXT Booleano (AUD-PERF-02):** Criação do índice `FULLTEXT INDEX idx_media_fulltext (original_name, alt_text, caption, ai_tags)` em `bin/schema.sql` e `core/Schema.php`. Consultas interativas em `public/admin/media.php` e `public/admin/api/media.php` com `MATCH ... AGAINST(? IN BOOLEAN MODE)`, tokenização `[^\p{L}\p{N}]+`, suporte a buscas mistas ("f1 brasil") via `shortWords` e resolução $O(\log N)$ para caminhos de upload com `/` em `media_variants`.
+  - [x] **Execução Defensiva com Fallback Transparente (AUD-PERF-02):** Tratamento da query real de `COUNT(*)` e `SELECT` em `try/catch` com fallback para `LIKE` em colunas textuais na ausência temporária do índice FULLTEXT ou sob stopwords do InnoDB, assegurando zero downtime e zero falsos negativos.
+  - [x] **Segregação de Cache de Objetos no Redis (AUD-PERF-03):** Separação estrita entre o grupo `'post_items'` (dedicado exclusivamente a `post_slug:{$slug}`, preservando o TTL estratificado de até 10 dias) e o grupo `'posts'` (exclusivo para listagens agregadas: `home_featured_posts`, `home_feed_posts_p1`, `blog_feed_posts_p1`, `related:*`, etc.).
+  - [x] **Proteção do Hit Ratio de 48.000+ Artigos (AUD-PERF-03):** Publicações, edições ou promoções de matérias agora executam `flushGroup('posts')` sem invalidar os milhares de artigos cacheados em `'post_items'`.
+  - [x] **Alinhamento do Ciclo de Vida e Conformidade L8 (AUD-PERF-03):** Captura segura de `&$resolvedSlug` na transação de `PostService::publishOrUpdate()`; importação e uso de `ObjectCache::flushGroup('post_items')` em `users.php` e `profile.php` ao alterar dados de autor; inclusão de `flushGroup('posts')` no toggle de featured da dashboard; expurgo pós-commit em `categories.php`; e atualização dos hooks do plugin `redis-cache-pro`.
+  - [x] **Suíte de Testes Automatizada e Integração FakeRedis (AUD-PERF-02, AUD-PERF-03):** Inclusão de 32 novas asserções em `bin/test.php` (totalizando 219 testes 100% aprovados) e teste de integração real com `FakeRedis` em `plugins/redis-cache-pro/tests/test-redis-cache-pro.php` comprovando a preservação do Hit Ratio após `flushGroup('posts')`.
 
 ---
 

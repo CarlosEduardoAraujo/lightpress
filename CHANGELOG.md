@@ -7,6 +7,37 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Otimização de Performance de Banco de Dados, I/O em Mídia e Segregação de Cache Redis (AUD-PERF-02, AUD-PERF-03) — 2026-11-22
+
+- **Eliminação de Varreduras MEDIUMTEXT e Otimização O(1) na Exclusão de Mídia (`public/admin/media.php` — AUD-PERF-02):**
+  - **Causa Raiz Neutralizada:** Substituição do laço de até 24 consultas pesadas com `SELECT COUNT(*)` usando `LIKE '%/uploads/%'` sobre colunas `MEDIUMTEXT` (`posts.content_json`, `posts.content_html`, `pages.content_html` e `post_revisions`). Em acervos com 48.000+ matérias, cada exclusão provocava dezenas de segundos de I/O em disco e travava workers do MariaDB/PHP-FPM.
+  - **Verificações Relacionais Indexadas $O(1)$:** Implementada cadeia de verificações diretas e indexadas em `media_refs (media_id)`, `posts.featured_media_id`, `posts.featured_image IN (...) LIMIT 1`, `pages.featured_image IN (...) LIMIT 1`, `users.avatar IN (...) LIMIT 1` e `Settings::getAll()` em memória RAM.
+  - **Checagem Leve em Páginas e Desligamento Seletivo de Fallback:** Consulta permanente em `pages.content_html` via `SELECT 1 ... LIMIT 1` com conjunto de caminhos normalizados `$uniquePaths` (< 1ms), preservando a integridade de páginas institucionais. Para `posts.content_html` e `post_revisions`, a checagem com `LIKE` fica desligada quando `media_refs` estiver populado.
+
+- **Busca Resiliente na Biblioteca com FULLTEXT Booleano e Resolução B-Tree (`public/admin/media.php`, `public/admin/api/media.php`, `bin/schema.sql`, `core/Schema.php` — AUD-PERF-02):**
+  - **Índice FULLTEXT Dedicado:** Adicionado `FULLTEXT INDEX idx_media_fulltext (original_name, alt_text, caption, ai_tags)` em `bin/schema.sql` e gerenciado por `Schema::ensureMediaFulltextSchema()` em `Schema::installMysql()`, posicionado estritamente após a garantia das colunas de metadados de IA.
+  - **Busca Booleana com Suporte a Termos Mistos:** Tokenização via `[^\p{L}\p{N}]+` com palavras $\ge 3$ caracteres (`innodb_ft_min_token_size = 3`), permitindo casamento exato de nomes hifenizados (ex.: `max-verstappen-ferrari`). Buscas mistas com termos curtos (ex.: `"f1 brasil"`) combinam o índice FULLTEXT (`+brasil*`) com filtro residual `AND LIKE` sobre o subconjunto reduzido.
+  - **Resolução B-Tree de Caminhos de Upload:** Consultas com `/` (ex.: `2024/05/foto.webp`) são resolvidas via prefix match indexado em `media_variants (url_path)` com prefixo `uploads/` e `Security::escapeLike()`, com custo $O(\log N)$ sem parsing de JSON.
+  - **Execução Defensiva com Fallback Transparente:** A execução real de `Database::fetchValue("SELECT COUNT(*) ...")` e `Database::fetchAll(...)` é protegida por `try/catch` com fallback para `LIKE` em colunas textuais na ausência temporária do índice FULLTEXT (SQLSTATE 1191) ou sob stopwords do InnoDB, garantindo zero downtime e zero falsos negativos.
+
+- **Segregação Estrita de Cache de Objetos no Redis e Proteção de Hit Ratio (`public/index.php`, `core/PostService.php`, `public/admin/` — AUD-PERF-03):**
+  - **Segregação em Dois Grupos:**
+    - Grupo `'post_items'`: dedicado exclusivamente a matérias individuais (`post_slug:{$slug}`), garantindo a preservação integral do TTL estratificado de até 10 dias (864.000s).
+    - Grupo `'posts'`: mantido exclusivamente para feeds, home e listagens agregadas (`home_featured_posts`, `home_feed_posts_p1`, `blog_feed_posts_p1`, `related:*`, etc.), invalidado via `flushGroup('posts')`.
+  - **Eliminação de Queda de Hit Ratio:** A publicação de uma nova notícia rotaciona apenas o grupo `'posts'`, mantendo todos os 48.000+ artigos anteriores com **Cache HIT** intacto em RAM.
+  - **Alinhamento do Ciclo de Vida Editorial:**
+    - `core/PostService.php`: Captura segura de `&$resolvedSlug` na transação de `publishOrUpdate()`, invalidando pontualmente `$resolvedSlug` e `$current['slug']` em `'post_items'` pós-commit. Invalidação pontual dos artigos promovidos em `promoteScheduledPosts()`.
+    - `public/admin/dashboard.php`: Invalidação de `'posts'` ao alternar destaque (`toggle_featured_id`) e de `'post_items'` na exclusão.
+    - `public/admin/editor.php`: Invalidação de `'post_items'` ao salvar rascunho de matéria previamente publicada.
+    - `public/admin/categories.php`: Invalidação pós-commit de `'post_items'` e `'posts'` na renomeação de slug e na exclusão de categoria.
+    - `public/admin/users.php` e `public/admin/profile.php`: Adição de `use LightPress\Core\ObjectCache;` e chamada a `flushGroup('post_items')` ao salvar dados de autor/perfil (refletindo nome, avatar e bio nos artigos cacheados).
+    - `core/ThemeManager.php`: Invalidação de `'post_items'` ao alterar opções de tema.
+    - `plugins/redis-cache-pro/`: Atualização dos hooks `post_saved` e `post_deleted` para `'post_items'` e inclusão do grupo na interface administrativa de grupos e Big Key Hunter.
+
+- **Expansão da Suíte de Testes Automatizada e Integração com FakeRedis (`bin/test.php`, `plugins/redis-cache-pro/tests/test-redis-cache-pro.php`):**
+  - **Seção [14] em `bin/test.php`:** Adicionadas 32 novas asserções estáticas e de conformidade para AUD-PERF-02 e AUD-PERF-03, elevando a suíte principal para **219 testes aprovados com 100% de sucesso**.
+  - **Validação de Integração Real com FakeRedis:** Teste unitário em `test-redis-cache-pro.php` comprovando que `flushGroup('posts')` invalida listagens agregadas mantendo o cache do artigo individual íntegro em `'post_items'` com HIT, e que a edição pontual invalida unicamente o artigo modificado (18/18 testes aprovados).
+
 ### Otimização de Índices B-Tree e Eliminação de Filesort em Consultas Públicas (AUD-PERF-01) — 2026-11-22
 
 - **Eliminação de `Using filesort` em Consultas Públicas (`public/index.php`, `public/api/posts.php`, `public/api/categories.php`, `public/api/search.php` — AUD-PERF-01):**
