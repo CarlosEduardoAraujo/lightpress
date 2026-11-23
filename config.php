@@ -80,6 +80,7 @@ $config = [
     // Segurança e Criptografia
     'security' => [
         'hmac_secret' => 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO',
+        'encryption_key' => '', // Chave secreta de 64 caracteres hexadecimais para criptografia de segredos em repouso (defina em config.local.php)
         'session_name' => 'LIGHTPRESSSESSID',
         'session_lifetime' => 86400, // 24 horas
         'session_idle_timeout' => 7200, // 2 horas de inatividade no servidor

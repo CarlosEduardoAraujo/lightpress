@@ -54,6 +54,17 @@ $headerCtaLink = BlockCompiler::sanitizeUrl((string)ThemeManager::option('header
     <?php \LightPress\Core\Hook::doAction('frontend_head'); ?>
 </head>
 <body>
+<?php if (!empty($isPreview)): ?>
+    <div class="preview-banner" style="background: #f59e0b; color: #78350f; padding: 0.75rem 1.5rem; position: sticky; top: 0; z-index: 9999; display: flex; justify-content: space-between; align-items: center; font-family: system-ui, sans-serif; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div>
+            ⚠️ MODO DE PRÉVIA PRIVADA (Status: <strong><?= strtoupper(Security::e($post['status'] ?? 'DRAFT')) ?></strong><?= !empty($post['revision_id']) ? ' &bull; Revisão #' . (int)$post['revision_id'] : '' ?>)
+            &bull; Este conteúdo não é público nem cacheável.
+        </div>
+        <div>
+            <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" style="background: #78350f; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; margin-left: 0.5rem;">&larr; Voltar ao Editor</a>
+        </div>
+    </div>
+<?php endif; ?>
     <header class="corp-header">
         <div class="corp-container">
             <div class="corp-nav-inner">

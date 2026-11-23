@@ -223,16 +223,16 @@ final class ApiPublisherService
     {
         self::ensureTablesSchema();
 
-        // 1. Rate Limiting por IP (Mitigação de Força Bruta)
-        $rateLimitLock = Security::checkLoginRateLimit($clientIp, 5, 900);
+        // 1. Rate Limiting por IP no escopo da API (AUD-SEC-05)
+        $rateLimitLock = Security::checkLoginRateLimit($clientIp, 5, 900, 'api_publisher');
         if ($rateLimitLock !== null) {
-            throw new RuntimeException("Muitas tentativas falhas de autenticação. Tente novamente em {$rateLimitLock} segundos.", 429);
+            throw new RuntimeException("Muitas tentativas falhas de autenticação na API. Tente novamente em {$rateLimitLock} segundos.", 429);
         }
 
         $password = $providedPassword ?? '';
         if ($password === '') {
             Security::verifyPassword('dummy', Security::DUMMY_ARGON2ID_HASH);
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('Credenciais de autenticação ausentes.', 401);
         }
 
@@ -245,7 +245,7 @@ final class ApiPublisherService
         if ($keyPrefix === '') {
             // Senha sem o formato canônico: executa hash dummy para tempo constante e registra falha
             Security::verifyPassword('dummy', Security::DUMMY_ARGON2ID_HASH);
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('Credenciais de autenticação inválidas.', 401);
         }
 
@@ -262,31 +262,31 @@ final class ApiPublisherService
 
         if (!$row) {
             Security::verifyPassword('dummy', Security::DUMMY_ARGON2ID_HASH);
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('Credenciais de autenticação inválidas.', 401);
         }
 
         // Verificação Argon2id em tempo constante
         if (!Security::verifyPassword($password, (string)$row['secret_hash'])) {
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('Credenciais de autenticação inválidas.', 401);
         }
 
         // 3. Verificação de Revogação
         if (!empty($row['is_revoked'])) {
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('Esta Senha de Aplicação foi revogada.', 401);
         }
 
         // Verificação de Conta Ativa
         if (empty($row['owner_active'])) {
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('A conta de usuário associada a esta chave está inativa.', 401);
         }
 
         // Correspondência do Username (se enviado no Basic Auth)
         if (!empty($providedUser) && strcasecmp(trim($providedUser), (string)$row['owner_username']) !== 0) {
-            Security::recordLoginFailure($clientIp, 5, 900);
+            Security::recordLoginFailure($clientIp, 5, 900, 'api_publisher');
             throw new RuntimeException('O usuário informado não corresponde ao titular desta Senha de Aplicação.', 401);
         }
 
@@ -312,8 +312,8 @@ final class ApiPublisherService
             throw new RuntimeException('O usuário titular desta chave não possui permissão para criar publicações.', 403);
         }
 
-        // Sucesso comprovado: limpa falhas de rate limit do IP
-        Security::clearLoginFailures($clientIp);
+        // Sucesso comprovado: limpa falhas de rate limit do IP no escopo da API
+        Security::clearLoginFailures($clientIp, 'api_publisher');
 
         // Atualização assíncrona do último uso e IP
         try {
@@ -401,31 +401,57 @@ final class ApiPublisherService
         self::ensureTablesSchema();
         $postService = new PostService();
 
-        return Database::transaction(function () use ($postService, $postData, $userId, $externalKey): array {
-            // 1. Criar post via PostService (força draft, is_featured=0, post_stats e post_revisions)
-            $createdRevId = null;
-            $postId = $postService->createPost($postData, $userId, $createdRevId);
+        try {
+            return Database::transaction(function () use ($postService, $postData, $userId, $externalKey): array {
+                // 1. Criar post via PostService (força draft, is_featured=0, post_stats e post_revisions)
+                $createdRevId = null;
+                $postId = $postService->createPost($postData, $userId, $createdRevId);
 
-            // 2. Registrar no log de idempotência se houver chave externa
-            if (!empty($externalKey)) {
-                Database::query(
-                    "INSERT INTO plugin_api_ingest_log (external_key, post_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-                    [trim($externalKey), $postId]
-                );
+                // 2. Registrar no log de idempotência se houver chave externa
+                if (!empty($externalKey)) {
+                    Database::query(
+                        "INSERT INTO plugin_api_ingest_log (external_key, post_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                        [trim($externalKey), $postId]
+                    );
+                }
+
+                // Buscar slug resolvido
+                $slug = (string)Database::fetchValue("SELECT slug FROM posts WHERE id = ? LIMIT 1", [$postId]);
+                $category = (string)Database::fetchValue("SELECT category FROM posts WHERE id = ? LIMIT 1", [$postId]) ?: 'geral';
+
+                return [
+                    'id' => $postId,
+                    'slug' => $slug,
+                    'status' => 'draft',
+                    'category' => $category,
+                    'author_id' => $userId,
+                ];
+            });
+        } catch (\PDOException $e) {
+            // AUD-ARCH-04 & Diretriz 1.2: A captura de duplicidade ocorre FORA de Database::transaction().
+            // Isso garante que Database::transaction() já executou o rollBack() automático,
+            // evitando que o post inserido antes da colisão de external_key seja comitado como órfão!
+            if (!empty($externalKey) && (
+                $e->getCode() === '23000' ||
+                $e->getCode() === 23000 ||
+                str_contains($e->getMessage(), '23000') ||
+                str_contains($e->getMessage(), 'UNIQUE constraint failed') ||
+                str_contains($e->getMessage(), 'Duplicate entry')
+            )) {
+                $existing = self::checkIdempotency($externalKey);
+                if ($existing !== null) {
+                    return [
+                        'id' => $existing['post_id'],
+                        'slug' => $existing['slug'],
+                        'status' => $existing['status'],
+                        'category' => $existing['category'],
+                        'author_id' => $existing['user_id'],
+                        'idempotent' => true,
+                    ];
+                }
             }
-
-            // Buscar slug resolvido
-            $slug = (string)Database::fetchValue("SELECT slug FROM posts WHERE id = ? LIMIT 1", [$postId]);
-            $category = (string)Database::fetchValue("SELECT category FROM posts WHERE id = ? LIMIT 1", [$postId]) ?: 'geral';
-
-            return [
-                'id' => $postId,
-                'slug' => $slug,
-                'status' => 'draft',
-                'category' => $category,
-                'author_id' => $userId,
-            ];
-        });
+            throw $e;
+        }
     }
 
     /**

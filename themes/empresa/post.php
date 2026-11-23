@@ -44,7 +44,16 @@ $phone = (string)ThemeManager::option('contact_phone', '');
 
                 <?php if (!empty($post['featured_image'])): ?>
                     <div style="margin-bottom: 2.5rem; border-radius: var(--corp-radius); overflow: hidden; box-shadow: var(--corp-shadow);">
-                        <img src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" alt="<?= Security::e($post['title']) ?>" style="width: 100%; height: auto; display: block;" loading="eager">
+                        <?= ImageProcessor::renderPicture(
+                            $post['featured_image'],
+                            $post['title'],
+                            [
+                                'style' => 'width: 100%; height: auto; display: block;',
+                                'loading' => 'eager',
+                                'picture_class' => 'block w-full',
+                            ],
+                            $post['featured_media_id'] ?? null
+                        ) ?>
                     </div>
                 <?php endif; ?>
 

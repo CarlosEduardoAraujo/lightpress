@@ -17,12 +17,18 @@ class Database
     private static array $config = [];
 
     /**
+     * @var list<callable(): void> Callbacks a serem executados exclusivamente após o COMMIT bem-sucedido da transação raiz.
+     */
+    private static array $afterCommitCallbacks = [];
+
+    /**
      * Inicializa a configuração do banco.
      */
     public static function init(array $config): void
     {
         self::$config = $config;
         self::$instance = null; // Reinicia a instância se reconfigurado
+        self::$afterCommitCallbacks = [];
     }
 
     /**
@@ -100,6 +106,22 @@ class Database
     }
 
     /**
+     * Registra um callback para ser executado exclusivamente após o commit da transação ativa.
+     * Se não houver transação em andamento, executa imediatamente.
+     *
+     * @param callable(): void $callback
+     */
+    public static function afterCommit(callable $callback): void
+    {
+        if (!self::getConnection()->inTransaction()) {
+            $callback();
+            return;
+        }
+
+        self::$afterCommitCallbacks[] = $callback;
+    }
+
+    /**
      * Executa uma função em transação atômica. Em caso de exceção, realiza rollback automático.
      *
      * @template T
@@ -120,8 +142,21 @@ class Database
         try {
             $result = $callback($pdo);
             $pdo->commit();
+
+            // Executa callbacks pós-commit registrados durante a transação raiz
+            $callbacks = self::$afterCommitCallbacks;
+            self::$afterCommitCallbacks = [];
+            foreach ($callbacks as $cb) {
+                try {
+                    $cb();
+                } catch (\Throwable $cbErr) {
+                    error_log('[Database::afterCommit] Falha ao executar callback pós-commit: ' . $cbErr->getMessage());
+                }
+            }
+
             return $result;
         } catch (\Throwable $e) {
+            self::$afterCommitCallbacks = [];
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }

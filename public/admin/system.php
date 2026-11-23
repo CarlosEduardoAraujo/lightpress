@@ -74,6 +74,9 @@ $uploadWritable = is_dir($uploadDir) && is_writable($uploadDir);
 $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
 $isDefaultHmac = ($hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32);
 
+$encKey = (string)($config['security']['encryption_key'] ?? '');
+$hasEncKey = !empty($encKey) && strlen(trim($encKey)) >= 32;
+
 $csrfToken = Security::generateCsrfToken();
 $pageTitle = 'Diagnóstico do Sistema';
 $activePage = 'system';
@@ -279,6 +282,10 @@ require __DIR__ . '/header.php';
                 <div class="info-row">
                     <span>Segredo HMAC</span>
                     <span><?= $isDefaultHmac ? '<span class="badge-err">Inseguro (Padrão ou &lt;32 chars)</span>' : '<span class="badge-ok">Configurado (' . strlen($hmacSecret) . ' chars)</span>' ?></span>
+                </div>
+                <div class="info-row">
+                    <span>Criptografia de Segredos (Repouso)</span>
+                    <span><?= $hasEncKey ? '<span class="badge-ok">Configurada (' . strlen(trim($encKey)) . ' chars)</span>' : '<span class="badge-warn">Pendente (Vazia)</span>' ?></span>
                 </div>
                 <div class="info-row">
                     <span>Nome da Sessão</span>

@@ -7,6 +7,47 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Remediação Completa da Auditoria Técnica: Pós-Commit, Streaming de Backup, Resiliência Picture AVIF, Criptografia e Idempotência (AUD-ARCH-01..04, AUD-SEC-01..05, AUD-PERF-04) — 2026-11-22
+
+- **Pós-Commit Real em Transações Relacionais (`core/Database.php`, `core/PostService.php` — AUD-ARCH-02):**
+  - **Mecanismo de Fila Pós-Commit (`Database::afterCommit`):** Implementação de fila estática tipada (`/** @var list<callable(): void> */`) gerenciada por `Database::afterCommit(callable $callback)`. Quando chamado fora de transação, o callback executa imediatamente; dentro de `Database::transaction()`, a execução é postergada para ocorrer estritamente após o `$pdo->commit()` da transação raiz externa.
+  - **Isolamento Total de Falhas:** Cada callback é executado dentro de bloco defensivo individual `try/catch (\Throwable)` com registro em `error_log`, garantindo que eventuais falhas em um webhook ou purga não interrompam os demais callbacks enfileirados.
+  - **Expurgo e Descarte Imediato em Rollback:** No bloco de captura de erros de `Database::transaction()`, a fila `$afterCommitCallbacks` é imediatamente esvaziada e descartada após `$pdo->rollBack()`. Impede o disparo prematuro ou indevido de purgas de cache e webhooks em transações abortadas (como restaurações de revisões em `public/admin/revisions.php` ou publicações com falha).
+  - **Encapsulamento em `PostService::publishOrUpdate()`:** O bloco de purga física de cache (`ObjectCache::delete`, `flushGroup('posts')`, `$cacheManager->purgeUrls`, `completePurgeJob`) e despacho do hook `post_published` foi envolvido em `Database::afterCommit(...)`.
+
+- **Streaming e Completude no Backup e Restauração (`bin/backup.php`, `bin/restore.php` — AUD-ARCH-03):**
+  - **Exportação em Streaming NDJSON.gz:** Redesenho completo de `bin/backup.php` para streaming compactado direto via `gzopen()` e `gzwrite()` no formato NDJSON (`.ndjson.gz`), com desativação de buffered queries no MySQL (`PDO::MYSQL_ATTR_USE_BUFFERED_QUERY = false`).
+  - **Cobertura de 100% das Tabelas Relacionais (15 Tabelas):** Inclusão das 5 tabelas ausentes (`media_variants`, `migration_map`, `plugin_app_passwords`, `plugin_api_ingest_log` e `plugin_webhook_sender_logs`).
+  - **Paginação de Cursor Tipado (Lotes de 500 Linhas):** Suporte específico por tipo de chave primária: keyset numérico (`WHERE id > ? ORDER BY id ASC LIMIT 500`) para PKs inteiras (`users`, `posts`, `post_stats`, etc.), keyset em string para `media.id` (32 caracteres hexadecimais) e paginação por tuplas para `settings` e `migration_map`, eliminando estouro de memória RAM (< 32 MiB mesmo com acervos volumosos de 50k+ artigos).
+  - **Restauração em Streaming com Integridade Referencial (`bin/restore.php`):** Desativação de chaves estrangeiras (`PRAGMA foreign_keys = OFF` / `SET FOREIGN_KEY_CHECKS = 0`) executada **fora** da transação com reativação garantida em `finally`, reaproveitamento de prepared statements em cache local, esvaziamento correto de tabelas vazias no momento do backup (`_table_start`), expurgo automático de tabelas efêmeras (`user_reset_tokens`, `view_dedupe`, `cache_purge_jobs`) e retrocompatibilidade total com backups legados `.json.gz` e `.json`.
+
+- **Padronização de Criptografia em Repouso e Setup Guard (`config.php`, `config.local.php.example`, `bin/setup.php`, `bin/diagnose.php`, `public/admin/system.php` — AUD-SEC-01):**
+  - **Template Padronizado e Seguro:** Inclusão de `'encryption_key' => ''` (string vazia intencional, sem placeholders públicos) nos arquivos de configuração padrão e exemplo.
+  - **Guarda Anti-Sobrescrita em `bin/setup.php`:** Só gera uma nova chave aleatória de 32 bytes se a chave estiver vazia E a tabela `settings` não contiver registros previamente cifrados (`enc:%`), prevenindo que uma reinstalação ou recriação de `config.local.php` inutilize segredos já salvos.
+  - **Auditoria Operacional em Tempo de Execução:** Verificação explícita em `bin/diagnose.php` (aviso quando vazia, aprovação quando $\ge 32$ chars) e linha de status visual dedicada em `public/admin/system.php` (preservando intactas as chaves de produção existentes).
+
+- **Helper `<picture>` Resiliente sem Armadilha 404 HTML5 e SEO Blindado (`core/ImageProcessor.php`, `core/Seo.php`, templates — AUD-ARCH-01):**
+  - **Mitigação da Armadilha 404 HTML5:** Implementação de `ImageProcessor::hasAvifVariant()` com checagem tripla (memória estática, `ObjectCache`, manifesto de variantes e disco físico) e `renderPicture()`. A tag `<source type="image/avif">` só é emitida caso a existência do arquivo `.avif` esteja comprovada; caso contrário, renderiza diretamente `<img src="...webp">`, prevenindo que navegadores com suporte a AVIF recebam 404 e quebrem a imagem sem fazer fallback.
+  - **Migração dos Templates Públicos:** Atualização de `templates/home.php`, `post.php`, `page.php`, `header.php`, `themes/portal-noticias/home.php`, `post.php`, `page.php`, `header.php` e `themes/empresa/post.php`, `page.php`, `header.php`.
+  - **Blindagem de Timestamps no SEO:** Em `Seo::renderJsonLd()` e `renderMetaTags()`, sanitização de datas contra strings vazias (`strtotime("") === false`), prevenindo `TypeError` em PHP 8.4/8.5 sob `strict_types=1`, com fallback automático para `.webp` na thumbnail quando o AVIF não existir.
+
+- **Preload Otimizado de Imagens Hero (`core/ImageProcessor.php`, `public/index.php` — AUD-PERF-04):**
+  - **Extensão de `preloadDescriptions()`:** Suporte a pares estruturados `['url' => ..., 'id' => ...]`, populando simultaneamente `$path . '|' . $id` e `$path . '|'` na memória estática e no `ObjectCache`.
+  - **Sincronização na Rota de Artigo:** Rota `/post/{slug}/` atualizada para repassar `featured_media_id` para a hero e posts relacionados, alcançando 100% de cache hit.
+
+- **Idempotência Atômica sem Rascunhos Órfãos e Rate Limit Segregado (`core/Security.php`, `plugins/api-publisher/` — AUD-ARCH-04, AUD-SEC-05):**
+  - **Baldes Segregados de Rate Limit:** Adicionado parâmetro `$scope = 'login'` em `Security::checkLoginRateLimit()`, `recordLoginFailure()` e `clearLoginFailures()`, segregando os arquivos em disco (`ratelimit_{$scope}_{$hash}.json`). A API REST agora opera com `$scope = 'api_publisher'`, isolando falhas da API do login web administrativo.
+  - **Rollback Externo e Retorno Idempotente:** Em `ApiPublisherService::createIngestedPost()`, a captura de duplicidade (`PDOException 23000`) ocorre fora de `Database::transaction()`. O rollback automático descarta o rascunho temporário e chama `checkIdempotency()`, retornando HTTP 200 com `idempotent => true` sem deixar rascunhos duplicados órfãos na tabela `posts`.
+  - **Validação de Comprimento:** `ApiPublisherController` agora valida o comprimento de todos os campos textuais retornando HTTP 422 descritivo.
+  - **Correção de HTML na Prévia:** Removido wrapper HTML duplicado (`<!DOCTYPE html><html><body>`) de `public/admin/preview.php`, com suporte a rascunhos pendentes de `post_revisions` e banner unificado em `header.php`.
+  - **Limpeza de Estilos no Redis:** Removidas injeções duplicadas de CSS/JS inline em `plugins/redis-cache-pro/settings.php` e sincronizado o CSS administrativo.
+
+- **Hardening Nginx, Manutenção CLI e Matriz CI Dual (`nginx/`, `bin/cleanup.php`, `.github/workflows/ci.yml` — AUD-SEC-04):**
+  - **Alinhamento Nginx:** Mapa `$lp_skip_script` avaliando `/index.php 0; default 1;` em `lightpress.conf`, elevação de `client_max_body_size` para `12M`, remoção de `fastcgi_ignore_headers Set-Cookie;` e injeção de `Strict-Transport-Security` e `Cache-Control: private, no-store` em `speedracing-tunnel.conf`.
+  - **Limpeza Ampla em `bin/cleanup.php`:** Padrão `glob` da etapa 5 atualizado para `glob($logDir . '/ratelimit_*.json')`, limpando arquivos expirados de todos os escopos.
+  - **CI com Matriz Dual:** Inclusão das 4 novas suítes de testes (`bin/test-after-commit.php`, `bin/test-backup-restore.php`, `bin/test-render-picture-seo.php`, `bin/test-passo6-api-preview.php`) no GitHub Actions (`.github/workflows/ci.yml`).
+  - **Suíte Consolidada:** 568 asserções em 16 suítes automatizadas com 100% de aprovação e PHPStan Nível 8 limpo (`[OK] No errors`).
+
 ### Otimização de Feeds, Sitemaps, Miniaturas Responsivas e Resiliência de Purga (AUD-PERF-04) — 2026-11-22
 
 - **ObjectCache em Feeds RSS, Sitemaps XML e Paginação (`public/index.php` — AUD-PERF-04):**

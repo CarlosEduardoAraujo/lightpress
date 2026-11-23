@@ -33,6 +33,9 @@ class ImageProcessor
     /** @var array<string, array{src: string, srcset: string, sizes: string, alt: string, title: string}> */
     private static array $memoryCardCache = [];
 
+    /** @var array<string, bool> */
+    private static array $memoryAvifExistsCache = [];
+
     private string $uploadDir;
     private string $stagingDir;
     private int $maxFileSize;
@@ -96,6 +99,126 @@ class ImageProcessor
     }
 
     /**
+     * Verifica de forma segura se a variante AVIF de uma imagem realmente existe,
+     * consultando cache estático em memória, ObjectCache (Redis/APCu), manifesto no banco
+     * e arquivo físico em disco. Previne a armadilha de HTTP 404 no HTML5 <picture>.
+     */
+    public static function hasAvifVariant(string $url, ?string $mediaId = null): bool
+    {
+        if (empty($url)) {
+            return false;
+        }
+        $avifUrl = self::toAvifUrl($url);
+        if (empty($avifUrl)) {
+            return false;
+        }
+
+        $staticKey = $avifUrl . '|' . ($mediaId ?? '');
+        if (isset(self::$memoryAvifExistsCache[$staticKey])) {
+            return self::$memoryAvifExistsCache[$staticKey];
+        }
+
+        // 1. Checar ObjectCache (Redis/APCu)
+        $cacheKey = 'img_has_avif:' . md5($staticKey);
+        $cached = ObjectCache::get($cacheKey, 'media');
+        if ($cached === '1' || $cached === '0') {
+            $exists = ($cached === '1');
+            self::$memoryAvifExistsCache[$staticKey] = $exists;
+            return $exists;
+        }
+
+        $exists = false;
+
+        // 2. Checar no manifesto em banco de dados / memória
+        $path = self::descriptionPath($url);
+        if ($path !== '') {
+            $manifest = self::getManifestForPath($path, $mediaId);
+            if ($manifest !== null) {
+                $variants = self::extractManifestVariants($manifest);
+                foreach ($variants as $v) {
+                    if (strtolower((string)($v['format'] ?? '')) === 'avif' || str_ends_with(strtolower((string)($v['url'] ?? '')), '.avif')) {
+                        $exists = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 3. Se ainda não confirmado pelo manifesto, verificar arquivo físico em disco
+        if (!$exists) {
+            $parsedPath = parse_url($avifUrl, PHP_URL_PATH);
+            if (is_string($parsedPath) && $parsedPath !== '') {
+                $docRoot = (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : ($GLOBALS['config']['paths']['public'] ?? (dirname(__DIR__) . '/public'));
+                $localPath = rtrim($docRoot, '/\\') . '/' . ltrim($parsedPath, '/\\');
+                if (file_exists($localPath)) {
+                    $exists = true;
+                }
+            }
+        }
+
+        ObjectCache::set($cacheKey, $exists ? '1' : '0', 'media', 86400);
+        self::$memoryAvifExistsCache[$staticKey] = $exists;
+        return $exists;
+    }
+
+    /**
+     * Renderiza uma tag HTML <picture> defensiva com fallback garantido em WebP,
+     * emitindo <source type="image/avif"> apenas quando a existência da variante AVIF
+     * for comprovada (evitando a armadilha de 404 do HTML5 onde navegadores quebram a imagem).
+     *
+     * @param string $imageUrl URL base da imagem
+     * @param string $alt Texto alternativo (alt)
+     * @param array<string, scalar|null> $attrs Atributos adicionais da tag <img> (class, width, height, loading, etc.)
+     * @param string|null $mediaId Identificador opcional da mídia para consulta no manifesto
+     */
+    public static function renderPicture(string $imageUrl, string $alt = '', array $attrs = [], ?string $mediaId = null): string
+    {
+        if (empty($imageUrl)) {
+            return '';
+        }
+
+        $webpUrl = self::toWebpUrl($imageUrl);
+        $avifUrl = self::toAvifUrl($imageUrl);
+
+        if ($alt === '') {
+            $alt = (string)($attrs['alt'] ?? '');
+            if ($alt === '') {
+                $alt = self::getImageDescription($imageUrl, null, $mediaId);
+            }
+        }
+
+        $pictureClass = (string)($attrs['picture_class'] ?? '');
+        unset($attrs['picture_class']);
+
+        // Montar atributos para a tag <img>
+        $imgAttrs = $attrs;
+        $imgAttrs['src'] = $webpUrl;
+        $imgAttrs['alt'] = $alt;
+
+        $attrStrings = [];
+        foreach ($imgAttrs as $k => $v) {
+            if ($v === null || $v === false) {
+                continue;
+            }
+            if ($v === true) {
+                $attrStrings[] = Security::e((string)$k);
+            } else {
+                $attrStrings[] = Security::e((string)$k) . '="' . Security::e((string)$v) . '"';
+            }
+        }
+        $imgTag = '<img ' . implode(' ', $attrStrings) . '>';
+
+        // AUD-ARCH-01: Só emite <source type="image/avif"> se a existência do arquivo AVIF estiver confirmada
+        $hasAvif = self::hasAvifVariant($imageUrl, $mediaId);
+        if ($hasAvif && $avifUrl !== $webpUrl) {
+            $picClassAttr = ($pictureClass !== '') ? ' class="' . Security::e($pictureClass) . '"' : '';
+            return '<picture' . $picClassAttr . '><source srcset="' . Security::e($avifUrl) . '" type="image/avif">' . $imgTag . '</picture>';
+        }
+
+        return $imgTag;
+    }
+
+    /**
      * Obtém a URL da variante Thumbnail (-thumb.avif ou -thumb.webp, 300x169px) para listagens e painéis leves.
      * Suporta nativamente:
      * 1. Novas imagens com variante -thumb.avif
@@ -140,7 +263,7 @@ class ImageProcessor
         $candidate = $replaced ?? $url;
 
         // Verificar existência física no sistema de arquivos para compatibilidade híbrida
-        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $docRoot = (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : ($GLOBALS['config']['paths']['public'] ?? (dirname(__DIR__) . '/public'));
         $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
 
         $resolved = '';
@@ -227,7 +350,7 @@ class ImageProcessor
 
         $candidate = $replaced ?? $url;
 
-        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $docRoot = (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : ($GLOBALS['config']['paths']['public'] ?? (dirname(__DIR__) . '/public'));
         $candidatePath = rtrim($docRoot, '/\\') . '/' . ltrim($candidate, '/\\');
 
         $resolved = '';
@@ -261,6 +384,7 @@ class ImageProcessor
         self::$memoryIntermediateCache = [];
         self::$memoryManifestCache = [];
         self::$memoryCardCache = [];
+        self::$memoryAvifExistsCache = [];
     }
 
     /** Resolve os metadados atuais; o segundo argumento preserva a API existente. */
@@ -280,15 +404,39 @@ class ImageProcessor
         return self::$memoryDescCache[$key];
     }
 
-    /** Usa o mesmo resolvedor da consulta individual, com queries em lote. */
-    public static function preloadDescriptions(array $imageUrls): void
+    /**
+     * Pré-carrega metadados e descrições em lote para eliminação de queries N+1 (AUD-PERF-04).
+     * Suporta array de strings (URLs) e array de estruturas com pares ['url' => ..., 'id' => ...].
+     *
+     * @param array<int|string, string|array{url?: string, path?: string, id?: string|null, featured_image?: string, featured_media_id?: string|null}> $images
+     */
+    public static function preloadDescriptions(array $images): void
     {
         $requests = [];
-        foreach ($imageUrls as $url) {
-            if (is_string($url) && ($path = self::descriptionPath($url)) !== '') {
-                $requests[$path . '|'] = ['path' => $path, 'id' => ''];
+        foreach ($images as $item) {
+            $url = null;
+            $mediaId = '';
+
+            if (is_string($item)) {
+                $url = $item;
+            } elseif (is_array($item)) {
+                $url = (string)($item['url'] ?? $item['path'] ?? $item['featured_image'] ?? '');
+                $mediaId = (string)($item['id'] ?? $item['media_id'] ?? $item['featured_media_id'] ?? '');
+            }
+
+            if ($url !== null && ($path = self::descriptionPath($url)) !== '') {
+                $requests[$path . '|' . $mediaId] = ['path' => $path, 'id' => $mediaId];
+                // Registra também chave sem ID para garantir hit caso quem consulte não passe ID
+                if ($mediaId !== '') {
+                    $requests[$path . '|'] = ['path' => $path, 'id' => $mediaId];
+                }
             }
         }
+
+        if (empty($requests)) {
+            return;
+        }
+
         foreach (array_chunk($requests, 100, true) as $chunk) {
             self::loadDescriptions($chunk);
         }
@@ -395,7 +543,7 @@ class ImageProcessor
 
         // Se o manifesto não cobriu ao menos duas larguras distintas, inspeciona os arquivos físicos
         if (count($variantsByWidth) < 2 && !empty($thumbUrl)) {
-            $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+            $docRoot = (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : ($GLOBALS['config']['paths']['public'] ?? (dirname(__DIR__) . '/public'));
             $thumbPath = rtrim($docRoot, '/\\') . '/' . ltrim($thumbUrl, '/\\');
             if (file_exists($thumbPath)) {
                 $size = @getimagesize($thumbPath);

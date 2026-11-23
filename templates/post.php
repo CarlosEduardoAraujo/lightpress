@@ -104,7 +104,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                     <div class="flex items-center gap-space-sm">
                         <div class="relative w-11 h-11 rounded-full overflow-hidden shrink-0 shadow-sm bg-surface-container dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white">
                             <?php if (!empty($post['author_avatar'])): ?>
-                                <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
+                                <?= ImageProcessor::renderPicture($post['author_avatar'], (string)($post['author_name'] ?? 'Autor'), ['class' => 'w-full h-full object-cover', 'picture_class' => 'w-full h-full block']) ?>
                             <?php else: ?>
                                 <span class="text-racing-red-text dark:text-racing-red-text-dark font-headline-sm"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
                             <?php endif; ?>
@@ -153,12 +153,19 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 ?>
                 <figure class="-mx-margin-mobile sm:mx-0 my-space-xs">
                     <div class="relative w-full aspect-[16/9] sm:rounded-xl overflow-hidden shadow-md group bg-carbon-black border border-subtle-border dark:border-[#2a303c]">
-                        <img alt="<?= $heroAltAttr ?>"<?= $heroTitleAttr ?>
-                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]" 
-                             src="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>"
-                             loading="eager"
-                             fetchpriority="high"
-                             decoding="async">
+                        <?= ImageProcessor::renderPicture(
+                            $post['featured_image'],
+                            $heroImageDesc,
+                            [
+                                'class' => 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01]',
+                                'title' => !empty($heroImageDesc) ? $heroImageDesc : null,
+                                'loading' => 'eager',
+                                'fetchpriority' => 'high',
+                                'decoding' => 'async',
+                                'picture_class' => 'w-full h-full block',
+                            ],
+                            $post['featured_media_id'] ?? null
+                        ) ?>
                         <div class="absolute top-space-sm left-space-sm bg-carbon-black/85 backdrop-blur-md px-2.5 py-1 rounded text-label-category font-data-telemetry text-pure-white flex items-center gap-1.5 shadow-sm">
                             <span class="w-2 h-2 rounded-full bg-flag-green"></span>
                             <span>SPEEDRACING • <?= Security::e(strtoupper((string)($post['category'] ?? ''))) ?></span>
@@ -189,7 +196,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                 <div class="flex items-center gap-space-md">
                     <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-md bg-surface-container dark:bg-[#252b36] flex items-center justify-center font-bold text-carbon-black dark:text-pure-white text-xl">
                         <?php if (!empty($post['author_avatar'])): ?>
-                            <img alt="<?= Security::e($post['author_name'] ?? 'Autor') ?>" class="w-full h-full object-cover" src="<?= Security::e(ImageProcessor::toAvifUrl($post['author_avatar'])) ?>">
+                            <?= ImageProcessor::renderPicture($post['author_avatar'], (string)($post['author_name'] ?? 'Autor'), ['class' => 'w-full h-full object-cover', 'picture_class' => 'w-full h-full block']) ?>
                         <?php else: ?>
                             <span class="text-racing-red-text dark:text-racing-red-text-dark"><?= mb_strtoupper(mb_substr($post['author_name'] ?? 'S', 0, 1)) ?></span>
                         <?php endif; ?>

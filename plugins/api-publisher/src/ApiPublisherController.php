@@ -105,10 +105,46 @@ final class ApiPublisherController
         // Idempotency: external_id, reddit_id ou header Idempotency-Key
         $externalKey = trim((string)($input['external_id'] ?? $input['reddit_id'] ?? ($_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? '')));
 
-        // 7. Validação de Campos Obrigatórios
+        // 7. Validação de Campos Obrigatórios e Comprimento Máximo (AUD-SEC-05)
         if ($title === '' || trim($content) === '') {
             http_response_code(422);
             echo json_encode(['ok' => false, 'error' => 'Os campos "title" (ou "titulo") e "content" (ou "texto_completo") são obrigatórios.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (mb_strlen($title) > 255) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "title" excede o limite máximo permitido de 255 caracteres.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($externalKey !== '' && mb_strlen($externalKey) > 191) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "external_id" excede o limite máximo permitido de 191 caracteres.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($slug !== '' && mb_strlen($slug) > 191) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "slug" excede o limite máximo permitido de 191 caracteres.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($seoTitle !== '' && mb_strlen($seoTitle) > 255) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "seo_title" excede o limite máximo permitido de 255 caracteres.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($seoDescription !== '' && mb_strlen($seoDescription) > 500) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "seo_description" excede o limite máximo permitido de 500 caracteres.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($focusKeyword !== '' && mb_strlen($focusKeyword) > 255) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'O campo "focus_keyword" excede o limite máximo permitido de 255 caracteres.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -179,9 +215,10 @@ final class ApiPublisherController
             );
 
             $editUrl = "{$canonicalOrigin}/admin/editor.php?id={$result['id']}";
+            $isIdempotent = !empty($result['idempotent']);
 
-            http_response_code(201);
-            echo json_encode([
+            http_response_code($isIdempotent ? 200 : 201);
+            $response = [
                 'ok' => true,
                 'id' => $result['id'],
                 'slug' => $result['slug'],
@@ -189,7 +226,12 @@ final class ApiPublisherController
                 'category' => $result['category'],
                 'author_id' => $result['author_id'],
                 'edit_url' => $editUrl,
-            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            ];
+            if ($isIdempotent) {
+                $response['idempotent'] = true;
+            }
+
+            echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             exit;
 
         } catch (\Throwable $e) {

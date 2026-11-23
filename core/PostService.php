@@ -537,33 +537,37 @@ class PostService
             return true;
         });
 
-        // Executa a purga física do cache estritamente após o commit (LP-09 / P2)
+        // Executa a purga física do cache estritamente após o commit (LP-09 / P2 / AUD-ARCH-02)
         if ($success) {
-            if (!empty($resolvedSlug)) {
-                ObjectCache::delete("post_slug:{$resolvedSlug}", 'post_items');
-            }
-            if (!empty($current['slug']) && $current['slug'] !== $resolvedSlug) {
-                ObjectCache::delete("post_slug:{$current['slug']}", 'post_items');
-            }
-            ObjectCache::flushGroup('posts');
-            if (!empty($affectedUrls)) {
-                try {
-                    $purgeResults = $this->cacheManager->purgeUrls($affectedUrls);
-                    if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
-                        $this->cacheManager->completePurgeJob($jobId);
-                    }
-                } catch (\Throwable $e) {
-                    error_log("[PostService Cache Purge Error] " . $e->getMessage());
+            Database::afterCommit(function () use (
+                $resolvedSlug, $current, $affectedUrls, $jobId, $isNowPublished, $postId, $data, $isFirstPublish
+            ): void {
+                if (!empty($resolvedSlug)) {
+                    ObjectCache::delete("post_slug:{$resolvedSlug}", 'post_items');
                 }
-            }
-        }
+                if (!empty($current['slug']) && $current['slug'] !== $resolvedSlug) {
+                    ObjectCache::delete("post_slug:{$current['slug']}", 'post_items');
+                }
+                ObjectCache::flushGroup('posts');
+                if (!empty($affectedUrls)) {
+                    try {
+                        $purgeResults = $this->cacheManager->purgeUrls($affectedUrls);
+                        if ($jobId > 0 && (empty($purgeResults) || !in_array(false, $purgeResults, true))) {
+                            $this->cacheManager->completePurgeJob($jobId);
+                        }
+                    } catch (\Throwable $e) {
+                        error_log("[PostService Cache Purge Error] " . $e->getMessage());
+                    }
+                }
 
-        if ($success && $isNowPublished) {
-            try {
-                Hook::doAction('post_published', $postId, $data, $current, $isFirstPublish);
-            } catch (\Throwable $e) {
-                error_log("[PostService Hook Error] post_published: " . $e->getMessage());
-            }
+                if ($isNowPublished) {
+                    try {
+                        Hook::doAction('post_published', $postId, $data, $current, $isFirstPublish);
+                    } catch (\Throwable $e) {
+                        error_log("[PostService Hook Error] post_published: " . $e->getMessage());
+                    }
+                }
+            });
         }
 
         return $success;

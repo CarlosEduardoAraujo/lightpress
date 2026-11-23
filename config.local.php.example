@@ -50,6 +50,7 @@ return [
     ],
     'security' => [
         'hmac_secret' => 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO',
+        'encryption_key' => '', // Gerar chave de 64 caracteres hex (ex: bin2hex(random_bytes(32))) para cifrar segredos em repouso
         'trust_cloudflare_headers' => false, // Defina true se a aplicação estiver atrás de CDN/Tunnel Cloudflare
     ],
 ];

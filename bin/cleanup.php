@@ -69,11 +69,12 @@ try {
     echo "  [ERRO] Falha ao promover artigos agendados: " . $e->getMessage() . "\n";
 }
 
-// 5. Limpeza de arquivos de rate limit de login expirados
+// 5. Limpeza de arquivos de rate limit expirados (todos os escopos)
 $logDir = $config['paths']['storage'] . '/logs';
 $deletedRateLimits = 0;
 if (is_dir($logDir)) {
-    foreach (glob($logDir . '/ratelimit_login_*.json') as $rlFile) {
+    $rlFiles = glob($logDir . '/ratelimit_*.json') ?: [];
+    foreach ($rlFiles as $rlFile) {
         if (filemtime($rlFile) < (time() - 3600)) {
             if (@unlink($rlFile)) {
                 $deletedRateLimits++;

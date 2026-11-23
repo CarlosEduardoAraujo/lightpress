@@ -17,6 +17,7 @@ $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 use LightPress\Core\Authorization;
 use LightPress\Core\Database;
 use LightPress\Core\Security;
+use LightPress\Core\ThemeManager;
 
 $currentUser = Security::requireAuth(null, null, $config);
 
@@ -42,54 +43,43 @@ if (!Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $post)) {
     die("Você não possui permissão para visualizar a prévia deste artigo.");
 }
 
+// Carregar revisão privada específica ou pendente mais recente (AUD-ARCH-04)
+$revisionId = isset($_GET['revision_id']) ? (int)$_GET['revision_id'] : 0;
+if ($revisionId > 0) {
+    $rev = Database::fetchOne(
+        "SELECT * FROM post_revisions WHERE id = ? AND post_id = ? LIMIT 1",
+        [$revisionId, $postId]
+    );
+    if ($rev) {
+        $payload = json_decode((string)$rev['payload_json'], true);
+        if (is_array($payload)) {
+            $post = array_merge($post, $payload);
+        }
+        $post['content_html'] = $rev['content_html'];
+        $post['revision_id'] = (int)$rev['id'];
+        $post['status'] = (string)$rev['status'];
+    }
+} else {
+    // Se não especificado revision_id, busca a revisão pendente mais recente da versão atual se existir
+    $latestRev = Database::fetchOne(
+        "SELECT * FROM post_revisions 
+         WHERE post_id = ? AND status IN ('draft', 'pending_review') 
+         ORDER BY id DESC LIMIT 1",
+        [$postId]
+    );
+    if ($latestRev) {
+        $payload = json_decode((string)$latestRev['payload_json'], true);
+        if (is_array($payload)) {
+            $post = array_merge($post, $payload);
+        }
+        $post['content_html'] = $latestRev['content_html'];
+        $post['revision_id'] = (int)$latestRev['id'];
+        $post['status'] = (string)$latestRev['status'];
+    }
+}
+
 $pageTitle = '[PRÉVIA] ' . $post['title'];
 $isPreview = true;
-?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= Security::e($pageTitle) ?></title>
-    <style>
-        .preview-banner {
-            background: #f59e0b;
-            color: #78350f;
-            padding: 0.75rem 1.5rem;
-            position: sticky;
-            top: 0;
-            z-index: 9999;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-family: system-ui, sans-serif;
-            font-size: 0.9rem;
-            font-weight: 600;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-        .preview-btn {
-            background: #78350f;
-            color: white;
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 0.85rem;
-            margin-left: 0.5rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="preview-banner">
-        <div>
-            ⚠️ MODO DE PRÉVIA PRIVADA (Status atual: <strong><?= strtoupper(Security::e($post['status'])) ?></strong>)
-            &bull; Este conteúdo não é público nem cacheável.
-        </div>
-        <div>
-            <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" class="preview-btn">&larr; Voltar ao Editor</a>
-        </div>
-    </div>
 
-    <!-- Renderização do Post usando o template oficial -->
-    <?php require \LightPress\Core\ThemeManager::getTemplateFile('post.php'); ?>
-</body>
-</html>
+// Renderização do Post usando o template oficial sem duplicação de DOCTYPE (AUD-ARCH-04)
+require ThemeManager::getTemplateFile('post.php');

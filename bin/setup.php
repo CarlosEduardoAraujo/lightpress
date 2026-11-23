@@ -17,6 +17,7 @@ $config = require __DIR__ . '/../core/bootstrap.php';
 use LightPress\Core\Database;
 use LightPress\Core\Schema;
 use LightPress\Core\Security;
+use LightPress\Core\Settings;
 
 echo "========================================================\n";
 echo "   LightPress / SpeedPress - Instalação de Banco de Dados\n";
@@ -74,6 +75,51 @@ try {
     echo "       - users, categories, posts, post_stats, post_revisions\n";
     echo "       - user_reset_tokens, media, media_refs, view_dedupe\n";
     echo "       - cache_purge_jobs, migration_map, redirects\n";
+
+    // AUD-SEC-01: Verificação segura de security.encryption_key
+    $currentEncKey = (string)($config['security']['encryption_key'] ?? '');
+    if (file_exists($configLocalFile)) {
+        $checkLocal = @include $configLocalFile;
+        if (is_array($checkLocal) && isset($checkLocal['security']['encryption_key'])) {
+            $currentEncKey = (string)$checkLocal['security']['encryption_key'];
+        }
+    }
+
+    if (empty(trim($currentEncKey))) {
+        // Verificar se já existem valores cifrados na tabela settings
+        $hasEncryptedValues = false;
+        try {
+            $encCheck = $pdo->query("SELECT 1 FROM settings WHERE value LIKE 'enc:%' LIMIT 1");
+            if ($encCheck && $encCheck->fetch()) {
+                $hasEncryptedValues = true;
+            }
+        } catch (\Throwable) {
+            // Tabela settings não existe ou erro de leitura
+        }
+
+        if ($hasEncryptedValues) {
+            echo "\n  [AVISO DE SEGURANÇA] A tabela 'settings' contém valores já cifrados ('enc:...'), mas 'security.encryption_key' está vazia!\n";
+            echo "  -> Para não corromper ou tornar ilegíveis os segredos existentes, uma nova chave NÃO foi gerada automaticamente.\n";
+            echo "  -> Configure a chave original em 'config.local.php' para restaurar o acesso aos dados cifrados.\n";
+        } else {
+            // Seguro gerar uma nova chave de 64 caracteres hexadecimais (32 bytes de entropia)
+            $generatedEncKey = bin2hex(random_bytes(32));
+            $localConfig = file_exists($configLocalFile) ? (@include $configLocalFile) : [];
+            if (!is_array($localConfig)) {
+                $localConfig = [];
+            }
+            if (!isset($localConfig['security']) || !is_array($localConfig['security'])) {
+                $localConfig['security'] = [];
+            }
+            $localConfig['security']['encryption_key'] = $generatedEncKey;
+            $exported = "<?php\ndeclare(strict_types=1);\n\nreturn " . var_export($localConfig, true) . ";\n";
+            @file_put_contents($configLocalFile, $exported);
+            Settings::init($generatedEncKey);
+            echo "  [CONFIG] Chave security.encryption_key gerada automaticamente em config.local.php (64 caracteres).\n";
+        }
+    } else {
+        echo "  [OK] Chave security.encryption_key configurada (" . strlen(trim($currentEncKey)) . " caracteres).\n";
+    }
 } catch (\Throwable $e) {
     echo "  [ERRO] Falha ao criar tabelas: " . $e->getMessage() . "\n";
     exit(1);

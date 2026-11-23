@@ -171,11 +171,7 @@ $settings = $diagnostics['config'] ?? [];
 $pageTitle = 'Redis Cache Pro · LightPress';
 $activePage = 'plugin-settings';
 
-$pluginCss = file_exists(__DIR__ . '/assets/css/admin.css') ? (string)file_get_contents(__DIR__ . '/assets/css/admin.css') : '';
 $extraHead = '<link rel="stylesheet" href="/assets/plugins/redis-cache-pro/css/admin.css">';
-if ($pluginCss !== '') {
-    $extraHead .= "\n    <style>\n" . $pluginCss . "\n    </style>";
-}
 
 require dirname(__DIR__, 2) . '/public/admin/header.php';
 ?>
@@ -654,15 +650,4 @@ require dirname(__DIR__, 2) . '/public/admin/header.php';
     window.rcpHistoryData = <?= json_encode($historyData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="/assets/plugins/redis-cache-pro/js/admin.js"></script>
-<?php
-$pluginJs = file_exists(__DIR__ . '/assets/js/admin.js') ? (string)file_get_contents(__DIR__ . '/assets/js/admin.js') : '';
-if ($pluginJs !== ''): ?>
-<script>
-if (!window.rcpScriptLoaded) {
-    window.rcpScriptLoaded = true;
-    <?= $pluginJs ?>
-}
-</script>
-<?php endif; ?>
-
 <?php require dirname(__DIR__, 2) . '/public/admin/footer.php'; ?>

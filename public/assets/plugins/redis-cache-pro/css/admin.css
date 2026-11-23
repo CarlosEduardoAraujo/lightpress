@@ -123,13 +123,13 @@
 }
 
 .rcp-btn-secondary {
-    background: #ffffff;
+    background: var(--rcp-surface);
     border-color: var(--rcp-border);
     color: var(--rcp-text);
 }
 .rcp-btn-secondary:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
+    background: var(--rcp-border);
+    border-color: var(--rcp-text-muted);
 }
 
 .rcp-btn-success {
@@ -426,8 +426,12 @@
 .rcp-code-key {
     font-family: monospace;
     font-size: 0.8rem;
-    color: var(--rcp-primary);
+    color: #0284c7;
     word-break: break-all;
+}
+
+[data-theme="dark"] .rcp-code-key {
+    color: #38bdf8;
 }
 
 /* Formulários */

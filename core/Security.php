@@ -348,10 +348,11 @@ class Security
      *
      * @return int|null Retorna os segundos restantes de bloqueio ou null se liberado.
      */
-    public static function checkLoginRateLimit(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900): ?int
+    public static function checkLoginRateLimit(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900, string $scope = 'login'): ?int
     {
         $ipHash = hash('sha256', $ip);
-        $file = dirname(__DIR__) . '/storage/logs/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+        $safeScope = preg_replace('/[^a-z0-9_-]/i', '', $scope) ?: 'login';
+        $file = dirname(__DIR__) . '/storage/logs/ratelimit_' . $safeScope . '_' . substr($ipHash, 0, 16) . '.json';
 
         if (!file_exists($file)) {
             return null;
@@ -406,14 +407,15 @@ class Security
     /**
      * Registra uma tentativa falha de login para o IP.
      */
-    public static function recordLoginFailure(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900): void
+    public static function recordLoginFailure(string $ip, int $maxAttempts = 5, int $lockoutSeconds = 900, string $scope = 'login'): void
     {
         $ipHash = hash('sha256', $ip);
+        $safeScope = preg_replace('/[^a-z0-9_-]/i', '', $scope) ?: 'login';
         $dir = dirname(__DIR__) . '/storage/logs';
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);
         }
-        $file = $dir . '/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+        $file = $dir . '/ratelimit_' . $safeScope . '_' . substr($ipHash, 0, 16) . '.json';
 
         $fp = @fopen($file, 'c+');
         if (!$fp) {
@@ -456,10 +458,11 @@ class Security
     /**
      * Limpa o histórico de tentativas falhas de login após sucesso.
      */
-    public static function clearLoginFailures(string $ip): void
+    public static function clearLoginFailures(string $ip, string $scope = 'login'): void
     {
         $ipHash = hash('sha256', $ip);
-        $file = dirname(__DIR__) . '/storage/logs/ratelimit_login_' . substr($ipHash, 0, 16) . '.json';
+        $safeScope = preg_replace('/[^a-z0-9_-]/i', '', $scope) ?: 'login';
+        $file = dirname(__DIR__) . '/storage/logs/ratelimit_' . $safeScope . '_' . substr($ipHash, 0, 16) . '.json';
         if (file_exists($file)) {
             @unlink($file);
         }

@@ -76,10 +76,15 @@ $formatPtDate = function(?string $dateStr) use ($ptMonths, $config): string {
                 $pageImgDesc = ImageProcessor::getImageDescription($page['featured_image']);
             ?>
                 <figure class="my-space-xs rounded-xl overflow-hidden border border-subtle-border dark:border-[#2a303c] shadow-xs">
-                    <img src="<?= Security::e(ImageProcessor::toAvifUrl($page['featured_image'])) ?>" 
-                         alt="<?= Security::e($pageImgDesc) ?>" 
-                         title="<?= Security::e($pageImgDesc) ?>" 
-                         class="w-full max-h-[420px] object-cover">
+                    <?= ImageProcessor::renderPicture(
+                        $page['featured_image'],
+                        $pageImgDesc,
+                        [
+                            'class' => 'w-full max-h-[420px] object-cover',
+                            'title' => $pageImgDesc,
+                            'picture_class' => 'w-full block',
+                        ]
+                    ) ?>
                 </figure>
             <?php endif; ?>
 

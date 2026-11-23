@@ -115,6 +115,10 @@ jobs:
         run_strict bin/test-plugins.php
         run_strict bin/test-sec02-settings-encryption.php
         run_strict bin/test-ssrf.php
+        run_strict bin/test-after-commit.php
+        run_strict bin/test-backup-restore.php
+        run_strict bin/test-render-picture-seo.php
+        run_strict bin/test-passo6-api-preview.php
         run_strict plugins/api-publisher/tests/test-api-publisher.php
         run_strict plugins/api-publisher/tests/test-api-e2e.php
         run_strict plugins/redis-cache-pro/tests/test-redis-cache-pro.php

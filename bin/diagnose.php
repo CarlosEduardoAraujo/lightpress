@@ -123,11 +123,27 @@ $writablePaths = [
     'public/uploads' => $config['media']['upload_dir'],
 ];
 
-foreach ($writablePaths as $label => $path) {
-    if (!is_dir($path)) {
-        @mkdir($path, 0755, true);
+$isDirWritable = function (string $dir): bool {
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
     }
-    if (is_writable($path)) {
+    if (!is_dir($dir)) {
+        return false;
+    }
+    if (PHP_OS_FAMILY === 'Windows') {
+        $testFile = rtrim($dir, '/\\') . '/.lp_perm_' . bin2hex(random_bytes(4));
+        $written = @file_put_contents($testFile, 'test');
+        if ($written !== false) {
+            @unlink($testFile);
+            return true;
+        }
+        return false;
+    }
+    return is_writable($dir);
+};
+
+foreach ($writablePaths as $label => $path) {
+    if ($isDirWritable($path)) {
         echo "  [OK] {$label} tem permissão de escrita.\n";
     } else {
         echo "  [ERRO] {$label} ({$path}) NÃO tem permissão de escrita!\n";
@@ -159,6 +175,18 @@ if ($hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' |
     $warnings[] = "Chave de segurança hmac_secret vulnerável (padrão ou < 32 caracteres). Configure uma chave forte em config.local.php.";
 } else {
     echo "  [OK] hmac_secret configurado com comprimento seguro (" . strlen($hmacSecret) . " caracteres).\n";
+}
+
+// 8. Chave de Criptografia em Repouso (Segurança - AUD-SEC-01)
+echo "\n[Chave de Criptografia em Repouso (security.encryption_key)]\n";
+$encKey = (string)($config['security']['encryption_key'] ?? '');
+if (empty($encKey) || strlen(trim($encKey)) < 32) {
+    echo "  [AVISO] security.encryption_key não está configurada ou possui menos de 32 caracteres.\n";
+    echo "  -> Segredos sensíveis (tokens de IA, webhooks, credenciais do Redis) não poderão ser cifrados em repouso no banco de dados.\n";
+    echo "  -> Configure 'security' => ['encryption_key' => '...'] em config.local.php.\n";
+    $warnings[] = "Chave security.encryption_key ausente ou com baixa entropia (< 32 chars). Configure em config.local.php.";
+} else {
+    echo "  [OK] security.encryption_key configurada com comprimento seguro (" . strlen(trim($encKey)) . " caracteres).\n";
 }
 
 // Resumo Final

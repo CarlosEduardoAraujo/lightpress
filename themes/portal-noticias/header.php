@@ -138,10 +138,20 @@ if (empty($trendingTags)) {
     <?= Seo::renderJsonLd($post ?? null, $config) ?>
 
     <!-- Pré-carregamento Prioritário da Imagem LCP (Elimina atraso de descoberta) -->
-    <?php if (!empty($post['featured_image'])): ?>
-        <link rel="preload" as="image" href="<?= Security::e(ImageProcessor::toAvifUrl($post['featured_image'])) ?>" type="image/avif" fetchpriority="high">
-    <?php elseif (!empty($featuredPosts[0]['featured_image']) && ($currentPage ?? 1) === 1): ?>
-        <link rel="preload" as="image" href="<?= Security::e(ImageProcessor::toAvifUrl($featuredPosts[0]['featured_image'])) ?>" type="image/avif" fetchpriority="high">
+    <?php if (!empty($post['featured_image'])): 
+        $heroPreloadImg = $post['featured_image'];
+        $hasHeroAvif = ImageProcessor::hasAvifVariant($heroPreloadImg, $post['featured_media_id'] ?? null);
+        $heroPreloadUrl = $hasHeroAvif ? ImageProcessor::toAvifUrl($heroPreloadImg) : ImageProcessor::toWebpUrl($heroPreloadImg);
+        $heroPreloadType = $hasHeroAvif ? 'image/avif' : 'image/webp';
+    ?>
+        <link rel="preload" as="image" href="<?= Security::e($heroPreloadUrl) ?>" type="<?= $heroPreloadType ?>" fetchpriority="high">
+    <?php elseif (!empty($featuredPosts[0]['featured_image']) && ($currentPage ?? 1) === 1): 
+        $heroPreloadImg = $featuredPosts[0]['featured_image'];
+        $hasHeroAvif = ImageProcessor::hasAvifVariant($heroPreloadImg, $featuredPosts[0]['featured_media_id'] ?? null);
+        $heroPreloadUrl = $hasHeroAvif ? ImageProcessor::toAvifUrl($heroPreloadImg) : ImageProcessor::toWebpUrl($heroPreloadImg);
+        $heroPreloadType = $hasHeroAvif ? 'image/avif' : 'image/webp';
+    ?>
+        <link rel="preload" as="image" href="<?= Security::e($heroPreloadUrl) ?>" type="<?= $heroPreloadType ?>" fetchpriority="high">
     <?php endif; ?>
 
     <!-- Script Anti-Flash de Tema (deferido para eliminar bloqueio de renderização) -->
@@ -161,6 +171,17 @@ if (empty($trendingTags)) {
     <?php \LightPress\Core\Hook::doAction('frontend_head'); ?>
 </head>
 <body class="bg-surface dark:bg-carbon-black font-body-md text-on-surface dark:text-pure-white antialiased transition-colors duration-200">
+<?php if (!empty($isPreview)): ?>
+    <div class="preview-banner" style="background: #f59e0b; color: #78350f; padding: 0.75rem 1.5rem; position: sticky; top: 0; z-index: 9999; display: flex; justify-content: space-between; align-items: center; font-family: system-ui, sans-serif; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div>
+            ⚠️ MODO DE PRÉVIA PRIVADA (Status: <strong><?= strtoupper(Security::e($post['status'] ?? 'DRAFT')) ?></strong><?= !empty($post['revision_id']) ? ' &bull; Revisão #' . (int)$post['revision_id'] : '' ?>)
+            &bull; Este conteúdo não é público nem cacheável.
+        </div>
+        <div>
+            <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" style="background: #78350f; color: white; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; margin-left: 0.5rem;">&larr; Voltar ao Editor</a>
+        </div>
+    </div>
+<?php endif; ?>
     <header class="fixed top-0 left-0 right-0 z-50 bg-pure-white/95 dark:bg-carbon-black/95 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_rgba(0,0,0,0.5)] border-b border-subtle-border dark:border-[#222]">
         <!-- 1. Top Strip -->
         <div class="w-full bg-carbon-black text-on-tertiary">

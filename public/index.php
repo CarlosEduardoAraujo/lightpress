@@ -1232,11 +1232,22 @@ $router->get('/{slug}/', function (array $params) use ($config): void {
     $wordCount = str_word_count($cleanText);
     $readingTime = max(1, (int)ceil($wordCount / 200));
 
-    // Pré-carregamento em lote: imagem principal e imagens das matérias relacionadas
-    $postImages = array_filter(array_merge(
-        [!empty($post['featured_image']) ? (string)$post['featured_image'] : null],
-        array_column($relatedPosts, 'featured_image')
-    ));
+    // Pré-carregamento em lote (AUD-PERF-04): imagem principal e imagens das matérias relacionadas com media_id
+    $postImages = [];
+    if (!empty($post['featured_image'])) {
+        $postImages[] = [
+            'url' => (string)$post['featured_image'],
+            'id' => (string)($post['featured_media_id'] ?? ''),
+        ];
+    }
+    foreach ($relatedPosts as $rel) {
+        if (!empty($rel['featured_image'])) {
+            $postImages[] = [
+                'url' => (string)$rel['featured_image'],
+                'id' => (string)($rel['featured_media_id'] ?? ''),
+            ];
+        }
+    }
     if (!empty($postImages)) {
         ImageProcessor::preloadDescriptions($postImages);
     }

@@ -44,7 +44,9 @@ class Seo
             // Forçar WebP para Open Graph e Twitter Cards (redes sociais como X/Twitter ainda não aceitam AVIF)
             $image = !empty($rawImage) ? ImageProcessor::toWebpUrl($rawImage) : '';
             $secureImageUrl = !empty($image) ? preg_replace('~^http://~i', 'https://', $image) : '';
-            $avifImage = !empty($rawImage) ? ImageProcessor::toAvifUrl($rawImage) : '';
+            $avifImage = !empty($rawImage) 
+                ? (ImageProcessor::hasAvifVariant($rawImage, $post['featured_media_id'] ?? null) ? ImageProcessor::toAvifUrl($rawImage) : ImageProcessor::toWebpUrl($rawImage)) 
+                : '';
             $type = 'article';
             $keywords = !empty($post['focus_keyword']) ? trim((string)$post['focus_keyword']) : (!empty($post['tags']) ? trim((string)$post['tags']) : '');
             $imgDimensions = !empty($image) ? self::getImageDimensions($image) : null;
@@ -160,7 +162,7 @@ class Seo
             return $default;
         }
 
-        $docRoot = !empty($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : (dirname(__DIR__) . '/public');
+        $docRoot = (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) ? $_SERVER['DOCUMENT_ROOT'] : ($GLOBALS['config']['paths']['public'] ?? (dirname(__DIR__) . '/public'));
         $localPath = rtrim($docRoot, '/\\') . '/' . ltrim($parsedPath, '/\\');
 
         if (file_exists($localPath)) {
@@ -202,6 +204,9 @@ class Seo
         $canonicalOrigin = rtrim($appConfig['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
         if ($post !== null) {
+            $tsPub = (!empty($post['published_at']) && ($ts = strtotime((string)$post['published_at'])) !== false) ? $ts : time();
+            $tsMod = (!empty($post['updated_at']) && ($ts = strtotime((string)$post['updated_at'])) !== false) ? $ts : $tsPub;
+
             $schema = [
                 '@context' => 'https://schema.org',
                 '@type' => 'NewsArticle',
@@ -211,8 +216,8 @@ class Seo
                 ],
                 'headline' => $post['title'],
                 'description' => $post['summary'] ?? '',
-                'datePublished' => date('c', strtotime($post['published_at'] ?? 'now')),
-                'dateModified' => date('c', strtotime($post['updated_at'] ?? $post['published_at'] ?? 'now')),
+                'datePublished' => date('c', $tsPub),
+                'dateModified' => date('c', $tsMod),
                 'author' => [
                     '@type' => 'Person',
                     'name' => $post['author_name'] ?? 'Redação',

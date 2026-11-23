@@ -145,6 +145,48 @@ parameters:
 			path: core/ImageProcessor.php
 
 		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:extractManifestVariants\(\) has parameter \$manifest with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:findIntermediateInManifest\(\) has parameter \$manifest with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:findIntermediateInManifest\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:findThumbnailInManifest\(\) has parameter \$manifest with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:findThumbnailInManifest\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:getManifestForPath\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:getResponsiveCardData\(\) should return array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\} but returns non\-empty\-array\<mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
 			message: '#^Method LightPress\\Core\\ImageProcessor\:\:loadDescriptions\(\) has parameter \$requests with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -163,12 +205,6 @@ parameters:
 			path: core/ImageProcessor.php
 
 		-
-			message: '#^Method LightPress\\Core\\ImageProcessor\:\:preloadDescriptions\(\) has parameter \$imageUrls with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: core/ImageProcessor.php
-
-		-
 			message: '#^Method LightPress\\Core\\ImageProcessor\:\:processUpload\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -181,13 +217,55 @@ parameters:
 			path: core/ImageProcessor.php
 
 		-
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:setMemoryManifest\(\) has parameter \$manifest with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
 			message: '#^Offset ''filename'' on array\{dirname\?\: string, basename\: string, extension\?\: string, filename\: string\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: core/ImageProcessor.php
 
 		-
+			message: '#^Offset ''format'' on array\{key\: string, url\: string, width\: int, format\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Offset ''media_id'' on array\{url\?\: string, path\?\: string, id\?\: string\|null, featured_image\?\: string, featured_media_id\?\: string\|null\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Offset ''url'' on array\{key\: string, url\: string, width\: int, format\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Property LightPress\\Core\\ImageProcessor\:\:\$memoryManifestCache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Static property LightPress\\Core\\ImageProcessor\:\:\$memoryCardCache \(array\<string, array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\}\>\) does not accept non\-empty\-array\<string, non\-empty\-array\<mixed\>\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
 			message: '#^Strict comparison using \!\=\= between string and false will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: core/ImageProcessor.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and null will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: core/ImageProcessor.php
@@ -247,8 +325,20 @@ parameters:
 			path: core/PostService.php
 
 		-
-			message: '#^Left side of && is always true\.$#'
-			identifier: booleanAnd.leftAlwaysTrue
+			message: '#^Method LightPress\\Core\\PostService\:\:buildPostPurgeUrls\(\) has parameter \$paginationTotals with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Method LightPress\\Core\\PostService\:\:buildPostPurgeUrls\(\) has parameter \$post with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/PostService.php
+
+		-
+			message: '#^Method LightPress\\Core\\PostService\:\:buildPostPurgeUrls\(\) has parameter \$previous with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
 			count: 1
 			path: core/PostService.php
 
@@ -291,7 +381,7 @@ parameters:
 		-
 			message: '#^Cannot call method fetch\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
-			count: 11
+			count: 12
 			path: core/Schema.php
 
 		-
@@ -361,6 +451,12 @@ parameters:
 			path: core/Seo.php
 
 		-
+			message: '#^Offset ''featured_media_id'' on array\{title\: string, summary\?\: string, featured_image\: string, published_at\?\: string, updated_at\?\: string, author_name\?\: string, category\?\: string, slug\?\: string, \.\.\.\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/Seo.php
+
+		-
 			message: '#^Method LightPress\\Core\\Settings\:\:applyToConfig\(\) has parameter \$config with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -425,6 +521,24 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: plugins/ai-copilot/src/MediaVision.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherController.php
+
+		-
+			message: '#^Offset ''idempotent'' on array\{id\: int, slug\: string, status\: string, category\: string, author_id\: int\} in empty\(\) does not exist\.$#'
+			identifier: empty.offset
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherController.php
+
+		-
+			message: '#^Ternary operator condition is always false\.$#'
+			identifier: ternary.alwaysFalse
+			count: 1
+			path: plugins/api-publisher/src/ApiPublisherController.php
 
 		-
 			message: '#^Method LightPress\\Plugin\\ApiPublisher\\ApiPublisherService\:\:authenticate\(\) return type has no value type specified in iterable type array\.$#'
@@ -529,6 +643,12 @@ parameters:
 			path: plugins/redis-cache-pro/src/QueryProfiler.php
 
 		-
+			message: '#^Call to an undefined method object\:\:eval\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
 			message: '#^Call to an undefined method object\:\:get\(\)\.$#'
 			identifier: method.notFound
 			count: 2
@@ -573,7 +693,13 @@ parameters:
 		-
 			message: '#^Cannot call method del\(\) on object\|null\.$#'
 			identifier: method.nonObject
-			count: 2
+			count: 1
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Cannot call method exists\(\) on object\|null\.$#'
+			identifier: method.nonObject
+			count: 1
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
@@ -597,7 +723,7 @@ parameters:
 		-
 			message: '#^Cannot call method set\(\) on object\|null\.$#'
 			identifier: method.nonObject
-			count: 4
+			count: 6
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
@@ -634,6 +760,18 @@ parameters:
 			message: '#^Parameter \#1 \$object_or_class of function method_exists expects object\|string, object\|null given\.$#'
 			identifier: argument.type
 			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Parameter \#2 \$port of method Redis\:\:pconnect\(\) expects int, null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: plugins/redis-cache-pro/src/RedisClient.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
