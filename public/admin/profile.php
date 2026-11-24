@@ -89,26 +89,28 @@ $activePage = 'profile';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-    @media (max-width: 768px) {
-        .grid { grid-template-columns: 1fr; }
-    }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-    .card-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 1.5rem; }
-    .form-group { margin-bottom: 1.25rem; }
-    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
-    input { width: 100%; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; background: var(--bg); color: var(--text); outline: none; }
-    input:focus { border-color: var(--primary-accent); }
-    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
-    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem; border-radius: var(--radius); margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .card { padding: 1.75rem; }
+    .card-title { font-size: 1.12rem; font-weight: 800; margin-bottom: 1.35rem; color: var(--primary); }
+    .form-group { margin-bottom: 1.15rem; }
+    label { display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
+    input, textarea { width: 100%; padding: 0.68rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.92rem; font-family: inherit; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    input:focus, textarea:focus { border-color: var(--primary-accent); box-shadow: 0 0 0 3px var(--primary-focus); }
+    input:disabled { background: var(--surface-hover); color: var(--text-muted); cursor: not-allowed; }
 </style>
 
     <div class="container">
-        <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1.5rem;">Configurações de Perfil</h1>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Configurações de Perfil</h1>
+                <p class="page-subtitle">Gerencie suas informações de exibição e credenciais de acesso</p>
+            </div>
+        </div>
 
         <?php if (!empty($isPasswordResetRequired)): ?>
-            <div class="alert-error" style="border-left: 4px solid #b91c1c; font-weight: 600; margin-bottom: 1.5rem;">
-                🔒 <strong>Ação Obrigatória:</strong> Sua conta requer a definição de uma nova senha antes de liberar o acesso às demais áreas do painel.
+            <div class="alert-error" style="border-left: 4px solid var(--danger); font-weight: 600;">
+                <strong>Ação Obrigatória:</strong> Sua conta requer a definição de uma nova senha antes de liberar o acesso às demais áreas do painel.
             </div>
         <?php endif; ?>
 
@@ -125,12 +127,12 @@ require __DIR__ . '/header.php';
 
                     <div class="form-group">
                         <label for="username">Nome de Usuário (Imutável)</label>
-                        <input type="text" id="username" value="<?= Security::e($currentUser['username']) ?>" disabled style="background: #f1f5f9;">
+                        <input type="text" id="username" value="<?= Security::e($currentUser['username']) ?>" disabled>
                     </div>
 
                     <div class="form-group">
                         <label for="email">E-mail</label>
-                        <input type="email" id="email" value="<?= Security::e($currentUser['email']) ?>" disabled style="background: #f1f5f9;">
+                        <input type="email" id="email" value="<?= Security::e($currentUser['email']) ?>" disabled>
                     </div>
 
                     <div class="form-group">

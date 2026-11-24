@@ -252,59 +252,68 @@ require __DIR__ . '/header.php';
 </style>
 
     <div class="container">
-        <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 0.5rem;">Histórico de Revisões</h1>
-        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-            Artigo: <strong><?= Security::e($post['title']) ?></strong> (Versão atual: #<?= (int)$post['version'] ?>)
-        </p>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Histórico de Revisões</h1>
+                <p class="page-subtitle">
+                    Artigo: <strong><?= Security::e($post['title']) ?></strong> (Versão atual: #<?= (int)$post['version'] ?>)
+                </p>
+            </div>
+            <a href="/admin/editor.php?id=<?= (int)$post['id'] ?>" class="btn btn-secondary btn-sm">
+                &larr; Voltar ao Editor
+            </a>
+        </div>
 
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>
 
-        <div class="card">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Revisão</th>
-                        <th>Editor Responsável</th>
-                        <th>Versão Base</th>
-                        <th>Status</th>
-                        <th>Data do Snapshot</th>
-                        <th style="text-align: right;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($revisions)): ?>
-                        <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nenhum histórico registrado para este artigo.</td></tr>
-                    <?php else: ?>
-                        <?php foreach ($revisions as $r): ?>
-                            <tr>
-                                <td><strong>#<?= (int)$r['id'] ?></strong></td>
-                                <td><?= Security::e($r['editor_name']) ?></td>
-                                <td>Versão #<?= (int)$r['base_version'] ?></td>
-                                <td>
-                                    <span class="badge badge-<?= Security::e($r['status']) ?>">
-                                        <?= Security::e($r['status']) ?>
-                                    </span>
-                                </td>
-                                <td><?= date('d/m/Y H:i:s', strtotime($r['created_at'])) ?></td>
-                                <td style="text-align: right;">
-                                    <?php if ($r['status'] !== 'applied'): ?>
-                                        <form method="POST" style="display: inline;" onsubmit="return confirm('Deseja realmente restaurar este snapshot? A alteração criará uma nova revisão aplicada.');">
-                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                                            <input type="hidden" name="restore_revision_id" value="<?= (int)$r['id'] ?>">
-                                            <input type="hidden" name="version" value="<?= (int)$post['version'] ?>">
-                                            <input type="hidden" name="known_revision_id" value="<?= $latestRevisionId ?>">
-                                            <button type="submit" class="btn btn-restore">Restaurar Versão</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.8rem; color: #16a34a; font-weight: 600;">Aplicada</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+        <div class="table-card">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Revisão</th>
+                            <th>Editor Responsável</th>
+                            <th>Versão Base</th>
+                            <th>Status</th>
+                            <th>Data do Snapshot</th>
+                            <th style="text-align: right;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($revisions)): ?>
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">Nenhum histórico registrado para este artigo.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($revisions as $r): ?>
+                                <tr>
+                                    <td class="tabular-nums"><strong>#<?= (int)$r['id'] ?></strong></td>
+                                    <td><?= Security::e($r['editor_name']) ?></td>
+                                    <td class="tabular-nums">Versão #<?= (int)$r['base_version'] ?></td>
+                                    <td>
+                                        <span class="badge <?= $r['status'] === 'applied' ? 'badge-ok' : 'badge-neutral' ?>">
+                                            <?= Security::e($r['status']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="tabular-nums"><?= date('d/m/Y H:i:s', strtotime($r['created_at'])) ?></td>
+                                    <td style="text-align: right;">
+                                        <?php if ($r['status'] !== 'applied'): ?>
+                                            <form method="POST" style="display: inline;" data-confirm="Deseja realmente restaurar este snapshot? A alteração criará uma nova revisão aplicada." data-confirm-title="Restaurar Versão" data-confirm-btn="Restaurar">
+                                                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                <input type="hidden" name="restore_revision_id" value="<?= (int)$r['id'] ?>">
+                                                <input type="hidden" name="version" value="<?= (int)$post['version'] ?>">
+                                                <input type="hidden" name="known_revision_id" value="<?= $latestRevisionId ?>">
+                                                <button type="submit" class="btn btn-sm">Restaurar Versão</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="badge badge-ok">Aplicada</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

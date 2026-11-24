@@ -34,15 +34,24 @@ if ($isLogout) {
     }
 }
 
-// Alternar destaque do artigo na Home (estritamente via POST com CSRF)
+// Alternar destaque do artigo na Home (estritamente via POST com CSRF; suporta AJAX + fallback)
 $toggleFeaturedId = $_SERVER['REQUEST_METHOD'] === 'POST' ? (int)($_POST['toggle_featured_id'] ?? 0) : 0;
 $tokenToggle = $_POST['_csrf_token'] ?? '';
 if ($toggleFeaturedId > 0 && Security::verifyCsrfToken($tokenToggle)) {
     if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)) {
         Database::query("UPDATE posts SET is_featured = CASE WHEN is_featured = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [$toggleFeaturedId]);
+        $newFeatured = (int)Database::fetchValue("SELECT is_featured FROM posts WHERE id = ?", [$toggleFeaturedId]);
         ObjectCache::flushGroup('posts');
         $cacheMgr->purgeUrls(['/']);
-        
+
+        $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+            || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'is_featured' => $newFeatured === 1]);
+            exit;
+        }
+
         $queryParams = $_GET;
         unset($queryParams['toggle_featured_id'], $queryParams['_csrf_token']);
         $qs = !empty($queryParams) ? '?' . http_build_query($queryParams) : '';
@@ -261,162 +270,159 @@ $activePage = 'dashboard';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    [data-theme="dark"] th { background: #0f172a; }
-    [data-theme="dark"] tr:hover td { background: #162036; }
-    [data-theme="dark"] .btn-filter { background: #1e293b; color: #f1f5f9; }
-    [data-theme="dark"] .btn-filter:hover { background: #334155; }
-    [data-theme="dark"] .form-select, [data-theme="dark"] .form-input { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-    [data-theme="dark"] .page-num { background: #131b2e; color: #f1f5f9; border-color: #1e293b; }
-    [data-theme="dark"] .page-num:hover:not(.active) { background: #1e293b; }
-    [data-theme="dark"] .star-inactive { background: #1e293b; color: #64748b; border-color: #334155; }
-
     /* Cards de Métricas */
     .metrics-grid {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 1.25rem;
-        margin-bottom: 2rem;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
     }
-    @media (max-width: 1400px) {
-        .metrics-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-    @media (max-width: 900px) {
-        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 640px) {
-        .metrics-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 1400px) { .metrics-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 900px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .metrics-grid { grid-template-columns: 1fr; } }
+
     .metric-card {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        padding: 1.25rem 1.5rem;
+        padding: 1.15rem 1.25rem;
         display: flex;
         flex-direction: column;
         gap: 0.35rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     }
-    .metric-label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .metric-value { font-size: 1.85rem; font-weight: 900; color: var(--primary); }
-    .metric-sub { font-size: 0.8rem; color: var(--text-muted); }
-
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--border-strong);
+    }
+    .metric-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+    .metric-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-sm);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .metric-label { font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-value { font-size: 1.75rem; font-weight: 900; color: var(--primary); font-variant-numeric: tabular-nums; line-height: 1.15; }
+    .metric-sub { font-size: 0.78rem; color: var(--text-muted); }
 
     /* Barra de Filtros */
     .filter-bar {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        padding: 1rem 1.25rem;
-        margin-bottom: 1.5rem;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.85rem;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .filter-group {
+        padding: 0.9rem 1.15rem;
+        margin-bottom: 1.35rem;
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
         align-items: center;
+        justify-content: space-between;
+        box-shadow: var(--shadow-sm);
     }
-    .form-input { min-width: 220px; }
-    
-    .btn-filter {
-        padding: 0.55rem 1rem;
-        background: #e2e8f0;
-        color: var(--text);
-        border: none;
-        border-radius: 6px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        cursor: pointer;
-        text-decoration: none;
+    .filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        align-items: center;
+        flex: 1;
     }
-    .btn-filter:hover { background: #cbd5e1; }
-    .btn-filter.btn-primary { background: var(--primary-accent); color: white; }
-    .btn-filter.btn-primary:hover { background: var(--primary-hover); }
-
-    /* Tabela */
-    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #f8fafc; padding: 0.85rem 1.15rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    td { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
-    
-    .status-badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-    .status-published { background: #dcfce7; color: #15803d; }
-    .status-draft { background: #f1f5f9; color: #475569; }
-    .status-pending_review { background: #fef3c7; color: #b45309; }
-    .status-archived { background: #fee2e2; color: #b91c1c; }
+    .filter-bar .form-input { min-width: 220px; flex: 1; max-width: 320px; }
 
     .star-featured {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         padding: 0.2rem 0.55rem;
-        border-radius: 4px;
+        border-radius: var(--radius-pill);
         text-decoration: none;
         font-weight: 700;
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        margin-left: 0.5rem;
+        gap: 0.28rem;
+        transition: all 0.15s ease;
     }
-    .star-active { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-    .star-inactive { background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; }
+    .star-active { background: var(--warning-bg); color: var(--warning-text); border: 1px solid rgba(217, 119, 6, 0.25); }
+    .star-inactive { background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); }
+    .star-inactive:hover { color: var(--warning-text); border-color: rgba(217, 119, 6, 0.35); }
 
     /* Paginação */
     .pagination {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1.25rem 1.5rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
         background: var(--surface);
         border-top: 1px solid var(--border);
-        font-size: 0.88rem;
+        font-size: 0.85rem;
         color: var(--text-muted);
     }
-    .page-links { display: flex; gap: 0.4rem; }
+    .page-links { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
     .page-num {
-        padding: 0.4rem 0.75rem;
+        padding: 0.38rem 0.72rem;
         border: 1px solid var(--border);
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         text-decoration: none;
         color: var(--text);
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.83rem;
+        background: var(--surface);
+        transition: background 0.15s, border-color 0.15s;
     }
-    .page-num.active { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
-    .page-num:hover:not(.active) { background: #f1f5f9; }
+    .page-num.active { background: var(--primary-accent); color: #fff; border-color: var(--primary-accent); }
+    .page-num:hover:not(.active) { background: var(--surface-hover); }
 </style>
 
     <div class="container">
         <!-- Cards de Métricas em Tempo Real -->
         <div class="metrics-grid">
             <div class="metric-card">
-                <span class="metric-label">Total de Artigos</span>
+                <div class="metric-top">
+                    <span class="metric-label">Total de Artigos</span>
+                    <span class="metric-icon" style="background: var(--surface-hover); color: var(--primary);"><?= \LightPress\Core\Icon::svg('newspaper', '', 17) ?></span>
+                </div>
                 <span class="metric-value"><?= number_format($totalPosts, 0, ',', '.') ?></span>
                 <span class="metric-sub">Acervo completo no banco</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Matérias Publicadas</span>
-                <span class="metric-value" style="color: #16a34a;"><?= number_format($publishedPosts, 0, ',', '.') ?></span>
+                <div class="metric-top">
+                    <span class="metric-label">Publicadas</span>
+                    <span class="metric-icon" style="background: var(--success-bg); color: var(--success-text);"><?= \LightPress\Core\Icon::svg('check', '', 17) ?></span>
+                </div>
+                <span class="metric-value" style="color: var(--success-text);"><?= number_format($publishedPosts, 0, ',', '.') ?></span>
                 <span class="metric-sub">Disponíveis ao público</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Agendadas</span>
-                <span class="metric-value" style="color: #b45309;"><?= number_format($scheduledPosts, 0, ',', '.') ?></span>
+                <div class="metric-top">
+                    <span class="metric-label">Agendadas</span>
+                    <span class="metric-icon" style="background: var(--warning-bg); color: var(--warning-text);"><?= \LightPress\Core\Icon::svg('calendar_today', '', 16) ?></span>
+                </div>
+                <span class="metric-value" style="color: var(--warning-text);"><?= number_format($scheduledPosts, 0, ',', '.') ?></span>
                 <span class="metric-sub">Publicação futura automática</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Rascunhos / Revisões</span>
-                <span class="metric-value" style="color: #d97706;"><?= number_format($draftPosts, 0, ',', '.') ?></span>
+                <div class="metric-top">
+                    <span class="metric-label">Rascunhos / Revisão</span>
+                    <span class="metric-icon" style="background: var(--info-bg); color: var(--info-text);"><?= \LightPress\Core\Icon::svg('edit_note', '', 17) ?></span>
+                </div>
+                <span class="metric-value" style="color: var(--info-text);"><?= number_format($draftPosts, 0, ',', '.') ?></span>
                 <span class="metric-sub">Em preparação editorial</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Visualizações Totais</span>
+                <div class="metric-top">
+                    <span class="metric-label">Visualizações</span>
+                    <span class="metric-icon" style="background: var(--primary-light); color: var(--primary-accent);"><?= \LightPress\Core\Icon::svg('trending_up', '', 17) ?></span>
+                </div>
                 <span class="metric-value" style="color: var(--primary-accent);"><?= number_format($totalViews, 0, ',', '.') ?></span>
                 <span class="metric-sub">Leituras reais registradas</span>
             </div>
@@ -425,12 +431,12 @@ require __DIR__ . '/header.php';
         <div class="page-header">
             <div>
                 <h1 class="page-title">Gerenciador de Notícias</h1>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.2rem;">
-                    Exibindo <?= number_format($filteredCount, 0, ',', '.') ?> <?= $filteredCount === 1 ? 'matéria' : 'matérias' ?> encontradas
+                <p class="page-subtitle">
+                    Exibindo <strong class="tabular-nums"><?= number_format($filteredCount, 0, ',', '.') ?></strong> <?= $filteredCount === 1 ? 'matéria' : 'matérias' ?> encontradas
                 </p>
             </div>
             <a href="/admin/editor.php" class="btn">
-                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                <?= \LightPress\Core\Icon::svg('plus', '', 17) ?>
                 Nova Publicação
             </a>
         </div>
@@ -438,7 +444,7 @@ require __DIR__ . '/header.php';
         <!-- Barra de Filtros e Busca -->
         <form method="GET" action="/admin/dashboard.php" class="filter-bar">
             <div class="filter-group">
-                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="Buscar por título, resumo ou tag..." class="form-input">
+                <input type="text" name="q" value="<?= Security::e($filterSearch) ?>" placeholder="Buscar por título, resumo ou tag... (Ctrl+K)" class="form-input">
 
                 <select name="status" class="form-select">
                     <option value="">Todos os Status</option>
@@ -469,191 +475,198 @@ require __DIR__ . '/header.php';
                     </select>
                 <?php endif; ?>
 
-                <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; font-weight: 600; cursor: pointer;">
+                <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
                     <input type="checkbox" name="featured" value="1" <?= $filterFeatured ? 'checked' : '' ?>>
-                    ★ Apenas Destaques
+                    Apenas Destaques
                 </label>
             </div>
 
             <div style="display: flex; gap: 0.5rem;">
-                <button type="submit" class="btn-filter btn-primary">Filtrar</button>
+                <button type="submit" class="btn btn-sm">
+                    <?= \LightPress\Core\Icon::svg('search', '', 14) ?>
+                    Filtrar
+                </button>
                 <?php if (!empty($filterStatus) || !empty($filterCategory) || !empty($filterAuthor) || !empty($filterSearch) || !empty($filterFeatured)): ?>
-                    <a href="/admin/dashboard.php" class="btn-filter" title="Limpar todos os filtros">Limpar</a>
+                    <a href="/admin/dashboard.php" class="btn btn-secondary btn-sm" title="Limpar todos os filtros">Limpar</a>
                 <?php endif; ?>
             </div>
         </form>
 
         <!-- Tabela de Publicações -->
         <div class="table-card">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 40%;">Título / Manchete</th>
-                        <th>Autor</th>
-                        <th>Categoria</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Views</th>
-                        <th>Data de Criação</th>
-                        <th style="text-align: right;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($posts)): ?>
+            <div class="table-responsive">
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
-                                Nenhuma publicação encontrada com os filtros selecionados.
-                            </td>
+                            <th style="width: 42%;">Título / Manchete</th>
+                            <th>Autor</th>
+                            <th>Categoria</th>
+                            <th>Status</th>
+                            <th style="text-align: right;">Views</th>
+                            <th>Data</th>
+                            <th style="text-align: right;">Ações</th>
                         </tr>
-                    <?php else: ?>
-                        <?php foreach ($posts as $p): ?>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($posts)): ?>
                             <tr>
-                                <td>
-                                    <div style="display: flex; align-items: center; gap: 1rem;">
-                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
-                                            <?php if (!empty($p['featured_image'])): ?>
-                                                <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'avif')) ?>" 
-                                                     alt="" 
-                                                     loading="lazy" 
-                                                     style="width: 76px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">
-                                            <?php else: ?>
-                                                <div style="width: 76px; height: 48px; border-radius: 6px; border: 1px dashed var(--border); background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;">
-                                                    Sem foto
-                                                </div>
-                                            <?php endif; ?>
-                                        </a>
-
-                                        <div style="flex-grow: 1; min-width: 0;">
-                                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
-                                                <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem; line-height: 1.35;">
-                                                    <?= Security::e($p['title']) ?>
-                                                </a>
-
-                                                <?php if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)): ?>
-                                                    <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;">
-                                                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                                                        <input type="hidden" name="toggle_featured_id" value="<?= (int)$p['id'] ?>">
-                                                        <button type="submit" class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>" style="border:none; cursor:pointer;" title="Clique para alternar presença no Hero Quad Grid da Home">
-                                                            <?= !empty($p['is_featured']) ? '★ Destaque Home' : '☆ Destacar' ?>
-                                                        </button>
-                                                    </form>
-                                                <?php elseif (!empty($p['is_featured'])): ?>
-                                                    <span class="star-featured star-active">★ Destaque</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
-                                                Slug: <code>/<?= Security::e($p['slug']) ?>/</code>
-                                            </div>
-
-                                            <?php if (!empty($p['tags'])): ?>
-                                                <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem;">
-                                                    <?php foreach (array_slice(array_map('trim', explode(',', $p['tags'])), 0, 4) as $tg): ?>
-                                                        <?php if (!empty($tg)): ?>
-                                                            <span style="font-size: 0.7rem; font-weight: 600; background: var(--primary-light); color: var(--primary-accent); padding: 0.1rem 0.45rem; border-radius: 4px;">
-                                                                #<?= Security::e($tg) ?>
-                                                            </span>
-                                                        <?php endif; ?>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span style="font-weight: 600;"><?= Security::e($p['author_name']) ?></span>
-                                </td>
-                                <td>
-                                    <span style="background: var(--primary-light); color: var(--primary-accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
-                                        <?= Security::e($p['category']) ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php 
-                                        $pubTime = !empty($p['published_at']) ? strtotime($p['published_at']) : 0;
-                                        $isSched = ($pubTime > time()) && ($p['status'] === 'scheduled' || $p['status'] === 'published');
-                                        $isPub = ($p['status'] === 'published') || ($pubTime > 0 && $pubTime <= time() && $p['status'] === 'scheduled');
-                                    ?>
-                                    <?php if ($isSched): ?>
-                                        <span class="status-badge" style="background: #fef3c7; color: #b45309;" title="Agendado para <?= $formatDisplayDate($p['published_at']) ?>">
-                                            📅 Agendado (<?= $formatDisplayDate($p['published_at'], 'd/m H:i') ?>)
-                                        </span>
-                                    <?php elseif ($isPub): ?>
-                                        <span class="status-badge status-published">
-                                            Publicado
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="status-badge status-<?= Security::e($p['status']) ?>">
-                                            <?= match($p['status']) {
-                                                'draft' => 'Rascunho',
-                                                'pending_review' => 'Em Revisão',
-                                                'archived' => 'Arquivado',
-                                                default => $p['status']
-                                            } ?>
-                                        </span>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="text-align: right; font-weight: 800; color: var(--primary);">
-                                    <?= number_format((int)$p['views'], 0, ',', '.') ?>
-                                </td>
-                                <td style="font-size: 0.82rem; color: var(--text-muted);">
-                                    <?= $formatDisplayDate($p['published_at'] ?? $p['updated_at']) ?>
-                                </td>
-                                <td style="text-align: right; white-space: nowrap;">
-                                    <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem; background: var(--primary-light); color: var(--primary-accent); font-weight: 700;">
-                                        Editar
-                                    </a>
-                                    
-                                    <?php if ($isPub): ?>
-                                        <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="btn-filter" style="padding: 0.35rem 0.7rem; font-size: 0.8rem;">
-                                            Ver ↗
-                                        </a>
-                                    <?php endif; ?>
-
-                                    <?php 
-                                    $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $p); 
-                                    if ($canDelete):
-                                    ?>
-                                        <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta publicação? Essa ação removerá o artigo e seu cache no Nginx.');">
-                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                                            <input type="hidden" name="delete_id" value="<?= (int)$p['id'] ?>">
-                                            <button type="submit" class="btn-filter" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; color: #dc2626; background: #fee2e2; border:none; cursor:pointer;" title="Excluir Artigo">
-                                                ✕
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                    Nenhuma publicação encontrada com os filtros selecionados.
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        <?php else: ?>
+                            <?php foreach ($posts as $p): ?>
+                                <tr>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 0.9rem;">
+                                            <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
+                                                <?php if (!empty($p['featured_image'])): ?>
+                                                    <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'avif')) ?>"
+                                                         alt=""
+                                                         loading="lazy"
+                                                         style="width: 76px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; background: var(--surface-hover);">
+                                                <?php else: ?>
+                                                    <div style="width: 76px; height: 48px; border-radius: var(--radius-sm); border: 1px dashed var(--border-strong); background: var(--surface-subtle); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                                                        <?= \LightPress\Core\Icon::svg('image', '', 18) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </a>
+
+                                            <div style="flex-grow: 1; min-width: 0;">
+                                                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem;">
+                                                    <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.94rem; line-height: 1.35;">
+                                                        <?= Security::e($p['title']) ?>
+                                                    </a>
+
+                                                    <?php if (Authorization::can($currentUser, Authorization::ACTION_SET_FEATURED)): ?>
+                                                        <form method="POST" action="<?= buildFilterUrl([]) ?>" class="js-toggle-featured" style="display:inline;">
+                                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                            <input type="hidden" name="toggle_featured_id" value="<?= (int)$p['id'] ?>">
+                                                            <button type="submit" class="star-featured <?= !empty($p['is_featured']) ? 'star-active' : 'star-inactive' ?>" style="cursor:pointer;" title="Clique para alternar presença no Hero Quad Grid da Home">
+                                                                <?= !empty($p['is_featured']) ? \LightPress\Core\Icon::svg('star_filled', '', 12) . ' Destaque' : \LightPress\Core\Icon::svg('star', '', 12) . ' Destacar' ?>
+                                                            </button>
+                                                        </form>
+                                                    <?php elseif (!empty($p['is_featured'])): ?>
+                                                        <span class="star-featured star-active"><?= \LightPress\Core\Icon::svg('star_filled', '', 12) ?> Destaque</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div style="font-size: 0.77rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                                    <code>/<?= Security::e($p['slug']) ?>/</code>
+                                                </div>
+
+                                                <?php if (!empty($p['tags'])): ?>
+                                                    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem;">
+                                                        <?php foreach (array_slice(array_map('trim', explode(',', $p['tags'])), 0, 4) as $tg): ?>
+                                                            <?php if (!empty($tg)): ?>
+                                                                <span style="font-size: 0.7rem; font-weight: 600; background: var(--primary-light); color: var(--primary-accent); padding: 0.1rem 0.45rem; border-radius: 4px;">
+                                                                    #<?= Security::e($tg) ?>
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span style="font-weight: 600; font-size: 0.86rem;"><?= Security::e($p['author_name']) ?></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: var(--primary-light); color: var(--primary-accent);">
+                                            <?= Security::e($p['category']) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                            $pubTime = !empty($p['published_at']) ? strtotime($p['published_at']) : 0;
+                                            $isSched = ($pubTime > time()) && ($p['status'] === 'scheduled' || $p['status'] === 'published');
+                                            $isPub = ($p['status'] === 'published') || ($pubTime > 0 && $pubTime <= time() && $p['status'] === 'scheduled');
+                                        ?>
+                                        <?php if ($isSched): ?>
+                                            <span class="status-badge status-scheduled" title="Agendado para <?= $formatDisplayDate($p['published_at']) ?>">
+                                                <?= \LightPress\Core\Icon::svg('schedule', '', 12) ?>
+                                                Agendado (<?= $formatDisplayDate($p['published_at'], 'd/m H:i') ?>)
+                                            </span>
+                                        <?php elseif ($isPub): ?>
+                                            <span class="status-badge status-published">Publicado</span>
+                                        <?php else: ?>
+                                            <span class="status-badge status-<?= Security::e($p['status']) ?>">
+                                                <?= match($p['status']) {
+                                                    'draft' => 'Rascunho',
+                                                    'pending_review' => 'Em Revisão',
+                                                    'archived' => 'Arquivado',
+                                                    default => $p['status']
+                                                } ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="tabular-nums" style="text-align: right; font-weight: 800; color: var(--primary);">
+                                        <?= number_format((int)$p['views'], 0, ',', '.') ?>
+                                    </td>
+                                    <td class="tabular-nums" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">
+                                        <?= $formatDisplayDate($p['published_at'] ?? $p['updated_at']) ?>
+                                    </td>
+                                    <td style="text-align: right; white-space: nowrap;">
+                                        <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm" style="background: var(--primary-light); color: var(--primary-accent);" title="Editar publicação">
+                                                <?= \LightPress\Core\Icon::svg('edit', '', 14) ?>
+                                                <span>Editar</span>
+                                            </a>
+
+                                            <?php if ($isPub): ?>
+                                                <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="btn btn-secondary btn-sm btn-icon" title="Ver publicação no site">
+                                                    <?= \LightPress\Core\Icon::svg('open_in_new', '', 14) ?>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <?php
+                                            $canDelete = Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $p);
+                                            if ($canDelete):
+                                            ?>
+                                                <form method="POST" action="<?= buildFilterUrl([]) ?>" style="display:inline;" data-confirm="Tem certeza que deseja excluir esta publicação? Essa ação removerá o artigo e seu cache." data-confirm-title="Excluir Publicação" data-confirm-btn="Excluir">
+                                                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                    <input type="hidden" name="delete_id" value="<?= (int)$p['id'] ?>">
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm btn-icon" title="Excluir Artigo">
+                                                        <?= \LightPress\Core\Icon::svg('trash', '', 14) ?>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
 
             <!-- Rodapé com Paginação -->
             <?php if ($totalPages > 1): ?>
                 <div class="pagination">
                     <div>
-                        Página <strong><?= $page ?></strong> de <strong><?= $totalPages ?></strong>
+                        Página <strong class="tabular-nums"><?= $page ?></strong> de <strong class="tabular-nums"><?= $totalPages ?></strong>
                     </div>
                     <div class="page-links">
                         <?php if ($page > 1): ?>
                             <a href="<?= buildFilterUrl(['page' => $page - 1]) ?>" class="page-num">&larr; Anterior</a>
                         <?php endif; ?>
 
-                        <?php 
+                        <?php
                         $startPage = max(1, $page - 2);
                         $endPage = min($totalPages, $page + 2);
                         if ($startPage > 1) {
                             echo '<a href="' . buildFilterUrl(['page' => 1]) . '" class="page-num">1</a>';
-                            if ($startPage > 2) echo '<span style="padding: 0.4rem;">...</span>';
+                            if ($startPage > 2) echo '<span style="padding: 0.35rem;">...</span>';
                         }
-                        for ($i = $startPage; $i <= $endPage; $i++): 
+                        for ($i = $startPage; $i <= $endPage; $i++):
                         ?>
                             <a href="<?= buildFilterUrl(['page' => $i]) ?>" class="page-num <?= $i === $page ? 'active' : '' ?>">
                                 <?= $i ?>
                             </a>
                         <?php endfor; ?>
-                        <?php 
+                        <?php
                         if ($endPage < $totalPages) {
-                            if ($endPage < $totalPages - 1) echo '<span style="padding: 0.4rem;">...</span>';
+                            if ($endPage < $totalPages - 1) echo '<span style="padding: 0.35rem;">...</span>';
                             echo '<a href="' . buildFilterUrl(['page' => $totalPages]) . '" class="page-num">' . $totalPages . '</a>';
                         }
                         ?>
@@ -666,4 +679,42 @@ require __DIR__ . '/header.php';
             <?php endif; ?>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (!form.classList || !form.classList.contains('js-toggle-featured')) return;
+            e.preventDefault();
+            var btn = form.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data && data.success && btn) {
+                    var active = !!data.is_featured;
+                    btn.className = 'star-featured ' + (active ? 'star-active' : 'star-inactive');
+                    btn.innerHTML = active
+                        ? '<?= \LightPress\Core\Icon::svg('star_filled', '', 12) ?> Destaque'
+                        : '<?= \LightPress\Core\Icon::svg('star', '', 12) ?> Destacar';
+                    if (window.LPAdmin) {
+                        window.LPAdmin.toast(active ? 'Matéria adicionada aos destaques da Home.' : 'Matéria removida dos destaques.', 'success');
+                    }
+                } else {
+                    form.submit();
+                }
+            })
+            .catch(function () {
+                form.classList.remove('js-toggle-featured');
+                form.submit();
+            })
+            .finally(function () {
+                if (btn) btn.disabled = false;
+            });
+        });
+    </script>
 <?php require __DIR__ . '/footer.php'; ?>

@@ -62,21 +62,9 @@ $activePage = 'stats';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    [data-theme="dark"] th { background: #0f172a; }
-    [data-theme="dark"] tr:hover td { background: #162036; }
-    [data-theme="dark"] .card-header { background: #0f172a; }
-
-    .page-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem; }
-
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 2.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-    .card-header { padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
-    .card-title { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
-
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #f8fafc; padding: 0.8rem 1.25rem; font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    td { padding: 0.95rem 1.25rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
+    .card { overflow: hidden; margin-bottom: 2rem; }
+    .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--surface-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .card-title { font-size: 1.05rem; font-weight: 800; color: var(--primary); display: inline-flex; align-items: center; gap: 0.5rem; }
 
     .rank-badge {
         display: inline-flex;
@@ -88,104 +76,112 @@ require __DIR__ . '/header.php';
         font-weight: 900;
         font-size: 0.82rem;
     }
-    .rank-1 { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-    .rank-2 { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-    .rank-3 { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+    .rank-1 { background: var(--warning-bg); color: var(--warning-text); }
+    .rank-2 { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border-strong); }
+    .rank-3 { background: var(--primary-light); color: var(--primary-accent); }
     .rank-other { background: transparent; color: var(--text-muted); }
 
-    .grid-stats {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2rem;
-    }
-    @media (max-width: 900px) {
-        .grid-stats { grid-template-columns: 1fr; }
-    }
+    .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 960px) { .grid-stats { grid-template-columns: 1fr; } }
 </style>
 
     <div class="container">
-        <h1 class="page-title">Audiência Editorial & Ranking de Notícias</h1>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Audiência Editorial & Ranking de Notícias</h1>
+                <p class="page-subtitle">Contabilização atômica sem duplicidade por IP</p>
+            </div>
+        </div>
 
         <!-- Top 20 Notícias Mais Lidas -->
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">🏆 Top 20 Notícias Mais Lidas</h2>
-                <span style="font-size: 0.82rem; color: var(--text-muted);">Contabilização atômica sem duplicidade por IP</span>
+                <h2 class="card-title"><?= \LightPress\Core\Icon::svg('trending_up', '', 18) ?> Top 20 Notícias Mais Lidas</h2>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 50px; text-align: center;">#</th>
-                        <th>Manchete / Notícia</th>
-                        <th>Categoria</th>
-                        <th>Autor</th>
-                        <th>Data</th>
-                        <th style="text-align: right;">Visualizações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($topPosts)): ?>
+            <div class="table-responsive">
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
-                                Nenhuma visualização registrada ainda. As leituras públicas aparecerão aqui automaticamente.
-                            </td>
+                            <th style="width: 50px; text-align: center;">#</th>
+                            <th>Manchete / Notícia</th>
+                            <th>Categoria</th>
+                            <th>Autor</th>
+                            <th>Data</th>
+                            <th style="text-align: right; min-width: 140px;">Visualizações</th>
                         </tr>
-                    <?php else: ?>
-                        <?php foreach ($topPosts as $idx => $p): 
-                            $rank = $idx + 1;
-                            $rankClass = match($rank) {
-                                1 => 'rank-1',
-                                2 => 'rank-2',
-                                3 => 'rank-3',
-                                default => 'rank-other'
-                            };
-                        ?>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($topPosts)): ?>
                             <tr>
-                                <td style="text-align: center;">
-                                    <span class="rank-badge <?= $rankClass ?>"><?= $rank ?></span>
-                                </td>
-                                <td>
-                                    <div style="display: flex; align-items: center; gap: 0.85rem;">
-                                        <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
-                                            <?php if (!empty($p['featured_image'])): ?>
-                                                <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'avif')) ?>" 
-                                                     alt="" 
-                                                     loading="lazy" 
-                                                     style="width: 64px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; background: #e2e8f0;">
-                                            <?php else: ?>
-                                                <div style="width: 64px; height: 40px; border-radius: 6px; border: 1px dashed var(--border); background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;">
-                                                    Sem foto
-                                                </div>
-                                            <?php endif; ?>
-                                        </a>
-
-                                        <div>
-                                            <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.95rem;">
-                                                <?= Security::e($p['title']) ?>
-                                            </a>
-                                            <span style="margin-left: 0.4rem; font-size: 0.8rem;">
-                                                <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary-accent); text-decoration: none;">[Editar]</a>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span style="background: var(--primary-light); color: var(--primary-accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700;">
-                                        <?= Security::e($p['category']) ?>
-                                    </span>
-                                </td>
-                                <td><?= Security::e($p['author_name']) ?></td>
-                                <td style="font-size: 0.82rem; color: var(--text-muted);">
-                                    <?= date('d/m/Y', strtotime($p['published_at'])) ?>
-                                </td>
-                                <td style="text-align: right; font-weight: 900; font-size: 1.05rem; color: var(--primary-accent);">
-                                    <?= number_format((int)$p['views'], 0, ',', '.') ?>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                    Nenhuma visualização registrada ainda. As leituras públicas aparecerão aqui automaticamente.
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        <?php else: ?>
+                            <?php
+                                $maxViews = max(1, (int)($topPosts[0]['views'] ?? 1));
+                                foreach ($topPosts as $idx => $p):
+                                    $rank = $idx + 1;
+                                    $rankClass = match($rank) {
+                                        1 => 'rank-1',
+                                        2 => 'rank-2',
+                                        3 => 'rank-3',
+                                        default => 'rank-other'
+                                    };
+                                    $pct = min(100, round(((int)$p['views'] / $maxViews) * 100));
+                            ?>
+                                <tr>
+                                    <td class="tabular-nums" style="text-align: center;">
+                                        <span class="rank-badge <?= $rankClass ?>"><?= $rank ?></span>
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 0.85rem;">
+                                            <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
+                                                <?php if (!empty($p['featured_image'])): ?>
+                                                    <img src="<?= Security::e(ImageProcessor::toThumbUrl($p['featured_image'], 'avif')) ?>"
+                                                         alt=""
+                                                         loading="lazy"
+                                                         style="width: 64px; height: 40px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; background: var(--surface-hover);">
+                                                <?php else: ?>
+                                                    <div style="width: 64px; height: 40px; border-radius: var(--radius-sm); border: 1px dashed var(--border-strong); background: var(--surface-subtle); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                                                        <?= \LightPress\Core\Icon::svg('image', '', 16) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </a>
+
+                                            <div>
+                                                <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 700; font-size: 0.94rem;">
+                                                    <?= Security::e($p['title']) ?>
+                                                </a>
+                                                <span style="margin-left: 0.4rem; font-size: 0.78rem;">
+                                                    <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="color: var(--primary-accent); text-decoration: none; font-weight: 600;">[Editar]</a>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: var(--primary-light); color: var(--primary-accent);">
+                                            <?= Security::e($p['category']) ?>
+                                        </span>
+                                    </td>
+                                    <td style="font-size: 0.86rem;"><?= Security::e($p['author_name']) ?></td>
+                                    <td class="tabular-nums" style="font-size: 0.82rem; color: var(--text-muted); white-space: nowrap;">
+                                        <?= date('d/m/Y', strtotime($p['published_at'])) ?>
+                                    </td>
+                                    <td class="tabular-nums" style="text-align: right;">
+                                        <div style="font-weight: 900; font-size: 1rem; color: var(--primary-accent);">
+                                            <?= number_format((int)$p['views'], 0, ',', '.') ?>
+                                        </div>
+                                        <div class="lp-progress" style="max-width: 110px; margin-left: auto;">
+                                            <div class="lp-progress-bar" style="width: <?= $pct ?>%;"></div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="grid-stats">

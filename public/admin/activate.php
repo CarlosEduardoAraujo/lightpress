@@ -117,52 +117,46 @@ $csrfToken = Security::generateCsrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ativar Conta - <?= Security::e($siteTitle) ?></title>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/assets/admin/admin.css?v=<?= @filemtime(dirname(__DIR__) . '/assets/admin/admin.css') ?: '1' ?>">
     <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #E10600;
-            --primary-hover: #b80500;
-            --bg: #f1f5f9;
-            --surface: #ffffff;
-            --border: #cbd5e1;
-            --text: #0f172a;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2.5rem; width: 100%; max-width: 420px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
-        .brand { font-size: 1.6rem; font-weight: 800; text-align: center; margin-bottom: 0.5rem; color: var(--primary); }
-        .brand span { color: var(--primary-accent); }
-        .subtitle { font-size: 0.9rem; color: #64748b; text-align: center; margin-bottom: 2rem; }
-        .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #334155; }
-        input[type="password"] { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; }
-        input:focus { outline: none; border-color: var(--primary-accent); box-shadow: 0 0 0 3px rgba(225,6,0,0.15); }
-        .btn { width: 100%; padding: 0.8rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .btn:hover { background: var(--primary-hover); }
-        .alert-error { background: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 0.75rem; border-radius: var(--radius); font-size: 0.85rem; margin-bottom: 1.25rem; }
-        .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 1rem; border-radius: var(--radius); text-align: center; }
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.25rem; background-image: radial-gradient(circle at 15% 15%, var(--primary-light) 0%, transparent 45%); }
+        .card { padding: 2.25rem 2rem; width: 100%; max-width: 420px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+        .brand { font-size: 1.5rem; font-weight: 800; justify-content: center; margin-bottom: 0.35rem; }
+        .subtitle { font-size: 0.9rem; color: var(--text-muted); text-align: center; margin-bottom: 1.85rem; }
+        .form-group { margin-bottom: 1.15rem; }
+        label { display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text); }
+        input[type="password"] { width: 100%; padding: 0.72rem 0.9rem; font-size: 0.95rem; }
+        .btn-full { width: 100%; padding: 0.78rem 1rem; font-size: 0.96rem; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="brand"><?= Security::e($siteTitle) ?></div>
+        <div class="brand"><span class="brand-dot" aria-hidden="true"></span><span><?= Security::e($siteTitle) ?></span></div>
         <div class="subtitle">Ativação de Conta e Criação de Senha</div>
 
         <?php if ($success): ?>
-            <div class="alert-success">
+            <div class="alert-success" style="display:block; text-align:center;">
                 <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Conta ativada com sucesso!</h3>
                 <p style="font-size: 0.9rem; margin-bottom: 1rem;">Sua senha foi registrada com segurança.</p>
-                <a href="/admin/login.php" class="btn" style="display: block; text-decoration: none;">Acessar o Painel</a>
+                <a href="/admin/login.php" class="btn btn-full">Acessar o Painel</a>
             </div>
         <?php else: ?>
             <?php if (!empty($error)): ?>
                 <div class="alert-error"><?= Security::e($error) ?></div>
             <?php endif; ?>
 
-            <p style="font-size: 0.9rem; color: #475569; margin-bottom: 1.5rem;">
-                Olá, <strong><?= Security::e($tokenRecord['name']) ?></strong>! Defina sua senha de acesso abaixo:
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+                Olá, <strong style="color: var(--text);"><?= Security::e($tokenRecord['name']) ?></strong>! Defina sua senha de acesso abaixo:
             </p>
 
             <form method="POST">
@@ -171,15 +165,15 @@ $csrfToken = Security::generateCsrfToken();
 
                 <div class="form-group">
                     <label for="password">Nova Senha (Mínimo 8 caracteres)</label>
-                    <input type="password" id="password" name="password" required autofocus minlength="8">
+                    <input type="password" id="password" name="password" class="form-input" required autofocus minlength="8">
                 </div>
 
                 <div class="form-group">
                     <label for="password_confirm">Confirme a Nova Senha</label>
-                    <input type="password" id="password_confirm" name="password_confirm" required minlength="8">
+                    <input type="password" id="password_confirm" name="password_confirm" class="form-input" required minlength="8">
                 </div>
 
-                <button type="submit" class="btn">Ativar Conta e Entrar</button>
+                <button type="submit" class="btn btn-full">Ativar Conta e Entrar</button>
             </form>
         <?php endif; ?>
     </div>

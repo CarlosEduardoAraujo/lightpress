@@ -226,35 +226,20 @@ $activePage = 'categories';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    [data-theme="dark"] th { background: #0f172a; }
-    [data-theme="dark"] tr:hover td { background: #162036; }
-    [data-theme="dark"] input[type="text"] { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-
-    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: flex-start; }
-    @media (max-width: 900px) {
-        .grid { grid-template-columns: 1fr; }
-    }
-    
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-    .form-group { margin-bottom: 1.25rem; }
-    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
-    input[type="text"] { width: 100%; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; background: var(--bg); color: var(--text); outline: none; }
-    input[type="text"]:focus { border-color: var(--primary-accent); }
-
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #f8fafc; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
-    td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
-
-    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: flex-start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { padding: 1.5rem; }
+    .form-group { margin-bottom: 1.15rem; }
+    .form-label { display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
 </style>
 
     <div class="container">
-        <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem;">
-            Gerenciador de Categorias
-        </h1>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Gerenciador de Categorias</h1>
+                <p class="page-subtitle">Organize as editorias e URLs de seção do portal</p>
+            </div>
+        </div>
 
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>
@@ -262,7 +247,7 @@ require __DIR__ . '/header.php';
         <div class="grid">
             <!-- Formulário de Criação / Edição -->
             <div class="card">
-                <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 1.25rem; color: var(--primary);">
+                <h2 style="font-size: 1.12rem; font-weight: 800; margin-bottom: 1.15rem; color: var(--primary);">
                     <?= $editCategory ? 'Editar Categoria' : 'Nova Categoria' ?>
                 </h2>
                 <form method="POST" action="/admin/categories.php">
@@ -273,13 +258,13 @@ require __DIR__ . '/header.php';
                     <?php endif; ?>
 
                     <div class="form-group">
-                        <label for="name">Nome da Categoria</label>
-                        <input type="text" id="name" name="name" required value="<?= Security::e($editCategory['name'] ?? '') ?>" placeholder="Ex: Fórmula 1">
+                        <label class="form-label" for="name">Nome da Categoria</label>
+                        <input type="text" id="name" name="name" class="form-input" style="width:100%;" required value="<?= Security::e($editCategory['name'] ?? '') ?>" placeholder="Ex: Fórmula 1">
                     </div>
                     <div class="form-group">
-                        <label for="slug">Slug Permanente (URL)</label>
-                        <input type="text" id="slug" name="slug" value="<?= Security::e($editCategory['slug'] ?? '') ?>" placeholder="formula-1">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.3rem;">
+                        <label class="form-label" for="slug">Slug Permanente (URL)</label>
+                        <input type="text" id="slug" name="slug" class="form-input" style="width:100%;" value="<?= Security::e($editCategory['slug'] ?? '') ?>" placeholder="formula-1">
+                        <span style="font-size: 0.76rem; color: var(--text-muted); display: block; margin-top: 0.35rem;">
                             URL pública: <code>/categoria/<?= $editCategory ? Security::e($editCategory['slug']) : '{slug}' ?>/</code>
                         </span>
                     </div>
@@ -296,65 +281,71 @@ require __DIR__ . '/header.php';
             </div>
 
             <!-- Listagem de Categorias -->
-            <div class="card">
-                <h2 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 1.25rem; color: var(--primary);">
-                    Categorias do Portal
-                </h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Slug</th>
-                            <th style="text-align: center;">Artigos</th>
-                            <th>Status</th>
-                            <th style="text-align: right;">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($categories as $cat): ?>
+            <div class="table-card">
+                <div style="padding: 1.15rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-size: 1.05rem; font-weight: 800; color: var(--primary);">Categorias do Portal</h2>
+                    <span class="badge badge-neutral tabular-nums"><?= count($categories) ?></span>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
                             <tr>
-                                <td>
-                                    <strong><?= Security::e($cat['name']) ?></strong>
-                                    <?php if ($cat['slug'] === 'geral'): ?>
-                                        <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: 0.3rem;">(Padrão)</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><code><?= Security::e($cat['slug']) ?></code></td>
-                                <td style="text-align: center; font-weight: 700;">
-                                    <?= (int)$cat['total_posts'] ?>
-                                </td>
-                                <td>
-                                    <span style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; background: <?= $cat['is_active'] ? '#dcfce7' : '#fee2e2' ?>; color: <?= $cat['is_active'] ? '#166534' : '#991b1b' ?>;">
-                                        <?= $cat['is_active'] ? 'Ativa' : 'Inativa' ?>
-                                    </span>
-                                </td>
-                                <td style="text-align: right; white-space: nowrap;">
-                                    <a href="/admin/categories.php?edit_id=<?= (int)$cat['id'] ?>" style="color: var(--primary-accent); text-decoration: none; font-weight: 700; font-size: 0.85rem; margin-right: 0.5rem;">
-                                        Editar
-                                    </a>
-
-                                    <?php if ($cat['slug'] !== 'geral'): ?>
-                                        <form method="POST" action="/admin/categories.php" style="display:inline;">
-                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                                            <input type="hidden" name="toggle_id" value="<?= (int)$cat['id'] ?>">
-                                            <button type="submit" style="background:none; border:none; cursor:pointer; color: var(--text-muted); font-size: 0.85rem; margin-right: 0.5rem; padding:0;">
-                                                <?= $cat['is_active'] ? 'Pausar' : 'Ativar' ?>
-                                            </button>
-                                        </form>
-
-                                        <form method="POST" action="/admin/categories.php" style="display:inline;" onsubmit="return confirm('Excluir esta categoria? As matérias vinculadas a ela serão movidas com segurança para a categoria Geral.');">
-                                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                                            <input type="hidden" name="delete_id" value="<?= (int)$cat['id'] ?>">
-                                            <button type="submit" style="background:none; border:none; cursor:pointer; color: #dc2626; font-weight: 700; font-size: 0.85rem; padding:0;" title="Excluir Categoria">
-                                                ✕
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-                                </td>
+                                <th>Nome</th>
+                                <th>Slug</th>
+                                <th style="text-align: center;">Artigos</th>
+                                <th>Status</th>
+                                <th style="text-align: right;">Ações</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($categories as $cat): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= Security::e($cat['name']) ?></strong>
+                                        <?php if ($cat['slug'] === 'geral'): ?>
+                                            <span style="font-size: 0.72rem; color: var(--text-muted); margin-left: 0.3rem;">(Padrão)</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><code><?= Security::e($cat['slug']) ?></code></td>
+                                    <td class="tabular-nums" style="text-align: center; font-weight: 700;">
+                                        <?= (int)$cat['total_posts'] ?>
+                                    </td>
+                                    <td>
+                                        <span class="badge <?= $cat['is_active'] ? 'badge-ok' : 'badge-err' ?>">
+                                            <?= $cat['is_active'] ? 'Ativa' : 'Inativa' ?>
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right; white-space: nowrap;">
+                                        <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                                            <a href="/admin/categories.php?edit_id=<?= (int)$cat['id'] ?>" class="btn btn-sm" style="background: var(--primary-light); color: var(--primary-accent);">
+                                                <?= \LightPress\Core\Icon::svg('edit', '', 13) ?>
+                                                Editar
+                                            </a>
+
+                                            <?php if ($cat['slug'] !== 'geral'): ?>
+                                                <form method="POST" action="/admin/categories.php" style="display:inline;">
+                                                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                    <input type="hidden" name="toggle_id" value="<?= (int)$cat['id'] ?>">
+                                                    <button type="submit" class="btn btn-secondary btn-sm">
+                                                        <?= $cat['is_active'] ? 'Pausar' : 'Ativar' ?>
+                                                    </button>
+                                                </form>
+
+                                                <form method="POST" action="/admin/categories.php" style="display:inline;" data-confirm="Excluir esta categoria? As matérias vinculadas a ela serão movidas com segurança para a categoria Geral." data-confirm-title="Excluir Categoria" data-confirm-btn="Excluir">
+                                                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                                                    <input type="hidden" name="delete_id" value="<?= (int)$cat['id'] ?>">
+                                                    <button type="submit" class="btn btn-danger-soft btn-sm btn-icon" title="Excluir Categoria">
+                                                        <?= \LightPress\Core\Icon::svg('trash', '', 14) ?>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

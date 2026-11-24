@@ -9,121 +9,152 @@ namespace LightPress\Core;
 final class AdminNav
 {
     /**
-     * Renderiza o cabeçalho completo do admin (<header class="site-header">) com menu e submenu de plugins.
+     * Renderiza o shell administrativo com Sidebar lateral colapsável, drawer mobile e topbar compacta.
      *
-     * @param string $activePage Slug da página ativa (ex: 'dashboard', 'pages', 'media', 'categories', 'stats', 'users', 'settings', 'system', 'plugins', 'plugin-settings')
+     * @param string $activePage Slug da página ativa
      * @param array $currentUser Usuário atualmente autenticado
      * @param string $csrfToken Token CSRF ativo para logout
-     * @return string HTML compilado do cabeçalho
+     * @param string $pageTitle Título exibido na topbar
+     * @return string HTML compilado do cabeçalho e abertura do container principal
      */
-    public static function renderHeader(string $activePage, array $currentUser, string $csrfToken): string
+    public static function renderHeader(string $activePage, array $currentUser, string $csrfToken, string $pageTitle = 'Painel Administrativo'): string
     {
         $isAdmin = ($currentUser['role'] ?? '') === 'admin';
         $menuPlugins = $isAdmin ? PluginManager::getActiveMenuPlugins() : [];
         $currentPluginParam = $_GET['plugin'] ?? '';
 
         $siteTitle = Settings::get('site_title', $GLOBALS['config']['app']['name'] ?? 'SpeedRacing');
+        $userName = trim((string)($currentUser['name'] ?? 'Usuário'));
+        $userRole = (string)($currentUser['role'] ?? 'autor');
+        $initials = strtoupper(mb_substr($userName, 0, 2, 'UTF-8'));
+        $isPluginsGroupOpen = in_array($activePage, ['plugins', 'plugin-settings'], true);
 
         ob_start();
         ?>
-        <style>
-            .nav-dropdown { position: relative; display: inline-flex; align-items: center; }
-            .nav-dropdown-toggle { display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: color 0.15s; }
-            .nav-dropdown-toggle:hover, .nav-dropdown-toggle.active { color: var(--primary-accent); }
-            .nav-dropdown-toggle .arrow { font-size: 0.72rem; transition: transform 0.2s; opacity: 0.75; }
-            .nav-dropdown:hover .nav-dropdown-toggle .arrow { transform: rotate(180deg); }
-            .nav-dropdown-menu { 
-                display: none; 
-                position: absolute; 
-                top: 100%; 
-                left: 0; 
-                margin-top: 0.45rem; 
-                min-width: 210px; 
-                background: var(--surface); 
-                border: 1px solid var(--border); 
-                border-radius: var(--radius, 8px); 
-                box-shadow: 0 10px 20px -3px rgba(0,0,0,0.12), 0 4px 6px -4px rgba(0,0,0,0.08); 
-                padding: 0.4rem 0; 
-                z-index: 1000; 
-            }
-            .nav-dropdown:hover .nav-dropdown-menu,
-            .nav-dropdown:focus-within .nav-dropdown-menu { 
-                display: block; 
-            }
-            .nav-dropdown-item { 
-                display: flex; 
-                align-items: center; 
-                gap: 0.5rem; 
-                padding: 0.55rem 1rem; 
-                color: var(--text); 
-                text-decoration: none; 
-                font-weight: 500; 
-                font-size: 0.88rem; 
-                transition: background 0.15s, color 0.15s; 
-                white-space: nowrap; 
-            }
-            .nav-dropdown-item:hover, .nav-dropdown-item.active { 
-                background: var(--bg); 
-                color: var(--primary-accent); 
-                font-weight: 700; 
-            }
-            .nav-dropdown-divider { 
-                height: 1px; 
-                background: var(--border); 
-                margin: 0.35rem 0; 
-            }
-        </style>
-        <header class="site-header">
-            <div style="display: flex; align-items: center; gap: 2.5rem;">
-                <a href="/admin/dashboard.php" class="brand"><?= Security::e($siteTitle) ?></a>
-                <nav class="nav-links">
-                    <a href="/admin/dashboard.php" class="<?= $activePage === 'dashboard' ? 'active' : '' ?>">Notícias</a>
-                    <a href="/admin/pages.php" class="<?= $activePage === 'pages' ? 'active' : '' ?>">Páginas</a>
-                    <a href="/admin/media.php" class="<?= $activePage === 'media' ? 'active' : '' ?>">Mídias</a>
-                    <a href="/admin/categories.php" class="<?= $activePage === 'categories' ? 'active' : '' ?>">Categorias</a>
-                    <a href="/admin/stats.php" class="<?= $activePage === 'stats' ? 'active' : '' ?>">Mais Lidas 📈</a>
+        <div class="admin-shell">
+            <aside class="admin-sidebar" aria-label="Menu Administrativo">
+                <div class="sidebar-brand-row">
+                    <a href="/admin/dashboard.php" class="brand" title="<?= Security::e($siteTitle) ?>">
+                        <span class="brand-dot" aria-hidden="true"></span>
+                        <span class="brand-text"><?= Security::e($siteTitle) ?></span>
+                    </a>
+                    <button type="button" class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Recolher/Expandir menu" aria-label="Recolher menu">
+                        <?= Icon::svg('chevron_left', '', 16) ?>
+                    </button>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <div class="sidebar-section-label">Editorial</div>
+
+                    <a href="/admin/dashboard.php" class="sidebar-link <?= $activePage === 'dashboard' ? 'active' : '' ?>" title="Notícias">
+                        <?= Icon::svg('newspaper', '', 18) ?>
+                        <span class="sidebar-label">Notícias</span>
+                    </a>
+                    <a href="/admin/pages.php" class="sidebar-link <?= $activePage === 'pages' ? 'active' : '' ?>" title="Páginas">
+                        <?= Icon::svg('file_text', '', 18) ?>
+                        <span class="sidebar-label">Páginas</span>
+                    </a>
+                    <a href="/admin/media.php" class="sidebar-link <?= $activePage === 'media' ? 'active' : '' ?>" title="Mídias">
+                        <?= Icon::svg('image', '', 18) ?>
+                        <span class="sidebar-label">Mídias</span>
+                    </a>
+                    <a href="/admin/categories.php" class="sidebar-link <?= $activePage === 'categories' ? 'active' : '' ?>" title="Categorias">
+                        <?= Icon::svg('folder', '', 18) ?>
+                        <span class="sidebar-label">Categorias</span>
+                    </a>
+                    <a href="/admin/stats.php" class="sidebar-link <?= $activePage === 'stats' ? 'active' : '' ?>" title="Mais Lidas">
+                        <?= Icon::svg('trending_up', '', 18) ?>
+                        <span class="sidebar-label">Mais Lidas</span>
+                    </a>
+
                     <?php if ($isAdmin): ?>
-                        <a href="/admin/users.php" class="<?= $activePage === 'users' ? 'active' : '' ?>">Usuários & Autores</a>
-                        <a href="/admin/themes.php" class="<?= $activePage === 'themes' ? 'active' : '' ?>">Temas</a>
-                        
-                        <!-- Submenu Dropdown de Plugins -->
-                        <div class="nav-dropdown">
-                            <a href="/admin/plugins.php" class="nav-dropdown-toggle <?= in_array($activePage, ['plugins', 'plugin-settings'], true) ? 'active' : '' ?>">
-                                Plugins <span class="arrow">▾</span>
-                            </a>
-                            <div class="nav-dropdown-menu">
-                                <a href="/admin/plugins.php" class="nav-dropdown-item <?= ($activePage === 'plugins' && empty($currentPluginParam)) ? 'active' : '' ?>">
-                                    <span>⚙️</span> Gerenciar Plugins
+                        <div class="sidebar-section-label">Administração</div>
+
+                        <a href="/admin/users.php" class="sidebar-link <?= $activePage === 'users' ? 'active' : '' ?>" title="Usuários & Autores">
+                            <?= Icon::svg('users', '', 18) ?>
+                            <span class="sidebar-label">Usuários & Autores</span>
+                        </a>
+                        <a href="/admin/themes.php" class="sidebar-link <?= $activePage === 'themes' ? 'active' : '' ?>" title="Temas">
+                            <?= Icon::svg('palette', '', 18) ?>
+                            <span class="sidebar-label">Temas</span>
+                        </a>
+
+                        <div class="sidebar-group <?= $isPluginsGroupOpen ? 'open' : '' ?>">
+                            <button type="button" class="sidebar-link sidebar-group-toggle <?= $isPluginsGroupOpen ? 'active' : '' ?>" onclick="toggleSidebarGroup(this)" title="Plugins">
+                                <span class="sidebar-group-left">
+                                    <?= Icon::svg('plug', '', 18) ?>
+                                    <span class="sidebar-label">Plugins</span>
+                                </span>
+                                <span class="sidebar-chevron"><?= Icon::svg('chevron_down', '', 15) ?></span>
+                            </button>
+                            <div class="sidebar-submenu">
+                                <a href="/admin/plugins.php" class="sidebar-sublink <?= ($activePage === 'plugins' && empty($currentPluginParam)) ? 'active' : '' ?>">
+                                    Gerenciar Plugins
                                 </a>
-                                <?php if (!empty($menuPlugins)): ?>
-                                    <div class="nav-dropdown-divider"></div>
-                                    <?php foreach ($menuPlugins as $item): ?>
-                                        <a href="/admin/plugin-settings.php?plugin=<?= urlencode($item['id']) ?>" 
-                                           class="nav-dropdown-item <?= ($activePage === 'plugin-settings' && $currentPluginParam === $item['id']) ? 'active' : '' ?>">
-                                            <span>🔗</span> <?= Security::e($item['admin_title']) ?>
-                                        </a>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                                <?php foreach ($menuPlugins as $item): ?>
+                                    <a href="/admin/plugin-settings.php?plugin=<?= urlencode($item['id']) ?>"
+                                       class="sidebar-sublink <?= ($activePage === 'plugin-settings' && $currentPluginParam === $item['id']) ? 'active' : '' ?>">
+                                        <?= Security::e($item['admin_title']) ?>
+                                    </a>
+                                <?php endforeach; ?>
                             </div>
                         </div>
 
-                        <a href="/admin/settings.php" class="<?= $activePage === 'settings' ? 'active' : '' ?>">Configurações</a>
-                        <a href="/admin/system.php" class="<?= $activePage === 'system' ? 'active' : '' ?>">Diagnóstico</a>
+                        <a href="/admin/settings.php" class="sidebar-link <?= $activePage === 'settings' ? 'active' : '' ?>" title="Configurações">
+                            <?= Icon::svg('settings', '', 18) ?>
+                            <span class="sidebar-label">Configurações</span>
+                        </a>
+                        <a href="/admin/system.php" class="sidebar-link <?= $activePage === 'system' ? 'active' : '' ?>" title="Diagnóstico">
+                            <?= Icon::svg('activity', '', 18) ?>
+                            <span class="sidebar-label">Diagnóstico</span>
+                        </a>
                     <?php endif; ?>
-                    <a href="/" target="_blank" style="color: var(--primary-accent);">Ver Site &rarr;</a>
                 </nav>
-            </div>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span>Olá, <strong><?= Security::e($currentUser['name'] ?? '') ?></strong></span>
-                <a href="/admin/profile.php" style="color: var(--primary-accent); text-decoration: none; font-weight: 600; font-size: 0.9rem;">Meu Perfil</a>
-                <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" id="btnThemeToggle">🌙</button>
-                <form method="POST" action="/admin/dashboard.php" style="display: inline; margin: 0; padding: 0;">
-                    <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-                    <input type="hidden" name="action" value="logout">
-                    <button type="submit" style="background: none; border: none; padding: 0; margin: 0; font: inherit; color: #dc2626; cursor: pointer; font-weight: 600;">Sair</button>
-                </form>
-            </div>
-        </header>
+
+                <div class="sidebar-footer">
+                    <a href="/admin/profile.php" class="sidebar-user-card <?= $activePage === 'profile' ? 'active' : '' ?>" title="Meu Perfil">
+                        <span class="user-avatar"><?= Security::e($initials) ?></span>
+                        <span class="sidebar-user-meta">
+                            <span class="sidebar-user-name"><?= Security::e($userName) ?></span>
+                            <span class="sidebar-user-role"><?= Security::e($userRole) ?></span>
+                        </span>
+                    </a>
+                    <form method="POST" action="/admin/dashboard.php" style="margin: 0;">
+                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                        <input type="hidden" name="action" value="logout">
+                        <button type="submit" class="sidebar-link" style="width: 100%; background: none; border: none; font-family: inherit; cursor: pointer; color: var(--danger-text);" title="Sair do sistema">
+                            <?= Icon::svg('log_out', '', 18) ?>
+                            <span class="sidebar-label">Sair</span>
+                        </button>
+                    </form>
+                </div>
+            </aside>
+
+            <div class="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>
+
+            <div class="admin-main">
+                <header class="admin-topbar">
+                    <div class="topbar-left">
+                        <button type="button" class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Abrir menu">
+                            <?= Icon::svg('menu', '', 18) ?>
+                        </button>
+                        <span class="topbar-breadcrumb"><?= Security::e($pageTitle) ?></span>
+                    </div>
+                    <div class="topbar-actions">
+                        <a href="/admin/editor.php" class="btn btn-sm" title="Nova Publicação">
+                            <?= Icon::svg('plus', '', 15) ?>
+                            <span class="hide-xs">Nova Publicação</span>
+                        </a>
+                        <a href="/" target="_blank" class="icon-action-btn" title="Ver Site em nova aba" aria-label="Ver Site">
+                            <?= Icon::svg('open_in_new', '', 16) ?>
+                        </a>
+                        <button type="button" class="theme-btn" onclick="toggleTheme()" title="Alternar Modo Claro/Escuro" aria-label="Alternar Tema" id="btnThemeToggle">
+                            <span id="lpIconSun" style="display:none;"><?= Icon::svg('sun', '', 17) ?></span>
+                            <span id="lpIconMoon"><?= Icon::svg('moon', '', 17) ?></span>
+                        </button>
+                    </div>
+                </header>
+                <main class="admin-content">
         <?php
         return (string)ob_get_clean();
     }

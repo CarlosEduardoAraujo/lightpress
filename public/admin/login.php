@@ -101,7 +101,8 @@ if ($lockRemaining !== null) {
 }
 
 $csrfToken = Security::generateCsrfToken();
-    $siteTitle = \LightPress\Core\Settings::get('site_title', $config['app']['name'] ?? 'SpeedRacing');
+$siteTitle = \LightPress\Core\Settings::get('site_title', $config['app']['name'] ?? 'SpeedRacing');
+$adminCssVer = @filemtime(dirname(__DIR__) . '/assets/admin/admin.css') ?: '1';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -109,57 +110,135 @@ $csrfToken = Security::generateCsrfToken();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?= Security::e($siteTitle) ?></title>
+    <script>
+        (function() {
+            var saved = localStorage.getItem('lp_theme');
+            if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="/assets/admin/admin.css?v=<?= $adminCssVer ?>">
     <style>
-        :root {
-            --primary: #0f172a;
-            --primary-accent: #E10600;
-            --primary-hover: #b80500;
-            --bg: #f1f5f9;
-            --surface: #ffffff;
-            --border: #cbd5e1;
-            --text: #0f172a;
-            --radius: 8px;
-            --font: system-ui, -apple-system, sans-serif;
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.25rem;
+            background-image:
+                radial-gradient(circle at 15% 15%, var(--primary-light) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(15, 23, 42, 0.05) 0%, transparent 45%);
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
-        .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
-        .brand { font-size: 1.6rem; font-weight: 800; text-align: center; margin-bottom: 0.5rem; color: var(--primary); }
-        .brand span { color: var(--primary-accent); }
-        .subtitle { font-size: 0.9rem; color: #64748b; text-align: center; margin-bottom: 2rem; }
-        .form-group { margin-bottom: 1.25rem; }
-        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: #334155; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 1rem; font-family: inherit; }
-        input:focus { outline: none; border-color: var(--primary-accent); box-shadow: 0 0 0 3px rgba(225,6,0,0.15); }
-        .btn-submit { width: 100%; padding: 0.8rem; background: var(--primary-accent); color: white; border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.15s; margin-top: 0.5rem; }
-        .btn-submit:hover { background: var(--primary-hover); }
-        .alert-error { background: #fee2e2; border: 1px solid #f87171; color: #991b1b; padding: 0.75rem; border-radius: var(--radius); font-size: 0.85rem; margin-bottom: 1.25rem; }
+        .login-wrap { width: 100%; max-width: 410px; animation: lpFadeIn 0.22s ease-out; }
+        .login-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2.25rem 2rem;
+            box-shadow: var(--shadow-lg);
+        }
+        .login-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.025em;
+            margin-bottom: 0.35rem;
+        }
+        .subtitle { font-size: 0.9rem; color: var(--text-muted); text-align: center; margin-bottom: 1.85rem; }
+        .form-group { margin-bottom: 1.15rem; }
+        .form-label { display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--text); }
+        .input-wrap { position: relative; }
+        .login-input { width: 100%; padding: 0.72rem 0.9rem; font-size: 0.95rem; }
+        .login-input.has-toggle { padding-right: 2.75rem; }
+        .pwd-toggle {
+            position: absolute;
+            right: 0.55rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+        }
+        .pwd-toggle:hover { color: var(--text); background: var(--surface-hover); }
+        .btn-submit { width: 100%; padding: 0.78rem 1rem; font-size: 0.96rem; margin-top: 0.4rem; }
+        .login-theme-btn { position: fixed; top: 1rem; right: 1rem; }
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <div class="brand"><?= Security::e($siteTitle) ?></div>
-        <div class="subtitle">Acesso ao Painel Editorial</div>
+    <button type="button" class="theme-btn login-theme-btn" onclick="toggleLoginTheme()" title="Alternar Tema" aria-label="Alternar Tema">
+        <span id="loginIconSun" style="display:none;"><?= \LightPress\Core\Icon::svg('sun', '', 17) ?></span>
+        <span id="loginIconMoon"><?= \LightPress\Core\Icon::svg('moon', '', 17) ?></span>
+    </button>
 
-        <?php if (!empty($error)): ?>
-            <div class="alert-error"><?= Security::e($error) ?></div>
-        <?php endif; ?>
-
-        <form method="POST" action="/admin/login.php">
-            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
-            
-            <div class="form-group">
-                <label for="username">Usuário ou E-mail</label>
-                <input type="text" id="username" name="username" required autofocus autocomplete="username">
+    <div class="login-wrap">
+        <div class="login-card">
+            <div class="login-brand">
+                <span class="brand-dot" aria-hidden="true"></span>
+                <span><?= Security::e($siteTitle) ?></span>
             </div>
+            <div class="subtitle">Acesso ao Painel Editorial</div>
 
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
-            </div>
+            <?php if (!empty($error)): ?>
+                <div class="alert-error"><?= Security::e($error) ?></div>
+            <?php endif; ?>
 
-            <button type="submit" class="btn-submit">Entrar no Sistema</button>
-        </form>
+            <form method="POST" action="/admin/login.php">
+                <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+
+                <div class="form-group">
+                    <label class="form-label" for="username">Usuário ou E-mail</label>
+                    <input type="text" id="username" name="username" class="form-input login-input" required autofocus autocomplete="username" placeholder="seu.usuario">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Senha</label>
+                    <div class="input-wrap">
+                        <input type="password" id="password" name="password" class="form-input login-input has-toggle" required autocomplete="current-password" placeholder="••••••••">
+                        <button type="button" class="pwd-toggle" onclick="togglePwd()" aria-label="Mostrar ou ocultar senha" title="Mostrar/ocultar senha">
+                            <span id="eyeOpen"><?= \LightPress\Core\Icon::svg('eye', '', 17) ?></span>
+                            <span id="eyeOff" style="display:none;"><?= \LightPress\Core\Icon::svg('eye_off', '', 17) ?></span>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-submit">Entrar no Sistema</button>
+            </form>
+        </div>
     </div>
+
+    <script>
+        function syncLoginThemeIcon() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.getElementById('loginIconSun').style.display = isDark ? 'inline-flex' : 'none';
+            document.getElementById('loginIconMoon').style.display = isDark ? 'none' : 'inline-flex';
+        }
+        function toggleLoginTheme() {
+            var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('lp_theme', next);
+            syncLoginThemeIcon();
+        }
+        function togglePwd() {
+            var input = document.getElementById('password');
+            var show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            document.getElementById('eyeOpen').style.display = show ? 'none' : 'inline-flex';
+            document.getElementById('eyeOff').style.display = show ? 'inline-flex' : 'none';
+        }
+        syncLoginThemeIcon();
+    </script>
 </body>
 </html>

@@ -214,7 +214,7 @@ require __DIR__ . '/header.php';
         border-bottom: none;
         border-radius: var(--radius) var(--radius) 0 0;
         position: sticky;
-        top: 0px;
+        top: var(--topbar-height);
         z-index: 40;
     }
     .tool-btn {

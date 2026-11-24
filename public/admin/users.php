@@ -252,41 +252,24 @@ $activePage = 'users';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    [data-theme="dark"] th { background: #0f172a; }
-    [data-theme="dark"] tr:hover td { background: #162036; }
-    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background: #0b1120; color: #f1f5f9; border-color: #1e293b; }
-
-    .grid { display: grid; grid-template-columns: 1.1fr 2fr; gap: 2rem; align-items: flex-start; }
-    @media (max-width: 960px) {
-        .grid { grid-template-columns: 1fr; }
-    }
-    
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
-    .form-group { margin-bottom: 1.25rem; }
-    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
-    input, select, textarea { width: 100%; padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; background: var(--bg); color: var(--text); outline: none; }
-    input:focus, select:focus, textarea:focus { border-color: var(--primary-accent); }
-    
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #f8fafc; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
-    td { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafafa; }
-
-    .user-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: var(--primary-accent); }
-
-    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    .token-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
-    .token-input { font-family: monospace; font-size: 0.85rem; background: #ffffff; margin-top: 0.25rem; cursor: pointer; }
-    [data-theme="dark"] .token-box { background: #1e293b; border-color: #334155; }
-    [data-theme="dark"] .token-input { background: #090d16; color: #f1f5f9; }
+    .grid { display: grid; grid-template-columns: 1.1fr 2fr; gap: 1.5rem; align-items: flex-start; }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    .card { padding: 1.5rem; }
+    .form-group { margin-bottom: 1.15rem; }
+    label { display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--primary); }
+    input, select, textarea { width: 100%; padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.92rem; font-family: inherit; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary-accent); box-shadow: 0 0 0 3px var(--primary-focus); }
+    .token-box { background: var(--info-bg); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .token-input { font-family: monospace; font-size: 0.85rem; background: var(--surface); margin-top: 0.25rem; cursor: pointer; }
 </style>
 
     <div class="container">
-        <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1.75rem;">
-            Equipe Editorial & Gestão de Autores
-        </h1>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Equipe Editorial & Gestão de Autores</h1>
+                <p class="page-subtitle">Gerencie permissões, convites e contas de acesso ao painel</p>
+            </div>
+        </div>
 
         <?php if (!empty($message)): ?><div class="alert-success"><?= Security::e($message) ?></div><?php endif; ?>
         <?php if (!empty($error)): ?><div class="alert-error"><?= Security::e($error) ?></div><?php endif; ?>

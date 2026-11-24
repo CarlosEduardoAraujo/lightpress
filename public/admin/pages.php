@@ -192,25 +192,6 @@ require __DIR__ . '/header.php';
     }
     .action-link:hover { color: var(--primary-accent); }
     .action-delete:hover { color: #ef4444; }
-
-    .alert-success {
-        background: #dcfce7;
-        border: 1px solid #bbf7d0;
-        color: #166534;
-        padding: 0.85rem 1.25rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        font-size: 0.9rem;
-    }
-    .alert-error {
-        background: #fee2e2;
-        border: 1px solid #fecaca;
-        color: #991b1b;
-        padding: 0.85rem 1.25rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        font-size: 0.9rem;
-    }
 </style>
 
     <div class="container">

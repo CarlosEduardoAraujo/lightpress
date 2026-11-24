@@ -362,7 +362,7 @@ lightpress/
 │   ├── Hook.php               # Sistema ultraleve de Actions e Filters (Zero Dependências)
 │   ├── ObjectCache.php        # Camada defensiva de cache de objetos em memória com fallback transparente
 │   ├── PluginManager.php      # Gerenciador central de plugins e ciclo de vida
-│   └── AdminNav.php           # Menu superior unificado do painel administrativo com submenu de plugins
+│   └── AdminNav.php           # Sidebar lateral colapsável e topbar unificada do painel administrativo com submenu de plugins
 ├── plugins/                   # Plugins isolados fora da raiz pública
 │   ├── ai-copilot/            # Plugin oficial de IA para linkagem interna e visão computacional
 │   ├── api-publisher/         # Plugin oficial de ingestão REST API com Senhas de Aplicação
@@ -415,7 +415,7 @@ lightpress/
     │   ├── view.php           # Incremento assíncrono de visualizações
     │   ├── search.php         # Autocomplete e busca instantânea
     │   └── posts.php          # Leitura pública de matérias (Headless)
-    ├── assets/                # JS puro do editor, CSS base e espelhamento público de temas (themes/)
+    ├── assets/                # JS puro do editor, design system admin (assets/admin/), CSS base e espelhamento público de temas (themes/)
     └── uploads/               # Diretório estático público (execução de scripts bloqueada)
 ```
 
@@ -1912,6 +1912,11 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Preload de Descrições Otimizado para Imagem Hero (`core/ImageProcessor.php`, `public/index.php` — AUD-PERF-04):** `preloadDescriptions()` estendido para pares `['url', 'id']` populando `$path|$id` e `$path|` com 100% de cache hit na hero de matérias.
   - [x] **Idempotência Atômica sem Rascunhos Órfãos e Baldes de Rate Limit Segregados (`core/Security.php`, `plugins/api-publisher/` — AUD-ARCH-04, AUD-SEC-05):** Baldes segregados para rate limit (`ratelimit_api_publisher_*.json`), tratamento de colisão `PDOException 23000` fora da transação com rollback limpo e retorno HTTP 200 `idempotent: true`, validação HTTP 422 para limites de tamanho, preview limpo sem DOCTYPE duplicado e remoção de CSS/JS inline redundantes no Redis.
   - [x] **Hardening Nginx, Manutenção CLI e Matriz CI Dual (`nginx/`, `bin/cleanup.php`, `.github/workflows/ci.yml` — AUD-SEC-04):** Mapa `$lp_skip_script`, upload `12M`, headers HSTS e no-store, ampliação de glob em `bin/cleanup.php` e inclusão das 4 novas suítes de testes no GitHub Actions. 568/568 asserções aprovadas com zero regressões e PHPStan Nível 8 limpo.
+
+* **FASE CONCLUÍDA — Modernização Visual, Sidebar Lateral e Dinamismo do Painel Administrativo (`public/admin`):**
+  - [x] **Design System Centralizado (`public/assets/admin/admin.css`, `public/assets/admin/admin.js`, `core/Icon.php`):** Tokens Light/Dark unificados, toasts flutuantes (`LPAdmin.toast`), modais de confirmação (`LPAdmin.confirm` via `data-confirm`), cópia rápida (`LPAdmin.copyText`), atalho `Ctrl+K` e expansão de ícones SVG inline em zero dependências externas.
+  - [x] **Sidebar Lateral Colapsável e Responsiva (`core/AdminNav.php`, `public/admin/header.php`, `public/admin/footer.php`):** Navegação lateral fixa e colapsável (estado persistido em `localStorage`), drawer mobile, submenu expansível de plugins e topbar compacta.
+  - [x] **Atualização Integral das Telas (`public/admin/*.php`):** Dark Mode e toggle de senha em `login.php` e `activate.php`; alternância de Destaque Home via `fetch()` em `dashboard.php` com fallback POST; barras proporcionais em `stats.php`; ajuste sticky da toolbar em `editor.php` e `page-edit.php`; padronização visual de `pages.php`, `categories.php`, `revisions.php`, `media.php`, `system.php`, `plugins.php`, `users.php` e `profile.php`.
 
 ---
 

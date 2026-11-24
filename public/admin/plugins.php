@@ -54,35 +54,13 @@ $activePage = 'plugins';
 require __DIR__ . '/header.php';
 ?>
 <style>
-    .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; margin-bottom: 2rem; }
-
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-    th { background: #f8fafc; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; }
-    [data-theme="dark"] th { background: #1e293b; }
-    td { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #f8fafc; }
-    [data-theme="dark"] tr:hover td { background: #0f172a; }
-
-    .plugin-icon { width: 44px; height: 44px; border-radius: 8px; background: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
-    .plugin-badge-active { background: #dcfce7; color: #166534; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    .plugin-badge-inactive { background: #f1f5f9; color: #64748b; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    [data-theme="dark"] .plugin-badge-active { background: #064e3b; color: #6ee7b7; }
-    [data-theme="dark"] .plugin-badge-inactive { background: #334155; color: #94a3b8; }
-
-    .alert-success { background: #dcfce7; color: #166534; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    .alert-error { background: #fee2e2; color: #991b1b; padding: 0.85rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; font-weight: 600; font-size: 0.9rem; }
-    [data-theme="dark"] .alert-success { background: #064e3b; color: #6ee7b7; }
-    [data-theme="dark"] .alert-error { background: #7f1d1d; color: #fca5a5; }
-    .badge-active { background: #dcfce7; color: #166534; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    .badge-inactive { background: #f1f5f9; color: #64748b; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
-    [data-theme="dark"] .badge-active { background: #064e3b; color: #6ee7b7; }
-    [data-theme="dark"] .badge-inactive { background: #334155; color: #94a3b8; }
-    .btn-danger { background: #fee2e2; color: #dc2626; }
-    .btn-danger:hover { background: #fecaca; }
-    [data-theme="dark"] .btn-danger { background: #7f1d1d; color: #fca5a5; }
-    [data-theme="dark"] .btn-danger:hover { background: #991b1b; }
+    .plugin-icon { width: 42px; height: 42px; border-radius: var(--radius-sm); background: var(--primary-light); color: var(--primary-accent); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .plugin-badge-active { background: var(--success-bg); color: var(--success-text); padding: 0.22rem 0.6rem; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; }
+    .plugin-badge-inactive { background: var(--surface-hover); color: var(--text-muted); padding: 0.22rem 0.6rem; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; }
+    .badge-active { background: var(--success-bg); color: var(--success-text); padding: 0.22rem 0.6rem; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; }
+    .badge-inactive { background: var(--surface-hover); color: var(--text-muted); padding: 0.22rem 0.6rem; border-radius: var(--radius-pill); font-size: 0.74rem; font-weight: 700; }
+    .btn-danger { background: var(--danger-bg); color: var(--danger-text); }
+    .btn-danger:hover { filter: brightness(0.95); }
 </style>
 
     <div class="container">

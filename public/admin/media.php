@@ -920,17 +920,16 @@ require __DIR__ . '/header.php';
 
     <script>
         function copyUrl(url, btn) {
-            navigator.clipboard.writeText(url).then(function() {
+            if (window.LPAdmin) {
+                window.LPAdmin.copyText(url, 'URL da imagem copiada!');
+            } else if (navigator.clipboard) {
+                navigator.clipboard.writeText(url);
+            }
+            if (btn) {
                 var oldText = btn.innerText;
                 btn.innerText = 'Copiado!';
-                btn.style.background = '#dcfce7';
-                btn.style.color = '#166534';
-                setTimeout(function() {
-                    btn.innerText = oldText;
-                    btn.style.background = '#f1f5f9';
-                    btn.style.color = '#334155';
-                }, 1500);
-            });
+                setTimeout(function() { btn.innerText = oldText; }, 1400);
+            }
         }
 
         // Delegação de eventos para suportar cópia em itens carregados via busca/AJAX (SEC-08)

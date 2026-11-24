@@ -7,6 +7,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Modernização Visual, Sidebar Lateral e Dinamismo do Painel Administrativo (`public/admin`) — 2026-11-24
+
+- **Design System Centralizado e Ultraleve (`public/assets/admin/admin.css`, `public/assets/admin/admin.js`):**
+  - **Tokens e Estilos Unificados (`admin.css`):** Consolidação de tokens para Light e Dark Mode (`--surface`, `--surface-subtle`, `--shadow-sm/md/lg`, `--radius-sm/lg/pill`), badges translúcidas, `.table-responsive`, tipografia `tabular-nums`, barras de progresso em CSS puro (`.lp-progress`), toasts flutuantes e modal de confirmação customizado, removendo blocos `<style>` duplicados das páginas administrativas.
+  - **Interações Dinâmicas em Vanilla JS (`admin.js`):** Implementação do namespace `LPAdmin` com notificações flutuantes (`LPAdmin.toast()`), modal de confirmação moderno (`LPAdmin.confirm()`) interceptando formulários `data-confirm` (substituindo `window.confirm()`), cópia rápida (`LPAdmin.copyText()`), atalho `Ctrl+K` para focar buscas e controle de estado da sidebar no `localStorage`.
+  - **Expansão de Ícones SVG Inline (`core/Icon.php`):** Adicionados ícones administrativos (`newspaper`, `file_text`, `image`, `folder`, `users`, `palette`, `plug`, `settings`, `activity`, `menu`, `x`, `chevron_down`, `chevron_left`, `plus`, `edit`, `trash`, `star`, `star_filled`, `eye`, `eye_off`, `copy`, `log_out`, `alert_triangle`, `upload`, `history`) mantendo custo zero de rede.
+
+- **Navegação em Sidebar Lateral Colapsável (`core/AdminNav.php`, `public/admin/header.php`, `public/admin/footer.php`):**
+  - Substituição da barra horizontal por **Sidebar lateral fixa e colapsável** agrupada em *Editorial* e *Administração*, com submenu expansível de Plugins, card de perfil/logout no rodapé da sidebar, drawer deslizante responsivo no mobile e topbar compacta com efeito *glassmorphism*.
+  - Carregamento automático de `admin.css` e `admin.js` com *cache-busting* via `filemtime`.
+
+- **Modernização das Telas Administrativas (`public/admin/*.php`):**
+  - **Login e Ativação (`login.php`, `activate.php`):** Suporte automático a Dark Mode (`lp_theme` / `prefers-color-scheme`), botão de alternância de tema e toggle de mostrar/ocultar senha no login.
+  - **Dashboard (`dashboard.php`):** Cards de métricas com ícones SVG e *hover* sutil, alternância de **★ Destaque Home** via `fetch()` assíncrono com feedback via toast (mantendo fallback POST tradicional) e modal customizado para exclusão de artigos.
+  - **Editores (`editor.php`, `page-edit.php`):** Ajuste de `top: var(--topbar-height)` na `.editor-toolbar` sticky para evitar colisão com a topbar fixa.
+  - **Audiência (`stats.php`):** Inclusão de barras proporcionais em CSS puro na coluna de visualizações do Top 20 e tabelas responsivas.
+  - **Demais Módulos (`pages.php`, `categories.php`, `revisions.php`, `media.php`, `system.php`, `plugins.php`, `users.php`, `profile.php`):** Padronização visual com `admin.css`, feedback via `LPAdmin.copyText()` na galeria de mídias e modais `data-confirm` nas exclusões e restaurações.
+
 ### Auto-Embed de Vídeos do YouTube, Sanitização Segura e Layout Responsivo 16:9 — 2026-11-24
 
 - **Auto-Embed Inteligente no Editor Visual (`public/admin/editor.php`, `public/admin/page-edit.php`):**
