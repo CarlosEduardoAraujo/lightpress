@@ -212,10 +212,8 @@ require __DIR__ . '/header.php';
         background: #f1f5f9;
         border: 1px solid var(--border);
         border-radius: var(--radius) var(--radius) 0 0;
-        position: sticky;
-        top: var(--topbar-height);
-        z-index: 40;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        position: relative;
+        z-index: 10;
     }
     .tool-btn {
         background: white;
