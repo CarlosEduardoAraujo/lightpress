@@ -407,6 +407,7 @@ lightpress/
     │   ├── settings.php       # Configurações do Site (Título, Tagline, Favicon, Timezone)
     │   ├── media.php          # Catálogo e upload de imagens (AVIF/WebP)
     │   ├── categories.php     # Gestão completa de categorias
+    │   ├── redirects.php      # Gerenciador de redirecionamentos SEO (301/302)
     │   ├── users.php          # Gestão de usuários, autores e links de ativação
     │   ├── stats.php          # Painel de Mais Lidas e métricas de audiência
     │   ├── profile.php        # Perfil do usuário e alteração de senha
@@ -1918,6 +1919,7 @@ Anexos passam pelo mesmo `ImageProcessor` dos uploads, com deduplicação pelo i
   - [x] **Sidebar Lateral Colapsável e Responsiva (`core/AdminNav.php`, `public/admin/header.php`, `public/admin/footer.php`):** Navegação lateral fixa e colapsável (estado persistido em `localStorage`), drawer mobile, submenu expansível de plugins e topbar compacta.
   - [x] **Atualização Integral das Telas (`public/admin/*.php`):** Dark Mode e toggle de senha em `login.php` e `activate.php`; alternância de Destaque Home via `fetch()` em `dashboard.php` com fallback POST, botão de edição compacto em amarelo e ação de copiar URL completa via toast; barras proporcionais em `stats.php`; toolbar fixa (`position: relative`) com `.editor-canvas` fluido sem barra de rolagem interna em `editor.php` e `page-edit.php`; padronização visual de `pages.php`, `categories.php`, `revisions.php`, `media.php`, `system.php`, `plugins.php`, `users.php` e `profile.php`.
   - [x] **Produtividade Editorial e Operacional (`public/admin/`):** Abas rápidas de status (pills) e ações em massa transacionais (`Publicar`, `Rascunho`, `Alterar Categoria`, `Excluir`) em `dashboard.php`; purga manual de cache global e por URL em `system.php`; auto-save local via `localStorage` em `editor.php` e `page-edit.php`; contadores de SEO e prévia ao vivo do Google (SERP Preview com `$config['app']['canonical_origin']`) em `editor.php`. Suíte `bin/test.php` (311/311) e todas as suítes `bin/test-*.php` aprovadas.
+  - [x] **Ferramentas Avançadas de SEO, Diagnóstico e Redação (`public/admin/`):** Gerenciador de redirecionamentos 301/302 (`redirects.php` + `AdminNav.php`); monitor da fila `cache_purge_jobs` e visualizador de `error.log` em `system.php`; Modo Foco, `Ctrl+S` e contador de palavras/tempo de leitura em `editor.php` e `page-edit.php`; filtros por período e exportação CSV em `stats.php`; filtro `Sem Alt Text` em `media.php`.
 
 ---
 

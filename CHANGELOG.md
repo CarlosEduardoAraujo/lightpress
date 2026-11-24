@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Redirecionamentos SEO, Monitor de Purgas/Logs, Modo Foco, CSV de Audiência e Filtro de Alt Text (`public/admin`) — 2026-11-24
+
+- **Gerenciador de Redirecionamentos SEO 301/302 (`public/admin/redirects.php`, `core/AdminNav.php`, `core/Icon.php`):**
+  - Nova tela administrativa para gerenciar a tabela `redirects` (já consultada por `core/Router.php`), com normalização automática de caminhos, hash SHA-256, validação contra loops e *Open Redirect*, busca, paginação e exclusão protegida por CSRF.
+  - Adicionado link **Redirecionamentos** na sidebar editorial (`AdminNav.php`) e novos ícones SVG (`arrow_left_right`, `maximize`, `download`) em `Icon.php`.
+- **Monitor de Purgas & Visualizador de Logs (`public/admin/system.php`):**
+  - Exibição dos últimos 15 jobs de `cache_purge_jobs` com ações para **Reenfileirar Falhos** e **Limpar Concluídos**.
+  - Visualizador somente leitura das últimas 80 linhas de `storage/logs/error.log` (restrito a `admin`) com botão de cópia rápida.
+- **Modo Foco, `Ctrl+S` e Métricas de Escrita (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - Botão **⛶ Foco** na barra de ferramentas para escrita sem distrações (oculta sidebar e coluna lateral; `Esc` para sair).
+  - Barra de status ao vivo no rodapé do canvas com contagem de palavras, caracteres e tempo estimado de leitura (`~200 palavras/min`), além de atalho `Ctrl+S` para salvar rascunho.
+- **Audiência por Período & Exportação CSV (`public/admin/stats.php`):**
+  - Filtros rápidos por janela editorial (*Todo o período*, *30 dias*, *7 dias*, *24 horas*) e botão **Exportar CSV** com UTF-8 BOM.
+- **Filtro de Acessibilidade na Galeria (`public/admin/media.php`):**
+  - Adicionado filtro `Sem Alt Text` para localizar rapidamente imagens sem texto alternativo preenchido.
+
 ### Produtividade Editorial, Ações em Massa, Purga Manual e SEO ao Vivo (`public/admin`) — 2026-11-24
 
 - **Dashboard Editorial (`public/admin/dashboard.php`):**

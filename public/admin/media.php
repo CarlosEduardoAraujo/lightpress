@@ -289,6 +289,7 @@ if (!empty($delMediaId) && Security::verifyCsrfToken($csrfMed)) {
 
 // 3. Filtro de Busca e Paginação de Mídias
 $filterSearch = Security::getSafeString($_GET, 'q');
+$filterMissingAlt = !empty($_GET['missing_alt']);
 $driver = Database::getDriver();
 
 // Paginação
@@ -296,7 +297,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 48; // Múltiplo amigável de 2, 3, 4 e 6 para grid responsivo
 
 if (!empty($filterSearch)) {
-    $buildMediaWhere = function (bool $tryFulltext) use ($filterSearch, $driver): array {
+    $buildMediaWhere = function (bool $tryFulltext) use ($filterSearch, $filterMissingAlt, $driver): array {
         $clauses = [];
         $p = [];
         if (str_contains($filterSearch, '/')) {
@@ -306,7 +307,10 @@ if (!empty($filterSearch)) {
             $p[] = Security::escapeLike($prefixedPath) . '%';
             $p[] = '%' . Security::escapeLike($filterSearch) . '%';
             $p[] = $filterSearch;
-            return [$clauses, $p];
+            if ($filterMissingAlt) {
+            $clauses[] = "(m.alt_text IS NULL OR TRIM(m.alt_text) = '')";
+        }
+        return [$clauses, $p];
         }
 
         $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $filterSearch) ?: []);
@@ -338,6 +342,9 @@ if (!empty($filterSearch)) {
             $p[] = $safeSearch; $p[] = $safeSearch; $p[] = $safeSearch; $p[] = $safeSearch;
             $p[] = $filterSearch;
         }
+        if ($filterMissingAlt) {
+            $clauses[] = "(m.alt_text IS NULL OR TRIM(m.alt_text) = '')";
+        }
         return [$clauses, $p];
     };
 
@@ -366,8 +373,11 @@ if (!empty($filterSearch)) {
 } else {
     $whereClauses = [];
     $params = [];
-    $whereSql = "";
-    $totalCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m", []);
+    if ($filterMissingAlt) {
+        $whereClauses[] = "(m.alt_text IS NULL OR TRIM(m.alt_text) = '')";
+    }
+    $whereSql = !empty($whereClauses) ? "WHERE " . implode(" AND ", $whereClauses) : "";
+    $totalCount = (int)Database::fetchValue("SELECT COUNT(*) FROM media m {$whereSql}", $params);
 }
 
 $totalPages = max(1, (int)ceil($totalCount / $perPage));
@@ -626,6 +636,10 @@ require __DIR__ . '/header.php';
                     <option value="desc" <?= $filterOrder === 'desc' ? 'selected' : '' ?>>Recentes primeiro</option>
                     <option value="asc" <?= $filterOrder === 'asc' ? 'selected' : '' ?>>Antigas primeiro</option>
                 </select>
+                <label style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.84rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                    <input type="checkbox" name="missing_alt" value="1" <?= $filterMissingAlt ? 'checked' : '' ?> onchange="document.getElementById('mediaSearchForm').submit();">
+                    Sem Alt Text
+                </label>
                 <button type="submit" class="btn-filter btn-primary">Buscar</button>
                 <a href="/admin/media.php" id="btnClearSearch" class="btn-filter" style="<?= empty($filterSearch) ? 'display: none;' : '' ?>" onclick="clearSearch(event)">Limpar</a>
             </form>

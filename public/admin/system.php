@@ -39,7 +39,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin) {
                 $cacheMgr->purgeUrls([$targetUrl]);
                 $purgeMessage = 'Purga executada para a URL: ' . $targetUrl;
             }
+        } elseif ($purgeAction === 'retry_failed') {
+            Database::query("UPDATE cache_purge_jobs SET status = 'pending', next_run_at = CURRENT_TIMESTAMP WHERE status = 'failed'");
+            $purgeMessage = 'Jobs com falha reenfileirados para reprocessamento.';
+        } elseif ($purgeAction === 'clear_completed') {
+            Database::query("DELETE FROM cache_purge_jobs WHERE status = 'completed'");
+            $purgeMessage = 'Jobs concluídos removidos da fila.';
         }
+    }
+}
+
+// Fila de purga recente & logs (somente admin)
+$purgeJobs = [];
+$logLines = [];
+if ($isAdmin) {
+    try {
+        $purgeJobs = Database::fetchAll(
+            "SELECT id, post_id, event, status, attempts, last_error, created_at
+             FROM cache_purge_jobs ORDER BY id DESC LIMIT 15"
+        );
+    } catch (\Throwable) {
+        $purgeJobs = [];
+    }
+
+    $logFile = ($config['paths']['storage'] ?? dirname(__DIR__, 2) . '/storage') . '/logs/error.log';
+    if (is_file($logFile) && is_readable($logFile)) {
+        $fileObj = new \SplFileObject($logFile, 'r');
+        $fileObj->seek(PHP_INT_MAX);
+        $lastLine = $fileObj->key();
+        $startLine = max(0, $lastLine - 80);
+        $fileObj->seek($startLine);
+        while (!$fileObj->eof()) {
+            $line = rtrim((string)$fileObj->current(), "\r\n");
+            if ($line !== '') {
+                $logLines[] = $line;
+            }
+            $fileObj->next();
+        }
+        $logLines = array_reverse($logLines);
     }
 }
 
@@ -363,6 +400,82 @@ require __DIR__ . '/header.php';
                 </div>
             </div>
         </div>
+
+        <?php if ($isAdmin): ?>
+            <!-- Monitor da Fila de Purga de Cache -->
+            <div class="card" style="margin-top: 1.5rem;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
+                    <h2 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">Fila de Purga de Cache (Últimos 15 Jobs)</h2>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                            <input type="hidden" name="purge_action" value="retry_failed">
+                            <button type="submit" class="btn btn-secondary btn-sm">Reenfileirar Falhos</button>
+                        </form>
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                            <input type="hidden" name="purge_action" value="clear_completed">
+                            <button type="submit" class="btn btn-secondary btn-sm">Limpar Concluídos</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Evento</th>
+                                <th>Post ID</th>
+                                <th>Status</th>
+                                <th>Tentativas</th>
+                                <th>Último Erro</th>
+                                <th>Criado em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($purgeJobs)): ?>
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.75rem;">Nenhum job registrado na fila.</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($purgeJobs as $job): ?>
+                                    <tr>
+                                        <td class="tabular-nums">#<?= (int)$job['id'] ?></td>
+                                        <td><code><?= Security::e($job['event']) ?></code></td>
+                                        <td class="tabular-nums"><?= $job['post_id'] ? '#' . (int)$job['post_id'] : '—' ?></td>
+                                        <td>
+                                            <span class="badge <?= match($job['status']) { 'completed' => 'badge-ok', 'failed' => 'badge-err', default => 'badge-warn' } ?>">
+                                                <?= Security::e($job['status']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="tabular-nums"><?= (int)$job['attempts'] ?></td>
+                                        <td style="font-size: 0.8rem; color: var(--danger-text); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?= Security::e((string)($job['last_error'] ?? '')) ?>">
+                                            <?= !empty($job['last_error']) ? Security::e((string)$job['last_error']) : '—' ?>
+                                        </td>
+                                        <td class="tabular-nums" style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">
+                                            <?= date('d/m/Y H:i', strtotime($job['created_at'])) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Visualizador de Logs (error.log) -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
+                    <h2 class="card-title" style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">Logs Recentes (storage/logs/error.log)</h2>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="LPAdmin.copyText(document.getElementById('lpErrorLogBox').textContent, 'Logs copiados!')">
+                        <?= Icon::svg('copy', '', 14) ?> Copiar
+                    </button>
+                </div>
+                <?php if (empty($logLines)): ?>
+                    <p style="color: var(--text-muted); font-size: 0.88rem;">Nenhum registro recente em <code>error.log</code>.</p>
+                <?php else: ?>
+                    <pre id="lpErrorLogBox" style="background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; font-size: 0.78rem; line-height: 1.5; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; color: var(--text);"><?= Security::e(implode("\n", $logLines)) ?></pre>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <?php require __DIR__ . '/footer.php'; ?>

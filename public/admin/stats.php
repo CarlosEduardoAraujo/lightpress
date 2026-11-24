@@ -15,45 +15,88 @@ use LightPress\Core\Security;
 $currentUser = Security::requireAuth(null, null, $config);
 
 $nowUtc = gmdate('Y-m-d H:i:s');
+$period = Security::getSafeString($_GET, 'period', 'all');
+if (!in_array($period, ['all', '30d', '7d', '24h'], true)) {
+    $period = 'all';
+}
+
+$sinceUtc = match ($period) {
+    '24h' => gmdate('Y-m-d H:i:s', time() - 86400),
+    '7d'  => gmdate('Y-m-d H:i:s', time() - 7 * 86400),
+    '30d' => gmdate('Y-m-d H:i:s', time() - 30 * 86400),
+    default => null,
+};
+
+$dateCondition = $sinceUtc !== null ? " AND p.published_at >= ?" : "";
+$topParams = $sinceUtc !== null ? [$nowUtc, $sinceUtc] : [$nowUtc];
+
 // Top 20 Notícias Mais Lidas
 $topPosts = Database::fetchAll(
     "SELECT p.id, p.title, p.slug, p.category, p.featured_image, p.published_at, u.name as author_name, s.views
      FROM posts p
      JOIN post_stats s ON s.post_id = p.id
      JOIN users u ON u.id = p.user_id
-     WHERE p.status = 'published' AND p.published_at <= ? AND s.views > 0
+     WHERE p.status = 'published' AND p.published_at <= ?{$dateCondition} AND s.views > 0
      ORDER BY s.views DESC
      LIMIT 20",
-    [$nowUtc]
+    $topParams
 );
 
+// Exportação CSV do ranking filtrado
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="audiencia-' . $period . '-' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    if ($out !== false) {
+        fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM para Excel
+        fputcsv($out, ['#', 'ID', 'Título', 'Slug', 'Categoria', 'Autor', 'Data Publicação', 'Visualizações'], ';');
+        foreach ($topPosts as $idx => $p) {
+            fputcsv($out, [
+                $idx + 1,
+                (int)$p['id'],
+                $p['title'],
+                '/' . $p['slug'] . '/',
+                $p['category'],
+                $p['author_name'],
+                $p['published_at'],
+                (int)$p['views'],
+            ], ';');
+        }
+        fclose($out);
+    }
+    exit;
+}
+
 // Desempenho por Categoria
+$catParams = $sinceUtc !== null ? [$nowUtc, $sinceUtc] : [$nowUtc];
 $categoryStats = Database::fetchAll(
     "SELECT c.name, c.slug, 
             COUNT(p.id) as total_posts, 
             COALESCE(SUM(s.views), 0) as total_views,
             ROUND(COALESCE(AVG(s.views), 0)) as avg_views
      FROM categories c
-     LEFT JOIN posts p ON p.category = c.slug AND p.status = 'published' AND p.published_at <= ?
+     LEFT JOIN posts p ON p.category = c.slug AND p.status = 'published' AND p.published_at <= ?{$dateCondition}
      LEFT JOIN post_stats s ON s.post_id = p.id
      WHERE c.is_active = 1
      GROUP BY c.id
      ORDER BY total_views DESC",
-    [$nowUtc]
+    $catParams
 );
 
 // Desempenho da Equipe de Redação (Autores)
+$authParams = $sinceUtc !== null ? [$nowUtc, $sinceUtc] : [$nowUtc];
 $authorStats = Database::fetchAll(
     "SELECT u.name, u.role, u.avatar,
             COUNT(p.id) as total_posts,
             COALESCE(SUM(s.views), 0) as total_views,
             ROUND(COALESCE(AVG(s.views), 0)) as avg_views
      FROM users u
-     LEFT JOIN posts p ON p.user_id = u.id AND p.status = 'published'
+     LEFT JOIN posts p ON p.user_id = u.id AND p.status = 'published' AND p.published_at <= ?{$dateCondition}
      LEFT JOIN post_stats s ON s.post_id = p.id
      WHERE u.is_active = 1
      GROUP BY u.id
-     ORDER BY total_views DESC"
+     ORDER BY total_views DESC",
+    $authParams
 );
 
 $csrfToken = Security::generateCsrfToken();
@@ -90,6 +133,22 @@ require __DIR__ . '/header.php';
             <div>
                 <h1 class="page-title">Audiência Editorial & Ranking de Notícias</h1>
                 <p class="page-subtitle">Contabilização atômica sem duplicidade por IP</p>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center;">
+                <?php
+                    $periods = ['all' => 'Todo o período', '30d' => '30 dias', '7d' => '7 dias', '24h' => '24 horas'];
+                    foreach ($periods as $pKey => $pLabel):
+                        $isActivePeriod = ($period === $pKey);
+                ?>
+                    <a href="/admin/stats.php?period=<?= $pKey ?>"
+                       class="btn btn-sm <?= $isActivePeriod ? '' : 'btn-secondary' ?>"
+                       style="border-radius: var(--radius-pill);">
+                        <?= $pLabel ?>
+                    </a>
+                <?php endforeach; ?>
+                <a href="/admin/stats.php?period=<?= urlencode($period) ?>&export=csv" class="btn btn-secondary btn-sm" title="Baixar ranking em CSV">
+                    <?= \LightPress\Core\Icon::svg('download', '', 14) ?> Exportar CSV
+                </a>
             </div>
         </div>
 

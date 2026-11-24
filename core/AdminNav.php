@@ -62,6 +62,10 @@ final class AdminNav
                         <?= Icon::svg('folder', '', 18) ?>
                         <span class="sidebar-label">Categorias</span>
                     </a>
+                    <a href="/admin/redirects.php" class="sidebar-link <?= $activePage === 'redirects' ? 'active' : '' ?>" title="Redirecionamentos">
+                        <?= Icon::svg('arrow_left_right', '', 18) ?>
+                        <span class="sidebar-label">Redirecionamentos</span>
+                    </a>
                     <a href="/admin/stats.php" class="sidebar-link <?= $activePage === 'stats' ? 'active' : '' ?>" title="Mais Lidas">
                         <?= Icon::svg('trending_up', '', 18) ?>
                         <span class="sidebar-label">Mais Lidas</span>
@@ -100,7 +104,7 @@ final class AdminNav
                             </div>
                         </div>
 
-                        <a href="/admin/settings.php" class="sidebar-link <?= $activePage === 'settings' ? 'active' : '' ?>" title="Configurações">
+                        <a href="/admin/settings.php" class="<?= $activePage === 'settings' ? 'active' : '' ?> sidebar-link" title="Configurações">
                             <?= Icon::svg('settings', '', 18) ?>
                             <span class="sidebar-label">Configurações</span>
                         </a>

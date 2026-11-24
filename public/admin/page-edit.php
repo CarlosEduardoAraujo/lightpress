@@ -188,6 +188,24 @@ require __DIR__ . '/header.php';
     @media (max-width: 1024px) {
         .editor-grid { grid-template-columns: 1fr; }
     }
+    body.lp-focus-mode .admin-sidebar,
+    body.lp-focus-mode .admin-topbar,
+    body.lp-focus-mode .editor-grid > div:last-child { display: none !important; }
+    body.lp-focus-mode .admin-main { margin-left: 0 !important; }
+    body.lp-focus-mode .editor-grid { grid-template-columns: 1fr; max-width: 860px; margin: 0 auto; }
+    .editor-statusbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.45rem 0.9rem;
+        background: var(--surface-subtle);
+        border-top: 1px solid var(--border);
+        font-size: 0.76rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+    }
 
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; transition: background 0.2s, border-color 0.2s; }
     .form-group { margin-bottom: 1.25rem; }
@@ -395,7 +413,8 @@ require __DIR__ . '/header.php';
                             <button type="button" class="tool-btn" onclick="promptYouTubeVideo()" style="background: #fee2e2; color: #b91c1c;" title="Inserir Vídeo do YouTube">▶ Vídeo</button>
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Limpar Formatação">✕ Limpar</button>
-                            <button type="button" class="tool-btn" onclick="toggleHtmlSource()" id="btnToggleSource" style="margin-left: auto;" title="Alternar entre Visual e Código HTML">&lt;/&gt; HTML</button>
+                            <button type="button" class="tool-btn" onclick="toggleFocusMode()" id="btnFocusMode" style="margin-left: auto;" title="Alternar Modo Foco (Esc para sair)">⛶ Foco</button>
+                            <button type="button" class="tool-btn" onclick="toggleHtmlSource()" id="btnToggleSource" title="Alternar entre Visual e Código HTML">&lt;/&gt; HTML</button>
                         </div>
 
                         <!-- Canvas Visual com Suporte a Colar Direto do Docs / Word -->
@@ -403,6 +422,11 @@ require __DIR__ . '/header.php';
                         
                         <!-- Textarea de Fallback / Código HTML Direto -->
                         <textarea id="rawHtmlArea" style="display: none; min-height: 480px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; padding: 1.25rem; border: none; border-radius: 0; outline: none; resize: vertical;"><?= Security::e((string)($page['content_html'] ?? ''), true) ?></textarea>
+
+                        <div class="editor-statusbar">
+                            <span id="editorWordStats">0 palavras · 0 caracteres · ~1 min de leitura</span>
+                            <span>Dica: <strong>Ctrl+S</strong> para salvar rascunho</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1689,6 +1713,46 @@ require __DIR__ . '/header.php';
 
             form.addEventListener('submit', function () {
                 try { localStorage.removeItem(storageKey); } catch (e) {}
+            });
+        })();
+
+        // Modo Foco, Contador de Palavras e Atalho Ctrl+S
+        window.toggleFocusMode = function (force) {
+            var active = typeof force === 'boolean'
+                ? document.body.classList.toggle('lp-focus-mode', force)
+                : document.body.classList.toggle('lp-focus-mode');
+            var btn = document.getElementById('btnFocusMode');
+            if (btn) {
+                btn.textContent = active ? '✕ Sair do Foco' : '⛶ Foco';
+            }
+        };
+
+        (function () {
+            var canvasEl = document.getElementById('editorCanvas');
+            var statsEl = document.getElementById('editorWordStats');
+
+            function updateWordStats() {
+                if (!canvasEl || !statsEl) return;
+                var text = (canvasEl.innerText || canvasEl.textContent || '').trim();
+                var words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+                var chars = text.length;
+                var mins = Math.max(1, Math.ceil(words / 200));
+                statsEl.textContent = words + (words === 1 ? ' palavra' : ' palavras') + ' · ' + chars + ' caracteres · ~' + mins + ' min de leitura';
+            }
+
+            if (canvasEl) {
+                canvasEl.addEventListener('input', updateWordStats);
+                updateWordStats();
+            }
+
+            document.addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                    e.preventDefault();
+                    var draftBtn = document.querySelector('button[name="form_action"][value="save_draft"]') || document.querySelector('button[name="form_action"][value="publish"]');
+                    if (draftBtn) draftBtn.click();
+                } else if (e.key === 'Escape' && document.body.classList.contains('lp-focus-mode')) {
+                    window.toggleFocusMode(false);
+                }
             });
         })();
     </script>
