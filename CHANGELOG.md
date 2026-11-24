@@ -21,7 +21,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Modernização das Telas Administrativas (`public/admin/*.php`):**
   - **Login e Ativação (`login.php`, `activate.php`):** Suporte automático a Dark Mode (`lp_theme` / `prefers-color-scheme`), botão de alternância de tema e toggle de mostrar/ocultar senha no login.
   - **Dashboard (`dashboard.php`):** Cards de métricas com ícones SVG e *hover* sutil, alternância de **★ Destaque Home** via `fetch()` assíncrono com feedback via toast (mantendo fallback POST tradicional), modal customizado para exclusão de artigos, botão de **Editar** compacto em amarelo (apenas ícone) e novo botão para **Copiar URL completa** da matéria com notificação via toast.
-  - **Editores (`editor.php`, `page-edit.php`):** Ajuste de `top: var(--topbar-height)` na `.editor-toolbar` sticky para evitar colisão com a topbar fixa.
+  - **Editores (`editor.php`, `page-edit.php`):** Ajuste de `top: var(--topbar-height)` na `.editor-toolbar` sticky, adição de borda inferior/sombra sutil e `max-height: 72vh; overflow-y: auto` no `.editor-canvas` para evitar que o texto deslize por baixo da barra de ferramentas durante a rolagem.
   - **Audiência (`stats.php`):** Inclusão de barras proporcionais em CSS puro na coluna de visualizações do Top 20 e tabelas responsivas.
   - **Demais Módulos (`pages.php`, `categories.php`, `revisions.php`, `media.php`, `system.php`, `plugins.php`, `users.php`, `profile.php`):** Padronização visual com `admin.css`, feedback via `LPAdmin.copyText()` na galeria de mídias e modais `data-confirm` nas exclusões e restaurações.
 

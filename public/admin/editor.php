@@ -522,14 +522,14 @@ require __DIR__ . '/header.php';
         display: flex;
         flex-wrap: wrap;
         gap: 0.35rem;
-        padding: 0.5rem;
+        padding: 0.55rem 0.65rem;
         background: #f1f5f9;
         border: 1px solid var(--border);
-        border-bottom: none;
         border-radius: var(--radius) var(--radius) 0 0;
         position: sticky;
         top: var(--topbar-height);
         z-index: 40;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     }
     .tool-btn {
         background: white;
@@ -548,9 +548,12 @@ require __DIR__ . '/header.php';
     /* Canvas de Escrita Visual */
     .editor-canvas {
         min-height: 480px;
+        max-height: 72vh;
+        overflow-y: auto;
         padding: 1.5rem;
         background: white;
         border: 1px solid var(--border);
+        border-top: none;
         border-radius: 0 0 var(--radius) var(--radius);
         font-family: inherit;
         font-size: 1.05rem;
