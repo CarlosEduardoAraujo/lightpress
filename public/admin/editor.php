@@ -915,8 +915,15 @@ require __DIR__ . '/header.php';
                             <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.45rem;">
                                 Prévia no Google (SERP)
                             </div>
+                            <?php
+                                $serpOrigin = rtrim((string)($config['app']['canonical_origin'] ?? ''), '/');
+                                if ($serpOrigin === '' && !empty($_SERVER['HTTP_HOST'])) {
+                                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                                    $serpOrigin = $scheme . '://' . $_SERVER['HTTP_HOST'];
+                                }
+                            ?>
                             <div id="serpUrl" style="font-size: 0.76rem; color: var(--success-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                <?= Security::e(rtrim($config['app']['url'] ?? 'https://seusite.com.br', '/')) ?>/<span id="serpSlug"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/
+                                <?= Security::e($serpOrigin) ?>/<span id="serpSlug"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/
                             </div>
                             <div id="serpTitle" style="font-size: 1rem; font-weight: 700; color: #1a0dab; line-height: 1.3; margin: 0.15rem 0 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                 <?= Security::e(!empty($post['seo_title']) ? $post['seo_title'] : ($post['title'] ?? 'Título da sua matéria aparecerá aqui')) ?>

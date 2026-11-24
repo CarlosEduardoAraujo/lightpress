@@ -17,7 +17,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Auto-Save Local de Segurança (`public/admin/editor.php`, `public/admin/page-edit.php`):**
   - Salvamento automático contínuo em `localStorage` (`lp_autosave_post_{id}` / `lp_autosave_page_{id}`) com banner de recuperação (*Restaurar* / *Descartar*) ao detectar alterações não salvas e limpeza automática ao salvar o formulário.
 - **SERP Preview & Contadores de SEO ao Vivo (`public/admin/editor.php`):**
-  - Contadores dinâmicos com barra de progresso colorida para **Título SEO** (60 caracteres) e **Meta Description** (160 caracteres), além de prévia instantânea do snippet no Google.
+  - Contadores dinâmicos com barra de progresso colorida para **Título SEO** (60 caracteres) e **Meta Description** (160 caracteres), além de prévia instantânea do snippet no Google utilizando a origem configurada em `$config['app']['canonical_origin']` (com fallback para o host atual).
 
 ### Modernização Visual, Sidebar Lateral e Dinamismo do Painel Administrativo (`public/admin`) — 2026-11-24
 
