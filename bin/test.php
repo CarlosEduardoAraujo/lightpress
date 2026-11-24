@@ -100,6 +100,48 @@ $headlessTable = [
 $headlessCompiled = BlockCompiler::compile($headlessTable);
 assertTest("compile suporta tabela estruturada de API headless", str_contains($headlessCompiled, '<th>Pos</th>') && str_contains($headlessCompiled, '<td>Verstappen</td>'));
 
+// Testes de Auto-Embed e Segurança de Vídeos do YouTube
+assertTest("extractYouTubeId captura link padrão /watch?v=", BlockCompiler::extractYouTubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId captura link com parâmetros invertidos", BlockCompiler::extractYouTubeId('https://www.youtube.com/watch?feature=shared&v=dQw4w9WgXcQ&t=42s') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId captura link encurtado youtu.be", BlockCompiler::extractYouTubeId('https://youtu.be/dQw4w9WgXcQ?si=abcdef123456') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId captura link shorts", BlockCompiler::extractYouTubeId('https://www.youtube.com/shorts/dQw4w9WgXcQ') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId captura link live", BlockCompiler::extractYouTubeId('https://www.youtube.com/live/dQw4w9WgXcQ') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId captura iframe completo", BlockCompiler::extractYouTubeId('<iframe width="560" height="315" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0"></iframe>') === 'dQw4w9WgXcQ');
+assertTest("extractYouTubeId rejeita domínio falso notyoutube.com", BlockCompiler::extractYouTubeId('https://notyoutube.com/watch?v=dQw4w9WgXcQ') === null);
+assertTest("extractYouTubeId rejeita domínio arbitrário externo", BlockCompiler::extractYouTubeId('https://evil.com/video.mp4') === null);
+assertTest("extractYouTubeStartTime converte segundos e formato 2m15s", 
+    BlockCompiler::extractYouTubeStartTime('https://youtu.be/dQw4w9WgXcQ?t=120') === 120 &&
+    BlockCompiler::extractYouTubeStartTime('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=2m15s') === 135
+);
+
+// Sanitização de iframes do YouTube
+$validYtHtml = '<figure class="video-container"><iframe src="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Meu Vídeo"></iframe></figure>';
+$sanitizedYt = BlockCompiler::sanitizeHtml($validYtHtml);
+assertTest("sanitizeHtml preserva iframe válido do YouTube com youtube-nocookie.com", 
+    str_contains($sanitizedYt, 'youtube-nocookie.com/embed/dQw4w9WgXcQ') &&
+    str_contains($sanitizedYt, 'video-container') &&
+    str_contains($sanitizedYt, 'loading="lazy"')
+);
+
+// Rejeição estrita de iframes maliciosos ou de terceiros
+$evilIframeHtml = '<p>Texto</p><iframe src="https://evil.com/phishing"></iframe><iframe src="javascript:alert(1)"></iframe>';
+$sanitizedEvil = BlockCompiler::sanitizeHtml($evilIframeHtml);
+assertTest("sanitizeHtml remove sumariamente iframes que não são do YouTube", !str_contains($sanitizedEvil, 'evil.com') && !str_contains($sanitizedEvil, '<iframe'));
+
+// Conversão e compilação de bloco de vídeo
+$videoJson = BlockCompiler::htmlToBlocks($validYtHtml);
+assertTest("htmlToBlocks gera bloco do tipo 'video' com provider 'youtube'", 
+    str_contains($videoJson, '"type":"video"') && 
+    str_contains($videoJson, '"provider":"youtube"') && 
+    str_contains($videoJson, '"video_id":"dQw4w9WgXcQ"')
+);
+
+$videoRecompiled = BlockCompiler::compile($videoJson);
+assertTest("compile reconstrói <figure class=\"video-container\"><iframe...", 
+    str_contains($videoRecompiled, '<figure class="video-container">') && 
+    str_contains($videoRecompiled, 'youtube-nocookie.com/embed/dQw4w9WgXcQ')
+);
+
 // -------------------------------------------------------------
 // 3. Testes da Matriz de Controle de Acesso (RBAC - Authorization)
 // -------------------------------------------------------------

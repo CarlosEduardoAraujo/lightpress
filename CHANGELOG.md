@@ -7,6 +7,28 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Auto-Embed de Vídeos do YouTube, Sanitização Segura e Layout Responsivo 16:9 — 2026-11-24
+
+- **Auto-Embed Inteligente no Editor Visual (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - **Detecção Universal de Links ao Colar (`Ctrl+V`):** Interceptação no evento `paste` de qualquer formato de link do YouTube (`https://www.youtube.com/watch?v=...`, `https://youtu.be/...`, `https://www.youtube.com/shorts/...`, `https://www.youtube.com/live/...`, links do YouTube mobile `m.youtube.com/...` e códigos de incorporação completos `<iframe>`).
+  - **Conversão Atômica com Suporte a Desfazer (`Ctrl+Z`):** Inserção via `document.execCommand('insertHTML')` do elemento atômico `<figure class="video-container" contenteditable="false"><iframe src="https://www.youtube-nocookie.com/embed/{id}" ...></iframe></figure><p><br></p>`, permitindo desfazer com `Ctrl+Z` e digitar imediatamente no parágrafo seguinte.
+  - **Botão Auxiliar na Barra de Ferramentas:** Adicionado o botão `▶ Vídeo` na toolbar rica de notícias e páginas para inserção assistida via prompt.
+  - **Preservação em Colagem de Textos Ricos:** O limpador `cleanWordOrDocsHtml` agora autoriza a tag `IFRAME` e a classe `video-container`, validando origens autênticas e impedindo que embeds sejam expurgados ao copiar e colar textos pré-formatados.
+
+- **Portão de Segurança e Sanitização Rigorosa (`core/BlockCompiler.php`):**
+  - **Whitelist de Tags e Atributos Seguros:** Removido `iframe` da lista de tags proibidas (`$dangerousTags`) e incluído em `$allowedTags`, autorizando com segurança os atributos `src`, `title`, `width`, `height`, `frameborder`, `allow`, `allowfullscreen`, `loading` e `referrerpolicy`, além da classe `video-container` para `<figure>`.
+  - **Validação Estrita de Origem e Normalização com Alta Privacidade:** Implementado `BlockCompiler::extractYouTubeId()` e `BlockCompiler::extractYouTubeStartTime()`, validando o domínio e identificador de 11 caracteres (`^[a-zA-Z0-9_-]{11}$`). Todo embed é normalizado compulsoriamente para `https://www.youtube-nocookie.com/embed/{id}` (conformidade com LGPD/GDPR sem cookies de rastreamento prévio), aplicando `loading="lazy"` e `referrerpolicy="strict-origin-when-cross-origin"`.
+  - **Eliminação Sumária de Iframes Maliciosos:** Qualquer tag `<iframe>` apontando para servidores externos, domínios de terceiros ou esquemas como `javascript:` ou `data:` é sumariamente removida do DOM pelo compilador.
+  - **Suporte Bidirecional a Blocos JSON:** `BlockCompiler::htmlToBlocks` converte o elemento em bloco estruturado `['type' => 'video', 'provider' => 'youtube', 'video_id' => '...', 'url' => '...']` e `BlockCompiler::compile` reconstrói o HTML responsivo correspondente.
+
+- **Layout Responsivo 16:9 (`src/input.css`, `themes/empresa/assets/css/style.css`, temas compilados):**
+  - Estilização do contêiner `.video-container` com `aspect-ratio: 16 / 9`, bordas arredondadas, fundo preto e sombra suave no canvas do editor visual e nos temas SpeedRacing e Empresa.
+  - Sincronização automatizada dos arquivos CSS estáticos via `npm run build:css`.
+
+- **Expansão da Suíte de Testes Automatizada (`bin/test.php`):**
+  - Adicionadas 13 novas asserções cobrindo extração de ID de URLs normais, invertidas, encurtadas, shorts, lives e iframes, rejeição de domínios falsos/arbitrários, conversão de timestamps de início, sanitização defensiva contra XSS e compilação bidirecional JSON <-> HTML.
+  - Suíte total ampliada para **309 testes unitários 100% aprovados**.
+
 ### Remediação Completa da Auditoria Técnica: Pós-Commit, Streaming de Backup, Resiliência Picture AVIF, Criptografia e Idempotência (AUD-ARCH-01..04, AUD-SEC-01..05, AUD-PERF-04) — 2026-11-22
 
 - **Pós-Commit Real em Transações Relacionais (`core/Database.php`, `core/PostService.php` — AUD-ARCH-02):**

@@ -79,6 +79,25 @@ html.dark .article-body strong, html.dark .article-body b {
 .article-body figure {
     margin: 2.25rem 0;
 }
+.article-body figure.video-container,
+.video-container {
+    margin: 2.25rem 0;
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #000000;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.article-body figure.video-container iframe,
+.video-container iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    border: 0;
+    display: block;
+}
 .article-body img {
     max-width: 100%;
     height: auto;

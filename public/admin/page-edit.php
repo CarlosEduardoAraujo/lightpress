@@ -256,6 +256,23 @@ require __DIR__ . '/header.php';
     .editor-canvas li { margin-bottom: 0.4rem; }
     .editor-canvas img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 1rem 0; display: block; }
     .editor-canvas figure { margin: 1.5rem 0; }
+    .editor-canvas figure.video-container {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        margin: 1.75rem 0;
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: #000000;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    }
+    .editor-canvas figure.video-container iframe {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        height: auto;
+        display: block;
+        border: none;
+    }
     .editor-canvas figcaption { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 0.4rem; font-style: italic; }
     .editor-canvas table { display: table; width: 100%; border-collapse: collapse; margin: 1.5rem 0; border: 1px solid var(--border); font-size: 0.95rem; }
     .editor-canvas th { background: #f8fafc; color: #0f172a; font-weight: 700; text-align: left; padding: 0.65rem 0.85rem; border-bottom: 2px solid var(--primary-accent); border-right: 1px solid var(--border); }
@@ -376,6 +393,7 @@ require __DIR__ . '/header.php';
                             <button type="button" class="tool-btn" onclick="promptLink()" title="Inserir Link">🔗 Link</button>
                             <button type="button" class="tool-btn" onclick="openMediaModal('content')" style="background: #e0f2fe; color: #0369a1;" title="Inserir Foto da Biblioteca">📷 Inserir Foto</button>
                             <button type="button" class="tool-btn" onclick="insertTableDialog()" title="Inserir Tabela">⊞ Tabela</button>
+                            <button type="button" class="tool-btn" onclick="promptYouTubeVideo()" style="background: #fee2e2; color: #b91c1c;" title="Inserir Vídeo do YouTube">▶ Vídeo</button>
                             <div class="tool-separator"></div>
                             <button type="button" class="tool-btn" onclick="execCmd('removeFormat')" title="Limpar Formatação">✕ Limpar</button>
                             <button type="button" class="tool-btn" onclick="toggleHtmlSource()" id="btnToggleSource" style="margin-left: auto;" title="Alternar entre Visual e Código HTML">&lt;/&gt; HTML</button>
@@ -605,6 +623,155 @@ require __DIR__ . '/header.php';
         }
 
         // -------------------------------------------------------------
+        // Suporte e Detecção Inteligente de Embeds do YouTube
+        // -------------------------------------------------------------
+        function parseYouTubeUrl(urlStr) {
+            if (!urlStr || typeof urlStr !== 'string') return null;
+            var str = urlStr.trim().replace(/^[<"']+|[>"']+$/g, '');
+
+            // Se for tag iframe completa
+            if (str.indexOf('<iframe') !== -1) {
+                var srcMatch = str.match(/src=["']([^"']+)["']/i);
+                if (srcMatch && srcMatch[1]) {
+                    str = srcMatch[1].trim();
+                }
+            }
+
+            try {
+                var urlObj = null;
+                if (/^https?:\/\//i.test(str)) {
+                    urlObj = new URL(str);
+                } else if (/^\/\//.test(str)) {
+                    urlObj = new URL('https:' + str);
+                } else if (/^(?:www\.|m\.|music\.)?(?:youtube\.com|youtu\.be)\//i.test(str)) {
+                    urlObj = new URL('https://' + str);
+                }
+
+                if (urlObj) {
+                    var host = urlObj.hostname.toLowerCase();
+                    var pathname = urlObj.pathname;
+                    var videoId = null;
+
+                    if (host === 'youtu.be') {
+                        var pathParts = pathname.split('/').filter(Boolean);
+                        if (pathParts.length > 0 && /^[a-zA-Z0-9_-]{11}$/.test(pathParts[0])) {
+                            videoId = pathParts[0];
+                        }
+                    } else if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
+                        if (pathname === '/watch') {
+                            var v = urlObj.searchParams.get('v');
+                            if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) {
+                                videoId = v;
+                            }
+                        } else {
+                            var m = pathname.match(/^\/(?:embed|shorts|live|v)\/([a-zA-Z0-9_-]{11})/i);
+                            if (m && m[1]) {
+                                videoId = m[1];
+                            }
+                        }
+                    }
+
+                    if (videoId) {
+                        var start = null;
+                        var tParam = urlObj.searchParams.get('t') || urlObj.searchParams.get('start');
+                        if (tParam) {
+                            var tStr = tParam.trim();
+                            if (/^\d+$/.test(tStr)) {
+                                start = parseInt(tStr, 10);
+                            } else {
+                                var timeMatch = tStr.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/i);
+                                if (timeMatch) {
+                                    var h = parseInt(timeMatch[1] || 0, 10);
+                                    var min = parseInt(timeMatch[2] || 0, 10);
+                                    var s = parseInt(timeMatch[3] || 0, 10);
+                                    var total = (h * 3600) + (min * 60) + s;
+                                    if (total > 0) start = total;
+                                }
+                            }
+                        }
+                        return { videoId: videoId, start: start };
+                    }
+                }
+            } catch (e) {
+                // Fallback para regex
+            }
+
+            // Fallback por regex direto caso o construtor URL falhe
+            var regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+            var match = str.match(regExp);
+            if (match && match[1] && /^[a-zA-Z0-9_-]{11}$/.test(match[1])) {
+                return { videoId: match[1], start: null };
+            }
+
+            return null;
+        }
+
+        function parseYouTubeFromHtml(html) {
+            if (!html || typeof html !== 'string') return null;
+            try {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                if (!doc || !doc.body) return null;
+
+                // Caso 1: tag iframe direta
+                var iframes = doc.querySelectorAll('iframe');
+                if (iframes.length === 1) {
+                    var src = iframes[0].getAttribute('src') || '';
+                    var ytIframe = parseYouTubeUrl(src);
+                    if (ytIframe) return ytIframe;
+                }
+
+                // Caso 2: tag link <a> exclusiva
+                var links = doc.querySelectorAll('a');
+                var text = (doc.body.textContent || '').trim();
+                if (links.length === 1 && (text === links[0].textContent.trim() || text === links[0].href.trim())) {
+                    var href = links[0].getAttribute('href') || links[0].textContent.trim();
+                    var ytLink = parseYouTubeUrl(href);
+                    if (ytLink) return ytLink;
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        function insertYouTubeEmbed(ytInfo) {
+            if (!ytInfo || !ytInfo.videoId) return;
+
+            var embedUrl = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(ytInfo.videoId);
+            if (ytInfo.start && ytInfo.start > 0) {
+                embedUrl += '?start=' + encodeURIComponent(ytInfo.start);
+            }
+
+            var embedHtml = '<figure class="video-container" contenteditable="false">'
+                + '<iframe src="' + embedUrl + '" title="Vídeo do YouTube" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+                + '</figure><p><br></p>';
+
+            if (isCanvasEmpty(editorCanvas)) {
+                editorCanvas.innerHTML = '';
+            }
+
+            editorCanvas.focus();
+            document.execCommand('insertHTML', false, embedHtml);
+            ensureCursorAfterTable(editorCanvas);
+        }
+
+        function promptYouTubeVideo() {
+            var url = prompt('Cole o link do vídeo do YouTube (ex: https://www.youtube.com/watch?v=... ou https://youtu.be/...):');
+            if (!url || !url.trim()) return;
+
+            var ytInfo = parseYouTubeUrl(url.trim());
+            if (ytInfo && ytInfo.videoId) {
+                if (isSourceMode) {
+                    var embedUrl = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(ytInfo.videoId) + (ytInfo.start ? '?start=' + encodeURIComponent(ytInfo.start) : '');
+                    var htmlSnippet = '\n<figure class="video-container">\n  <iframe src="' + embedUrl + '" title="Vídeo do YouTube" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>\n</figure>\n<p></p>\n';
+                    rawHtmlArea.value += htmlSnippet;
+                } else {
+                    insertYouTubeEmbed(ytInfo);
+                }
+            } else {
+                alert('URL do YouTube não reconhecida. Por favor, cole um link válido do YouTube (watch, youtu.be, shorts ou live).');
+            }
+        }
+
+        // -------------------------------------------------------------
         // Limpador Inteligente de Ctrl+V (Google Docs / MS Word)
         // -------------------------------------------------------------
         editorCanvas.addEventListener('paste', function(e) {
@@ -614,6 +781,25 @@ require __DIR__ . '/header.php';
 
             var html = clipboardData.getData('text/html');
             var text = clipboardData.getData('text/plain');
+
+            // 1. Interceptar e auto-incorporar links ou iframes do YouTube
+            var trimmedText = (text || '').trim();
+            var ytInfo = null;
+
+            // Se for link colado como texto puro (sem quebras de linha ou múltiplos parágrafos)
+            if (trimmedText && (!/\s/.test(trimmedText) || trimmedText.indexOf('<iframe') !== -1)) {
+                ytInfo = parseYouTubeUrl(trimmedText);
+            }
+
+            // Se não encontrou pelo texto mas há HTML (ex: link rico isolado ou iframe)
+            if (!ytInfo && html) {
+                ytInfo = parseYouTubeFromHtml(html);
+            }
+
+            if (ytInfo && ytInfo.videoId) {
+                insertYouTubeEmbed(ytInfo);
+                return;
+            }
 
             // Se o canvas estiver vazio (apenas <p><br></p> ou espaços), limpa para evitar parágrafo vazio no topo
             if (isCanvasEmpty(editorCanvas)) {
@@ -703,7 +889,8 @@ require __DIR__ . '/header.php';
             var allowedTags = [
                 'P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'S',
                 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'IMG', 'FIGURE', 'FIGCAPTION',
-                'BR', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'CAPTION'
+                'BR', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'CAPTION',
+                'IFRAME'
             ];
 
             function cleanNode(node) {
@@ -853,13 +1040,52 @@ require __DIR__ . '/header.php';
 
                     // Remover estilos sujos, classes de Word, IDs e eventos on*
                     if (tag !== 'TD' && tag !== 'TH') {
+                        var isFig = (tag === 'FIGURE');
+                        var isIfr = (tag === 'IFRAME');
                         var attrs = Array.from(node.attributes);
                         attrs.forEach(function(attr) {
                             var name = attr.name.toLowerCase();
+                            if (isFig && name === 'class') {
+                                if (node.classList.contains('video-container')) {
+                                    node.setAttribute('class', 'video-container');
+                                    return;
+                                }
+                            }
+                            if (isIfr && ['src', 'title', 'frameborder', 'allow', 'allowfullscreen', 'loading', 'referrerpolicy'].includes(name)) {
+                                return;
+                            }
                             if (name.startsWith('on') || name === 'style' || name === 'class' || name === 'id' || name === 'dir' || name === 'lang' || name === 'width' || name === 'height' || name === 'border') {
                                 node.removeAttribute(attr.name);
                             }
                         });
+                    }
+
+                    // Validação estrita de iframes: apenas YouTube autorizado
+                    if (tag === 'IFRAME') {
+                        var yt = parseYouTubeUrl(node.getAttribute('src') || '');
+                        if (yt && yt.videoId) {
+                            var normSrc = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(yt.videoId) + (yt.start ? '?start=' + encodeURIComponent(yt.start) : '');
+                            node.setAttribute('src', normSrc);
+                            node.setAttribute('frameborder', '0');
+                            node.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+                            node.setAttribute('allowfullscreen', 'allowfullscreen');
+                            node.setAttribute('loading', 'lazy');
+                            node.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+                            if (!node.getAttribute('title')) node.setAttribute('title', 'Vídeo do YouTube');
+
+                            // Garantir encapsulamento em <figure class="video-container">
+                            if (node.parentNode && node.parentNode.tagName !== 'FIGURE') {
+                                var fig = doc.createElement('figure');
+                                fig.className = 'video-container';
+                                node.parentNode.insertBefore(fig, node);
+                                fig.appendChild(node);
+                            } else if (node.parentNode && node.parentNode.tagName === 'FIGURE') {
+                                node.parentNode.setAttribute('class', 'video-container');
+                            }
+                        } else {
+                            node.remove();
+                            return;
+                        }
                     }
 
                     // Limpar e blindar links

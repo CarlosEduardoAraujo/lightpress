@@ -57,6 +57,7 @@ class BlockCompiler
                 'quote' => self::compileQuote($block),
                 'table' => self::compileTable($block),
                 'image' => self::compileImage($block, $isFirstImage),
+                'video', 'youtube' => self::compileVideo($block),
                 default => '', // Blocos desconhecidos são sumariamente ignorados
             };
 
@@ -87,12 +88,13 @@ class BlockCompiler
         $allowedTags = [
             'h2', 'h3', 'h4', 'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'u', 's',
             'blockquote', 'cite', 'ul', 'ol', 'li', 'a', 'figure', 'picture', 'source',
-            'img', 'figcaption', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption'
+            'img', 'figcaption', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
+            'iframe'
         ];
 
         // Tags ativas/perigosas cujo nó e todo o conteúdo interno devem ser eliminados
         $dangerousTags = [
-            'script', 'style', 'iframe', 'object', 'embed', 'applet', 'meta',
+            'script', 'style', 'object', 'embed', 'applet', 'meta',
             'link', 'form', 'input', 'textarea', 'button', 'select', 'option',
             'svg', 'math', 'base', 'colgroup', 'col'
         ];
@@ -105,6 +107,8 @@ class BlockCompiler
             'blockquote' => ['cite'],
             'th' => ['colspan', 'rowspan', 'scope'],
             'td' => ['colspan', 'rowspan'],
+            'figure' => ['class'],
+            'iframe' => ['src', 'title', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen', 'loading', 'referrerpolicy'],
         ];
 
         $dom = new \DOMDocument();
@@ -260,6 +264,14 @@ class BlockCompiler
                         } else {
                             $attrsToRemove[] = $attrName;
                         }
+                    } elseif ($tagName === 'figure' && $attrName === 'class') {
+                        $parts = preg_split('/\s+/', strtolower($val));
+                        $safeClasses = array_intersect($parts, ['video-container', 'video-embed', 'align-center', 'align-left', 'align-right']);
+                        if (empty($safeClasses)) {
+                            $attrsToRemove[] = $attrName;
+                        } else {
+                            $child->setAttribute('class', implode(' ', $safeClasses));
+                        }
                     }
                 }
 
@@ -304,6 +316,38 @@ class BlockCompiler
                     continue;
                 }
                 $child->setAttribute('loading', 'lazy');
+            } elseif ($tagName === 'iframe') {
+                $src = $child->getAttribute('src');
+                $ytId = self::extractYouTubeId($src);
+                if ($ytId === null) {
+                    $node->removeChild($child);
+                    continue;
+                }
+
+                $startSec = self::extractYouTubeStartTime($src);
+                $embedSrc = "https://www.youtube-nocookie.com/embed/{$ytId}";
+                if ($startSec !== null && $startSec > 0) {
+                    $embedSrc .= "?start={$startSec}";
+                }
+                $child->setAttribute('src', $embedSrc);
+
+                $title = trim($child->getAttribute('title'));
+                $child->setAttribute('title', !empty($title) ? Security::e(strip_tags($title)) : 'Vídeo do YouTube');
+                $child->setAttribute('frameborder', '0');
+                $child->setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+                $child->setAttribute('allowfullscreen', 'allowfullscreen');
+                $child->setAttribute('loading', 'lazy');
+                $child->setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+
+                // Garante que o iframe esteja encapsulado em <figure class="video-container">
+                if (strtolower($node->nodeName) !== 'figure') {
+                    $figure = $node->ownerDocument->createElement('figure');
+                    $figure->setAttribute('class', 'video-container');
+                    $node->replaceChild($figure, $child);
+                    $figure->appendChild($child);
+                } elseif (strtolower($node->nodeName) === 'figure' && !$node->hasAttribute('class')) {
+                    $node->setAttribute('class', 'video-container');
+                }
             }
 
             // Processar filhos recursivamente
@@ -483,6 +527,32 @@ class BlockCompiler
                 $tableHtml = (string)$dom->saveHTML($node);
                 $blocks[] = ['type' => 'table', 'content' => trim($tableHtml)];
             } elseif ($tag === 'figure') {
+                $iframes = $node->getElementsByTagName('iframe');
+                if ($iframes->length > 0) {
+                    $iframe = $iframes->item(0);
+                    if ($iframe instanceof \DOMElement) {
+                        $src = $iframe->getAttribute('src');
+                        $ytId = self::extractYouTubeId($src);
+                        if (!empty($ytId)) {
+                            $captionNode = $node->getElementsByTagName('figcaption');
+                            $captionEl = $captionNode->length > 0 ? $captionNode->item(0) : null;
+                            $caption = $captionEl !== null ? trim($captionEl->textContent) : '';
+                            $start = self::extractYouTubeStartTime($src);
+                            $blockData = [
+                                'type' => 'video',
+                                'provider' => 'youtube',
+                                'video_id' => $ytId,
+                                'url' => "https://www.youtube-nocookie.com/embed/{$ytId}",
+                                'caption' => $caption,
+                            ];
+                            if ($start !== null && $start > 0) {
+                                $blockData['start'] = $start;
+                            }
+                            $blocks[] = $blockData;
+                            continue;
+                        }
+                    }
+                }
                 $imgs = $node->getElementsByTagName('img');
                 if ($imgs->length > 0) {
                     $img = $imgs->item(0);
@@ -494,6 +564,23 @@ class BlockCompiler
                         $caption = $captionEl !== null ? trim($captionEl->textContent) : '';
                         $blocks[] = ['type' => 'image', 'url' => $url, 'caption' => $caption, 'alt' => $alt];
                     }
+                }
+            } elseif ($tag === 'iframe') {
+                $src = $node->getAttribute('src');
+                $ytId = self::extractYouTubeId($src);
+                if (!empty($ytId)) {
+                    $start = self::extractYouTubeStartTime($src);
+                    $blockData = [
+                        'type' => 'video',
+                        'provider' => 'youtube',
+                        'video_id' => $ytId,
+                        'url' => "https://www.youtube-nocookie.com/embed/{$ytId}",
+                        'caption' => '',
+                    ];
+                    if ($start !== null && $start > 0) {
+                        $blockData['start'] = $start;
+                    }
+                    $blocks[] = $blockData;
                 }
             } elseif ($tag === 'img') {
                 $url = $node->getAttribute('src');
@@ -822,5 +909,152 @@ class BlockCompiler
         }
 
         return '';
+    }
+
+    /**
+     * Compila bloco de vídeo (YouTube) para elemento semântico e responsivo <figure class="video-container">.
+     */
+    private static function compileVideo(array $block): string
+    {
+        $url = trim($block['url'] ?? '');
+        $videoId = trim($block['video_id'] ?? '');
+        if (empty($videoId) && !empty($url)) {
+            $videoId = self::extractYouTubeId($url);
+        }
+        if (empty($videoId) || !preg_match('/^[a-zA-Z0-9_-]{11}$/', $videoId)) {
+            return '';
+        }
+
+        $startSec = !empty($block['start']) && is_numeric($block['start'])
+            ? (int)$block['start']
+            : self::extractYouTubeStartTime($url);
+
+        $embedUrl = "https://www.youtube-nocookie.com/embed/{$videoId}";
+        if ($startSec !== null && $startSec > 0) {
+            $embedUrl .= "?start={$startSec}";
+        }
+
+        $caption = !empty($block['caption']) ? self::sanitizeInline((string)$block['caption']) : '';
+
+        $html = '<figure class="video-container">';
+        $html .= '<iframe src="' . $embedUrl . '" title="Vídeo do YouTube" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+        if (!empty($caption)) {
+            $html .= '<figcaption>' . $caption . '</figcaption>';
+        }
+        $html .= '</figure>';
+
+        return $html;
+    }
+
+    /**
+     * Extrai o ID único de 11 caracteres de qualquer URL ou embed do YouTube.
+     * Retorna null se a URL não pertencer a um domínio autorizado do YouTube ou não tiver ID válido.
+     */
+    public static function extractYouTubeId(string $url): ?string
+    {
+        $url = htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE);
+        if ($url === '') {
+            return null;
+        }
+
+        // Se for tag iframe completa
+        if (str_contains($url, '<iframe')) {
+            if (preg_match('/src=["\']([^"\']+)["\']/i', $url, $m)) {
+                $url = $m[1];
+            }
+        }
+
+        // Limpeza de aspas residuais ou colchetes angulares
+        $url = trim($url, " \t\n\r\0\x0B<>\"'");
+
+        $parsed = parse_url($url);
+        if (!$parsed || empty($parsed['host'])) {
+            $parsed = parse_url('https://' . ltrim($url, '/'));
+        }
+
+        if (!$parsed || empty($parsed['host'])) {
+            return null;
+        }
+
+        $host = strtolower($parsed['host']);
+        $path = $parsed['path'] ?? '';
+
+        // Validação estrita de domínios autorizados do YouTube
+        $isYouTubeHost = (
+            $host === 'youtu.be' ||
+            $host === 'youtube.com' ||
+            str_ends_with($host, '.youtube.com') ||
+            $host === 'youtube-nocookie.com' ||
+            str_ends_with($host, '.youtube-nocookie.com')
+        );
+
+        if (!$isYouTubeHost) {
+            return null;
+        }
+
+        // 1. youtu.be/VIDEO_ID
+        if ($host === 'youtu.be') {
+            $trimmedPath = trim($path, '/');
+            $parts = explode('/', $trimmedPath);
+            $id = $parts[0] ?? '';
+            if (preg_match('/^[a-zA-Z0-9_-]{11}$/', $id)) {
+                return $id;
+            }
+            return null;
+        }
+
+        // 2. youtube.com / youtube-nocookie.com
+        // /watch?v=VIDEO_ID (ou com outros parâmetros)
+        if ($path === '/watch' && !empty($parsed['query'])) {
+            parse_str($parsed['query'], $queryParams);
+            $v = $queryParams['v'] ?? '';
+            if (is_string($v) && preg_match('/^[a-zA-Z0-9_-]{11}$/', $v)) {
+                return $v;
+            }
+        }
+
+        // /embed/ID, /shorts/ID, /live/ID, /v/ID
+        if (preg_match('#^/(?:embed|shorts|live|v)/([a-zA-Z0-9_-]{11})#i', $path, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Extrai o tempo de início do vídeo (em segundos) caso informado na URL (parâmetros t ou start).
+     */
+    public static function extractYouTubeStartTime(string $url): ?int
+    {
+        $url = htmlspecialchars_decode(trim($url), ENT_QUOTES | ENT_SUBSTITUTE);
+        $parsed = parse_url($url);
+        if (!$parsed) {
+            return null;
+        }
+
+        $query = $parsed['query'] ?? '';
+        parse_str($query, $params);
+
+        $t = $params['t'] ?? $params['start'] ?? null;
+        if ($t === null) {
+            return null;
+        }
+
+        $tStr = trim((string)$t);
+        if (is_numeric($tStr)) {
+            $sec = (int)$tStr;
+            return $sec > 0 ? $sec : null;
+        }
+
+        // Formato como 2m15s ou 1h20m30s
+        if (preg_match('/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i', $tStr, $matches)) {
+            $h = (int)($matches[1] ?? 0);
+            $m = (int)($matches[2] ?? 0);
+            $s = (int)($matches[3] ?? 0);
+            $total = ($h * 3600) + ($m * 60) + $s;
+            return $total > 0 ? $total : null;
+        }
+
+        return null;
     }
 }

@@ -431,3 +431,25 @@ html.dark .corp-hero-badge {
         gap: 2.5rem;
     }
 }
+
+/* Vídeos do YouTube Embutidos Responsivos */
+.corp-content .video-container,
+.corp-content figure.video-container {
+    margin: 2rem 0;
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--corp-radius, 8px);
+    overflow: hidden;
+    background: #000000;
+    box-shadow: var(--corp-shadow, 0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+.corp-content .video-container iframe,
+.corp-content figure.video-container iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    border: none;
+    display: block;
+}
