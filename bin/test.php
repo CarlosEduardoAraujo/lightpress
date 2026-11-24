@@ -142,6 +142,16 @@ assertTest("compile reconstrói <figure class=\"video-container\"><iframe...",
     str_contains($videoRecompiled, 'youtube-nocookie.com/embed/dQw4w9WgXcQ')
 );
 
+// Validação de CSP para YouTube Embeds (public/index.php e nginx/lightpress.conf)
+$indexPhp = file_get_contents(dirname(__DIR__) . '/public/index.php');
+$nginxConf = file_get_contents(dirname(__DIR__) . '/nginx/lightpress.conf');
+assertTest("CSP em public/index.php autoriza frame-src para YouTube", 
+    str_contains($indexPhp, "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com;")
+);
+assertTest("CSP em nginx/lightpress.conf autoriza frame-src para YouTube", 
+    str_contains($nginxConf, "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com;")
+);
+
 // -------------------------------------------------------------
 // 3. Testes da Matriz de Controle de Acesso (RBAC - Authorization)
 // -------------------------------------------------------------
