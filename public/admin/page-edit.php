@@ -556,7 +556,10 @@ require __DIR__ . '/header.php';
             <div class="media-modal-footer" style="flex-direction: column; align-items: stretch; gap: 0.75rem;">
                 <div id="modalContentMetaFields" style="display: none; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">Metadados da Imagem para a Página</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">Metadados da Imagem para a Página</span>
+                            <span id="modalMetaSaveStatus" style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);"></span>
+                        </div>
                         <?php if ($isAiVisionEnabled): ?>
                             <button type="button" id="btnModalAiDescribe" class="btn btn-secondary btn-sm" onclick="generateAiInMediaModal(this)" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; background: #f0fdf4; color: #166534; border-color: #bbf7d0; font-weight: 600;" title="Gera texto alternativo e legenda automaticamente usando IA">
                                 ✨ Gerar com IA
@@ -1290,10 +1293,113 @@ require __DIR__ . '/header.php';
         var currentModalTarget = 'featured'; // 'featured' ou 'content'
         var modalMediaList = [];
         var selectedMediaItem = null;
+        var metaSaveTimer = null;
+        var metaSaveStatusTimer = null;
+
+        function setModalMetaStatus(text, color) {
+            var statusEl = document.getElementById('modalMetaSaveStatus');
+            if (!statusEl) return;
+            clearTimeout(metaSaveStatusTimer);
+            statusEl.textContent = text || '';
+            statusEl.style.color = color || 'var(--text-muted)';
+            if (text && text.indexOf('Salvo') !== -1) {
+                metaSaveStatusTimer = setTimeout(function() {
+                    statusEl.textContent = '';
+                }, 2500);
+            }
+        }
+
+        async function saveMediaMetaInModal(targetItem) {
+            var item = targetItem || selectedMediaItem;
+            if (!item || !item.id) return;
+
+            var altInput = document.getElementById('modalAltTextInput');
+            var capInput = document.getElementById('modalCaptionInput');
+            if (!altInput || !capInput) return;
+
+            var newAlt = altInput.value.trim();
+            var newCap = capInput.value.trim();
+            var currentAlt = (item.alt_text || '').trim();
+            var currentCap = (item.caption || '').trim();
+
+            if (newAlt === currentAlt && newCap === currentCap) {
+                return;
+            }
+
+            var csrfInput = document.getElementById('csrfToken') || document.querySelector('input[name="_csrf_token"]');
+            var csrf = csrfInput ? csrfInput.value : '';
+
+            if (selectedMediaItem && String(selectedMediaItem.id) === String(item.id)) {
+                setModalMetaStatus('Salvando...', 'var(--text-muted)');
+            }
+
+            try {
+                var res = await fetch('/admin/api/media.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
+                        'X-CSRF-Token': csrf
+                    },
+                    body: new URLSearchParams({
+                        '_csrf_token': csrf,
+                        'media_id': item.id,
+                        'alt_text': newAlt,
+                        'caption': newCap
+                    })
+                });
+                var data = await res.json();
+                if (res.ok && data.ok) {
+                    item.alt_text = data.alt_text;
+                    item.caption = data.caption;
+                    var listMatch = modalMediaList.find(function(m) { return String(m.id) === String(item.id); });
+                    if (listMatch) {
+                        listMatch.alt_text = data.alt_text;
+                        listMatch.caption = data.caption;
+                    }
+                    if (selectedMediaItem && String(selectedMediaItem.id) === String(item.id)) {
+                        setModalMetaStatus('✓ Salvo', '#166534');
+                    }
+                } else {
+                    if (selectedMediaItem && String(selectedMediaItem.id) === String(item.id)) {
+                        setModalMetaStatus('⚠ Erro ao salvar', '#dc2626');
+                    }
+                }
+            } catch (err) {
+                if (selectedMediaItem && String(selectedMediaItem.id) === String(item.id)) {
+                    setModalMetaStatus('⚠ Erro ao salvar', '#dc2626');
+                }
+            }
+        }
+
+        function scheduleMediaMetaSave() {
+            if (!selectedMediaItem || !selectedMediaItem.id) return;
+            clearTimeout(metaSaveTimer);
+            var targetItem = selectedMediaItem;
+            metaSaveTimer = setTimeout(function() {
+                saveMediaMetaInModal(targetItem);
+            }, 600);
+        }
+
+        ['modalAltTextInput', 'modalCaptionInput'].forEach(function(inputId) {
+            var el = document.getElementById(inputId);
+            if (!el) return;
+            el.addEventListener('input', scheduleMediaMetaSave);
+            el.addEventListener('change', function() {
+                clearTimeout(metaSaveTimer);
+                saveMediaMetaInModal(selectedMediaItem);
+            });
+            el.addEventListener('blur', function() {
+                clearTimeout(metaSaveTimer);
+                saveMediaMetaInModal(selectedMediaItem);
+            });
+        });
 
         function openMediaModal(target) {
             currentModalTarget = target;
             selectedMediaItem = null;
+            clearTimeout(metaSaveTimer);
+            setModalMetaStatus('');
             document.getElementById('modalSelectionDetails').innerText = 'Nenhuma imagem selecionada.';
             document.getElementById('btnApplySelection').disabled = true;
             document.getElementById('modalSearchInput').value = '';
@@ -1318,6 +1424,11 @@ require __DIR__ . '/header.php';
         }
 
         function selectModalItem(item) {
+            if (selectedMediaItem && String(selectedMediaItem.id) !== String(item.id)) {
+                clearTimeout(metaSaveTimer);
+                saveMediaMetaInModal(selectedMediaItem);
+            }
+            setModalMetaStatus('');
             selectedMediaItem = item;
             document.querySelectorAll('.modal-media-item').forEach(function(el) {
                 if (el.dataset.id === String(item.id)) {
@@ -1389,9 +1500,17 @@ require __DIR__ . '/header.php';
                     if (document.getElementById('modalCaptionInput')) {
                         document.getElementById('modalCaptionInput').value = data.caption || '';
                     }
+                    clearTimeout(metaSaveTimer);
                     selectedMediaItem.alt_text = data.alt_text || '';
                     selectedMediaItem.caption = data.caption || '';
                     selectedMediaItem.ai_tags = data.ai_tags || '';
+                    var listMatch = modalMediaList.find(function(m) { return String(m.id) === String(selectedMediaItem.id); });
+                    if (listMatch) {
+                        listMatch.alt_text = selectedMediaItem.alt_text;
+                        listMatch.caption = selectedMediaItem.caption;
+                        listMatch.ai_tags = selectedMediaItem.ai_tags;
+                    }
+                    setModalMetaStatus('✓ Salvo', '#166534');
 
                     if (btn) {
                         btn.innerHTML = '✨ Gerado!';
@@ -1607,8 +1726,11 @@ require __DIR__ . '/header.php';
             }
         }
 
-        function applyMediaSelection() {
+        async function applyMediaSelection() {
             if (!selectedMediaItem) return;
+
+            clearTimeout(metaSaveTimer);
+            await saveMediaMetaInModal(selectedMediaItem);
 
             if (currentModalTarget === 'featured') {
                 var url = selectedMediaItem.full_url;

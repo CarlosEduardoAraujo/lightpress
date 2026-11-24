@@ -16,6 +16,50 @@ use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth();
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $csrfToken = $_POST['_csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!Security::verifyCsrfToken($csrfToken)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token de segurança CSRF inválido ou expirado.']);
+        exit;
+    }
+
+    $mediaId = trim((string)($_POST['media_id'] ?? ''));
+    if ($mediaId === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Identificador da imagem (media_id) não informado.']);
+        exit;
+    }
+
+    $mediaItem = Database::fetchOne("SELECT user_id FROM media WHERE id = ? LIMIT 1", [$mediaId]);
+    if (!$mediaItem) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Mídia não encontrada.']);
+        exit;
+    }
+
+    if (!in_array($currentUser['role'] ?? '', ['admin', 'editor', 'superadmin'], true)
+        && (int)($mediaItem['user_id'] ?? 0) !== (int)$currentUser['id']) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Permissão negada para editar metadados desta mídia.']);
+        exit;
+    }
+
+    $alt = mb_substr(trim(strip_tags((string)($_POST['alt_text'] ?? ''))), 0, 255);
+    $cap = mb_substr(trim(strip_tags((string)($_POST['caption'] ?? ''))), 0, 500);
+
+    Database::query("UPDATE media SET alt_text = ?, caption = ? WHERE id = ?", [$alt, $cap, $mediaId]);
+    \LightPress\Core\ImageProcessor::invalidateMediaMetadata($mediaId);
+
+    echo json_encode([
+        'ok' => true,
+        'media_id' => $mediaId,
+        'alt_text' => $alt,
+        'caption' => $cap,
+    ]);
+    exit;
+}
+
 $search = Security::getSafeString($_GET, 'q');
 $limit = min(max((int)($_GET['limit'] ?? 60), 1), 100);
 

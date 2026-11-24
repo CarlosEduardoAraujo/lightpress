@@ -7,6 +7,15 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Auto-Save de Metadados de Imagem no Modal do Editor (`public/admin/api/media.php`, `editor.php`, `page-edit.php`) — 2026-11-24
+
+- **Endpoint de Atualização de Metadados (`public/admin/api/media.php`):**
+  - Adicionado suporte a `POST` para atualizar `alt_text` (até 255 caracteres) e `caption` (até 500 caracteres) diretamente na tabela `media`, preservando `ai_tags` existentes e funcionando independentemente do plugin `ai-copilot`.
+  - Protegido com autenticação (`Security::requireAuth()`), token CSRF (`Security::verifyCsrfToken()`), checagem RBAC (`admin`, `editor`, `superadmin` ou proprietário `user_id`) e invalidação de cache via `ImageProcessor::invalidateMediaMetadata()`.
+- **Auto-Save no Modal da Biblioteca de Mídias (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - Adicionado auto-save com debounce (`600ms`), salvamento imediato em `change`/`blur` e garantia de gravação antes de fechar ao trocar de imagem ou clicar em **Confirmar Seleção** (`applyMediaSelection()`), tanto no fluxo de **Imagem de Destaque** quanto no de **Inserir Foto** no conteúdo.
+  - Adicionado indicador visual de status (`Salvando...`, `✓ Salvo`, `⚠ Erro ao salvar`) no cabeçalho do bloco de metadados e sincronização em memória da lista do modal (`modalMediaList`).
+
 ### Redirecionamentos SEO, Monitor de Purgas/Logs, Modo Foco, CSV de Audiência e Filtro de Alt Text (`public/admin`) — 2026-11-24
 
 - **Gerenciador de Redirecionamentos SEO 301/302 (`public/admin/redirects.php`, `core/AdminNav.php`, `core/Icon.php`):**
