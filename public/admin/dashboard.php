@@ -139,12 +139,94 @@ if ($delPostId > 0 && Security::verifyCsrfToken($tokenDel)) {
     }
 }
 
+// Ações em Massa (Bulk Actions) estritamente via POST com CSRF
+$bulkAction = $_SERVER['REQUEST_METHOD'] === 'POST' ? Security::getSafeString($_POST, 'bulk_action') : '';
+$tokenBulk = $_POST['_csrf_token'] ?? '';
+if ($bulkAction !== '' && Security::verifyCsrfToken($tokenBulk)) {
+    $rawIds = $_POST['post_ids'] ?? [];
+    $bulkIds = is_array($rawIds) ? array_values(array_unique(array_filter(array_map('intval', $rawIds), fn($v) => $v > 0))) : [];
+    $bulkCategory = Security::getSafeString($_POST, 'bulk_category');
+    $affectedCount = 0;
+
+    if (!empty($bulkIds)) {
+        $placeholders = implode(',', array_fill(0, count($bulkIds), '?'));
+        $targetPosts = Database::fetchAll("SELECT id, slug, category, status, user_id FROM posts WHERE id IN ({$placeholders})", $bulkIds);
+        $purgeUrls = ['/', '/blog/', '/feed.xml', '/sitemap.xml', '/sitemap-main.xml', '/sitemap-news.xml'];
+
+        $allowedIds = [];
+        foreach ($targetPosts as $tp) {
+            if ($bulkAction === 'delete') {
+                if (Authorization::can($currentUser, Authorization::ACTION_DELETE_POST, $tp)) {
+                    $allowedIds[] = (int)$tp['id'];
+                    $purgeUrls[] = '/' . $tp['slug'] . '/';
+                    $purgeUrls[] = '/categoria/' . $tp['category'] . '/';
+                }
+            } elseif ($bulkAction === 'publish') {
+                if (Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST, $tp)) {
+                    $allowedIds[] = (int)$tp['id'];
+                    $purgeUrls[] = '/' . $tp['slug'] . '/';
+                    $purgeUrls[] = '/categoria/' . $tp['category'] . '/';
+                }
+            } elseif (in_array($bulkAction, ['draft', 'category'], true)) {
+                if (Authorization::can($currentUser, Authorization::ACTION_EDIT_POST, $tp)) {
+                    $allowedIds[] = (int)$tp['id'];
+                    $purgeUrls[] = '/' . $tp['slug'] . '/';
+                    $purgeUrls[] = '/categoria/' . $tp['category'] . '/';
+                }
+            }
+        }
+
+        if (!empty($allowedIds)) {
+            $idPh = implode(',', array_fill(0, count($allowedIds), '?'));
+            Database::transaction(function () use ($bulkAction, $bulkCategory, $allowedIds, $idPh, &$affectedCount): void {
+                if ($bulkAction === 'delete') {
+                    Database::query("DELETE FROM post_stats WHERE post_id IN ({$idPh})", $allowedIds);
+                    Database::query("DELETE FROM post_revisions WHERE post_id IN ({$idPh})", $allowedIds);
+                    Database::query("DELETE FROM posts WHERE id IN ({$idPh})", $allowedIds);
+                    $affectedCount = count($allowedIds);
+                } elseif ($bulkAction === 'publish') {
+                    Database::query("UPDATE posts SET status = 'published', published_at = COALESCE(published_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id IN ({$idPh})", $allowedIds);
+                    $affectedCount = count($allowedIds);
+                } elseif ($bulkAction === 'draft') {
+                    Database::query("UPDATE posts SET status = 'draft', updated_at = CURRENT_TIMESTAMP WHERE id IN ({$idPh})", $allowedIds);
+                    $affectedCount = count($allowedIds);
+                } elseif ($bulkAction === 'category' && $bulkCategory !== '') {
+                    $catExists = Database::fetchValue("SELECT COUNT(*) FROM categories WHERE slug = ? AND is_active = 1", [$bulkCategory]);
+                    if ((int)$catExists > 0) {
+                        Database::query("UPDATE posts SET category = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({$idPh})", array_merge([$bulkCategory], $allowedIds));
+                        $affectedCount = count($allowedIds);
+                    }
+                }
+            });
+
+            if ($affectedCount > 0) {
+                ObjectCache::flushGroup('posts');
+                try {
+                    $cacheMgr->purgeUrls(array_values(array_unique($purgeUrls)));
+                } catch (\Throwable $e) {
+                    error_log("[Dashboard Bulk Purge Error] " . $e->getMessage());
+                }
+            }
+        }
+    }
+
+    $queryParams = $_GET;
+    unset($queryParams['delete_id'], $queryParams['toggle_featured_id'], $queryParams['_csrf_token']);
+    if ($affectedCount > 0) {
+        $queryParams['bulk_ok'] = $affectedCount;
+    }
+    $qs = !empty($queryParams) ? '?' . http_build_query($queryParams) : '';
+    header('Location: /admin/dashboard.php' . $qs);
+    exit;
+}
+
 // Métricas do Topo (inclui agendadas cujo horário já foi atingido como publicadas)
 $nowUtc = gmdate('Y-m-d H:i:s');
 $totalPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts");
 $scheduledPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE (status = 'scheduled' AND published_at > ?) OR (status = 'published' AND published_at > ?)", [$nowUtc, $nowUtc]);
 $publishedPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE (status = 'published' AND (published_at IS NULL OR published_at <= ?)) OR (status = 'scheduled' AND published_at <= ?)", [$nowUtc, $nowUtc]);
 $draftPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE status IN ('draft', 'pending_review')");
+$featuredPosts = (int)Database::fetchValue("SELECT COUNT(*) FROM posts WHERE is_featured = 1");
 $totalViews = (int)Database::fetchValue("SELECT COALESCE(SUM(views), 0) FROM post_stats");
 
 // Carregar Categorias e Autores para os filtros
@@ -441,6 +523,62 @@ require __DIR__ . '/header.php';
             </a>
         </div>
 
+        <!-- Abas Rápidas de Status (Pills) -->
+        <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 1rem;">
+            <?php
+                $isAllActive = ($filterStatus === '' && !$filterFeatured);
+                $pillBase = 'display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.42rem 0.85rem; border-radius: var(--radius-pill); font-size: 0.82rem; font-weight: 700; text-decoration: none; border: 1px solid var(--border); transition: all 0.15s;';
+                $pillActive = 'background: var(--primary-accent); color: #fff; border-color: var(--primary-accent);';
+                $pillIdle = 'background: var(--surface); color: var(--text-muted);';
+            ?>
+            <a href="/admin/dashboard.php" style="<?= $pillBase . ($isAllActive ? $pillActive : $pillIdle) ?>">
+                Todas <span class="tabular-nums" style="opacity: 0.8;">(<?= number_format($totalPosts, 0, ',', '.') ?>)</span>
+            </a>
+            <a href="<?= buildFilterUrl(['status' => 'published', 'featured' => 0, 'page' => 1]) ?>" style="<?= $pillBase . ($filterStatus === 'published' && !$filterFeatured ? $pillActive : $pillIdle) ?>">
+                Publicadas <span class="tabular-nums" style="opacity: 0.8;">(<?= number_format($publishedPosts, 0, ',', '.') ?>)</span>
+            </a>
+            <a href="<?= buildFilterUrl(['status' => 'scheduled', 'featured' => 0, 'page' => 1]) ?>" style="<?= $pillBase . ($filterStatus === 'scheduled' ? $pillActive : $pillIdle) ?>">
+                Agendadas <span class="tabular-nums" style="opacity: 0.8;">(<?= number_format($scheduledPosts, 0, ',', '.') ?>)</span>
+            </a>
+            <a href="<?= buildFilterUrl(['status' => 'draft', 'featured' => 0, 'page' => 1]) ?>" style="<?= $pillBase . ($filterStatus === 'draft' ? $pillActive : $pillIdle) ?>">
+                Rascunhos <span class="tabular-nums" style="opacity: 0.8;">(<?= number_format($draftPosts, 0, ',', '.') ?>)</span>
+            </a>
+            <a href="<?= buildFilterUrl(['status' => 'pending_review', 'featured' => 0, 'page' => 1]) ?>" style="<?= $pillBase . ($filterStatus === 'pending_review' ? $pillActive : $pillIdle) ?>">
+                Em Revisão
+            </a>
+            <a href="<?= buildFilterUrl(['status' => '', 'featured' => 1, 'page' => 1]) ?>" style="<?= $pillBase . ($filterFeatured ? $pillActive : $pillIdle) ?>">
+                <?= \LightPress\Core\Icon::svg('star_filled', '', 12) ?> Destaques <span class="tabular-nums" style="opacity: 0.8;">(<?= number_format($featuredPosts, 0, ',', '.') ?>)</span>
+            </a>
+        </div>
+
+        <!-- Barra Contextual de Ações em Massa -->
+        <form id="bulkActionForm" method="POST" action="<?= buildFilterUrl([]) ?>" style="display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; background: var(--surface); border: 1px solid var(--primary-accent); border-radius: var(--radius); padding: 0.75rem 1.15rem; margin-bottom: 1rem; box-shadow: var(--shadow-md);">
+            <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+            <div id="bulkHiddenIds"></div>
+            <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.88rem; font-weight: 700; color: var(--primary);">
+                <span class="badge" style="background: var(--primary-light); color: var(--primary-accent);" id="bulkSelectedCount">0 selecionadas</span>
+                <span>Ações em massa:</span>
+            </div>
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <?php if (Authorization::can($currentUser, Authorization::ACTION_PUBLISH_POST)): ?>
+                    <button type="submit" name="bulk_action" value="publish" class="btn btn-sm">Publicar</button>
+                <?php endif; ?>
+                <button type="submit" name="bulk_action" value="draft" class="btn btn-secondary btn-sm">Mover p/ Rascunho</button>
+                <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <select name="bulk_category" class="form-select" style="padding: 0.35rem 0.6rem; font-size: 0.8rem;">
+                        <option value="">Alterar categoria...</option>
+                        <?php foreach ($categories as $cat): ?>
+                            <option value="<?= Security::e($cat['slug']) ?>"><?= Security::e($cat['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" name="bulk_action" value="category" class="btn btn-secondary btn-sm">Aplicar</button>
+                </div>
+                <button type="button" onclick="confirmBulkDelete()" class="btn btn-danger-soft btn-sm">
+                    <?= \LightPress\Core\Icon::svg('trash', '', 14) ?> Excluir
+                </button>
+            </div>
+        </form>
+
         <!-- Barra de Filtros e Busca -->
         <form method="GET" action="/admin/dashboard.php" class="filter-bar">
             <div class="filter-group">
@@ -498,7 +636,10 @@ require __DIR__ . '/header.php';
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 42%;">Título / Manchete</th>
+                            <th style="width: 38px; text-align: center;">
+                                <input type="checkbox" id="bulkSelectAll" title="Selecionar todas" style="cursor: pointer;">
+                            </th>
+                            <th style="width: 40%;">Título / Manchete</th>
                             <th>Autor</th>
                             <th>Categoria</th>
                             <th>Status</th>
@@ -510,13 +651,16 @@ require __DIR__ . '/header.php';
                     <tbody>
                         <?php if (empty($posts)): ?>
                             <tr>
-                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+                                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 3rem;">
                                     Nenhuma publicação encontrada com os filtros selecionados.
                                 </td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($posts as $p): ?>
                                 <tr>
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" class="js-bulk-cb" value="<?= (int)$p['id'] ?>" style="cursor: pointer;">
+                                    </td>
                                     <td>
                                         <div style="display: flex; align-items: center; gap: 0.9rem;">
                                             <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" style="flex-shrink: 0; display: block;" title="Editar publicação">
@@ -723,5 +867,78 @@ require __DIR__ . '/header.php';
                 if (btn) btn.disabled = false;
             });
         });
+
+        // Ações em Massa (Checkboxes)
+        (function () {
+            var selectAll = document.getElementById('bulkSelectAll');
+            var bulkForm = document.getElementById('bulkActionForm');
+            var countBadge = document.getElementById('bulkSelectedCount');
+            var hiddenBox = document.getElementById('bulkHiddenIds');
+
+            function syncBulkBar() {
+                var checked = Array.prototype.slice.call(document.querySelectorAll('.js-bulk-cb:checked'));
+                if (!bulkForm) return;
+                if (checked.length > 0) {
+                    bulkForm.style.display = 'flex';
+                    countBadge.textContent = checked.length + (checked.length === 1 ? ' selecionada' : ' selecionadas');
+                    hiddenBox.innerHTML = '';
+                    checked.forEach(function (cb) {
+                        var inp = document.createElement('input');
+                        inp.type = 'hidden';
+                        inp.name = 'post_ids[]';
+                        inp.value = cb.value;
+                        hiddenBox.appendChild(inp);
+                    });
+                } else {
+                    bulkForm.style.display = 'none';
+                    hiddenBox.innerHTML = '';
+                }
+            }
+
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    document.querySelectorAll('.js-bulk-cb').forEach(function (cb) {
+                        cb.checked = selectAll.checked;
+                    });
+                    syncBulkBar();
+                });
+            }
+
+            document.addEventListener('change', function (e) {
+                if (e.target && e.target.classList && e.target.classList.contains('js-bulk-cb')) {
+                    syncBulkBar();
+                }
+            });
+
+            window.confirmBulkDelete = function () {
+                var count = document.querySelectorAll('.js-bulk-cb:checked').length;
+                if (count === 0) return;
+                var doSubmit = function () {
+                    var act = document.createElement('input');
+                    act.type = 'hidden';
+                    act.name = 'bulk_action';
+                    act.value = 'delete';
+                    bulkForm.appendChild(act);
+                    bulkForm.submit();
+                };
+                if (window.LPAdmin) {
+                    window.LPAdmin.confirm(
+                        'Deseja realmente excluir as ' + count + ' publicações selecionadas? Esta ação é irreversível.',
+                        doSubmit,
+                        { title: 'Exclusão em Massa', confirmText: 'Excluir Selecionadas', danger: true }
+                    );
+                } else if (confirm('Excluir ' + count + ' publicações selecionadas?')) {
+                    doSubmit();
+                }
+            };
+
+            <?php if (!empty($_GET['bulk_ok'])): ?>
+                document.addEventListener('DOMContentLoaded', function () {
+                    if (window.LPAdmin) {
+                        window.LPAdmin.toast('Ação em massa aplicada em <?= (int)$_GET['bulk_ok'] ?> matéria(s).', 'success');
+                    }
+                });
+            <?php endif; ?>
+        })();
     </script>
 <?php require __DIR__ . '/footer.php'; ?>

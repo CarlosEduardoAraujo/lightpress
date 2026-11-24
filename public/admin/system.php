@@ -8,10 +8,40 @@ declare(strict_types=1);
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Authorization;
+use LightPress\Core\CacheManager;
 use LightPress\Core\Database;
+use LightPress\Core\Icon;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 
 $currentUser = Security::requireAuth(null, ['admin', 'editor'], $config);
+$isAdmin = ($currentUser['role'] ?? '') === 'admin';
+$purgeMessage = '';
+$purgeError = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin) {
+    $token = $_POST['_csrf_token'] ?? '';
+    if (!Security::verifyCsrfToken($token)) {
+        $purgeError = 'Token CSRF inválido. Recarregue a página e tente novamente.';
+    } else {
+        $purgeAction = Security::getSafeString($_POST, 'purge_action');
+        $cacheMgr = new CacheManager($config);
+
+        if ($purgeAction === 'global') {
+            ObjectCache::flushAll();
+            $cacheMgr->purgeUrls(['/', '/blog/', '/feed.xml', '/sitemap.xml', '/sitemap-main.xml', '/sitemap-news.xml']);
+            $purgeMessage = 'Cache global (ObjectCache + Home/Feeds/Sitemaps) purgado com sucesso!';
+        } elseif ($purgeAction === 'url') {
+            $targetUrl = trim(Security::getSafeString($_POST, 'target_url'));
+            if ($targetUrl === '' || !str_starts_with($targetUrl, '/')) {
+                $purgeError = 'Informe um caminho relativo válido começando com / (ex: /categoria/f1/).';
+            } else {
+                $cacheMgr->purgeUrls([$targetUrl]);
+                $purgeMessage = 'Purga executada para a URL: ' . $targetUrl;
+            }
+        }
+    }
+}
 
 // 1. Estatísticas do Banco de Dados
 $totalPosts = (int)(Database::fetchOne("SELECT COUNT(*) as c FROM posts")['c'] ?? 0);
@@ -106,7 +136,34 @@ require __DIR__ . '/header.php';
 </style>
 
     <div class="container">
-        <h1 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1.5rem;">Diagnóstico e Saúde da Infraestrutura</h1>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Diagnóstico e Saúde da Infraestrutura</h1>
+                <p class="page-subtitle">Monitoramento do ambiente PHP, armazenamento, segurança e cache</p>
+            </div>
+        </div>
+
+        <?php if (!empty($purgeMessage)): ?><div class="alert-success"><?= Security::e($purgeMessage) ?></div><?php endif; ?>
+        <?php if (!empty($purgeError)): ?><div class="alert-error"><?= Security::e($purgeError) ?></div><?php endif; ?>
+
+        <?php if ($isAdmin): ?>
+            <div class="card">
+                <h2 class="card-title"><?= Icon::svg('activity', '', 18) ?> Gerenciamento Rápido de Cache</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+                    <form method="POST" style="flex: 1; min-width: 280px; display: flex; gap: 0.5rem;">
+                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                        <input type="hidden" name="purge_action" value="url">
+                        <input type="text" name="target_url" class="form-input" style="flex: 1;" placeholder="Purgar URL específica (ex: /categoria/f1/ ou /minha-materia/)" required>
+                        <button type="submit" class="btn btn-secondary btn-sm">Purgar URL</button>
+                    </form>
+                    <form method="POST" data-confirm="Deseja purgar todo o ObjectCache e as rotas principais (Home, Blog, Feeds e Sitemaps)?" data-confirm-title="Purgar Cache Global" data-confirm-btn="Purgar Tudo">
+                        <input type="hidden" name="_csrf_token" value="<?= Security::e($csrfToken) ?>">
+                        <input type="hidden" name="purge_action" value="global">
+                        <button type="submit" class="btn btn-sm">Purgar Cache Global</button>
+                    </form>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <?php if ($isDefaultHmac): ?>
             <div style="background: rgba(239, 68, 68, 0.12); border: 2px solid #ef4444; color: #dc2626; border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 2rem;">

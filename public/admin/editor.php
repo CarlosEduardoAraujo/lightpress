@@ -893,13 +893,37 @@ require __DIR__ . '/header.php';
                         </div>
 
                         <div class="form-group">
-                            <label for="seo_title">Título SEO (Tag Title)</label>
-                            <input type="text" id="seo_title" name="seo_title" value="<?= Security::e($post['seo_title'] ?? '') ?>" placeholder="Título nos motores de busca (Google)">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="seo_title" style="margin-bottom: 0;">Título SEO (Tag Title)</label>
+                                <span id="seoTitleCounter" class="tabular-nums" style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">0 / 60</span>
+                            </div>
+                            <input type="text" id="seo_title" name="seo_title" value="<?= Security::e($post['seo_title'] ?? '') ?>" placeholder="Título nos motores de busca (Google)" style="margin-top: 0.35rem;">
+                            <div class="lp-progress"><div class="lp-progress-bar" id="seoTitleBar" style="width: 0%;"></div></div>
                         </div>
 
                         <div class="form-group">
-                            <label for="seo_description">Meta Description</label>
-                            <textarea id="seo_description" name="seo_description" rows="3" placeholder="Resumo de até 160 caracteres exibido na página de resultados..."><?= Security::e($post['seo_description'] ?? '') ?></textarea>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="seo_description" style="margin-bottom: 0;">Meta Description</label>
+                                <span id="seoDescCounter" class="tabular-nums" style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">0 / 160</span>
+                            </div>
+                            <textarea id="seo_description" name="seo_description" rows="3" placeholder="Resumo de até 160 caracteres exibido na página de resultados..." style="margin-top: 0.35rem;"><?= Security::e($post['seo_description'] ?? '') ?></textarea>
+                            <div class="lp-progress"><div class="lp-progress-bar" id="seoDescBar" style="width: 0%;"></div></div>
+                        </div>
+
+                        <!-- Prévia ao Vivo no Google (SERP Preview) -->
+                        <div style="background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.9rem 1rem; margin-top: 0.5rem;">
+                            <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.45rem;">
+                                Prévia no Google (SERP)
+                            </div>
+                            <div id="serpUrl" style="font-size: 0.76rem; color: var(--success-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <?= Security::e(rtrim($config['app']['url'] ?? 'https://seusite.com.br', '/')) ?>/<span id="serpSlug"><?= Security::e($post['slug'] ?? 'url-da-noticia') ?></span>/
+                            </div>
+                            <div id="serpTitle" style="font-size: 1rem; font-weight: 700; color: #1a0dab; line-height: 1.3; margin: 0.15rem 0 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                <?= Security::e(!empty($post['seo_title']) ? $post['seo_title'] : ($post['title'] ?? 'Título da sua matéria aparecerá aqui')) ?>
+                            </div>
+                            <div id="serpDesc" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                <?= Security::e(!empty($post['seo_description']) ? $post['seo_description'] : ($post['summary'] ?? 'A descrição ou resumo da matéria exibida nos resultados de busca aparecerá aqui.')) ?>
+                            </div>
                         </div>
                     </div>
 
@@ -2400,6 +2424,159 @@ require __DIR__ . '/header.php';
             }
             return false;
         }
+
+        // =========================================================
+        // SERP Preview & Contadores de SEO ao Vivo
+        // =========================================================
+        (function () {
+            var titleEl = document.getElementById('title');
+            var slugEl = document.getElementById('slug');
+            var summaryEl = document.getElementById('summary');
+            var seoTitleEl = document.getElementById('seo_title');
+            var seoDescEl = document.getElementById('seo_description');
+
+            var titleCounter = document.getElementById('seoTitleCounter');
+            var titleBar = document.getElementById('seoTitleBar');
+            var descCounter = document.getElementById('seoDescCounter');
+            var descBar = document.getElementById('seoDescBar');
+
+            var serpTitle = document.getElementById('serpTitle');
+            var serpSlug = document.getElementById('serpSlug');
+            var serpDesc = document.getElementById('serpDesc');
+
+            function updateSeoWidgets() {
+                var effectiveTitle = (seoTitleEl && seoTitleEl.value.trim()) ? seoTitleEl.value.trim() : (titleEl ? titleEl.value.trim() : '');
+                var effectiveDesc = (seoDescEl && seoDescEl.value.trim()) ? seoDescEl.value.trim() : (summaryEl ? summaryEl.value.trim() : '');
+                var effectiveSlug = (slugEl && slugEl.value.trim()) ? slugEl.value.trim() : 'url-da-noticia';
+
+                var tLen = effectiveTitle.length;
+                if (titleCounter && titleBar) {
+                    titleCounter.textContent = tLen + ' / 60';
+                    var tPct = Math.min(100, Math.round((tLen / 60) * 100));
+                    titleBar.style.width = tPct + '%';
+                    if (tLen === 0) {
+                        titleBar.style.background = 'var(--border-strong)';
+                        titleCounter.style.color = 'var(--text-muted)';
+                    } else if (tLen >= 35 && tLen <= 60) {
+                        titleBar.style.background = 'var(--success)';
+                        titleCounter.style.color = 'var(--success-text)';
+                    } else if (tLen <= 70) {
+                        titleBar.style.background = 'var(--warning)';
+                        titleCounter.style.color = 'var(--warning-text)';
+                    } else {
+                        titleBar.style.background = 'var(--danger)';
+                        titleCounter.style.color = 'var(--danger-text)';
+                    }
+                }
+
+                var dLen = effectiveDesc.length;
+                if (descCounter && descBar) {
+                    descCounter.textContent = dLen + ' / 160';
+                    var dPct = Math.min(100, Math.round((dLen / 160) * 100));
+                    descBar.style.width = dPct + '%';
+                    if (dLen === 0) {
+                        descBar.style.background = 'var(--border-strong)';
+                        descCounter.style.color = 'var(--text-muted)';
+                    } else if (dLen >= 100 && dLen <= 160) {
+                        descBar.style.background = 'var(--success)';
+                        descCounter.style.color = 'var(--success-text)';
+                    } else if (dLen <= 175) {
+                        descBar.style.background = 'var(--warning)';
+                        descCounter.style.color = 'var(--warning-text)';
+                    } else {
+                        descBar.style.background = 'var(--danger)';
+                        descCounter.style.color = 'var(--danger-text)';
+                    }
+                }
+
+                if (serpTitle) serpTitle.textContent = effectiveTitle || 'Título da sua matéria aparecerá aqui';
+                if (serpSlug) serpSlug.textContent = effectiveSlug;
+                if (serpDesc) serpDesc.textContent = effectiveDesc || 'A descrição ou resumo da matéria exibida nos resultados de busca aparecerá aqui.';
+            }
+
+            [titleEl, slugEl, summaryEl, seoTitleEl, seoDescEl].forEach(function (el) {
+                if (el) el.addEventListener('input', updateSeoWidgets);
+            });
+            updateSeoWidgets();
+        })();
+
+        // =========================================================
+        // Auto-Save Local de Segurança (localStorage)
+        // =========================================================
+        (function () {
+            var postId = <?= (int)($post['id'] ?? 0) ?>;
+            var storageKey = 'lp_autosave_post_' + postId;
+            var form = document.querySelector('form[method="POST"]');
+            var titleEl = document.getElementById('title');
+            var summaryEl = document.getElementById('summary');
+            var canvasEl = document.getElementById('editorCanvas');
+            if (!form || !titleEl || !canvasEl) return;
+
+            var initialSnapshot = JSON.stringify({
+                title: titleEl.value,
+                summary: summaryEl ? summaryEl.value : '',
+                html: canvasEl.innerHTML
+            });
+
+            try {
+                var savedRaw = localStorage.getItem(storageKey);
+                if (savedRaw) {
+                    var saved = JSON.parse(savedRaw);
+                    var currentSnap = JSON.stringify({ title: saved.title || '', summary: saved.summary || '', html: saved.html || '' });
+                    if (saved && currentSnap !== initialSnapshot && (saved.title || saved.html)) {
+                        var banner = document.createElement('div');
+                        banner.className = 'alert-warning';
+                        banner.style.justifyContent = 'space-between';
+                        banner.style.flexWrap = 'wrap';
+                        banner.innerHTML =
+                            '<span>Rascunho local salvo automaticamente em <strong>' + (saved.time || '') + '</strong> foi encontrado.</span>' +
+                            '<span style="display:inline-flex; gap:0.5rem;">' +
+                                '<button type="button" class="btn btn-sm" id="lpRestoreLocalBtn">Restaurar</button>' +
+                                '<button type="button" class="btn btn-secondary btn-sm" id="lpDiscardLocalBtn">Descartar</button>' +
+                            '</span>';
+                        form.parentNode.insertBefore(banner, form);
+
+                        document.getElementById('lpRestoreLocalBtn').onclick = function () {
+                            if (saved.title) titleEl.value = saved.title;
+                            if (summaryEl && typeof saved.summary === 'string') summaryEl.value = saved.summary;
+                            if (typeof saved.html === 'string') canvasEl.innerHTML = saved.html;
+                            banner.remove();
+                            if (window.LPAdmin) window.LPAdmin.toast('Rascunho local restaurado!', 'success');
+                        };
+                        document.getElementById('lpDiscardLocalBtn').onclick = function () {
+                            localStorage.removeItem(storageKey);
+                            banner.remove();
+                        };
+                    }
+                }
+            } catch (e) {}
+
+            var saveTimer = null;
+            function scheduleLocalSave() {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    try {
+                        var now = new Date();
+                        var hh = String(now.getHours()).padStart(2, '0');
+                        var mm = String(now.getMinutes()).padStart(2, '0');
+                        localStorage.setItem(storageKey, JSON.stringify({
+                            title: titleEl.value,
+                            summary: summaryEl ? summaryEl.value : '',
+                            html: canvasEl.innerHTML,
+                            time: hh + ':' + mm
+                        }));
+                    } catch (e) {}
+                }, 2500);
+            }
+
+            titleEl.addEventListener('input', scheduleLocalSave);
+            if (summaryEl) summaryEl.addEventListener('input', scheduleLocalSave);
+            canvasEl.addEventListener('input', scheduleLocalSave);
+
+            form.addEventListener('submit', function () {
+                try { localStorage.removeItem(storageKey); } catch (e) {}
+            });
+        })();
 
         </script>
 <?php require __DIR__ . '/footer.php'; ?>

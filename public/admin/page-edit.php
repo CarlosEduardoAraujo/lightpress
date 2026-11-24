@@ -1620,5 +1620,76 @@ require __DIR__ . '/header.php';
             document.getElementById('featuredPreviewImg').src = '';
             document.getElementById('featuredPreviewBox').style.display = 'none';
         }
+
+        // Auto-Save Local de Segurança (localStorage)
+        (function () {
+            var pageId = <?= (int)($page['id'] ?? 0) ?>;
+            var storageKey = 'lp_autosave_page_' + pageId;
+            var form = document.querySelector('form[method="POST"]');
+            var titleEl = document.getElementById('title');
+            var canvasEl = document.getElementById('editorCanvas');
+            if (!form || !titleEl || !canvasEl) return;
+
+            var initialSnapshot = JSON.stringify({
+                title: titleEl.value,
+                html: canvasEl.innerHTML
+            });
+
+            try {
+                var savedRaw = localStorage.getItem(storageKey);
+                if (savedRaw) {
+                    var saved = JSON.parse(savedRaw);
+                    var currentSnap = JSON.stringify({ title: saved.title || '', html: saved.html || '' });
+                    if (saved && currentSnap !== initialSnapshot && (saved.title || saved.html)) {
+                        var banner = document.createElement('div');
+                        banner.className = 'alert-warning';
+                        banner.style.justifyContent = 'space-between';
+                        banner.style.flexWrap = 'wrap';
+                        banner.innerHTML =
+                            '<span>Rascunho local salvo automaticamente em <strong>' + (saved.time || '') + '</strong> foi encontrado.</span>' +
+                            '<span style="display:inline-flex; gap:0.5rem;">' +
+                                '<button type="button" class="btn btn-sm" id="lpRestoreLocalPageBtn">Restaurar</button>' +
+                                '<button type="button" class="btn btn-secondary btn-sm" id="lpDiscardLocalPageBtn">Descartar</button>' +
+                            '</span>';
+                        form.parentNode.insertBefore(banner, form);
+
+                        document.getElementById('lpRestoreLocalPageBtn').onclick = function () {
+                            if (saved.title) titleEl.value = saved.title;
+                            if (typeof saved.html === 'string') canvasEl.innerHTML = saved.html;
+                            banner.remove();
+                            if (window.LPAdmin) window.LPAdmin.toast('Rascunho local restaurado!', 'success');
+                        };
+                        document.getElementById('lpDiscardLocalPageBtn').onclick = function () {
+                            localStorage.removeItem(storageKey);
+                            banner.remove();
+                        };
+                    }
+                }
+            } catch (e) {}
+
+            var saveTimer = null;
+            function scheduleLocalSave() {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(function () {
+                    try {
+                        var now = new Date();
+                        var hh = String(now.getHours()).padStart(2, '0');
+                        var mm = String(now.getMinutes()).padStart(2, '0');
+                        localStorage.setItem(storageKey, JSON.stringify({
+                            title: titleEl.value,
+                            html: canvasEl.innerHTML,
+                            time: hh + ':' + mm
+                        }));
+                    } catch (e) {}
+                }, 2500);
+            }
+
+            titleEl.addEventListener('input', scheduleLocalSave);
+            canvasEl.addEventListener('input', scheduleLocalSave);
+
+            form.addEventListener('submit', function () {
+                try { localStorage.removeItem(storageKey); } catch (e) {}
+            });
+        })();
     </script>
 <?php require __DIR__ . '/footer.php'; ?>

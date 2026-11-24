@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Produtividade Editorial, Ações em Massa, Purga Manual e SEO ao Vivo (`public/admin`) — 2026-11-24
+
+- **Dashboard Editorial (`public/admin/dashboard.php`):**
+  - **Abas Rápidas de Status (Pills):** Adicionada barra de *pills* clicáveis acima da tabela (*Todas*, *Publicadas*, *Agendadas*, *Rascunhos*, *Em Revisão* e *Destaques*) com contadores dinâmicos.
+  - **Ações em Massa (Bulk Actions):** Seleção múltipla via checkboxes com barra contextual para **Publicar**, **Mover para Rascunho**, **Alterar Categoria** ou **Excluir Selecionadas** (com modal `LPAdmin.confirm`), respeitando `Authorization::can()` por item, executando em `Database::transaction()` e realizando purga única consolidada de cache.
+- **Purga Manual de Cache (`public/admin/system.php`):**
+  - Adicionado card *"Gerenciamento Rápido de Cache"* restrito a administradores (com proteção CSRF) para purgar URLs específicas ou executar purga global (`ObjectCache::flushAll()` + Home, Blog, Feeds e Sitemaps).
+- **Auto-Save Local de Segurança (`public/admin/editor.php`, `public/admin/page-edit.php`):**
+  - Salvamento automático contínuo em `localStorage` (`lp_autosave_post_{id}` / `lp_autosave_page_{id}`) com banner de recuperação (*Restaurar* / *Descartar*) ao detectar alterações não salvas e limpeza automática ao salvar o formulário.
+- **SERP Preview & Contadores de SEO ao Vivo (`public/admin/editor.php`):**
+  - Contadores dinâmicos com barra de progresso colorida para **Título SEO** (60 caracteres) e **Meta Description** (160 caracteres), além de prévia instantânea do snippet no Google.
+
 ### Modernização Visual, Sidebar Lateral e Dinamismo do Painel Administrativo (`public/admin`) — 2026-11-24
 
 - **Design System Centralizado e Ultraleve (`public/assets/admin/admin.css`, `public/assets/admin/admin.js`):**
