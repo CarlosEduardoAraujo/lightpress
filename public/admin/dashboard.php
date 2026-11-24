@@ -608,13 +608,20 @@ require __DIR__ . '/header.php';
                                     </td>
                                     <td style="text-align: right; white-space: nowrap;">
                                         <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
-                                            <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm" style="background: var(--primary-light); color: var(--primary-accent);" title="Editar publicação">
+                                            <a href="/admin/editor.php?id=<?= (int)$p['id'] ?>" class="btn btn-sm btn-icon" style="background: var(--warning-bg); color: var(--warning-text);" title="Editar publicação" aria-label="Editar publicação">
                                                 <?= \LightPress\Core\Icon::svg('edit', '', 14) ?>
-                                                <span>Editar</span>
                                             </a>
 
+                                            <button type="button"
+                                                    class="btn btn-secondary btn-sm btn-icon"
+                                                    onclick="LPAdmin.copyText(window.location.origin + '/<?= Security::e($p['slug']) ?>/', 'URL da matéria copiada!')"
+                                                    title="Copiar URL completa"
+                                                    aria-label="Copiar URL completa">
+                                                <?= \LightPress\Core\Icon::svg('copy', '', 14) ?>
+                                            </button>
+
                                             <?php if ($isPub): ?>
-                                                <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="btn btn-secondary btn-sm btn-icon" title="Ver publicação no site">
+                                                <a href="/<?= Security::e($p['slug']) ?>/" target="_blank" class="btn btn-secondary btn-sm btn-icon" title="Ver publicação no site" aria-label="Ver publicação no site">
                                                     <?= \LightPress\Core\Icon::svg('open_in_new', '', 14) ?>
                                                 </a>
                                             <?php endif; ?>
