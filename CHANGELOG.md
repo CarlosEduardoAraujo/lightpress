@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Correção de Quebras de Linha ao Colar e Salvar no Editor Mobile (`public/admin/editor.php`) — 2026-11-26
+
+- **Preservação de Parágrafos em Texto Puro (`text/plain`):**
+  - Alterado o manipulador `paste` de `#editorCanvas` em `public/admin/editor.php` para converter cada linha não vazia (incluindo quebras simples `\n` vindas de apps móveis, notas e área de transferência do Chrome/Firefox no celular) em um parágrafo `<p>...</p>` próprio, em vez de fundir linhas consecutivas com espaços (`cur.join(' ')`).
+- **Preservação de Quebras em HTML Móvel (`cleanWordOrDocsHtml`):**
+  - Adicionada conversão prévia de `\r?\n` para `<br>` em elementos `<pre>`, blocos com `white-space: pre` / `pre-wrap` / `pre-line` / `break-spaces` e trechos HTML sem tags de bloco.
+  - Substituída a remoção sumária de `<br>` filhos diretos de `doc.body` pelo agrupamento automático de nós inline e texto solto na raiz em elementos `<p>...</p>` separados por `<br>`.
+  - Incluídas as tags `CITE`, `PICTURE` e `SOURCE` em `allowedTags` para alinhamento com `BlockCompiler::sanitizeHtml()`.
+- **Inserção Resiliente no Mobile e Normalização no Envio (`insertHtmlAtCursor`, `handleFormSubmit`):**
+  - Criado o helper `insertHtmlAtCursor()`, que restaura foco e `Selection`/`Range` após limpar o canvas vazio, usa `document.execCommand('insertHTML')` com fallback direto via DOM (`Range.insertNode` / `appendChild`) e dispara evento `input` para atualizar contador de palavras e auto-save local.
+  - Em `handleFormSubmit()`, quando no modo visual, o conteúdo de `#editorCanvas` passa por `cleanWordOrDocsHtml()` antes do envio, convertendo eventuais `<div>` e `<br>` gerados pelo `contenteditable` móvel em `<p>` para que `BlockCompiler::sanitizeHtml()` preserve integralmente os parágrafos no servidor.
+
 ### Blindagem de Datas Nulas/Inválidas nos Templates de Artigo (`templates/post.php`, `themes/portal-noticias/post.php`) — 2026-11-25
 
 - **Prevenção de `TypeError` em `strtotime()` e `date()` no PHP 8.4+:**

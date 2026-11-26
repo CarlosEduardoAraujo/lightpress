@@ -1299,6 +1299,57 @@ require __DIR__ . '/header.php';
             }
         }
 
+        function insertHtmlAtCursor(html) {
+            if (!html) return;
+            editorCanvas.focus();
+            var sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0 || !editorCanvas.contains(sel.anchorNode)) {
+                var range = document.createRange();
+                range.selectNodeContents(editorCanvas);
+                range.collapse(false);
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
+
+            var before = editorCanvas.innerHTML;
+            var inserted = false;
+            try {
+                inserted = document.execCommand('insertHTML', false, html);
+            } catch (e) {
+                inserted = false;
+            }
+
+            if (!inserted && editorCanvas.innerHTML === before) {
+                var temp = document.createElement('div');
+                temp.innerHTML = html;
+                var frag = document.createDocumentFragment();
+                var lastNode = null;
+                while (temp.firstChild) {
+                    lastNode = temp.firstChild;
+                    frag.appendChild(lastNode);
+                }
+                sel = window.getSelection();
+                if (sel && sel.rangeCount > 0 && editorCanvas.contains(sel.anchorNode)) {
+                    var r = sel.getRangeAt(0);
+                    r.deleteContents();
+                    r.insertNode(frag);
+                    if (lastNode) {
+                        r.setStartAfter(lastNode);
+                        r.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(r);
+                    }
+                } else {
+                    editorCanvas.appendChild(frag);
+                }
+            }
+
+            ensureCursorAfterTable(editorCanvas);
+            editorCanvas.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
         editorCanvas.addEventListener('paste', function(e) {
             e.preventDefault();
             var clipboardData = e.clipboardData || window.clipboardData;
@@ -1335,8 +1386,7 @@ require __DIR__ . '/header.php';
                 try {
                     var cleanHtml = cleanWordOrDocsHtml(html);
                     if (cleanHtml && cleanHtml.trim() !== '') {
-                        document.execCommand('insertHTML', false, cleanHtml);
-                        ensureCursorAfterTable(editorCanvas);
+                        insertHtmlAtCursor(cleanHtml);
                         return;
                     }
                 } catch (err) {
@@ -1347,22 +1397,12 @@ require __DIR__ . '/header.php';
             if (text && text.trim() !== '') {
                 var lines = text.split(/\r?\n/).map(function(l) { return l.trim(); });
                 var paragraphs = [];
-                var cur = [];
                 for (var i = 0; i < lines.length; i++) {
-                    if (lines[i] === '') {
-                        if (cur.length > 0) {
-                            paragraphs.push('<p>' + escapeHtml(cur.join(' ')) + '</p>');
-                            cur = [];
-                        }
-                    } else {
-                        cur.push(lines[i]);
+                    if (lines[i] !== '') {
+                        paragraphs.push('<p>' + escapeHtml(lines[i]) + '</p>');
                     }
                 }
-                if (cur.length > 0) {
-                    paragraphs.push('<p>' + escapeHtml(cur.join(' ')) + '</p>');
-                }
-                document.execCommand('insertHTML', false, paragraphs.join('') || escapeHtml(text));
-                ensureCursorAfterTable(editorCanvas);
+                insertHtmlAtCursor(paragraphs.join('') || ('<p>' + escapeHtml(text.trim()) + '</p>'));
             }
         });
 
@@ -1407,15 +1447,50 @@ require __DIR__ . '/header.php';
             var doc = new DOMParser().parseFromString(html, 'text/html');
             if (!doc || !doc.body) return '';
 
+            // 1.5 Preservar quebras de linha (\n) de <pre>, white-space: pre/pre-wrap ou HTML sem blocos (comum no mobile)
+            function convertNewlinesToBrInElement(rootEl) {
+                var walker = doc.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null, false);
+                var textNodes = [];
+                var tn;
+                while ((tn = walker.nextNode())) {
+                    if (tn.nodeValue && /\r?\n/.test(tn.nodeValue)) {
+                        textNodes.push(tn);
+                    }
+                }
+                textNodes.forEach(function(textNode) {
+                    var parts = textNode.nodeValue.split(/\r?\n/);
+                    var frag = doc.createDocumentFragment();
+                    for (var idx = 0; idx < parts.length; idx++) {
+                        if (idx > 0) frag.appendChild(doc.createElement('br'));
+                        if (parts[idx] !== '') frag.appendChild(doc.createTextNode(parts[idx]));
+                    }
+                    if (textNode.parentNode) {
+                        textNode.parentNode.replaceChild(frag, textNode);
+                    }
+                });
+            }
+
+            var hasAnyBlock = doc.body.querySelector('p, div, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, table, section, article, main, figure');
+            if (!hasAnyBlock) {
+                convertNewlinesToBrInElement(doc.body);
+            } else {
+                doc.body.querySelectorAll('pre, [style*="white-space"]').forEach(function(el) {
+                    var ws = (el.tagName === 'PRE') ? 'pre' : (el.style && el.style.whiteSpace ? el.style.whiteSpace.toLowerCase() : '');
+                    if (ws === 'pre' || ws === 'pre-wrap' || ws === 'break-spaces' || ws === 'pre-line') {
+                        convertNewlinesToBrInElement(el);
+                    }
+                });
+            }
+
             // 2. Remover tags indesejadas remanescentes (incluindo colgroup e col de planilhas)
             var badTags = doc.querySelectorAll('script, style, meta, link, o\\:p, xml, font, colgroup, col');
             badTags.forEach(function(el) { el.remove(); });
 
             var allowedTags = [
                 'P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'S',
-                'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'IMG', 'FIGURE', 'FIGCAPTION',
-                'BR', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD', 'CAPTION',
-                'IFRAME'
+                'BLOCKQUOTE', 'CITE', 'UL', 'OL', 'LI', 'A', 'IMG', 'PICTURE', 'SOURCE',
+                'FIGURE', 'FIGCAPTION', 'BR', 'HR', 'TABLE', 'THEAD', 'TBODY', 'TFOOT',
+                'TR', 'TH', 'TD', 'CAPTION', 'IFRAME'
             ];
 
             function cleanNode(node) {
@@ -1626,6 +1701,42 @@ require __DIR__ . '/header.php';
 
             cleanNode(doc.body);
 
+            // 2.5 Agrupar nós inline e texto solto na raiz em parágrafos <p>, convertendo <br> de nível raiz em quebras de parágrafo
+            (function wrapTopLevelInlineRuns() {
+                var blockTags = ['P', 'H2', 'H3', 'H4', 'BLOCKQUOTE', 'UL', 'OL', 'TABLE', 'FIGURE', 'HR'];
+                var topNodes = Array.from(doc.body.childNodes);
+                var currentP = null;
+
+                topNodes.forEach(function(child) {
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        var tName = child.tagName.toUpperCase();
+                        if (blockTags.includes(tName)) {
+                            currentP = null;
+                            return;
+                        }
+                        if (tName === 'BR') {
+                            doc.body.removeChild(child);
+                            currentP = null;
+                            return;
+                        }
+                    } else if (child.nodeType === Node.TEXT_NODE) {
+                        if (!currentP && /^[\s\r\n]+$/.test(child.nodeValue || '')) {
+                            doc.body.removeChild(child);
+                            return;
+                        }
+                    } else {
+                        doc.body.removeChild(child);
+                        return;
+                    }
+
+                    if (!currentP) {
+                        currentP = doc.createElement('p');
+                        doc.body.insertBefore(currentP, child);
+                    }
+                    currentP.appendChild(child);
+                });
+            })();
+
             // 3. Promoção automática de cabeçalho para planilhas (Excel / Google Sheets)
             var tables = Array.from(doc.querySelectorAll('table'));
             tables.forEach(function(table) {
@@ -1790,6 +1901,11 @@ require __DIR__ . '/header.php';
                 var jsonInput = document.getElementById('contentJsonInput');
                 if (jsonInput) {
                     jsonInput.value = '[]';
+                }
+            } else if (!isSourceMode) {
+                var normalized = cleanWordOrDocsHtml(html);
+                if (normalized && normalized.trim() !== '') {
+                    html = normalized;
                 }
             }
             document.getElementById('contentHtmlInput').value = html;
