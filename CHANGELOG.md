@@ -7,6 +7,13 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Blindagem de Datas Nulas/Inválidas nos Templates de Artigo (`templates/post.php`, `themes/portal-noticias/post.php`) — 2026-11-25
+
+- **Prevenção de `TypeError` em `strtotime()` e `date()` no PHP 8.4+:**
+  - Adicionado fallback seguro `strtotime($dateStr) ?: time()` dentro do bloco `catch (\Throwable)` de `$formatPtFullDate` em `templates/post.php` e `themes/portal-noticias/post.php`, evitando falha fatal caso uma data malformada faça `strtotime()` retornar `false`.
+  - Protegido o atributo `<time datetime="...">` com `Security::e((string)($post['published_at'] ?? ''))` e `$post['published_at'] ?? null` na chamada de `$formatPtFullDate`, garantindo segurança na renderização de prévias de rascunhos sem `published_at`.
+  - Blindada a exibição de data nas matérias relacionadas com `strtotime((string)($rel['published_at'] ?? '')) ?: time()`.
+
 ### Remediação da Auditoria de Segurança e Performance (`AUDITORIAS/20261125-gh-anti.md` — Fases 1 e 2) — 2026-11-25
 
 - **Endurecimento de `<iframe>` no Compilador (`core/BlockCompiler.php` — SEC-01):**

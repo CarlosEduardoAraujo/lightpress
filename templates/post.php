@@ -24,7 +24,7 @@ $formatPtFullDate = function(?string $dateStr) use ($ptMonths, $config): string 
         $h = $dt->format('H:i');
         return sprintf('%02d de %s de %d às %s', $d, $m, $y, $h);
     } catch (\Throwable) {
-        $t = strtotime($dateStr);
+        $t = strtotime($dateStr) ?: time();
         $d = date('j', $t);
         $m = $ptMonths[(int)date('n', $t)] ?? date('m', $t);
         $y = date('Y', $t);
@@ -117,7 +117,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                 <span title="Jornalista Verificado SpeedRacing"><?= Icon::svg('verified', 'text-flag-green', 15) ?></span>
                             </div>
                             <div class="flex items-center gap-2 text-label-meta font-label-meta text-secondary dark:text-secondary-fixed-dim">
-                                <time datetime="<?= $post['published_at'] ?>"><?= $formatPtFullDate($post['published_at']) ?></time>
+                                <time datetime="<?= Security::e((string)($post['published_at'] ?? '')) ?>"><?= $formatPtFullDate($post['published_at'] ?? null) ?></time>
                                 <span>•</span>
                                 <span class="flex items-center gap-1 text-carbon-black dark:text-pure-white">
                                     <?= Icon::svg('schedule', 'text-carbon-black dark:text-pure-white', 14) ?> <?= (int)($readingTime ?? 3) ?> min de leitura
@@ -287,7 +287,7 @@ $primarySubtopic = !empty($tagsList[0]) ? $tagsList[0] : $post['category'];
                                         <?= Security::e($rel['title']) ?>
                                     </h5>
                                     <span class="text-[11px] font-label-meta text-secondary dark:text-secondary-fixed-dim">
-                                        <?= date('d/m/Y', strtotime($rel['published_at'])) ?>
+                                        <?= date('d/m/Y', strtotime((string)($rel['published_at'] ?? '')) ?: time()) ?>
                                     </span>
                                 </div>
                             </a>
