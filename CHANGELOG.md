@@ -18,10 +18,12 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **Validação *Fail-Fast* de `encryption_key` em Produção (`config.php`, `core/bootstrap.php`, `core/Settings.php`, `bin/setup.php` — SEC-03):**
   - Definido o placeholder explícito `'MUDAESSAINFORMACAOANTESDESUBIROSITE'` em `config.php`, tratado como chave não configurada (`null`) em `Settings::init()`, `Settings::getEncryptionKey()` e `bin/setup.php`.
   - `core/bootstrap.php` bloqueia o boot HTTP em `production` (HTTP 500) se `security.encryption_key` estiver ausente, menor que 32 caracteres ou igual ao placeholder; `Settings::encryptValue()` lança `RuntimeException` em produção sem chave válida.
-- **Rate Limit Secundário por Conta no Login (`public/admin/login.php` — SEC-05):**
-  - Adicionado controle secundário por identificador de conta (`scope: 'login_acct'`) para mitigar ataques distribuídos de *password spraying* (a adoção do prefixo `__Host-` no cookie de sessão permanece documentada para estudo futuro).
-- **Supply Chain no CI (`.github/workflows/ci.yml` — SEC-06):**
-  - Fixada a versão `2.1.0` do `phpstan.phar` com verificação `sha256sum -c` antes da execução da análise estática nível 8.
+- **Cookie de Sessão `__Host-` e Rate Limit Secundário por Conta (`core/Security.php`, `public/admin/login.php` — SEC-05):**
+  - Aplicado automaticamente o prefixo `__Host-` ao cookie de sessão em HTTPS via `Security::resolveSessionName()` (`__Host-LIGHTPRESSSESSID`).
+  - Adicionado controle secundário por identificador de conta (`scope: 'login_acct'`) para mitigar ataques distribuídos de *password spraying*.
+- **Supply Chain e Cobertura PHPStan Nível 8 no CI (`.github/workflows/ci.yml`, `phpstan.neon`, `phpstan-baseline.neon` — SEC-06):**
+  - Fixada a versão `2.1.0` do `phpstan.phar` com checksum SHA256 verificado (`a9293d0e8ce2002a0de970e93ae505a0ce18070e52316764b76d84134751cafd`).
+  - Expandido o escopo de `phpstan.neon` (nível 8) para incluir `public/` e `themes/`, com `phpstan-baseline.neon` regenerado para a versão `2.1.0`.
 - **Cacheamento de Listagens Paginadas e Redução de DDL no Runtime (`public/index.php`, `core/Settings.php`, `core/PostService.php` — PERF-01 / PERF-02 cache / PERF-03):**
   - Adicionado `ObjectCache::remember(..., 300, ..., 'posts')` para `cat_total:{$categorySlug}`, páginas `2..5` de `/page/{page}/`, `/blog/page/{page}/`, `/categoria/{slug}/` e `/categoria/{slug}/page/{page}/`, além de `/tag/{tag}/` e `/tag/{tag}/page/{page}/` (páginas `1..5`), mantendo preservado o teto de paginação `100000`.
   - Adicionada guarda estática `$tableChecked` em `Settings::ensureTable()` e restringida a verificação `ensureScheduledEnumSupported()` em `PostService::__construct()` ao contexto `PHP_SAPI === 'cli'`.

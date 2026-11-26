@@ -142,7 +142,8 @@ class Security
             }
         }
 
-        $sessionName = $cfg['security']['session_name'] ?? 'LIGHTPRESSSESSID';
+        $baseSessionName = (string)($cfg['security']['session_name'] ?? 'LIGHTPRESSSESSID');
+        $sessionName = self::resolveSessionName($baseSessionName, $isHttps);
         $lifetime = $cfg['security']['session_lifetime'] ?? 86400;
 
         session_name($sessionName);
@@ -157,6 +158,18 @@ class Security
             'use_strict_mode' => true,   // Rejeita sessões não inicializadas pelo servidor
             'use_only_cookies' => true,
         ]);
+    }
+
+    /**
+     * Resolve o nome do cookie de sessão aplicando o prefixo __Host- em HTTPS.
+     */
+    public static function resolveSessionName(string $baseName, bool $isHttps): string
+    {
+        $trimmed = trim($baseName) !== '' ? trim($baseName) : 'LIGHTPRESSSESSID';
+        if ($isHttps && !str_starts_with($trimmed, '__Host-')) {
+            return '__Host-' . $trimmed;
+        }
+        return $trimmed;
     }
 
     /**

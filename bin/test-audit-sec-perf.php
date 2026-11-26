@@ -108,5 +108,20 @@ assertAuditTest(
     Security::checkLoginRateLimit($acctKey, 3, 60, 'login_acct') === null
 );
 
+// 4. SEC-05: Prefixo __Host- no cookie de sessão em HTTPS
+echo "\n[4] SEC-05: Prefixo __Host- em HTTPS\n";
+assertAuditTest(
+    'resolveSessionName() adiciona prefixo __Host- em HTTPS',
+    Security::resolveSessionName('LIGHTPRESSSESSID', true) === '__Host-LIGHTPRESSSESSID'
+);
+assertAuditTest(
+    'resolveSessionName() não duplica prefixo __Host- se já presente',
+    Security::resolveSessionName('__Host-LIGHTPRESSSESSID', true) === '__Host-LIGHTPRESSSESSID'
+);
+assertAuditTest(
+    'resolveSessionName() mantém nome padrão em HTTP local',
+    Security::resolveSessionName('LIGHTPRESSSESSID', false) === 'LIGHTPRESSSESSID'
+);
+
 echo "\nResultado: {$passed} passaram, {$failed} falharam.\n";
 exit($failed > 0 ? 1 : 0);

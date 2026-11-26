@@ -19,6 +19,30 @@ parameters:
 			path: core/Authorization.php
 
 		-
+			message: '#^Call to an undefined method DOMNode\:\:hasAttribute\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Call to an undefined method DOMNode\:\:setAttribute\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Cannot call method createElement\(\) on DOMDocument\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Cannot cast array\<mixed\>\|string to string\.$#'
+			identifier: cast.string
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
 			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compile\(\) has parameter \$input with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -61,8 +85,20 @@ parameters:
 			path: core/BlockCompiler.php
 
 		-
-			message: '#^Variable \$webpSrcset in empty\(\) always exists and is not falsy\.$#'
-			identifier: empty.variable
+			message: '#^Method LightPress\\Core\\BlockCompiler\:\:compileVideo\(\) has parameter \$block with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: core/BlockCompiler.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_intersect expects array, list\<string\>\|false given\.$#'
+			identifier: argument.type
 			count: 1
 			path: core/BlockCompiler.php
 
@@ -181,7 +217,7 @@ parameters:
 			path: core/ImageProcessor.php
 
 		-
-			message: '#^Method LightPress\\Core\\ImageProcessor\:\:getResponsiveCardData\(\) should return array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\} but returns non\-empty\-array\<mixed\>\.$#'
+			message: '#^Method LightPress\\Core\\ImageProcessor\:\:getResponsiveCardData\(\) should return array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\} but returns non\-empty\-array\.$#'
 			identifier: return.type
 			count: 1
 			path: core/ImageProcessor.php
@@ -253,7 +289,7 @@ parameters:
 			path: core/ImageProcessor.php
 
 		-
-			message: '#^Static property LightPress\\Core\\ImageProcessor\:\:\$memoryCardCache \(array\<string, array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\}\>\) does not accept non\-empty\-array\<string, non\-empty\-array\<mixed\>\>\.$#'
+			message: '#^Static property LightPress\\Core\\ImageProcessor\:\:\$memoryCardCache \(array\<string, array\{src\: string, srcset\: string, sizes\: string, alt\: string, title\: string\}\>\) does not accept non\-empty\-array\<string, array\>\.$#'
 			identifier: assign.propertyType
 			count: 1
 			path: core/ImageProcessor.php
@@ -571,12 +607,6 @@ parameters:
 			path: plugins/api-publisher/src/ApiPublisherService.php
 
 		-
-			message: '#^Match arm comparison between 4 and 4 is always true\.$#'
-			identifier: match.alwaysTrue
-			count: 1
-			path: plugins/api-publisher/src/MarkdownParser.php
-
-		-
 			message: '#^Method LightPress\\Plugin\\RedisCachePro\\AlertService\:\:dispatch\(\) has parameter \$settings with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -631,13 +661,13 @@ parameters:
 			path: plugins/redis-cache-pro/src/QueryProfiler.php
 
 		-
-			message: '#^Method LightPress\\Plugin\\RedisCachePro\\QueryProfiler\:\:getLogs\(\) should return array\<int, array\{command\: string, key\: string, caller\: string, duration\: float, status\: string, time\: float\}\> but returns non\-empty\-list\<array\<mixed, mixed\>\>\.$#'
+			message: '#^Method LightPress\\Plugin\\RedisCachePro\\QueryProfiler\:\:getLogs\(\) should return array\<int, array\{command\: string, key\: string, caller\: string, duration\: float, status\: string, time\: float\}\> but returns non\-empty\-list\<array\<mixed\>\>\.$#'
 			identifier: return.type
 			count: 1
 			path: plugins/redis-cache-pro/src/QueryProfiler.php
 
 		-
-			message: '#^Offset ''function'' on array\{function\: string, line\?\: int, file\?\: string, class\?\: class\-string, type\?\: ''\-\>''\|''\:\:'', args\?\: list\<mixed\>, object\?\: object\} on left side of \?\? always exists and is not nullable\.$#'
+			message: '#^Offset ''function'' on array\{function\: string, line\?\: int, file\?\: string, class\?\: class\-string, type\?\: ''\-\>''\|''\:\:'', args\?\: array\<mixed\>, object\?\: object\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: plugins/redis-cache-pro/src/QueryProfiler.php
@@ -769,12 +799,6 @@ parameters:
 			path: plugins/redis-cache-pro/src/RedisClient.php
 
 		-
-			message: '#^Right side of && is always true\.$#'
-			identifier: booleanAnd.rightAlwaysTrue
-			count: 1
-			path: plugins/redis-cache-pro/src/RedisClient.php
-
-		-
 			message: '#^Method WebhookSenderService\:\:buildPayload\(\) has parameter \$config with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -799,7 +823,481 @@ parameters:
 			path: plugins/webhook-sender/webhook-sender.php
 
 		-
-			message: '#^Parameter \#2 \$options of function curl_setopt_array expects array\{10002\: non\-empty\-string, 47\: bool, 10015\: array\|string, 10023\: array\<int, string\>, 19913\: bool, 78\: int, 13\: int, 64\: bool, \.\.\.\}, array\{10002\: string, 47\: true, 10015\: non\-empty\-string, 10023\: array\{''Content\-Type\:…'', ''User\-Agent\:…'', ''Accept\: application…''\}, 19913\: true, 78\: 3, 13\: 4, 64\: true, \.\.\.\} given\.$#'
+			message: '#^Function buildFilterUrl\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_filter expects array, list\<string\>\|false given\.$#'
 			identifier: argument.type
 			count: 1
-			path: plugins/webhook-sender/webhook-sender.php
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 6
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, non\-empty\-array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/dashboard.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments mixed, array\{''published'', ''scheduled''\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^If condition is always false\.$#'
+			identifier: if.alwaysFalse
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 8
+			path: public/admin/editor.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Parameter \#5 \$knownRevisionId of method LightPress\\Core\\PostService\:\:publishOrUpdate\(\) expects int, int\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Variable \$activeRevisionId on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: public/admin/editor.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: public/admin/media.php
+
+		-
+			message: '#^Function buildMediaUrl\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: public/admin/media.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/preview.php
+
+		-
+			message: '#^Offset ''id'' might not exist on array\|null\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: public/admin/revisions.php
+
+		-
+			message: '#^Offset ''title'' might not exist on array\|null\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: public/admin/revisions.php
+
+		-
+			message: '#^Offset ''version'' might not exist on array\|null\.$#'
+			identifier: offsetAccess.notFound
+			count: 3
+			path: public/admin/revisions.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method LightPress\\Core\\Authorization\:\:can\(\) expects array\{id\: int\|string, role\: string, is_active\: int\|string\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 3
+			path: public/admin/revisions.php
+
+		-
+			message: '#^Parameter \#1 \$timezone of class DateTimeZone constructor expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/admin/settings.php
+
+		-
+			message: '#^Call to an undefined static method LightPress\\Core\\ObjectCache\:\:flushAll\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: public/admin/system.php
+
+		-
+			message: '#^Cannot cast array\|string\|false to string\.$#'
+			identifier: cast.string
+			count: 1
+			path: public/admin/system.php
+
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/api/search.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: public/api/view.php
+
+		-
+			message: '#^Anonymous function has an unused use \$config\.$#'
+			identifier: closure.unusedUse
+			count: 2
+			path: public/index.php
+
+		-
+			message: '#^Anonymous function has an unused use \$router\.$#'
+			identifier: closure.unusedUse
+			count: 2
+			path: public/index.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: public/index.php
+
+		-
+			message: '#^Offset ''latest_mod'' on array\{total\: int, latest_mod\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: public/index.php
+
+		-
+			message: '#^Offset ''posts'' on array\{total\: int, posts\: array\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: public/index.php
+
+		-
+			message: '#^Offset ''total'' on array\{total\: int, latest_mod\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: public/index.php
+
+		-
+			message: '#^Offset ''total'' on array\{total\: int, posts\: array\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: public/index.php
+
+		-
+			message: '#^Offset 1 on array\{string, ''''\|''page'', numeric\-string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: public/index.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_filter expects array, list\<string\>\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/index.php
+
+		-
+			message: '#^Parameter \#1 \$string of function strlen expects string, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: public/index.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/empresa/blog.php
+
+		-
+			message: '#^Variable \$category might not be defined\.$#'
+			identifier: variable.undefined
+			count: 5
+			path: themes/empresa/category.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/empresa/category.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/empresa/header.php
+
+		-
+			message: '#^Variable \$post might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/empresa/header.php
+
+		-
+			message: '#^Variable \$page might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/empresa/page.php
+
+		-
+			message: '#^Variable \$post might not be defined\.$#'
+			identifier: variable.undefined
+			count: 3
+			path: themes/empresa/post.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/empresa/search.php
+
+		-
+			message: '#^Variable \$query might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/empresa/search.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/empresa/tag.php
+
+		-
+			message: '#^Variable \$tagRaw might not be defined\.$#'
+			identifier: variable.undefined
+			count: 3
+			path: themes/empresa/tag.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: themes/portal-noticias/blog.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/blog.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/blog.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/category.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 5
+			path: themes/portal-noticias/category.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/category.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/category.php
+
+		-
+			message: '#^Variable \$posts might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/portal-noticias/category.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/portal-noticias/header.php
+
+		-
+			message: '#^Variable \$trendingTags in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: themes/portal-noticias/header.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/home.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 6
+			path: themes/portal-noticias/home.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/portal-noticias/home.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/home.php
+
+		-
+			message: '#^Variable \$posts might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/home.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/page.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 4
+			path: themes/portal-noticias/page.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/page.php
+
+		-
+			message: '#^Variable \$page might not be defined\.$#'
+			identifier: variable.undefined
+			count: 4
+			path: themes/portal-noticias/page.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/post.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 5
+			path: themes/portal-noticias/post.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/post.php
+
+		-
+			message: '#^Variable \$post might not be defined\.$#'
+			identifier: variable.undefined
+			count: 12
+			path: themes/portal-noticias/post.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/search.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 5
+			path: themes/portal-noticias/search.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/search.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/search.php
+
+		-
+			message: '#^Variable \$posts might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/portal-noticias/search.php
+
+		-
+			message: '#^Offset 1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11\|12 on array\{1\: ''janeiro'', 2\: ''fevereiro'', 3\: ''março'', 4\: ''abril'', 5\: ''maio'', 6\: ''junho'', 7\: ''julho'', 8\: ''agosto'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: themes/portal-noticias/tag.php
+
+		-
+			message: '#^Parameter \#2 \$timestamp of function date expects int\|null, int\|false given\.$#'
+			identifier: argument.type
+			count: 5
+			path: themes/portal-noticias/tag.php
+
+		-
+			message: '#^Variable \$config might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/tag.php
+
+		-
+			message: '#^Variable \$currentPage might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: themes/portal-noticias/tag.php
+
+		-
+			message: '#^Variable \$posts might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: themes/portal-noticias/tag.php
