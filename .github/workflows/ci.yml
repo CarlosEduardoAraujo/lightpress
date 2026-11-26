@@ -75,7 +75,10 @@ jobs:
 
     - name: Análise Estática (PHPStan Nível 8 — PHAR isolado sem Composer)
       run: |
-        curl -fSL -o /tmp/phpstan.phar https://github.com/phpstan/phpstan/releases/latest/download/phpstan.phar
+        PHPSTAN_VERSION="2.1.0"
+        PHPSTAN_SHA256="87fa9aa451bb9b61d7c65d40ec7d14d5bab67e3ad74ce75a09b3140d6f22631a"
+        curl -fSL -o /tmp/phpstan.phar "https://github.com/phpstan/phpstan/releases/download/${PHPSTAN_VERSION}/phpstan.phar"
+        echo "${PHPSTAN_SHA256}  /tmp/phpstan.phar" | sha256sum -c -
         php /tmp/phpstan.phar analyse -c phpstan.neon --no-progress --memory-limit=512M
 
     - name: Executar Diagnóstico e Todas as Suítes PHP (Zero E_DEPRECATED)

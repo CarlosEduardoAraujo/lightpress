@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Remediação da Auditoria de Segurança e Performance (`AUDITORIAS/20261125-gh-anti.md` — Fases 1 e 2) — 2026-11-25
+
+- **Endurecimento de `<iframe>` no Compilador (`core/BlockCompiler.php` — SEC-01):**
+  - Removido `'allow'` arbitrário da whitelist de atributos de `<iframe>` e adicionado `'sandbox'` com valor fixo `allow-scripts allow-same-origin allow-presentation` nos embeds normalizados do YouTube (`youtube-nocookie.com`).
+  - Mantida a remoção sumária de qualquer `<iframe>` fora dos domínios oficiais do YouTube.
+- **Alinhamento Nginx de Produção e Hardening de Headers/Cache (`nginx/speedracing-tunnel.conf`, `nginx/lightpress.conf` — SEC-02 / SEC-04):**
+  - `nginx/speedracing-tunnel.conf` alinhado à configuração de produção (`/etc/nginx/sites-available/speedracing`), preservando `limit_req_zone speedracing_api`, `location ^~ /api/` e `fastcgi_cache_valid 404 1m;`.
+  - `nginx/lightpress.conf` alinhado integralmente com a estrutura de produção: `fastcgi_hide_header`, `absolute_redirect off`, `server_tokens off`, `Content-Security-Policy "default-src 'none'; sandbox;"` em `/uploads/`, CSP dedicada em `/admin/`, replicação completa de `add_header` nos blocos filhos e mapas `$lp_skip_query` / `$lp_skip_authorization` / `$lp_skip_path` para evitar colisões de cache FastCGI.
+- **Validação *Fail-Fast* de `encryption_key` em Produção (`config.php`, `core/bootstrap.php`, `core/Settings.php`, `bin/setup.php` — SEC-03):**
+  - Definido o placeholder explícito `'MUDAESSAINFORMACAOANTESDESUBIROSITE'` em `config.php`, tratado como chave não configurada (`null`) em `Settings::init()`, `Settings::getEncryptionKey()` e `bin/setup.php`.
+  - `core/bootstrap.php` bloqueia o boot HTTP em `production` (HTTP 500) se `security.encryption_key` estiver ausente, menor que 32 caracteres ou igual ao placeholder; `Settings::encryptValue()` lança `RuntimeException` em produção sem chave válida.
+- **Rate Limit Secundário por Conta no Login (`public/admin/login.php` — SEC-05):**
+  - Adicionado controle secundário por identificador de conta (`scope: 'login_acct'`) para mitigar ataques distribuídos de *password spraying* (a adoção do prefixo `__Host-` no cookie de sessão permanece documentada para estudo futuro).
+- **Supply Chain no CI (`.github/workflows/ci.yml` — SEC-06):**
+  - Fixada a versão `2.1.0` do `phpstan.phar` com verificação `sha256sum -c` antes da execução da análise estática nível 8.
+- **Cacheamento de Listagens Paginadas e Redução de DDL no Runtime (`public/index.php`, `core/Settings.php`, `core/PostService.php` — PERF-01 / PERF-02 cache / PERF-03):**
+  - Adicionado `ObjectCache::remember(..., 300, ..., 'posts')` para `cat_total:{$categorySlug}`, páginas `2..5` de `/page/{page}/`, `/blog/page/{page}/`, `/categoria/{slug}/` e `/categoria/{slug}/page/{page}/`, além de `/tag/{tag}/` e `/tag/{tag}/page/{page}/` (páginas `1..5`), mantendo preservado o teto de paginação `100000`.
+  - Adicionada guarda estática `$tableChecked` em `Settings::ensureTable()` e restringida a verificação `ensureScheduledEnumSupported()` em `PostService::__construct()` ao contexto `PHP_SAPI === 'cli'`.
+- **Testes Automatizados (`bin/test-audit-sec-perf.php`):**
+  - Criada suíte de regressão para `SEC-01`, `SEC-03` e `SEC-05` (8/8 aprovados) e validadas todas as suítes existentes (`bin/test.php` 311/311, `test-sec02`, `test-revision-safety`, `test-perf06`, `test-perf03`, `test-query-indexes` e `diagnose.php`).
+
 ### Auto-Save de Metadados de Imagem no Modal do Editor (`public/admin/api/media.php`, `editor.php`, `page-edit.php`) — 2026-11-24
 
 - **Endpoint de Atualização de Metadados (`public/admin/api/media.php`):**

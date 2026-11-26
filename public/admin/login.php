@@ -52,48 +52,59 @@ if ($lockRemaining !== null) {
         if (empty($username) || empty($password)) {
             $error = 'Informe o usuário e a senha.';
         } else {
-            $user = Database::fetchOne(
-                "SELECT id, name, username, password_hash, role, is_active, password_reset_required, session_version
-                 FROM users WHERE username = ? OR email = ? LIMIT 1",
-                [$username, $username]
-            );
+            $acctKey = 'acct_' . hash('sha256', mb_strtolower(trim($username), 'UTF-8'));
+            $acctMaxAttempts = max(10, $maxAttempts * 2);
+            $acctLockRemaining = Security::checkLoginRateLimit($acctKey, $acctMaxAttempts, $lockoutSeconds, 'login_acct');
 
-            // Mitigação de timing attack: se usuário não existe OU conta inativa, valida contra DUMMY_ARGON2ID_HASH
-            $isValidAccount = ($user && !empty($user['is_active']));
-            $hashToVerify = $isValidAccount ? (string)$user['password_hash'] : Security::DUMMY_ARGON2ID_HASH;
-            $passwordMatches = Security::verifyPassword($password, $hashToVerify);
-
-            if ($isValidAccount && $passwordMatches) {
-                // Sucesso: limpar bloqueio por IP e sessão
-                Security::clearLoginFailures($clientIp);
-                unset($_SESSION['login_failures']);
-
-                Security::regenerateSession();
-                $_SESSION['user_id'] = (int)$user['id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_role'] = $user['role'];
-                $_SESSION['session_version'] = (int)$user['session_version'];
-                $_SESSION['auth_created_at'] = time();
-                $_SESSION['last_activity_at'] = time();
-
-                if ((int)($user['password_reset_required'] ?? 0) === 1) {
-                    header('Location: /admin/profile.php?force_reset=1');
-                    exit;
-                }
-
-                header('Location: /admin/dashboard.php');
-                exit;
+            if ($acctLockRemaining !== null) {
+                $min = (int)ceil($acctLockRemaining / 60);
+                $error = "Muitas tentativas incorretas para esta conta. Tente novamente em {$min} minuto(s).";
             } else {
-                // Falha: registrar no IP e na sessão
-                Security::recordLoginFailure($clientIp, $maxAttempts, $lockoutSeconds);
-                $_SESSION['login_failures']++;
+                $user = Database::fetchOne(
+                    "SELECT id, name, username, password_hash, role, is_active, password_reset_required, session_version
+                     FROM users WHERE username = ? OR email = ? LIMIT 1",
+                    [$username, $username]
+                );
 
-                $lockRemaining = Security::checkLoginRateLimit($clientIp, $maxAttempts, $lockoutSeconds);
-                if ($lockRemaining !== null) {
-                    $min = (int)ceil($lockRemaining / 60);
-                    $error = "Muitas tentativas incorretas. Acesso bloqueado para este IP por {$min} minuto(s).";
+                // Mitigação de timing attack: se usuário não existe OU conta inativa, valida contra DUMMY_ARGON2ID_HASH
+                $isValidAccount = ($user && !empty($user['is_active']));
+                $hashToVerify = $isValidAccount ? (string)$user['password_hash'] : Security::DUMMY_ARGON2ID_HASH;
+                $passwordMatches = Security::verifyPassword($password, $hashToVerify);
+
+                if ($isValidAccount && $passwordMatches) {
+                    // Sucesso: limpar bloqueio por IP, conta e sessão
+                    Security::clearLoginFailures($clientIp);
+                    Security::clearLoginFailures($acctKey, 'login_acct');
+                    unset($_SESSION['login_failures']);
+
+                    Security::regenerateSession();
+                    $_SESSION['user_id'] = (int)$user['id'];
+                    $_SESSION['user_name'] = $user['name'];
+                    $_SESSION['user_role'] = $user['role'];
+                    $_SESSION['session_version'] = (int)$user['session_version'];
+                    $_SESSION['auth_created_at'] = time();
+                    $_SESSION['last_activity_at'] = time();
+
+                    if ((int)($user['password_reset_required'] ?? 0) === 1) {
+                        header('Location: /admin/profile.php?force_reset=1');
+                        exit;
+                    }
+
+                    header('Location: /admin/dashboard.php');
+                    exit;
                 } else {
-                    $error = 'Usuário ou senha incorretos.';
+                    // Falha: registrar no IP, na conta e na sessão
+                    Security::recordLoginFailure($clientIp, $maxAttempts, $lockoutSeconds);
+                    Security::recordLoginFailure($acctKey, $acctMaxAttempts, $lockoutSeconds, 'login_acct');
+                    $_SESSION['login_failures']++;
+
+                    $lockRemaining = Security::checkLoginRateLimit($clientIp, $maxAttempts, $lockoutSeconds);
+                    if ($lockRemaining !== null) {
+                        $min = (int)ceil($lockRemaining / 60);
+                        $error = "Muitas tentativas incorretas. Acesso bloqueado para este IP por {$min} minuto(s).";
+                    } else {
+                        $error = 'Usuário ou senha incorretos.';
+                    }
                 }
             }
         }

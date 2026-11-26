@@ -108,7 +108,7 @@ class BlockCompiler
             'th' => ['colspan', 'rowspan', 'scope'],
             'td' => ['colspan', 'rowspan'],
             'figure' => ['class'],
-            'iframe' => ['src', 'title', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen', 'loading', 'referrerpolicy'],
+            'iframe' => ['src', 'title', 'width', 'height', 'frameborder', 'allowfullscreen', 'loading', 'referrerpolicy', 'sandbox'],
         ];
 
         $dom = new \DOMDocument();
@@ -338,6 +338,7 @@ class BlockCompiler
                 $child->setAttribute('allowfullscreen', 'allowfullscreen');
                 $child->setAttribute('loading', 'lazy');
                 $child->setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+                $child->setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
 
                 // Garante que o iframe esteja encapsulado em <figure class="video-container">
                 if (strtolower($node->nodeName) !== 'figure') {

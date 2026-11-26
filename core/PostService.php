@@ -31,7 +31,9 @@ class PostService
     public function __construct(?CacheManager $cacheManager = null)
     {
         $this->cacheManager = $cacheManager ?? new CacheManager();
-        $this->ensureScheduledEnumSupported();
+        if (PHP_SAPI === 'cli') {
+            $this->ensureScheduledEnumSupported();
+        }
     }
 
     private static bool $enumChecked = false;

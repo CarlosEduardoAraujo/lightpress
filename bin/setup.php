@@ -85,7 +85,8 @@ try {
         }
     }
 
-    if (empty(trim($currentEncKey))) {
+    $trimmedEncKey = trim($currentEncKey);
+    if ($trimmedEncKey === '' || in_array($trimmedEncKey, Settings::DEFAULT_ENCRYPTION_PLACEHOLDERS, true)) {
         // Verificar se já existem valores cifrados na tabela settings
         $hasEncryptedValues = false;
         try {

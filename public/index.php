@@ -189,14 +189,19 @@ $router->get('/page/{page}/', function (array $params) use ($config): void {
     $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
-    $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status = 'published' AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-        [$nowUtc, (int)$perPage, (int)$offset]
-    );
+    $fetchHomePage = static function () use ($nowUtc, $perPage, $offset): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status = 'published' AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+            [$nowUtc, (int)$perPage, (int)$offset]
+        );
+    };
+    $posts = ($page <= 5)
+        ? ObjectCache::remember("home_feed_posts_p{$page}", 300, $fetchHomePage, 'posts')
+        : $fetchHomePage();
 
     $pageImages = array_filter(array_column($posts, 'featured_image'));
     if (!empty($pageImages)) {
@@ -268,14 +273,19 @@ $router->get('/blog/page/{page}/', function (array $params) use ($config, $route
     $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
-    $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.status = 'published' AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-        [$nowUtc, (int)$perPage, (int)$offset]
-    );
+    $fetchBlogPage = static function () use ($nowUtc, $perPage, $offset): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.status = 'published' AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+            [$nowUtc, (int)$perPage, (int)$offset]
+        );
+    };
+    $posts = ($page <= 5)
+        ? ObjectCache::remember("blog_feed_posts_p{$page}", 300, $fetchBlogPage, 'posts')
+        : $fetchBlogPage();
 
     $pageImages = array_filter(array_column($posts, 'featured_image'));
     if (!empty($pageImages)) {
@@ -312,21 +322,25 @@ $router->get('/categoria/{slug}/', function (array $params) use ($config): void 
         return;
     }
 
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
-        [$categorySlug, $nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember("cat_total:{$categorySlug}", 300, function () use ($categorySlug, $nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+            [$categorySlug, $nowUtc]
+        );
+    }, 'posts');
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
 
-    $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT ?",
-        [$categorySlug, $nowUtc, (int)$perPage]
-    );
+    $posts = ObjectCache::remember("cat_posts:{$categorySlug}:p1", 300, function () use ($categorySlug, $nowUtc, $perPage): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ?",
+            [$categorySlug, $nowUtc, (int)$perPage]
+        );
+    }, 'posts');
 
     $catImages = array_filter(array_column($posts, 'featured_image'));
     if (!empty($catImages)) {
@@ -364,10 +378,12 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
         return;
     }
 
-    $totalPosts = (int)Database::fetchValue(
-        "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
-        [$categorySlug, $nowUtc]
-    );
+    $totalPosts = (int)ObjectCache::remember("cat_total:{$categorySlug}", 300, function () use ($categorySlug, $nowUtc): int {
+        return (int)Database::fetchValue(
+            "SELECT COUNT(*) FROM posts WHERE category = ? AND status = 'published' AND published_at <= ?",
+            [$categorySlug, $nowUtc]
+        );
+    }, 'posts');
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
 
     if ($page > $totalPages) {
@@ -380,14 +396,19 @@ $router->get('/categoria/{slug}/page/{page}/', function (array $params) use ($co
     $offset = ($page - 1) * $perPage;
     $currentPage = $page;
 
-    $posts = Database::fetchAll(
-        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-         FROM posts p
-         LEFT JOIN users u ON u.id = p.user_id
-         WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
-         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-        [$categorySlug, $nowUtc, (int)$perPage, (int)$offset]
-    );
+    $fetchCatPage = static function () use ($categorySlug, $nowUtc, $perPage, $offset): array {
+        return Database::fetchAll(
+            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+             FROM posts p
+             LEFT JOIN users u ON u.id = p.user_id
+             WHERE p.category = ? AND p.status = 'published' AND p.published_at <= ?
+             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+            [$categorySlug, $nowUtc, (int)$perPage, (int)$offset]
+        );
+    };
+    $posts = ($page <= 5)
+        ? ObjectCache::remember("cat_posts:{$categorySlug}:p{$page}", 300, $fetchCatPage, 'posts')
+        : $fetchCatPage();
 
     $catImages = array_filter(array_column($posts, 'featured_image'));
     if (!empty($catImages)) {
@@ -528,92 +549,100 @@ $router->get('/tag/{tag}/', function (array $params) use ($config): void {
     $perPage = 12;
 
     $tagClean = trim(str_replace('-', ' ', $tagRaw));
-    $isSqlite = Database::getDriver() === 'sqlite';
-    $useFulltext = false;
-    $boolQuery = '';
+    $tagCacheData = ObjectCache::remember("tag_page:{$tagRaw}:p1", 300, static function () use ($tagRaw, $tagClean, $nowUtc, $perPage): array {
+        $isSqlite = Database::getDriver() === 'sqlite';
+        $useFulltext = false;
+        $boolQuery = '';
+        $tagCondition = '';
+        $tagCriteria = [];
 
-    if ($isSqlite) {
-        $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
-        $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
-        $totalPosts = (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
-            array_merge([$nowUtc], $tagCriteria)
-        );
-    } else {
-        // No MySQL, extrai termos com >= 3 caracteres para pré-filtragem via índice FULLTEXT
-        $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $tagClean) ?: []);
-        $fulltextWords = [];
-        foreach ($words as $w) {
-            if (mb_strlen($w) >= 3) {
-                $fulltextWords[] = "+{$w}*";
-            }
-        }
-
-        $totalPosts = 0;
-        if (!empty($fulltextWords)) {
-            $boolQuery = implode(' ', $fulltextWords);
-            try {
-                $totalPosts = (int)Database::fetchValue(
-                    "SELECT COUNT(*) FROM posts p 
-                     WHERE p.status = 'published' AND p.published_at <= ? 
-                       AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-                       AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
-                    [$nowUtc, $boolQuery, $tagClean, $tagRaw]
-                );
-                if ($totalPosts > 0) {
-                    $useFulltext = true;
-                }
-            } catch (\Throwable) {
-                $totalPosts = 0;
-            }
-        }
-
-        // Fallback para FIND_IN_SET puro se FULLTEXT não foi usado, falhou ou retornou 0
-        if (!$useFulltext) {
-            $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
-            $tagCriteria = [$tagClean, $tagRaw];
+        if ($isSqlite) {
+            $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
+            $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
             $totalPosts = (int)Database::fetchValue(
                 "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
                 array_merge([$nowUtc], $tagCriteria)
             );
-        }
-    }
+        } else {
+            // No MySQL, extrai termos com >= 3 caracteres para pré-filtragem via índice FULLTEXT
+            $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $tagClean) ?: []);
+            $fulltextWords = [];
+            foreach ($words as $w) {
+                if (mb_strlen($w) >= 3) {
+                    $fulltextWords[] = "+{$w}*";
+                }
+            }
 
+            $totalPosts = 0;
+            if (!empty($fulltextWords)) {
+                $boolQuery = implode(' ', $fulltextWords);
+                try {
+                    $totalPosts = (int)Database::fetchValue(
+                        "SELECT COUNT(*) FROM posts p 
+                         WHERE p.status = 'published' AND p.published_at <= ? 
+                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                           AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
+                        [$nowUtc, $boolQuery, $tagClean, $tagRaw]
+                    );
+                    if ($totalPosts > 0) {
+                        $useFulltext = true;
+                    }
+                } catch (\Throwable) {
+                    $totalPosts = 0;
+                }
+            }
+
+            // Fallback para FIND_IN_SET puro se FULLTEXT não foi usado, falhou ou retornou 0
+            if (!$useFulltext) {
+                $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
+                $tagCriteria = [$tagClean, $tagRaw];
+                $totalPosts = (int)Database::fetchValue(
+                    "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
+                    array_merge([$nowUtc], $tagCriteria)
+                );
+            }
+        }
+
+        if ($totalPosts === 0) {
+            $posts = [];
+        } elseif ($isSqlite) {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
+                 ORDER BY p.published_at DESC LIMIT ?",
+                array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
+            );
+        } elseif ($useFulltext) {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? 
+                   AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                   AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
+                 ORDER BY p.published_at DESC LIMIT ?",
+                [$nowUtc, $boolQuery, $tagClean, $tagRaw, (int)$perPage]
+            );
+        } else {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
+                 ORDER BY p.published_at DESC LIMIT ?",
+                array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
+            );
+        }
+
+        return ['total' => $totalPosts, 'posts' => $posts];
+    }, 'posts');
+
+    $totalPosts = (int)($tagCacheData['total'] ?? 0);
+    $posts = is_array($tagCacheData['posts'] ?? null) ? $tagCacheData['posts'] : [];
     $totalPages = (int)ceil($totalPosts / $perPage);
     $currentPage = 1;
-
-    if ($totalPosts === 0) {
-        $posts = [];
-    } elseif ($isSqlite) {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
-             ORDER BY p.published_at DESC LIMIT ?",
-            array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
-        );
-    } elseif ($useFulltext) {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? 
-               AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-               AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
-             ORDER BY p.published_at DESC LIMIT ?",
-            [$nowUtc, $boolQuery, $tagClean, $tagRaw, (int)$perPage]
-        );
-    } else {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
-             ORDER BY p.published_at DESC LIMIT ?",
-            array_merge([$nowUtc], $tagCriteria, [(int)$perPage])
-        );
-    }
 
     $tagName = ucwords($tagClean);
     $pageTitle = "Tópico: #{$tagName} - " . $config['app']['name'];
@@ -635,57 +664,105 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
     $nowUtc = gmdate('Y-m-d H:i:s');
 
     $tagClean = trim(str_replace('-', ' ', $tagRaw));
-    $isSqlite = Database::getDriver() === 'sqlite';
-    $useFulltext = false;
-    $boolQuery = '';
+    $fetchTagPage = static function () use ($tagRaw, $tagClean, $page, $perPage, $nowUtc): array {
+        $isSqlite = Database::getDriver() === 'sqlite';
+        $useFulltext = false;
+        $boolQuery = '';
+        $tagCondition = '';
+        $tagCriteria = [];
 
-    if ($isSqlite) {
-        $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
-        $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
-        $totalPosts = (int)Database::fetchValue(
-            "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
-            array_merge([$nowUtc], $tagCriteria)
-        );
-    } else {
-        // No MySQL, extrai termos com >= 3 caracteres para pré-filtragem via índice FULLTEXT
-        $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $tagClean) ?: []);
-        $fulltextWords = [];
-        foreach ($words as $w) {
-            if (mb_strlen($w) >= 3) {
-                $fulltextWords[] = "+{$w}*";
-            }
-        }
-
-        $totalPosts = 0;
-        if (!empty($fulltextWords)) {
-            $boolQuery = implode(' ', $fulltextWords);
-            try {
-                $totalPosts = (int)Database::fetchValue(
-                    "SELECT COUNT(*) FROM posts p 
-                     WHERE p.status = 'published' AND p.published_at <= ? 
-                       AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-                       AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
-                    [$nowUtc, $boolQuery, $tagClean, $tagRaw]
-                );
-                if ($totalPosts > 0) {
-                    $useFulltext = true;
-                }
-            } catch (\Throwable) {
-                $totalPosts = 0;
-            }
-        }
-
-        // Fallback para FIND_IN_SET puro se FULLTEXT não foi usado, falhou ou retornou 0
-        if (!$useFulltext) {
-            $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
-            $tagCriteria = [$tagClean, $tagRaw];
+        if ($isSqlite) {
+            $tagCondition = "((',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ? OR (',' || REPLACE(REPLACE(COALESCE(p.tags, ''), ', ', ','), ' ,', ',') || ',') LIKE ?)";
+            $tagCriteria = ['%,' . Security::escapeLike($tagClean) . ',%', '%,' . Security::escapeLike($tagRaw) . ',%'];
             $totalPosts = (int)Database::fetchValue(
                 "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
                 array_merge([$nowUtc], $tagCriteria)
             );
-        }
-    }
+        } else {
+            // No MySQL, extrai termos com >= 3 caracteres para pré-filtragem via índice FULLTEXT
+            $words = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $tagClean) ?: []);
+            $fulltextWords = [];
+            foreach ($words as $w) {
+                if (mb_strlen($w) >= 3) {
+                    $fulltextWords[] = "+{$w}*";
+                }
+            }
 
+            $totalPosts = 0;
+            if (!empty($fulltextWords)) {
+                $boolQuery = implode(' ', $fulltextWords);
+                try {
+                    $totalPosts = (int)Database::fetchValue(
+                        "SELECT COUNT(*) FROM posts p 
+                         WHERE p.status = 'published' AND p.published_at <= ? 
+                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                           AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)",
+                        [$nowUtc, $boolQuery, $tagClean, $tagRaw]
+                    );
+                    if ($totalPosts > 0) {
+                        $useFulltext = true;
+                    }
+                } catch (\Throwable) {
+                    $totalPosts = 0;
+                }
+            }
+
+            // Fallback para FIND_IN_SET puro se FULLTEXT não foi usado, falhou ou retornou 0
+            if (!$useFulltext) {
+                $tagCondition = "(FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)";
+                $tagCriteria = [$tagClean, $tagRaw];
+                $totalPosts = (int)Database::fetchValue(
+                    "SELECT COUNT(*) FROM posts p WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}",
+                    array_merge([$nowUtc], $tagCriteria)
+                );
+            }
+        }
+
+        $totalPages = max(1, (int)ceil($totalPosts / $perPage));
+        if ($page > $totalPages) {
+            return ['total' => $totalPosts, 'posts' => []];
+        }
+
+        $offset = ($page - 1) * $perPage;
+        if ($isSqlite) {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
+                 ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
+            );
+        } elseif ($useFulltext) {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? 
+                   AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                   AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
+                 ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                [$nowUtc, $boolQuery, $tagClean, $tagRaw, (int)$perPage, (int)$offset]
+            );
+        } else {
+            $posts = Database::fetchAll(
+                "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
+                 FROM posts p
+                 LEFT JOIN users u ON u.id = p.user_id
+                 WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
+                 ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
+            );
+        }
+
+        return ['total' => $totalPosts, 'posts' => $posts];
+    };
+
+    $tagCacheData = ($page <= 5)
+        ? ObjectCache::remember("tag_page:{$tagRaw}:p{$page}", 300, $fetchTagPage, 'posts')
+        : $fetchTagPage();
+
+    $totalPosts = (int)($tagCacheData['total'] ?? 0);
     $totalPages = max(1, (int)ceil($totalPosts / $perPage));
 
     if ($page > $totalPages) {
@@ -695,39 +772,8 @@ $router->get('/tag/{tag}/page/{page}/', function (array $params) use ($config): 
         return;
     }
 
-    $offset = ($page - 1) * $perPage;
     $currentPage = $page;
-
-    if ($isSqlite) {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
-             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-            array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
-        );
-    } elseif ($useFulltext) {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? 
-               AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-               AND (FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0 OR FIND_IN_SET(?, REPLACE(COALESCE(p.tags, ''), ', ', ',')) > 0)
-             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-            [$nowUtc, $boolQuery, $tagClean, $tagRaw, (int)$perPage, (int)$offset]
-        );
-    } else {
-        $posts = Database::fetchAll(
-            "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name 
-             FROM posts p
-             LEFT JOIN users u ON u.id = p.user_id
-             WHERE p.status = 'published' AND p.published_at <= ? AND {$tagCondition}
-             ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-            array_merge([$nowUtc], $tagCriteria, [(int)$perPage, (int)$offset])
-        );
-    }
+    $posts = is_array($tagCacheData['posts'] ?? null) ? $tagCacheData['posts'] : [];
 
     $tagImages = array_filter(array_column($posts, 'featured_image'));
     if (!empty($tagImages)) {

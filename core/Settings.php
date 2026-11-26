@@ -14,6 +14,12 @@ class Settings
 {
     private static ?array $cache = null;
     private static ?string $encryptionKey = null;
+    private static bool $tableChecked = false;
+
+    public const DEFAULT_ENCRYPTION_PLACEHOLDERS = [
+        'MUDAESSAINFORMACAOANTESDESUBIROSITE',
+        'MUDAESSAINFORMAÇÃOANTESDESUBIROSITE',
+    ];
 
     /**
      * Lista de chaves cujos valores contêm credenciais ou dados confidenciais e devem ser cifrados em repouso.
@@ -45,7 +51,7 @@ class Settings
             $rawKey = trim($rawKey);
         }
 
-        if (!empty($rawKey)) {
+        if (!empty($rawKey) && !in_array($rawKey, self::DEFAULT_ENCRYPTION_PLACEHOLDERS, true)) {
             self::$encryptionKey = hash('sha256', $rawKey, true);
         } else {
             self::$encryptionKey = null;
@@ -63,10 +69,14 @@ class Settings
         }
 
         $rawKey = $GLOBALS['config']['security']['encryption_key'] ?? null;
-        if (empty($rawKey) || !is_string($rawKey) || trim($rawKey) === '') {
+        if (empty($rawKey) || !is_string($rawKey)) {
             return null;
         }
-        return hash('sha256', trim($rawKey), true);
+        $trimmed = trim($rawKey);
+        if ($trimmed === '' || in_array($trimmed, self::DEFAULT_ENCRYPTION_PLACEHOLDERS, true)) {
+            return null;
+        }
+        return hash('sha256', $trimmed, true);
     }
 
     /**
@@ -74,6 +84,9 @@ class Settings
      */
     public static function ensureTable(?PDO $pdo = null, ?string $driver = null): void
     {
+        if ($pdo === null && self::$tableChecked) {
+            return;
+        }
         $conn = $pdo ?? Database::getConnection();
         $drv = $driver ?? Database::getDriver();
         if ($drv === 'sqlite') {
@@ -115,6 +128,10 @@ class Settings
         } catch (Throwable) {
             // Em caso de tabela recém-criada ou erro transitório
         }
+
+        if ($pdo === null) {
+            self::$tableChecked = true;
+        }
     }
 
     /**
@@ -151,6 +168,9 @@ class Settings
     {
         $encKey = self::getEncryptionKey();
         if ($encKey === null) {
+            if (($GLOBALS['config']['app']['env'] ?? '') === 'production') {
+                throw new \RuntimeException('Chave security.encryption_key obrigatória em produção para cifrar credenciais.');
+            }
             return $plaintext;
         }
 
@@ -235,6 +255,7 @@ class Settings
     {
         self::$cache = null;
         self::$encryptionKey = null;
+        self::$tableChecked = false;
         ObjectCache::flushGroup('settings');
     }
 

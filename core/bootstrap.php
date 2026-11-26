@@ -78,9 +78,20 @@ if (!empty($config['app']['error_log']) && is_string($config['app']['error_log']
 // Validação defensiva de segurança em ambiente de produção (fail-fast HTTP)
 if (PHP_SAPI !== 'cli' && ($config['app']['env'] ?? '') === 'production') {
     $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');
-    if (empty($hmacSecret) || $hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32) {
+    $encKey = trim((string)($config['security']['encryption_key'] ?? ''));
+    $invalidHmac = empty($hmacSecret) || $hmacSecret === 'ALTERAR_PARA_UMA_CHAVE_ALEATORIA_DE_64_CHARS_EM_PRODUCAO' || strlen($hmacSecret) < 32;
+    $invalidEncKey = $encKey === ''
+        || strlen($encKey) < 32
+        || in_array($encKey, \LightPress\Core\Settings::DEFAULT_ENCRYPTION_PLACEHOLDERS, true);
+
+    if ($invalidHmac || $invalidEncKey) {
         http_response_code(500);
-        error_log('[LightPress Security] Chave hmac_secret ausente, padrão ou menor que 32 caracteres em ambiente de produção.');
+        if ($invalidHmac) {
+            error_log('[LightPress Security] Chave hmac_secret ausente, padrão ou menor que 32 caracteres em ambiente de produção.');
+        }
+        if ($invalidEncKey) {
+            error_log('[LightPress Security] Chave security.encryption_key ausente, padrão ou menor que 32 caracteres em ambiente de produção.');
+        }
 
         $isJson = false;
         foreach (headers_list() as $hdr) {
