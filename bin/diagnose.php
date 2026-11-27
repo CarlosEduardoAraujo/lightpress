@@ -165,6 +165,35 @@ if (is_dir($cachePath)) {
     echo "  [INFO] {$cachePath} não encontrado localmente (esperado em ambiente Linux/Nginx em produção).\n";
 }
 
+// 6b. OPcache e Path Cache
+echo "\n[OPcache & Path Cache]\n";
+$opcacheLoaded = extension_loaded('Zend OPcache') || function_exists('opcache_get_status');
+if ($opcacheLoaded) {
+    $opEnable = ini_get('opcache.enable');
+    $opCli = ini_get('opcache.enable_cli');
+    $opStatus = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+    echo "  [OK] Extensão OPcache carregada (opcache.enable={$opEnable}, opcache.enable_cli={$opCli}).\n";
+    if (is_array($opStatus) && !empty($opStatus['opcache_enabled'])) {
+        $hitRate = $opStatus['opcache_statistics']['opcache_hit_rate'] ?? 0.0;
+        $scripts = $opStatus['opcache_statistics']['num_cached_scripts'] ?? 0;
+        echo "  [OK] OPcache ativo no SAPI atual (scripts={$scripts}, hit_rate=" . round((float)$hitRate, 2) . "%).\n";
+    } else {
+        echo "  [INFO] OPcache inativo no SAPI CLI (normal se opcache.enable_cli=0; valide no PHP-FPM via /admin/system.php).\n";
+    }
+} else {
+    echo "  [AVISO] Extensão Zend OPcache não carregada neste runtime PHP.\n";
+    $warnings[] = "Extensão OPcache não detectada no PHP CLI atual.";
+}
+
+// 6c. Redis Cache Pro & Extensão phpredis
+echo "\n[Redis Cache Pro (ObjectCache)]\n";
+if (extension_loaded('redis')) {
+    echo "  [OK] Extensão phpredis carregada (v" . (phpversion('redis') ?: '?') . ").\n";
+} else {
+    echo "  [AVISO] Extensão phpredis não carregada neste ambiente PHP.\n";
+    $warnings[] = "Extensão phpredis ausente no PHP atual (ObjectCache operará em fallback sem Redis).";
+}
+
 // 7. Chave HMAC Anti-Abuso (Segurança)
 echo "\n[Chave Secreta HMAC (Anti-Abuso de Views)]\n";
 $hmacSecret = (string)($config['security']['hmac_secret'] ?? '');

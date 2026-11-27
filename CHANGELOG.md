@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ## [Unreleased]
 
+### Auditoria e Otimização de Cache (OPcache e Redis Cache Pro) — 2026-11-26
+
+- **Eliminação de Consulta SQL Duplicada no Bootstrap (`core/Settings.php`, `core/PluginManager.php`, `plugins/redis-cache-pro/src/RedisClient.php`):**
+  - Adicionados `Settings::hasCache()` e `Settings::getDirect()` para leitura pontual de `active_plugins` e `redis_cache_pro_settings` durante o bootstrap sem acionar `Settings::getAll()` nem popular `Settings::$cache` prematuramente.
+  - Em cache HIT no Redis, `Settings::getAll()` passa a ler `all_settings` diretamente da RAM sem disparar `SELECT key, value FROM settings` em toda requisição.
+- **Cobertura de `ObjectCache` em Endpoints Públicos Restantes (`public/api/posts.php`, `public/index.php`):**
+  - `public/api/posts.php`: Adicionado `ObjectCache::remember("api_posts:...", 60, ..., 'posts')` para páginas iniciais (`$page <= 10`), alinhado a `Cache-Control: public, max-age=60`.
+  - `public/index.php` (rota `/busca/`): Encapsulada a consulta de busca pública com `ObjectCache::remember("web_search:...", 60, ..., 'posts')` para termos com `>= 2` caracteres e páginas `1..5`.
+- **Alinhamento do `WarmupService` às Chaves Reais da Aplicação (`plugins/redis-cache-pro/src/WarmupService.php`):**
+  - Atualizado `WarmupService::run()` para aquecer `'all_settings'` no grupo `'settings'`, `post_slug:{$slug}` no grupo `'post_items'` (payload completo `p.*` + autor) e `'all_active_categories'` no grupo `'categories'` (mapa `slug => row`).
+- **Diagnóstico Expandido de OPcache/Redis e Auditoria em Runtime (`public/admin/system.php`, `bin/diagnose.php`, `bin/audit-cache.php`, `bin/test-cache-audit.php`):**
+  - `public/admin/system.php` passou a exibir scripts cacheados vs `opcache.max_accelerated_files`, `oom_restarts`/`cache_full`, `interned_strings_usage`, `validate_timestamps`/`revalidate_freq`, `realpath_cache_size` e status de conexão do Redis Cache Pro.
+  - `bin/diagnose.php` passou a reportar `[OPcache & Path Cache]` e `[Redis Cache Pro (ObjectCache)]`.
+  - Criado `bin/audit-cache.php` (com suporte a `--http --url=...`) para auditoria em runtime de OPcache, conexão `phpredis`, roundtrip `SET/GET/DEL`, chaves críticas e sonda HTTP de `X-FastCGI-Cache`.
+  - Criado `bin/test-cache-audit.php` (6/6 aprovados) cobrindo `Settings::getAll()`, `Settings::getDirect()` e `WarmupService`.
+
 ### Correção de Quebras de Linha ao Colar e Salvar no Editor Mobile (`public/admin/editor.php`) — 2026-11-26
 
 - **Preservação de Parágrafos em Texto Puro (`text/plain`):**

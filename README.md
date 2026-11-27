@@ -392,6 +392,7 @@ lightpress/
 │   ├── migrate-wp.php         # Importador em lotes, retomável e auditável
 │   ├── retry-cache-purge.php  # Retentativa de purgas persistidas
 │   ├── purge-cache.php        # Utilitário CLI para purga seletiva/total (Cloudflare e Nginx)
+│   ├── audit-cache.php        # Auditoria em runtime de OPcache, Redis Cache Pro e sonda HTTP FastCGI
 │   └── cleanup.php            # Expiração de tokens, deduplicação e staging
 └── public/                    # Web Root (Nginx / Servidor Web)
     ├── index.php              # Ponto único de entrada (Front Controller)
@@ -411,7 +412,7 @@ lightpress/
     │   ├── users.php          # Gestão de usuários, autores e links de ativação
     │   ├── stats.php          # Painel de Mais Lidas e métricas de audiência
     │   ├── profile.php        # Perfil do usuário e alteração de senha
-    │   └── system.php         # Diagnóstico de integridade, PHP-GD, OPcache e permissões
+    │   └── system.php         # Diagnóstico de integridade, PHP-GD, OPcache detalhado, Redis e permissões
     ├── api/                   # Micro-endpoints públicos de baixa latência
     │   ├── view.php           # Incremento assíncrono de visualizações
     │   ├── search.php         # Autocomplete e busca instantânea
@@ -979,6 +980,10 @@ O terceiro módulo corporativo do ecossistema LightPress introduz um motor de ca
 * **Codecs Modernos de Alta Velocidade:**
   - Serializadores: suporte prioritário a `igbinary` (redução drástica de CPU e consumo de bytes em RAM) com fallback transparente para o serializador nativo do PHP.
   - Algoritmos de Compressão: detecção e aplicação automática de `zstd` (Zstandard) e `lz4` se compilados na extensão `phpredis`.
+* **Auditoria de Cache e Pré-aquecimento Alinhado (`bin/audit-cache.php`, `WarmupService`, `Settings::getDirect()`):**
+  - `Settings::getDirect()` evita que a detecção de plugins no bootstrap dispare `SELECT * FROM settings` antes da conexão ao Redis, permitindo que `Settings::getAll()` leia `all_settings` diretamente da RAM em cache HIT.
+  - Todos os endpoints públicos de leitura (`public/index.php` incluindo `/busca/`, `public/api/categories.php`, `public/api/posts.php` e `public/api/search.php`) operam com `ObjectCache::remember()`, enquanto `WarmupService` aquece exatamente as chaves canônicas consumidas (`all_settings`, `post_slug:{slug}` em `post_items` e `all_active_categories`).
+  - Use `php bin/audit-cache.php --http --url=https://seudominio.com.br` em produção para auditar OPcache, conexão `phpredis`, chaves críticas e cabeçalhos `X-FastCGI-Cache`.
 * **Precedência de Configuração e Sobrescrita Segura:**
   - Prioridade estrita para a constante `WP_REDIS_CONFIG` em `config.local.php`, mantendo credenciais e parâmetros de infraestrutura sob controle de versão local/produção:
     ```php

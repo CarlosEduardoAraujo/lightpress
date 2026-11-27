@@ -13,6 +13,7 @@ header('Cache-Control: public, max-age=60');
 $config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use LightPress\Core\Database;
+use LightPress\Core\ObjectCache;
 use LightPress\Core\Security;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -29,35 +30,45 @@ $category = Security::getSafeString($_GET, 'category');
 $nowUtc = gmdate('Y-m-d H:i:s');
 $canonicalOrigin = rtrim($config['app']['canonical_origin'] ?? 'http://localhost:8080', '/');
 
-$params = [$nowUtc];
-$whereCategory = '';
-if (!empty($category)) {
-    $whereCategory = 'AND p.category = ?';
-    $params[] = $category;
-}
+$cacheKey = 'api_posts:p' . $page . ':l' . $limit . ':c' . md5($category);
+$fetchApiPosts = static function () use ($nowUtc, $category, $limit, $offset, $canonicalOrigin): array {
+    $params = [$nowUtc];
+    $whereCategory = '';
+    if (!empty($category)) {
+        $whereCategory = 'AND p.category = ?';
+        $params[] = $category;
+    }
 
-$paramsWithLimit = $params;
-$paramsWithLimit[] = $limit;
-$paramsWithLimit[] = $offset;
+    $paramsWithLimit = $params;
+    $paramsWithLimit[] = $limit;
+    $paramsWithLimit[] = $offset;
 
-$posts = Database::fetchAll(
-    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.featured_image, p.published_at,
-            u.name as author_name, COALESCE(s.views, 0) as views
-     FROM posts p
-     JOIN users u ON u.id = p.user_id
-     LEFT JOIN post_stats s ON s.post_id = p.id
-     WHERE p.status = 'published' AND p.published_at <= ? {$whereCategory}
-     ORDER BY p.published_at DESC
-     LIMIT ? OFFSET ?",
-    $paramsWithLimit
-);
+    $rows = Database::fetchAll(
+        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.featured_image, p.published_at,
+                u.name as author_name, COALESCE(s.views, 0) as views
+         FROM posts p
+         JOIN users u ON u.id = p.user_id
+         LEFT JOIN post_stats s ON s.post_id = p.id
+         WHERE p.status = 'published' AND p.published_at <= ? {$whereCategory}
+         ORDER BY p.published_at DESC
+         LIMIT ? OFFSET ?",
+        $paramsWithLimit
+    );
 
-// Formatar URLs canônicas
-foreach ($posts as &$item) {
-    $item['url'] = "{$canonicalOrigin}/{$item['slug']}/";
-    $item['views'] = (int)$item['views'];
-}
-unset($item);
+    // Formatar URLs canônicas
+    foreach ($rows as &$item) {
+        $item['url'] = "{$canonicalOrigin}/{$item['slug']}/";
+        $item['views'] = (int)$item['views'];
+    }
+    unset($item);
+
+    return $rows;
+};
+
+// Cache em RAM Redis por 60s para páginas iniciais (alinhado a Cache-Control: max-age=60)
+$posts = ($page <= 10)
+    ? ObjectCache::remember($cacheKey, 60, $fetchApiPosts, 'posts')
+    : $fetchApiPosts();
 
 echo json_encode([
     'ok' => true,

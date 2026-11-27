@@ -38,54 +38,61 @@ final class WarmupService
         $warmupCategories = !empty($options['warmup_categories']);
         $customUrls = trim((string)($options['warmup_custom_urls'] ?? ''));
 
-        // 1. Aquecer Opções Globais do LightPress
+        // 1. Aquecer Opções Globais do LightPress (mesma chave/formato de Settings::getAll)
         try {
             $allSettings = Database::fetchAll("SELECT `key`, `value` FROM settings");
+            $settingsMap = [];
             foreach ($allSettings as $row) {
                 if (!empty($row['key'])) {
-                    $this->client->set((string)$row['key'], $row['value'], 'settings', 86400);
+                    $settingsMap[(string)$row['key']] = $row['value'] ?? '';
                     $settingsCount++;
                 }
             }
+            if (!empty($settingsMap)) {
+                $this->client->set('all_settings', $settingsMap, 'settings', 86400);
+            }
         } catch (Throwable) {}
 
-        // 2. Aquecer Posts Mais Recentes
+        // 2. Aquecer Posts Mais Recentes (mesmo grupo 'post_items' e payload completo de public/index.php)
         if ($postsLimit > 0) {
             try {
                 $nowUtc = gmdate('Y-m-d H:i:s');
                 $posts = Database::fetchAll(
-                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.status, p.published_at, p.featured_image, COALESCE(s.views, 0) AS views_count 
+                    "SELECT p.*, u.name AS author_name, u.avatar AS author_avatar, u.bio AS author_bio
                      FROM posts p
-                     LEFT JOIN post_stats s ON s.post_id = p.id
-                     WHERE p.status = 'published' AND (p.published_at IS NULL OR p.published_at <= ?)
-                     ORDER BY p.published_at DESC 
+                     JOIN users u ON u.id = p.user_id
+                     WHERE p.status = 'published' AND p.published_at <= ?
+                     ORDER BY p.published_at DESC
                      LIMIT ?",
                     [$nowUtc, $postsLimit]
                 );
 
                 foreach ($posts as $post) {
-                    $postId = (string)$post['id'];
                     $slug = (string)$post['slug'];
+                    if ($slug === '') {
+                        continue;
+                    }
 
-                    // Cache por ID e por Slug
-                    $this->client->set("post:{$postId}", $post, 'posts', 43200);
-                    $this->client->set("post_slug:{$slug}", $post, 'posts', 43200);
+                    $this->client->set("post_slug:{$slug}", $post, 'post_items', 43200);
                     $postsCount++;
                 }
             } catch (Throwable) {}
         }
 
-        // 3. Aquecer Categorias
+        // 3. Aquecer Categorias Ativas (mesma chave/formato de public/index.php)
         if ($warmupCategories) {
             try {
-                $categories = Database::fetchAll("SELECT * FROM categories ORDER BY name ASC");
+                $categories = Database::fetchAll("SELECT * FROM categories WHERE is_active = 1 ORDER BY name ASC");
                 if (!empty($categories)) {
-                    $this->client->set('all_categories', $categories, 'categories', 86400);
+                    $activeCategoriesMap = [];
                     foreach ($categories as $cat) {
                         if (!empty($cat['slug'])) {
-                            $this->client->set("cat:{$cat['slug']}", $cat, 'categories', 86400);
+                            $activeCategoriesMap[(string)$cat['slug']] = $cat;
                             $categoriesCount++;
                         }
+                    }
+                    if (!empty($activeCategoriesMap)) {
+                        $this->client->set('all_active_categories', $activeCategoriesMap, 'categories', 86400);
                     }
                 }
             } catch (Throwable) {}

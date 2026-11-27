@@ -101,7 +101,9 @@ final class PluginManager
      */
     public static function getActivePluginSlugs(): array
     {
-        $raw = Settings::get('active_plugins', '[]');
+        $raw = Settings::hasCache()
+            ? Settings::get('active_plugins', '[]')
+            : Settings::getDirect('active_plugins', '[]');
         if (empty($raw)) {
             return [];
         }

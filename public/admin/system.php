@@ -93,16 +93,32 @@ $gdInfo = extension_loaded('gd') ? gd_info() : [];
 $hasWebp = !empty($gdInfo['WebP Support']);
 $hasAvif = !empty($gdInfo['AVIF Support']) || function_exists('imageavif');
 
-// 3. Status do OPcache e Hardening do Runtime PHP
+// 3. Status do OPcache, Redis e Hardening do Runtime PHP
 $opcacheData = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+$opcacheConfig = function_exists('opcache_get_configuration') ? @opcache_get_configuration() : false;
 $opcacheEnabled = is_array($opcacheData) && !empty($opcacheData['opcache_enabled']);
 $opcacheHitRate = null;
 $opcacheUsedMb = null;
 $opcacheTotalMb = null;
+$opcacheCachedScripts = null;
+$opcacheMaxFiles = null;
+$opcacheOomRestarts = 0;
+$opcacheFull = false;
+$opcacheInternedUsedMb = null;
+$opcacheInternedTotalMb = null;
+$opcacheValidateTimestamps = null;
+$opcacheRevalidateFreq = null;
 if ($opcacheEnabled) {
     if (isset($opcacheData['opcache_statistics']['opcache_hit_rate'])) {
         $opcacheHitRate = (float)$opcacheData['opcache_statistics']['opcache_hit_rate'];
     }
+    if (isset($opcacheData['opcache_statistics']['num_cached_scripts'])) {
+        $opcacheCachedScripts = (int)$opcacheData['opcache_statistics']['num_cached_scripts'];
+    }
+    if (isset($opcacheData['opcache_statistics']['oom_restarts'])) {
+        $opcacheOomRestarts = (int)$opcacheData['opcache_statistics']['oom_restarts'];
+    }
+    $opcacheFull = !empty($opcacheData['cache_full']);
     if (isset($opcacheData['memory_usage']['used_memory'], $opcacheData['memory_usage']['free_memory'])) {
         $usedBytes = (float)$opcacheData['memory_usage']['used_memory'];
         $freeBytes = (float)$opcacheData['memory_usage']['free_memory'];
@@ -110,7 +126,24 @@ if ($opcacheEnabled) {
         $opcacheUsedMb = round($usedBytes / 1048576, 1);
         $opcacheTotalMb = round(($usedBytes + $freeBytes + $wastedBytes) / 1048576, 1);
     }
+    if (isset($opcacheData['interned_strings_usage']['used_memory'], $opcacheData['interned_strings_usage']['buffer_size'])) {
+        $opcacheInternedUsedMb = round((float)$opcacheData['interned_strings_usage']['used_memory'] / 1048576, 1);
+        $opcacheInternedTotalMb = round((float)$opcacheData['interned_strings_usage']['buffer_size'] / 1048576, 1);
+    }
 }
+if (is_array($opcacheConfig) && isset($opcacheConfig['directives'])) {
+    $dirs = $opcacheConfig['directives'];
+    $opcacheMaxFiles = isset($dirs['opcache.max_accelerated_files']) ? (int)$dirs['opcache.max_accelerated_files'] : null;
+    $opcacheValidateTimestamps = isset($dirs['opcache.validate_timestamps']) ? (bool)$dirs['opcache.validate_timestamps'] : null;
+    $opcacheRevalidateFreq = isset($dirs['opcache.revalidate_freq']) ? (int)$dirs['opcache.revalidate_freq'] : null;
+}
+
+$realpathCacheSizeKb = function_exists('realpath_cache_size') ? round(realpath_cache_size() / 1024, 1) : null;
+$phpRedisLoaded = extension_loaded('redis');
+$redisPluginLoaded = ObjectCache::isAvailable();
+$redisConnected = $redisPluginLoaded && class_exists(\LightPress\Plugin\RedisCachePro\RedisCache::class, false)
+    ? \LightPress\Plugin\RedisCachePro\RedisCache::isConnected()
+    : false;
 
 $strictSessionMode = in_array(
     strtolower(trim((string)ini_get('session.use_strict_mode'))),
@@ -271,6 +304,41 @@ require __DIR__ . '/header.php';
                             <?php endif; ?>
                         <?php else: ?>
                             <span class="badge-warn">Desativado</span>
+                        <?php endif; ?>
+                    </span>
+                </div>
+                <?php if ($opcacheEnabled): ?>
+                <div class="info-row">
+                    <span>OPcache Scripts / OOM</span>
+                    <span>
+                        <?= $opcacheCachedScripts !== null ? number_format($opcacheCachedScripts, 0, ',', '.') : '?' ?><?= $opcacheMaxFiles !== null ? '/' . number_format($opcacheMaxFiles, 0, ',', '.') : '' ?> scripts
+                        <?php if ($opcacheFull || $opcacheOomRestarts > 0): ?>
+                            <span class="badge-err" style="margin-left: 0.35rem;">Cheio/OOM (<?= $opcacheOomRestarts ?>)</span>
+                        <?php else: ?>
+                            <span class="badge-ok" style="margin-left: 0.35rem;">Saudável</span>
+                        <?php endif; ?>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span>OPcache Interned / Revalidação</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);">
+                        <?= $opcacheInternedUsedMb !== null ? number_format($opcacheInternedUsedMb, 1, ',', '.') . '/' . number_format((float)$opcacheInternedTotalMb, 0, ',', '.') . ' MB' : 'N/A' ?>
+                        · <?= $opcacheValidateTimestamps ? ('revalidate=' . (int)$opcacheRevalidateFreq . 's') : 'validate=0 (deploy)' ?>
+                        <?= $realpathCacheSizeKb !== null ? ' · realpath ' . number_format($realpathCacheSizeKb, 0, ',', '.') . ' KB' : '' ?>
+                    </span>
+                </div>
+                <?php endif; ?>
+                <div class="info-row">
+                    <span>Redis Cache Pro (ObjectCache)</span>
+                    <span>
+                        <?php if ($redisConnected): ?>
+                            <span class="badge-ok">Conectado</span>
+                        <?php elseif ($redisPluginLoaded && !$phpRedisLoaded): ?>
+                            <span class="badge-err">Extensão phpredis ausente</span>
+                        <?php elseif ($redisPluginLoaded): ?>
+                            <span class="badge-warn">Desconectado / Fallback</span>
+                        <?php else: ?>
+                            <span class="badge-warn">Plugin Inativo</span>
                         <?php endif; ?>
                     </span>
                 </div>

@@ -135,6 +135,36 @@ class Settings
     }
 
     /**
+     * Indica se o cache estático em memória da requisição já foi populado.
+     */
+    public static function hasCache(): bool
+    {
+        return self::$cache !== null;
+    }
+
+    /**
+     * Lê uma única chave diretamente do banco sem acionar ObjectCache/getAll().
+     * Útil durante o bootstrap para evitar recursão antes do Redis estar conectado.
+     */
+    public static function getDirect(string $key, ?string $default = null): ?string
+    {
+        if (self::$cache !== null) {
+            return self::get($key, $default);
+        }
+
+        try {
+            $row = Database::fetchOne("SELECT `value` FROM `settings` WHERE `key` = ? LIMIT 1", [$key]);
+            if ($row && array_key_exists('value', $row) && (string)$row['value'] !== '') {
+                return self::decryptValue((string)$row['value']);
+            }
+        } catch (Throwable) {
+            // Fallback para default em caso de erro transitório
+        }
+
+        return $default;
+    }
+
+    /**
      * Carrega todas as configurações do banco com cache na mesma requisição.
      *
      * @return array<string, string>

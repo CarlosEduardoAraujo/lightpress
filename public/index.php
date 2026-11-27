@@ -434,80 +434,97 @@ $router->get('/busca/', function () use ($config): void {
     $totalPosts = 0;
 
     if (strlen($query) >= 2) {
-        // 1. Tenta busca FULLTEXT booleana de alta performance (InnoDB MySQL/MariaDB)
-        $driver = $config['database']['driver'] ?? 'mysql';
-        $boolQuery = '';
-        if ($driver === 'mysql') {
-            try {
-                $words = array_filter(preg_split('/\s+/', $query));
-                foreach ($words as $w) {
-                    $cleanW = preg_replace('/[+\-><()~*\"@]+/', '', $w);
-                    if (strlen($cleanW) >= 2) {
-                        $boolQuery .= "+{$cleanW}* ";
-                    }
-                }
-                $boolQuery = trim($boolQuery);
+        $fetchSearchPage = static function () use ($config, $query, $page, $perPage, $nowUtc, $searchTerm): array {
+            $driver = $config['database']['driver'] ?? 'mysql';
+            $boolQuery = '';
+            $totalPosts = 0;
 
-                if (!empty($boolQuery)) {
-                    $totalPosts = (int)Database::fetchValue(
-                        "SELECT COUNT(*)
+            if ($driver === 'mysql') {
+                try {
+                    $words = array_filter(preg_split('/\s+/', $query) ?: []);
+                    foreach ($words as $w) {
+                        $cleanW = preg_replace('/[+\-><()~*\"@]+/', '', $w);
+                        if (strlen($cleanW) >= 2) {
+                            $boolQuery .= "+{$cleanW}* ";
+                        }
+                    }
+                    $boolQuery = trim($boolQuery);
+
+                    if (!empty($boolQuery)) {
+                        $totalPosts = (int)Database::fetchValue(
+                            "SELECT COUNT(*)
+                             FROM posts p
+                             WHERE p.status = 'published' AND p.published_at <= ?
+                               AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)",
+                            [$nowUtc, $boolQuery]
+                        );
+                    }
+                } catch (\Throwable) {
+                    $totalPosts = 0;
+                }
+            }
+
+            $useLike = false;
+            if ($totalPosts === 0) {
+                $totalPosts = (int)Database::fetchValue(
+                    "SELECT COUNT(*)
+                     FROM posts p
+                     WHERE p.status = 'published' AND p.published_at <= ? 
+                       AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)",
+                    [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
+                );
+                $useLike = true;
+            }
+
+            $totalPages = (int)ceil($totalPosts / $perPage);
+            if ($page > max(1, $totalPages)) {
+                return ['total' => $totalPosts, 'posts' => [], 'out_of_range' => true];
+            }
+
+            $offset = ($page - 1) * $perPage;
+            $posts = [];
+
+            if ($totalPosts > 0) {
+                if (!$useLike && !empty($boolQuery)) {
+                    $posts = Database::fetchAll(
+                        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
                          FROM posts p
+                         LEFT JOIN users u ON u.id = p.user_id
                          WHERE p.status = 'published' AND p.published_at <= ?
-                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)",
-                        [$nowUtc, $boolQuery]
+                           AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
+                         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                        [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
+                    );
+                } else {
+                    $posts = Database::fetchAll(
+                        "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
+                         FROM posts p
+                         LEFT JOIN users u ON u.id = p.user_id
+                         WHERE p.status = 'published' AND p.published_at <= ? 
+                           AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
+                         ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
+                        [$nowUtc, $searchTerm, $searchTerm, $searchTerm, (int)$perPage, (int)$offset]
                     );
                 }
-            } catch (\Throwable) {
-                $totalPosts = 0;
             }
-        }
 
-        // 2. Fallback via LIKE caso o FULLTEXT não retorne resultados ou o driver seja SQLite
-        $useLike = false;
-        if ($totalPosts === 0) {
-            $totalPosts = (int)Database::fetchValue(
-                "SELECT COUNT(*)
-                 FROM posts p
-                 WHERE p.status = 'published' AND p.published_at <= ? 
-                   AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)",
-                [$nowUtc, $searchTerm, $searchTerm, $searchTerm]
-            );
-            $useLike = true;
-        }
+            return ['total' => $totalPosts, 'posts' => $posts, 'out_of_range' => false];
+        };
 
-        $totalPages = (int)ceil($totalPosts / $perPage);
-        if ($page > max(1, $totalPages)) {
+        $searchCacheKey = 'web_search:' . md5(mb_strtolower($query) . ":{$page}:{$perPage}");
+        $searchResult = ($page <= 5)
+            ? ObjectCache::remember($searchCacheKey, 60, $fetchSearchPage, 'posts')
+            : $fetchSearchPage();
+
+        if (!empty($searchResult['out_of_range'])) {
             http_response_code(404);
             $pageTitle = "Página Não Encontrada - " . $config['app']['name'];
             require ThemeManager::getTemplateFile('404.php');
             return;
         }
 
-        $offset = ($page - 1) * $perPage;
-
-        if ($totalPosts > 0) {
-            if (!$useLike && !empty($boolQuery)) {
-                $posts = Database::fetchAll(
-                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-                     FROM posts p
-                     LEFT JOIN users u ON u.id = p.user_id
-                     WHERE p.status = 'published' AND p.published_at <= ?
-                       AND MATCH(p.title, p.summary, p.tags) AGAINST(? IN BOOLEAN MODE)
-                     ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-                    [$nowUtc, $boolQuery, (int)$perPage, (int)$offset]
-                );
-            } else {
-                $posts = Database::fetchAll(
-                    "SELECT p.id, p.slug, p.title, p.summary, p.category, p.tags, p.featured_image, p.published_at, u.name AS author_name
-                     FROM posts p
-                     LEFT JOIN users u ON u.id = p.user_id
-                     WHERE p.status = 'published' AND p.published_at <= ? 
-                       AND (p.title LIKE ? OR p.summary LIKE ? OR p.tags LIKE ?)
-                     ORDER BY p.published_at DESC LIMIT ? OFFSET ?",
-                    [$nowUtc, $searchTerm, $searchTerm, $searchTerm, (int)$perPage, (int)$offset]
-                );
-            }
-        }
+        $totalPosts = (int)($searchResult['total'] ?? 0);
+        $posts = is_array($searchResult['posts'] ?? null) ? $searchResult['posts'] : [];
     } else {
         $totalPages = 0;
         if ($page > 1) {
